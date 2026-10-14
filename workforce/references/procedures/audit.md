@@ -2263,7 +2263,7 @@ byte-identical to the one already in place. **It never commits.** Report the uns
 only this clone is healed.
 
 **Nothing here needs typing in the ordinary case.** The same function runs at SessionStart from
-`wf-commitments`, so a project heals the first time anybody opens it after the scripts land (the
+`wf-heal`, so a project heals the first time anybody opens it after the scripts land (the
 2026-09-07 directive, "the next use of workforce will heal the situation"). This step is where an audit
 confirms it happened and reports what is still unstaged.
 

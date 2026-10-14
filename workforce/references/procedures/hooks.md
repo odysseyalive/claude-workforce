@@ -43,8 +43,7 @@ detection at the next command, and the user's first directive is the thing it pr
 | `wf-code-origin` | `PreToolUse` | `Edit\|Write\|MultiEdit\|NotebookEdit` | before an edit, reports which lines of the file are human, AI, or unknown by git history, so the precedence `USER_WORDS` states (human code decides how new code is written; AI code ranks below it even when newer) arrives at the edit instead of relying on a look-up a long session skips. A commit carrying a Claude Code marker is AI; one dated before the repository's first marked commit is human; an unmarked commit after that is unknown until the user settles it once in `.claude/code-origin.json`. A new file gets the human-created files beside it. Context only: never denies, silent outside git. |
 | `wf-artifact-style` | `PreToolUse` | `Artifact` | the house style for a shareable online artifact, arriving before the page is written. On `quickstart` it emits the instruction to load the `shared-artifact` skill plus the routing rule (a polished read-only page goes to HTML with intent `"other"`; Claude Docs only when co-editing is the point, because the Docs viewer owns heading styles). On a publish of a local `.html` it reads the page and **denies** one missing the floor — `:root` colour tokens, a `prefers-color-scheme: dark` block guarded by `:root:not([data-theme="light"])` or equivalently overridden by `:root[data-theme="light"]`, a `:root[data-theme="dark"]` block, an explicit `body` background, a non-empty `<title>`, and a viewport meta where the page declares its own `<head`. The reason names each missing item and the one action that fixes them all. A width media query is named and never blocked. Silent on `read`/`list`/`comments`, on an asset, and on anything it cannot read; registered on `PreToolUse` because that event fires in spawned employees too, and "workforce decides to generate one" happens inside an agent that never saw the user's message. MEASURED against seven published artifact pages on the maintainer's machine: 7 of 7 pass the floor, 0 wrong fires. |
 | `wf-widen-agent` | `Stop` | *(none)* | **the only hook here that ACTS.** A `type: "agent"` hook, not a command — it spawns a reader with Read and Bash and none of the finishing turn's context, opens the sense `wf-widen` flagged as unopened, and returns what it found as the next instruction. Returns `ok: true` and spends nothing when there is no flag. § The widen below |
-| `wf-commitments` | `Stop` | *(none)* | records what the turn said it would do NEXT — a stated intention is a debt, and this is the one queue nobody was keeping. Records and reports; never blocks, never judges whether an item is done. § The commitment ledger below |
-| `wf-commitments` | `SessionStart` | *(none)* | reads that ledger back before the first request of the next session, so a debt stated on Monday is still visible on Tuesday. It also runs the settings heal for the project it fired in (§ Healing), because this is the one registration that fires once per session in every project. |
+| `wf-heal` | `SessionStart` | *(none)* | runs the settings heal for the project it fired in (§ Healing), because this is the one registration that fires once per session in every project; also removes the retired `.claude/workforce/commitments.json`. It replaced `wf-commitments` on 2026-10-14, whose list of what turns said they would do became the `noted` lines under ISSUES (`wf-widen`). |
 | `wf-org-sync` | `PostToolUse` | `Edit\|Write\|MultiEdit\|NotebookEdit\|Bash` | **keeps an org chart that already EXISTS current with the files on disk, so nobody has to type `org index` to make a new agent dispatchable.** Appends an ADOPTED `## Roster` row for an agent in `.claude/agents/**` the chart does not list (`org.md` step 1a), marks a charted row whose file is gone `GHOST` (`org.md` step 4), and rewrites one marker-delimited `## Skills` list from `.claude/skills/*/SKILL.md`. It is **not an index**: it computes no tier, department, manager, fan-out or stamp, and it never touches the `Generated:` line — a separate `Synced:` line records this pass, and it is written only beside a real change, so a run with nothing to do writes nothing and a second run is byte-for-byte identical. `Bash` is in the matcher because a `cp`, a `mv` or a `git pull` adds an agent exactly as a `Write` does. Never creates a chart (`bin/sync`'s rule — never materialize an org nobody built), and that absent-chart `lstat` is also what makes it cheap enough to run on every call. § The org sync below |
 | `wf-org-sync` | `SessionStart` | *(none)* | the same sync for everything that happened while nobody was looking — another session, a checkout, a sibling clone. A `PostToolUse`-only registration can only see writes made in front of it. |
 | `wf-turn-budget` | `PostToolUse` | `*` | **tells a capped employee it is near its turn limit, once, while it still has turns to write with.** MEASURED in odyssey-alive session `52aabcb1` (2026-10-12): of 18 dispatches, the 2 that hit `maxTurns` were both build orders, both had already finished and verified their main work, and both returned **no report at all** — the run ends mid-sentence and the manager gets nothing to read. At 80% of the agent's `maxTurns` it injects one instruction: start no new work, write `OUTPUT.md` with every exit criterion MET or UNMET, write the seven-section continuation brief at `HANDOFF.md`, return `HANDOFF <path>` — which is the verdict `org.md` rung 12b acts on. A second injection at `maxTurns − 3` says return now with what exists, writing both files in ONE turn as parallel `Write` calls and replying with the verdict on the next — measured in commit `d782174`'s end-to-end run, at `maxTurns − 2` the agent spent both remaining turns writing a file each and the verdict never reached the manager. Each fires at most once, claimed with `O_CREAT\|O_EXCL` because parallel calls in one turn run this hook concurrently. It counts **TURNS, not calls** — assistant messages carrying a `tool_use`, read from the subagent's own transcript at `<session>/subagents/agent-<agent_id>.jsonl` from a stored byte offset — because parallel calls share a turn and two measured report orders ran 42 and 44 calls inside a 40-turn cap and both finished. Silent for the main thread (no `agent_id`), for an agent hook's own agent (`agent_id`, no `agent_type`), for an agent with no handbook, and for one with no `maxTurns` (every Lead). The counter is scratch under `$TMPDIR`, never in the project. § The turn budget below |
@@ -235,7 +234,7 @@ failing on every prompt and tool call.
 
 | Caller | Reaches |
 |---|---|
-| `wf-commitments` at `SessionStart` | every project, the first time anyone opens it after the files land. No audit, no typed command, no new wiring |
+| `wf-heal` at `SessionStart` | every project, the first time anyone opens it after the files land. No audit, no typed command, no new wiring |
 | `wf-settings-apply --root <tree> --heal --execute` | what `verify` § Hook wiring runs before it counts |
 | `--wire-defaults` | the installer and `audit` Step 6-H, before they wire |
 
@@ -661,33 +660,25 @@ its context exhausted (`e06d730`). The injected text says so, because an agent t
 be replaced writes a brief for a stranger rather than a checkpoint for itself, and a capped agent
 cannot know which of the two is coming unless this text tells it.
 
-## The commitment ledger
+## Noted intentions — what a turn said it would do next
 
-**The defect this closes sits one level above every other hook here, and it is measured.**
-The user set a goal — *"don't stop until what I asked for is done completely"* — and the
-next turn answered with a list: wire the tag into `wf-widen`, the manifest, the hook set,
-docs, assertions, fixtures, then run every suite. Every item shipped. All four suites went
-green. The goal's condition held and it cleared, correctly. **And the work was still half
-done**, because the list omitted the acting half of the mechanism being built.
+**Why it exists.** A list a turn writes for itself inherits whatever that turn left out, so a
+plan stated out loud is kept rather than trusted: `wf-widen` reads each reply at `Stop` for
+sentences that state what comes next ("I'll merge it and report when the reviewer finishes")
+and records them on the issue being worked, under `noted`, shown as lowercase `noted` lines
+under ISSUES.
 
-**The defect is the list, not the goal.** A goal takes its definition of "done" from a list
-written inside the same head that is tunneling, so it inherits whatever that head left out.
-Checking the list is the tunnel grading its own homework against an answer key it wrote.
+**Noted is never a verdict.** A captured sentence is a reading, not something the session
+wrote, and the ledger never infers an undone item, so nothing that judges an issue reads
+`noted` — it can never produce KICKBACK, HOLD or a resume. The session turns one into a real,
+closable item by writing it to its asks checklist.
 
-**What can be mechanised is narrower, and still worth having.** Nothing on the machine knows
-whether the right list was written. What it can hold is that **a list stated out loud is a
-debt that must not evaporate silently** — recorded at `Stop`, surviving the session, read
-back at `SessionStart`. It cannot make a list complete. It stops an incomplete one from
-being quietly forgotten, which is the failure that actually happened.
-
-**It is `SKILL.md`'s deferment-queue directive pointed at the operator.** *"all items in the
-deferment queue should be resolved one by one ... NO EXCEPTIONS! NO BLOCKS! NO EXCUSES!"*
-was written about a run's deferred findings; this is the same rule applied to the queue of
-things the operator said it would do next.
-
-**It never judges whether an item is done.** That is a judgment, and a regex making it would
-close debts that are still open — the worse of the two errors, because an item wrongly
-closed is invisible while an item wrongly kept is one line a reader dismisses.
+**What it replaced, 2026-10-14.** Until then `wf-commitments` kept these in a separate
+per-project list, `.claude/workforce/commitments.json`, read back at every session start and
+never closed. Measured that day: 40 entries, most of them fragments ("lands:"), reports, or
+repeats, all open. The user: *"Retire it, fold in."* The capture now drops questions, lead-ins
+ending in a colon, table rows and quoted text, merges repeats, and keeps at most 10 per issue.
+`wf-heal` deletes the old file at the next session start.
 
 ## The turn ledger
 
@@ -764,7 +755,7 @@ On a mismatch it re-reads once after 500ms, because the host flushes the transcr
 Still unmatched, the Stop is a side query and not the end of a turn: `wf-widen` blocks on nothing,
 raises no flag, hands no checklist over and prints only the reply's length. It removes an earlier
 Stop's flag once the transcript holds a `stop_hook_summary` row newer than the flag, so the widening
-agent never judges one flag twice (`references/senses.md`). `wf-commitments` records nothing, and the
+agent never judges one flag twice (`references/senses.md`). Nothing is noted and the
 ledger skips its reply scans. On `SubagentStop` the transcript is
 `agent_transcript_path`, because `transcript_path` there is the parent's. Over 1,069 genuine final
 replies on this machine (890 Stops, 179 subagents) the rule rejected none. With no field, only text

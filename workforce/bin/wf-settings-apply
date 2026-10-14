@@ -31,7 +31,7 @@ audit-setup.md` § 856 said this producer "could be built"; it is built.
                         workforce hook rows whose script the distribution RETIRED
                         (`RETIRED_HOOKS`) and whose install is present and whole. Never a
                         live row, never a user-scope file (see `heal`). The same function
-                        runs at SessionStart from `wf-commitments`, so a project heals on
+                        runs at SessionStart from `wf-heal`, so a project heals on
                         first use without anybody typing this. It also runs the GIT half
                         (`heal_git_hooks`): the retired pin guard wired `core.hooksPath`
                         at a directory in the repository rather than a settings row, and
@@ -169,14 +169,11 @@ SHIPPED_HOOKS = {
     # this one spawns a reader and opens the channel the turn left shut. Config shape is
     # in AGENT_HOOKS below — it is registered as `type: "agent"`, not `command`.
     "wf-widen-agent": ("Stop", None),
-    # THE DEBT LEDGER, ON BOTH ENDS OF A SESSION. `Stop` records what a turn said it
-    # would do next; `SessionStart` reads it back before the first request of the next
-    # session. Registered twice for the same reason the ledger is: a stated intention
-    # that disappears between sessions is how work gets left half finished, and the
-    # gap it closes is measured — a goal whose condition held while the work was still
-    # half done, because the list it checked was written by the head that was tunneling.
-    "wf-commitments": ("Stop", None),
-    "wf-commitments@sessionstart": ("SessionStart", None),
+    # THE PROJECT HEAL, ONCE PER SESSION IN EVERY PROJECT: retired hook rows, the retired
+    # pin guard's git hook, machine-owned regions, the retired commitments ledger. It rode
+    # `wf-commitments@sessionstart` until that list was retired (user, 2026-10-14: "Retire
+    # it, fold in"); its Stop capture now lands on the issue ledger in `wf-widen`.
+    "wf-heal": ("SessionStart", None),
     # THE ORG CHART, KEPT CURRENT WITHOUT ANYONE TYPING `org index`. User request
     # 2026-10-08: "when new skills, agents, etc are added into any project, automatically
     # the existing project org index needs updated". `org index` is a procedure a model
@@ -354,10 +351,10 @@ DEFAULT_HOOKS = tuple(n for n in sorted(SHIPPED_HOOKS) if n not in OPT_IN_HOOKS)
 # shipped hook in every one of those cases, with nothing to put it back (independent
 # review, 2026-09-14).
 RETIRED_HOOKS = frozenset({
-    "wf-budget-guard", "wf-effort-budget", "wf-handoff", "wf-ledger-capture",
-    "wf-ledger-open", "wf-loop-guard", "wf-model-budget", "wf-pin-check",
-    "wf-plain-guard", "wf-speak-guard", "wf-standing-request", "wf-turn-brief",
-    "wf-unique-persona",
+    "wf-budget-guard", "wf-commitments", "wf-effort-budget", "wf-handoff",
+    "wf-ledger-capture", "wf-ledger-open", "wf-loop-guard", "wf-model-budget",
+    "wf-pin-check", "wf-plain-guard", "wf-speak-guard", "wf-standing-request",
+    "wf-turn-brief", "wf-unique-persona",
 })
 # The scripts a complete, current install holds. A missing retired script proves
 # retirement only when the install it would live in is present and whole.
@@ -1742,7 +1739,7 @@ def heal(root, execute, quiet=False, progress=None):
     census counted 38 dead rows across six projects on one workstation, from two config
     roots, each failing on every prompt and tool call.
 
-    THREE CALLERS, ONE RULE: `wf-commitments` at SessionStart (every project, first
+    THREE CALLERS, ONE RULE: `wf-heal` at SessionStart (every project, first
     use), `--heal` (`verify` § Hook wiring), and `--wire-defaults` (installer, `audit`).
     `wf-apply`'s PASS-DEAD-HOOK decides workforce rows through the same verdict.
 
@@ -1811,10 +1808,10 @@ def heal(root, execute, quiet=False, progress=None):
 # mechanism has to reach the projects that already have it — user directive 2026-09-07,
 # "the next use of workforce will heal the situation".
 #
-# IT RIDES THE EXISTING HEAL: no new hook, no settings write. `wf-commitments` already
-# hosts the per-project retired-mechanism heal at SessionStart and its docstring says why
-# ("a new hook would also need a settings write before it ran anywhere"), so this is a
-# second half of one classifier rather than a second carrier. `--heal` runs both halves,
+# IT RIDES THE EXISTING HEAL: no new hook, no settings write. The SessionStart carrier
+# (`wf-heal` since 2026-10-14) already hosts the per-project retired-mechanism heal, and a
+# new hook would also need a settings write before it ran anywhere, so this is a second
+# half of one classifier rather than a second carrier. `--heal` runs both halves,
 # `verify` and `audit` get it through the `--heal` they already run, and every machine
 # picks it up on the next `update` or `bin/sync`.
 
@@ -1851,7 +1848,7 @@ GIT_VERBS = {"copy": ("would copy", "copied", "+"),
 
 def _git(root, *args):
     """`(returncode, stdout)`. NEVER RAISES: git may be absent, and this runs from the
-    SessionStart hook that must go on regardless (`wf-commitments.heal_settings`)."""
+    SessionStart hook that must go on regardless (`wf-heal.heal_settings`)."""
     import shutil
     import subprocess
     if not shutil.which("git"):
@@ -2231,7 +2228,7 @@ def _git_apply(out, root, owned_path, progress):
     for kind, src, dst, _text in out["plan"]:
         # WHAT THIS ACTION WROTE, not what any earlier one did: a bare
         # `progress["wrote"].append(out["changed"][-1])` re-appended the previous path on
-        # every action that writes no file (the config restore), and `wf-commitments`'
+        # every action that writes no file (the config restore), and `wf-heal`'s
         # HEAL INTERRUPTED line reads that list back to the user.
         before = len(out["changed"])
         try:

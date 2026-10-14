@@ -92,7 +92,7 @@
   },
   "commitments-heals-git-hook": {
     "_why": "THE CARRIER FOR THE GIT HALF. The SessionStart registration every default install already has reaches a stranded repository with no audit, no typed command and no settings write -- the 2026-09-07 directive, the next use of workforce heals it. This tree has NO settings file at all, which is the point: the settings half's own gate ends on the first read here, so a git half placed behind it would never fire. The hook still exits 0 and still speaks JSON.",
-    "script": "wf-commitments",
+    "script": "wf-heal",
     "stdin_raw": "{\"cwd\": \".\", \"hook_event_name\": \"SessionStart\", \"source\": \"startup\"}",
     "exit": 0,
     "git": {
@@ -1473,7 +1473,7 @@
   },
   "commitments-region-refreshed": {
     "_why": "K9, 2026-10-12. The user asked \"I don't have to run an audit after this update, correct?\" and until this the answer was that they did: a project's /org dispatch rungs are a byte-canonical region copied into its own SKILL.md, and the only producer was `wf-companion --execute`, which only audit Step 4 runs. So a rung a release changed reached nobody who did not audit. The SessionStart carrier now refreshes it, through wf-companion's own refresh_drifted -- the same evaluate, the same write, the same read-back -- so only the span between the markers moves. The preamble above it and the trailer below it are asserted byte-for-byte, because a heal that 'won' by rewriting the file would take a project's own text with it. The stamp is written so the next session start costs two directory listings and no import.",
-    "script": "wf-commitments",
+    "script": "wf-heal",
     "stdin_raw": "{\"cwd\": \".\", \"hook_event_name\": \"SessionStart\", \"source\": \"startup\"}",
     "exit": 0,
     "want": [
@@ -1502,172 +1502,6 @@
         "want": []
       }
     }
-  },
-  "commitments-ignore-rule": {
-    "_why": "K7, 2026-10-12. The ledger is git-tracked in nsayka-wawa and odyssey-alive, and on 2026-10-10 a local edit to the copy on nsayka-wawa's live server would have made `git pull --ff-only` conflict. The rule that stops it rides the WRITE, because the ledger is created by a hook that runs long before anybody types a workforce command -- an audit-authored rule arrives after the file has been committed, which is how both of those projects got there. It covers commitments.json and nothing else: the user, 2026-10-12, \"some projects actually do ship their Claude directory with the repository\", so the rest of .claude/workforce/ stays theirs to commit. The hand-written rule above it is asserted byte-for-byte and the ledger's own rule exactly once, because an appender that runs on every turn is one duplicated line away from a file nobody can read.",
-    "script": "wf-commitments",
-    "stdin_raw": "{\"cwd\": \".\", \"hook_event_name\": \"Stop\", \"timestamp\": \"2026-10-12T10:00:00Z\", \"last_assistant_message\": \"Next, I will wire the ignore rule and then run the suite.\"}",
-    "exit": 0,
-    "want": [
-      "COMMITMENTS",
-      "stated this turn"
-    ],
-    "not": [
-      "Traceback"
-    ],
-    "after": {
-      ".claude/workforce/.gitignore": {
-        "want": [
-          "# This project's own rule, written by hand. It must survive byte-for-byte.",
-          "scratch/",
-          "Written by the workforce commitments hook"
-        ],
-        "once": [
-          "commitments.json"
-        ],
-        "not": [
-          ".claude/",
-          "\nworkforce/",
-          "\n*\n"
-        ]
-      },
-      ".claude/workforce/commitments.json": {
-        "want": [
-          "wire the ignore rule"
-        ]
-      }
-    }
-  },
-  "commitments-ledger-tracked": {
-    "_why": "K7's other half. An ignore rule does nothing for a file git already tracks, and this is the shape measured in two projects on 2026-10-12: the ledger committed, no rule, because there was none to stop it. Untracking is one command, it belongs in a commit the project's author makes with their own message, and A HOOK DOES NOT STAGE OR COMMIT IN SOMEBODY ELSE'S REPOSITORY -- so the session start names the command and stops. The absent .gitignore is the assertion that it stopped: the rule rides the ledger WRITE and a SessionStart writes nothing into the repository at all.",
-    "script": "wf-commitments",
-    "stdin_raw": "{\"cwd\": \".\", \"hook_event_name\": \"SessionStart\", \"source\": \"startup\"}",
-    "exit": 0,
-    "git": {
-      "init": true,
-      "commit": true
-    },
-    "want": [
-      "LEDGER TRACKED",
-      "git rm --cached .claude/workforce/commitments.json",
-      "this hook stages nothing and commits nothing",
-      "1 thing(s) a previous turn in this project said it would"
-    ],
-    "not": [
-      "Traceback"
-    ],
-    "after": {
-      ".claude/workforce/.gitignore": {
-        "absent": true
-      },
-      ".claude/workforce/commitments.json": {
-        "want": [
-          "wire the tag into wf-widen"
-        ]
-      }
-    }
-  },
-  "commitments-ledger-untracked": {
-    "_why": "The clean half, and the one that keeps the answer honest. Same ledger, same kind of repository, never committed: the path is not an entry in .git/index, which the hook parses itself, so nothing is said. A line that appears in a healthy project is a line every reader learns to skip, which is the whole value of the one above. The read-back line is asserted to prove the hook did its ordinary job here rather than bailing out early.",
-    "script": "wf-commitments",
-    "stdin_raw": "{\"cwd\": \".\", \"hook_event_name\": \"SessionStart\", \"source\": \"startup\"}",
-    "exit": 0,
-    "git": {
-      "init": true
-    },
-    "want": [
-      "1 thing(s) a previous turn in this project said it would"
-    ],
-    "not": [
-      "LEDGER TRACKED",
-      "git rm --cached",
-      "Traceback"
-    ]
-  },
-  "commitments-fsmonitor-never-run": {
-    "_why": "A SECURITY FINDING, MEASURED. Asking `git ls-files` meant running git inside a directory whose own .git/config git then reads, and several config keys name an executable git runs for it. Measured 2026-10-12 on git 2.55.0: with core.fsmonitor set to a command in a repository's LOCAL config, `git ls-files --error-unmatch -- <path>` executed that command. This hook fires at the start of every session in every project with nobody watching, so opening a repository somebody else prepared ran their command. The marker that command would create is asserted ABSENT, and the tracked-ledger line is asserted PRESENT in the same case, because a fix that answered the question by saying nothing would pass the first half and lose the feature. The answer now comes out of .git/index, which the hook parses itself.",
-    "script": "wf-commitments",
-    "stdin_raw": "{\"cwd\": \".\", \"hook_event_name\": \"SessionStart\", \"source\": \"startup\"}",
-    "exit": 0,
-    "git": {
-      "init": true,
-      "commit": true,
-      "config": {
-        "core.fsmonitor": "touch '${TREE}/FSMONITOR-RAN' ; false"
-      }
-    },
-    "want": [
-      "LEDGER TRACKED",
-      "git rm --cached .claude/workforce/commitments.json",
-      "1 thing(s) a previous turn in this project said it would"
-    ],
-    "not": [
-      "Traceback"
-    ],
-    "after": {
-      "FSMONITOR-RAN": {
-        "absent": true
-      }
-    }
-  },
-  "commitments-gitignore-link-unchanged": {
-    "_why": "CWE-59, the TOCTOU half. The ignore rule rides the ledger write, so it is appended by a hook that runs on every turn with nobody watching, at a path anyone who has seen one workforce project can predict. An append follows a symlink, so a link planted at `.claude/workforce/.gitignore` sends the note and the rule wherever it points. `os.path.islink(p)` and then `open(p, \"a\")` resolve that name twice and a link planted between the two calls is followed; the open itself has to refuse, which is what O_NOFOLLOW does. The link's target is asserted byte-unchanged, and the LEDGER is asserted written in the same case: refusing the rule is not refusing the turn.",
-    "script": "wf-commitments",
-    "stdin_raw": "{\"cwd\": \".\", \"hook_event_name\": \"Stop\", \"timestamp\": \"2026-10-12T10:00:00Z\", \"last_assistant_message\": \"Next, I will parse the index instead of asking git, and then run the suite.\"}",
-    "exit": 0,
-    "git": {
-      "init": true,
-      "links": {
-        ".claude/workforce/.gitignore": "../../decoy.md"
-      }
-    },
-    "want": [
-      "COMMITMENTS",
-      "stated this turn"
-    ],
-    "not": [
-      "Traceback"
-    ],
-    "after": {
-      "decoy.md": {
-        "want": [
-          "DECOY TARGET"
-        ],
-        "not": [
-          "Written by the workforce commitments hook",
-          "commitments.json\n"
-        ]
-      },
-      ".claude/workforce/commitments.json": {
-        "want": [
-          "parse the index instead of asking git"
-        ]
-      }
-    }
-  },
-  "commitments-records-a-list": {
-    "_why": "THE MEASURED CASE, verbatim in shape. A goal was set, the next turn answered with this list, every item shipped, all four suites went green, the goal cleared - and the work was half done, because the list omitted the acting half. The ledger cannot make a list complete; it stops an incomplete one from evaporating.",
-    "exit": 0,
-    "script": "wf-commitments",
-    "stdin_raw": "{\"cwd\": \".\", \"hook_event_name\": \"Stop\", \"timestamp\": \"2026-09-09T10:00:00Z\", \"last_assistant_message\": \"Goal understood. I will wire the tag into wf-widen, manifest, hook set, docs, assertions, fixtures, then run every suite.\"}",
-    "want": [
-      "COMMITMENTS",
-      "stated this turn"
-    ]
-  },
-  "commitments-ignores-a-report": {
-    "_why": "Past tense is a report and future tense is a debt; only a debt can go unpaid. A ledger that recorded finished work would fill with noise and be skimmed, which costs the attention it exists to buy.",
-    "exit": 0,
-    "script": "wf-commitments",
-    "stdin_raw": "{\"cwd\": \".\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"Wired the manifest and ran the check. 1150 passed.\"}",
-    "want": []
-  },
-  "commitments-reads-back": {
-    "_why": "A ledger written and never read is the orphan hand-off the detector-ships-with-its-actor check refuses. SessionStart is where a debt stated in a previous session becomes visible again, before the first request.",
-    "exit": 0,
-    "script": "wf-commitments",
-    "stdin_raw": "{\"cwd\": \".\", \"hook_event_name\": \"SessionStart\", \"source\": \"startup\"}",
-    "want": []
   },
   "conform-adopted": {
     "exit": 0,
@@ -5287,7 +5121,7 @@
     },
     "exit": 0,
     "want": [
-      "wf-commitments already registered on Stop in",
+      "wf-heal already registered on SessionStart in",
       "wf-protect-directives already registered on PostToolUse in",
       "wf-task-tag already registered on UserPromptSubmit in",
       "wf-turn-ledger@subagent already registered on SubagentStop in",
@@ -5297,7 +5131,7 @@
       "~ wf-widen-agent  Stop  would register"
     ],
     "not": [
-      "~ wf-commitments  Stop",
+      "~ wf-heal  SessionStart",
       "~ wf-protect-directives  PostToolUse",
       "~ wf-widen  Stop",
       "verified on disk"
@@ -5788,7 +5622,7 @@
   },
   "commitments-heals-at-sessionstart": {
     "_why": "THE CARRIER. The SessionStart registration every default install already has removes a retired row with no audit and no typed command \u2014 the 2026-09-07 directive: the next use of workforce heals it. The hook still exits 0 and speaks JSON, and the user's own row beside it stays.",
-    "script": "wf-commitments",
+    "script": "wf-heal",
     "stdin_raw": "{\"cwd\": \".\", \"hook_event_name\": \"SessionStart\", \"source\": \"startup\"}",
     "exit": 0,
     "want": [
@@ -5818,7 +5652,7 @@
   },
   "commitments-heal-concurrent": {
     "_why": "Eight sessions starting at once in one project. MEASURED before the lock: 19 of 40 such starts appended the same removal twice, and disband would then write the row back twice. Under the directory lock the first heals and the rest find nothing, so the record holds it exactly once.",
-    "script": "wf-commitments",
+    "script": "wf-heal",
     "stdin_raw": "{\"cwd\": \".\", \"hook_event_name\": \"SessionStart\", \"source\": \"startup\"}",
     "concurrent": 8,
     "exit": 0,
@@ -5865,7 +5699,7 @@
   },
   "commitments-sessionstart-clean": {
     "_why": "The clean half of the pair. Settings that name workforce, so the gate opens and the classifier runs, holding only a live project-install row and the user's own hook: nothing is removed, nothing is said, the file is untouched. A heal that spoke or wrote here would do it in every healthy project on every session.",
-    "script": "wf-commitments",
+    "script": "wf-heal",
     "stdin_raw": "{\"cwd\": \".\", \"hook_event_name\": \"SessionStart\", \"source\": \"startup\"}",
     "env": {
       "CLAUDE_CONFIG_DIR": "${TREE}/nocfg"
@@ -6224,7 +6058,7 @@
   },
   "commitments-heal-failure-first": {
     "_why": "A read-only settings file holding a retired row, at the first session start that sees it: HEAL FAILED names the real cause, and the notice records the file's state so the next session does not say it again.",
-    "script": "wf-commitments",
+    "script": "wf-heal",
     "stdin_raw": "{\"cwd\": \".\", \"hook_event_name\": \"SessionStart\", \"source\": \"startup\"}",
     "chmod": {
       ".claude/settings.local.json": "0444"
@@ -6250,7 +6084,7 @@
   },
   "commitments-heal-failure-once": {
     "_why": "The next session start over the SAME file state (round-one partial #4): silent. It used to print HEAL FAILED at every session start forever, with nothing the user could do but make the file writable.",
-    "script": "wf-commitments",
+    "script": "wf-heal",
     "stdin_raw": "{\"cwd\": \".\", \"hook_event_name\": \"SessionStart\", \"source\": \"startup\"}",
     "chmod": {
       ".claude/settings.local.json": "0444"
@@ -6283,16 +6117,14 @@
   },
   "commitments-heal-bad-notice": {
     "_why": "A non-UTF-8 .heal-notice (review 3, L1, reproduced): it raised UnicodeDecodeError out of the SessionStart hook, exit 1, and the commitment ledger's read-back never printed. An unreadable notice is an absent one, the heal path cannot fail the hook, and the ledger still reads back.",
-    "script": "wf-commitments",
+    "script": "wf-heal",
     "stdin_raw": "{\"cwd\": \".\", \"hook_event_name\": \"SessionStart\", \"source\": \"startup\"}",
     "chmod": {
       ".claude/settings.local.json": "0444"
     },
     "exit": 0,
     "want": [
-      "HEAL FAILED",
-      "thing(s) a previous turn in this project said it would do",
-      "wire the heal into the release notes"
+      "HEAL FAILED"
     ],
     "not": [
       "Traceback",
@@ -6439,7 +6271,7 @@
   },
   "commitments-heal-notice-cleared": {
     "_why": "The notice is not residue (review 3, L6): once nothing is failing \u2014 here the heal succeeds \u2014 it is removed.",
-    "script": "wf-commitments",
+    "script": "wf-heal",
     "stdin_raw": "{\"cwd\": \".\", \"hook_event_name\": \"SessionStart\", \"source\": \"startup\"}",
     "exit": 0,
     "want": [
@@ -6489,7 +6321,7 @@
   },
   "commitments-heal-bom-skipped": {
     "_why": "A settings file with a byte-order mark is not strict JSON, so the heal cannot read it (review 3, L8). It was skipped in silence at every session start, and the retired row in it stayed forever. Now it is said, once for this state of the file.",
-    "script": "wf-commitments",
+    "script": "wf-heal",
     "stdin_raw": "{\"cwd\": \".\", \"hook_event_name\": \"SessionStart\", \"source\": \"startup\"}",
     "exit": 0,
     "want": [
@@ -6507,7 +6339,7 @@
   },
   "commitments-heal-backslash-gate": {
     "_why": "WINDOWS ROWS OPEN THE GATE (final review, F1). hook_command joins with os.path.join, so on Windows a row reads `\u2026\\\\skills\\\\workforce\\\\bin\\\\wf-x` in the JSON text; the session-start gate looked for `/wf-` only and never opened there, so the automatic heal never ran on Windows. Linux cannot run a backslash row, so the observable here is the unparseable-file notice this file's byte-order mark triggers \u2014 which fires only once the gate has opened.",
-    "script": "wf-commitments",
+    "script": "wf-heal",
     "stdin_raw": "{\"cwd\": \".\", \"hook_event_name\": \"SessionStart\", \"source\": \"startup\"}",
     "exit": 0,
     "want": [
@@ -6554,7 +6386,7 @@
   },
   "commitments-heal-refused-notice": {
     "_why": "A refusal that leaves retired rows is SAID at session start, once per state (final review, F2). settings.json links to the running account's user settings, which the heal never writes; settings.local.json beside it is healed in the same session. Both used to be silent.",
-    "script": "wf-commitments",
+    "script": "wf-heal",
     "stdin_raw": "{\"cwd\": \".\", \"hook_event_name\": \"SessionStart\", \"source\": \"startup\"}",
     "env": {
       "CLAUDE_CONFIG_DIR": "${TREE}/cfg"
@@ -6610,7 +6442,7 @@
   },
   "commitments-heal-claude-dir-outside": {
     "_why": "`.claude` is a link OUT of the project (last review, 1, reproduced): the HEAL REFUSED notice was written into the link's target. Every heal write now passes the inside-the-project test, so the notice file is never created; the refusal is said at every session start while it lasts, which writes nothing. CLAUDE_PROJECT_DIR is the subdirectory, so the link's target is outside it.",
-    "script": "wf-commitments",
+    "script": "wf-heal",
     "stdin_raw": "{\"cwd\": \".\", \"hook_event_name\": \"SessionStart\", \"source\": \"startup\"}",
     "env": {
       "CLAUDE_PROJECT_DIR": "${TREE}/proj"

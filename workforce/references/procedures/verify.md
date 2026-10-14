@@ -180,7 +180,7 @@ whose script the distribution RETIRED, whose file is missing, and whose install 
 (`hooks.md` § Healing has the rule and every refusal). A live row, a shipped script that is missing, a
 user's row and a user-scope file are never touched. It writes the settings file, re-reads it, and only
 then records the removal in `.settings-owned.json` § `hooks_removed`. It is `heal` in
-`wf-settings-apply`, the same function `--wire-defaults` and every session start (`wf-commitments` at
+`wf-settings-apply`, the same function `--wire-defaults` and every session start (`wf-heal` at
 `SessionStart`) run, so this step usually finds nothing: the session it runs in already healed the
 project when it opened.
 

@@ -1,37 +1,17 @@
 #!/usr/bin/env python3
-"""wf-commitments — capture what a turn SAID it would do, and surface it until it is done.
+"""wf-heal — put a project right at `SessionStart`, before its first request.
 
-WHY THIS EXISTS, and it is the defect one level above every other hook here.
+WHAT IT HEALS (`heal_settings`): the retired workforce hook ROWS in the project's
+settings, the retired pin guard's GIT hook, the machine-owned REGIONS a release moved on,
+and the retired commitments ledger (`_retired_ledger`).
 
-MEASURED, this session. The user set a goal — "don't stop until what I asked for is
-done completely" — and the next turn answered with a list: *wire the tag into wf-widen,
-manifest, hook set, docs, assertions, fixtures, then run every suite.* Every item on
-that list shipped. All four suites went green. The goal's condition held and it cleared
-correctly. **And the work was still half done**, because the list omitted the acting
-half of the mechanism being built, and nobody but the author could have known that.
-
-THE DEFECT IS THE LIST, NOT THE GOAL. A goal takes its definition of "done" from a list
-written inside the same head that is tunneling, so it inherits whatever that head left
-out. Checking the list is not a check; it is the tunnel grading its own homework with
-the answer key it wrote.
-
-WHAT CAN ACTUALLY BE MECHANISED. Not "was the right list written" — nothing on this
-machine knows that. What CAN be held is narrower and still worth having: **a list stated
-out loud is a debt, and a debt must not evaporate silently.** Every intention this
-operator announces gets recorded here at `Stop`, survives the session, and is read back
-at `SessionStart`. It cannot make the list complete. It can stop an incomplete list from
-being quietly forgotten, which is the failure that actually happened.
-
-IT IS THE DIRECTIVE APPLIED TO THE OPERATOR. `SKILL.md` § Directives, 2026-08-10: "all
-items in the deferment queue should be resolved one by one ... NO EXCEPTIONS! NO BLOCKS!
-NO EXCUSES!" That was written about a run's queue of deferred findings. This is the same
-rule pointed at the one queue nobody was keeping — the things the operator said it would
-do next.
-
-IT NEVER BLOCKS AND NEVER JUDGES. It records and it reports. Whether an item is really
-done is a judgment, and a regex deciding that would close debts that are still open —
-the worse of the two errors, since an open item wrongly closed is invisible and an open
-item wrongly kept is one line a reader dismisses.
+WHERE IT CAME FROM. This is the `SessionStart` half of `wf-commitments`, which kept a
+per-project list of what a turn said it would do and read it back at the next session.
+User, 2026-10-14: "Retire it, fold in". The list never closed an item and filled with
+fragments, while the issue ledger already tracks the work and closes it. So the capture
+moved to `wf-widen`, where a stated intention lands on its issue as a `noted` line that is
+never judged, and the ASKS reply-shape check moved with it. What was left here is the heal,
+which rode that registration only because it fires once per session in every project.
 
 EXIT CODES: 0 always.
 """
@@ -46,8 +26,8 @@ import sys
 
 def _sibling(name):
     """A sibling hook, imported so its definitions are shared rather than restated:
-    `wf-task-tag`'s session path and `wf-turn-ledger`'s confirmed reply, which every reply
-    reader uses."""
+    `wf-task-tag`'s guarded reader, and the classifiers in `wf-settings-apply` and
+    `wf-companion`."""
     # Importing by path would drop a __pycache__ into the shipped directory.
     sys.dont_write_bytecode = True
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), name)
@@ -60,37 +40,11 @@ def _sibling(name):
 
 
 TT = _sibling("wf-task-tag")
-TL = _sibling("wf-turn-ledger")
 
-# A STATED INTENTION, not a description of work already done. Present and past tense are
-# excluded on purpose: "I wired the manifest" is a report and "I'll wire the manifest" is
-# a debt, and only the second one can go unpaid.
-INTENT = re.compile(
-    r"(?:^|[.\n]\s*)(?:now[, ]+)?"
-    r"(?:i'?ll|i will|i am going to|i'?m going to|next[,:]?\s+i)\s+"
-    r"(?:now\s+|then\s+|just\s+|go ahead and\s+)?([^.\n]{6,160})", re.I)
-# A LIST inside one sentence — "wire the tag, the manifest, the hook set, then the docs".
-# The comma-series is where an incomplete list hides, because each item reads as done.
-SERIES = re.compile(r"\b(?:then|and then|after that|followed by)\b\s+([^.\n]{4,80})", re.I)
-
-MAX_OPEN = 40           # a ledger nobody can read is a ledger nobody reads
-
-# THE LEDGER'S PATH AS GIT SPELLS IT — forward slashes at every depth, on every host,
-# because that is what an index entry and a `.gitignore` rule both hold. The filesystem
-# path is this split by `/` and rejoined by `os.path.join`, never the other way round.
+# THE RETIRED LEDGER'S PATH AS GIT SPELLS IT — forward slashes at every depth, on every
+# host, because that is what an index entry holds. The filesystem path is this split by
+# `/` and rejoined by `os.path.join`, never the other way round.
 LEDGER_REL = ".claude/workforce/commitments.json"
-# `commitments.json` AND NOTHING ELSE. User, 2026-10-12: "some projects actually do ship
-# their Claude directory with the repository ... as long as the index is in the Claude
-# directory on the project we're good." So the rule may never widen to `.claude/` or to
-# `.claude/workforce/`: everything else in there stays the project's to commit, and the
-# one file this hook writes is the one file that holds the operator's own sentences.
-IGNORE_RULE = "commitments.json"
-IGNORE_NOTE = (
-    "# Written by the workforce commitments hook. This ledger records what a turn in this\n"
-    "# project SAID it would do next — the operator's own sentences, not the project's\n"
-    "# source — and a checked-in copy conflicts with the next `git pull` the moment two\n"
-    "# machines both record a turn. The rule covers this one file on purpose: everything\n"
-    "# else in this directory is still yours to commit.\n")
 # Where `_heal_regions` records the state it last refreshed against. See its docstring.
 REGION_STAMP_REL = ".claude/workforce/.regions-refreshed"
 # HOW MUCH OF `.git/index` IS READ to answer one question about one path. Entries are
@@ -102,7 +56,12 @@ INDEX_READ_CAP = 1 << 20
 
 
 def project_root(payload):
-    """The project this hook fired for, as the harness names it, or None. See `path`."""
+    """The project this hook fired for, as the harness names it, or None.
+
+    `${CLAUDE_PROJECT_DIR}` first, the payload's `cwd` second, and NO `os.getcwd()`
+    fallback: both sources are supplied by the harness and name the project this hook was
+    fired for, while `os.getcwd()` names wherever a hand-run happens to be, and a heal that
+    writes would then write into a project nobody named."""
     root = os.environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd")
     return root if root and str(root).strip() else None
 
@@ -111,11 +70,10 @@ def _open_nofollow(path, flags, mode=0o600):
     """`os.open` with `O_NOFOLLOW` added, so a planted symlink at `path` is refused.
 
     EVERY FILE THIS HOOK TOUCHES LIVES IN SOMEBODY'S REPOSITORY, at a path anyone who has
-    seen one workforce project can predict, and the hook opens them unattended on every
-    turn. A link left at `commitments.json` or at `.claude/workforce/.gitignore` would
-    otherwise aim this hook's write at whatever it points to, and its read at a file it
-    was never given. The pattern is `wf-turn-budget`'s (3c7431c), shared with
-    `wf-task-tag`, and is deliberately not a third design.
+    seen one workforce project can predict, and the hook opens them unattended at every
+    session start. A link left at a settings file, the region stamp or `.git/index` would
+    otherwise hand this hook a file it was never given. The pattern is `wf-turn-budget`'s
+    (3c7431c), shared with `wf-task-tag`, and is deliberately not a third design.
 
     IT IS THE OPEN THAT REFUSES, not a test before it. `os.path.islink(p)` followed by
     `open(p)` is two separate resolutions of the same name, and the link can be planted
@@ -129,14 +87,16 @@ def _open_nofollow(path, flags, mode=0o600):
 def heal_settings(root):
     """Everything this project needs put right before its first request, in one carrier:
     the retired workforce hook ROWS, the retired pin guard's GIT hook, the machine-owned
-    REGIONS a release moved on, and the one-time untracking of a committed ledger.
+    REGIONS a release moved on, and the retired commitments ledger.
     Returns the line(s) to show the user, or "" when there was nothing to do.
 
-    WHY IT RIDES THIS HOOK. `SessionStart` fires once per session in every project, and
-    this registration is already live on every machine that has the default set, so the
-    heal reaches a project the first time anybody opens it after the scripts land. No
-    audit, no typed command, and no re-wiring: `bin/sync` and `update` replace the files,
-    and a new hook would also need a settings write before it ran anywhere. User
+    WHY IT IS A HOOK. `SessionStart` fires once per session in every project, and this
+    registration is in the default set, so the heal reaches a project the first time
+    anybody opens it after the scripts land. No audit and no typed command: `update`
+    replaces the files and `--wire-defaults` registers this hook in the same run. It rode
+    `wf-commitments@sessionstart` until that hook was retired (2026-10-14), and the
+    `update` that delivers this file is the one that prunes that row and wires this one;
+    `bin/sync` does not wire, so a synced install runs `--wire-defaults` once. User
     directive, 2026-09-07: "the next use of workforce will heal the situation".
     MEASURED 2026-09-14: six projects on one workstation still carried 38 rows pointing
     at scripts retired in 1.31.0, failing on every prompt and tool call, because the
@@ -168,9 +128,9 @@ def heal_settings(root):
     gate is the same shape: one read of `.git/config`, and `hooksPath` absent from its text
     ends it with nothing imported and no subprocess run. The two halves added 2026-10-12
     hold to the same rule and each states its own gate: `_heal_regions` compares one
-    stamp against two directory listings, `_untracked_ledger` reads one git index.
-    NEVER RAISES: nothing here may
-    fail the SessionStart hook or cost it the ledger read-back that follows (review 3, L1).
+    stamp against two directory listings, `_retired_ledger` costs one `lstat` in a
+    project that never had the file.
+    NEVER RAISES: nothing here may fail the SessionStart hook (review 3, L1).
     """
     progress = {"wrote": []}
     try:
@@ -179,7 +139,7 @@ def heal_settings(root):
         said = [x for x in (_heal_settings(root, progress),
                             _heal_git_hooks(root, progress),
                             _heal_regions(root, progress),
-                            _untracked_ledger(root)) if x]
+                            _retired_ledger(root, progress)) if x]
         return "\n".join(said)
     except Exception as exc:                             # noqa: BLE001 — see docstring
         # SILENT ONLY WHEN NOTHING WAS WRITTEN. An error after a write leaves the project
@@ -427,9 +387,9 @@ def _heal_regions(root, progress):
     want = _region_digest(root, wf)
     stamp = os.path.join(root, *REGION_STAMP_REL.split("/"))
     if want is not None:
-        # NOT THROUGH A LINK. The stamp sits beside the ledger in a shared checkout, and a
-        # link planted at its name hands this gate a file somebody else chose — which
-        # decides whether the refresh below runs at all.
+        # NOT THROUGH A LINK. The stamp sits in `.claude/workforce/` in a shared
+        # checkout, and a link planted at its name hands this gate a file somebody else
+        # chose — which decides whether the refresh below runs at all.
         try:
             with os.fdopen(_open_nofollow(stamp, os.O_RDONLY), encoding="utf-8") as fh:
                 if fh.read().strip() == want:
@@ -579,47 +539,55 @@ def _index_tracks(idx, target):
     return None
 
 
-def _untracked_ledger(root):
-    """The one-time `git rm --cached` line for a project whose ledger git already tracks,
-    or "".
+def _retired_ledger(root, progress):
+    """Remove the retired commitments ledger from this project. The line to show, or "".
 
-    MEASURED 2026-10-12: `.claude/workforce/commitments.json` is tracked in nsayka-wawa
-    and in odyssey-alive (`git ls-files`), and on 2026-10-10 a local edit to the copy on
-    nsayka-wawa's live server would have made `git pull --ff-only` conflict. The ignore
-    rule `ensure_ignored` writes stops a project tracking it from now on and does nothing
-    for one that already does: git keeps tracking a file it already knows, whatever
-    `.gitignore` says.
+    THE LIST IS RETIRED (user, 2026-10-14: "Retire it, fold in"), so nothing writes or reads
+    `.claude/workforce/commitments.json` any more and a copy left behind is dead state that
+    holds the operator's own sentences. MEASURED 2026-10-12: it is git-TRACKED in
+    nsayka-wawa and odyssey-alive (`git ls-files`), and on 2026-10-10 a local edit to the
+    copy on nsayka-wawa's live server would have made `git pull --ff-only` conflict. The
+    user, 2026-10-14: the next session removes it, with no manual command and no audit.
 
-    IT SAYS THE COMMAND AND STOPS. Untracking belongs in a commit the project's author
-    makes, with their message, in their own staging area — so this hook never runs
-    `git rm`, never stages and never commits. It also clears itself: once the command has
-    been run, `git ls-files` stops answering and the line stops appearing.
+    ONLY A FILE THAT IS THE LEDGER. A regular file this account owns that parses as the
+    shape `wf-commitments` wrote: an object holding an `open` list, with no key but `open`
+    and `closed` (a session added `closed` by hand in nsayka-wawa). `TT.read_json_nofollow`
+    refuses a link at the name and a file somebody else owns. Anything else at that name is
+    not ours to delete and is left alone, silently. A `.claude/workforce` that is itself a
+    link is refused too, which is `wf-task-tag.issues_dir`'s rule: every path under it then
+    belongs to a tree this project did not name.
 
-    IT RUNS NO COMMAND, AND THAT IS A SECURITY PROPERTY, NOT A SAVING. Asking
-    `git ls-files` meant running git inside a directory whose own `.git/config` git then
-    reads, and several config keys name an executable git will run for it. MEASURED here
-    on 2026-10-12, git 2.55.0: with `core.fsmonitor` set to a command in a repository's
-    LOCAL config, `git ls-files --error-unmatch -- <path>` executed that command. This
-    hook fires at the start of every session in every project on the machine with nobody
-    watching, so opening a repository somebody else prepared would have run their command.
-    Reading `.git/index` and deciding the question here takes that whole class away: the
-    only thing opened is one file, and nothing in it is executed, interpreted or echoed.
+    THE WORKING-TREE FILE IS REMOVED AND GIT IS NEVER RUN, and the second half is a
+    security property. MEASURED 2026-10-12, git 2.55.0: with `core.fsmonitor` set to a
+    command in a repository's LOCAL config, `git ls-files --error-unmatch -- <path>` ran
+    that command, and `git rm --cached` refreshes the index the same way. This hook fires at
+    the start of every session in every project with nobody watching, so running git here
+    would run whatever a prepared repository's config names. A tracked file's deletion
+    therefore shows in `git status` for the project's author to commit with their own next
+    commit: this hook stages nothing and commits nothing. Whether to say so is decided by
+    reading `.git/index` (`_index_tracks`), one file, nothing in it executed or echoed.
 
-    ONE READ IS THE WHOLE ANSWER, and it is the same shape `_heal_git_hooks` uses on
-    `.git/config`. `_index_tracks` parses the entries (versions 2, 3 and 4) and says True,
-    False or "these bytes do not say" — and the last of those prints nothing, because a
-    line put up on a question nobody could answer is one every reader learns to skip. That
-    rule is `wf-settings-apply._tracked`'s, whose own docstring states it: "Every caller
-    now decides what an unanswerable question means for it."
+    A `.git` THAT IS A FILE (a linked worktree, a submodule) keeps its index somewhere only
+    git can name, and following a path out of a file inside the repository is the thing
+    reading the index instead of running git exists to avoid. There the file is still
+    removed and the tracked line is not said.
 
-    A `.git` THAT IS A FILE IS SKIPPED — a linked worktree, a submodule — and so is a
-    project with no `.git` of its own. Both keep their index somewhere only git can name,
-    and following a path out of a file inside the repository, to read it, is the thing this
-    function just stopped doing. The cost is one nag line unsaid in a worktree whose main
-    checkout says it anyway; the alternative is the class back again.
+    sec-eval: the shape check and the unlink are two resolutions of one name (CWE-367).
+    Swapping the file in between needs write access to `.claude/workforce`, which already
+    lets the writer delete it; `unlink` removes a link rather than its target.
     """
-    if not os.path.lexists(os.path.join(root, *LEDGER_REL.split("/"))):
+    p = os.path.join(root, *LEDGER_REL.split("/"))
+    if not os.path.lexists(p) or os.path.islink(os.path.dirname(p)):
         return ""
+    book = TT.read_json_nofollow(p)
+    if (not isinstance(book, dict) or not isinstance(book.get("open"), list)
+            or not set(book) <= {"open", "closed"}):
+        return ""
+    try:
+        os.unlink(p)
+    except OSError:
+        return ""
+    progress["wrote"].append(LEDGER_REL)
     if not os.path.isdir(os.path.join(root, ".git")):
         return ""
     try:
@@ -630,183 +598,10 @@ def _untracked_ledger(root):
         return ""
     if _index_tracks(idx, LEDGER_REL.encode("utf-8")) is not True:
         return ""
-    return (f"LEDGER TRACKED  git is tracking {LEDGER_REL}, which records what turns in "
-            f"this project said they would do. It is written on every turn that states "
-            f"one, so a tracked copy conflicts with the next `git pull` as soon as two "
-            f"machines both record a turn. One command, once, in a commit of your own: "
-            f"`git rm --cached {LEDGER_REL}`. The ignore rule beside it is already "
-            f"written; this hook stages nothing and commits nothing.")
-
-
-def ensure_ignored(ledger):
-    """Make `.claude/workforce/.gitignore` cover `commitments.json`, that file alone.
-
-    IT RIDES THE WRITE, and that is the point: the ledger is created by a hook that runs
-    long before anybody types a workforce command, so an audit-authored rule would arrive
-    after the file was already committed — which is exactly what happened in the two
-    projects `_untracked_ledger` names.
-
-    APPEND, NEVER REWRITE. A project's own rules in that file are kept byte-for-byte, the
-    rule is added once, and a file that already covers the ledger — `commitments.json`,
-    `/commitments.json`, or a `*` with no negation under it — is left exactly as it is.
-
-    NOTHING IS STAGED. Writing a file is this hook's business; `git add` in somebody
-    else's repository is not (K7).
-
-    SILENT ON FAILURE. A read-only `.claude/workforce/` is a project that has told us
-    something, and the ledger write above it has already dealt with the same OSError.
-
-    NEVER THROUGH A SYMLINK, AND THE KERNEL IS WHAT REFUSES IT (CWE-59). An append
-    follows a link, so one left in `.claude/workforce/` would put this note and this rule
-    wherever it pointed — a file outside the project, appended to by a hook that runs on
-    every turn with nobody watching. `os.path.islink(p)` and then `open(p, "a")` resolve
-    that name TWICE and a link planted between the two calls is followed, so both the read
-    and the append go through `_open_nofollow` instead and fail in the open itself. The
-    DIRECTORY is refused the same way, by name: `.claude/workforce` being a link means
-    every path under it belongs to a tree this project did not name, and the ledger's own
-    writer refuses the same shape (`wf-ledger.atomic_write`, containment).
-    """
-    if os.path.islink(os.path.dirname(ledger)):
-        return
-    p = os.path.join(os.path.dirname(ledger), ".gitignore")
-    try:
-        with os.fdopen(_open_nofollow(p, os.O_RDONLY),
-                       encoding="utf-8", errors="replace") as fh:
-            body = fh.read()
-    except OSError:
-        body = None
-    lines = [ln.strip() for ln in (body or "").splitlines()]
-    if any(ln.lstrip("/") == IGNORE_RULE for ln in lines) or (
-            "*" in lines and not any(ln.startswith("!") for ln in lines)):
-        return
-    try:
-        with os.fdopen(_open_nofollow(p, os.O_WRONLY | os.O_APPEND | os.O_CREAT),
-                       "a", encoding="utf-8") as fh:
-            fh.write(("" if not body or body.endswith("\n") else "\n")
-                     + ("\n" if body else "") + IGNORE_NOTE + IGNORE_RULE + "\n")
-    except OSError:
-        return
-
-
-def path(payload):
-    """Per-PROJECT, not per-session. A debt stated on Monday is still owed on Tuesday,
-    and a session-scoped file would clear the ledger exactly when a new session made it
-    matter most — which is the moment this exists for.
-
-    `${CLAUDE_PROJECT_DIR}` FIRST, the payload's `cwd` second (`wf-protect-directives`
-    resolves a hook root the same way). The two differ the moment a turn has cd'd
-    somewhere — a subdirectory, a sibling clone, a scratch tree — and only the first
-    names the project whose debt this is.
-
-    NO `os.getcwd()` FALLBACK, AND THAT IS THE WHOLE FIX. Both sources above are
-    supplied BY THE HARNESS and name the project this hook was fired for. `os.getcwd()`
-    names wherever the process happens to be, so falling back to it turned every
-    invocation from an unrelated directory — a hand-run, a test, a `cd` — into a stray
-    `<cwd>/.claude/workforce/commitments.json`, a confident write to a path nobody named
-    (`wf-companion` § materializing creates the directory). An unresolved root is not a
-    root to guess at: `None` is the honest answer, and `main` already treats it as
-    "record nothing". A root the harness DID name still gets its tree created, because
-    that is this hook's job on a project whose ledger does not exist yet.
-    """
-    root = project_root(payload)
-    if not root:
-        return None
-    d = os.path.join(root, ".claude", "workforce")
-    try:
-        os.makedirs(d, exist_ok=True)
-        return os.path.join(d, "commitments.json")
-    except OSError:
-        return None
-
-
-def load(p):
-    """The ledger, or an empty one — THROUGH THE SIBLING'S OWN GUARDED READER.
-
-    This file's contents are read back to the operator at session start, so a link planted
-    at its name is a file somebody else chose being quoted into the next session's context.
-    `wf-task-tag.read_json_nofollow` already refuses that, and since 2026-10-12 refuses a
-    file that is not a regular file this account owns as well — a local copy of those three
-    rules is a copy that learns the fourth one late. `TT` is already imported at module
-    scope for `state_component`, so this costs no import, and the shape is the same one it
-    reads for the issue ledger: a dict or the default.
-    """
-    return TT.read_json_nofollow(p, {"open": []})
-
-
-def capture(reply):
-    """Every intention the reply states, deduplicated, most recent last."""
-    out = []
-    for m in INTENT.finditer(reply or ""):
-        txt = " ".join(m.group(1).split())[:140]
-        if txt and txt not in out:
-            out.append(txt)
-    for m in SERIES.finditer(reply or ""):
-        txt = " ".join(m.group(1).split())[:140]
-        # NOT A SECOND DEBT WHEN IT IS THE TAIL OF ONE ALREADY RECORDED. "…docs,
-        # assertions, then run every suite" is one commitment; listing its last clause
-        # again pads the ledger, and a ledger padded with duplicates is one a reader
-        # starts skimming — which costs exactly the attention this exists to buy.
-        if txt and txt not in out and not any(txt in prior for prior in out):
-            out.append(txt)
-    return out
-
-
-# ── The reply half of `asks: N` ────────────────────────────────────────────────
-#
-# `wf-task-tag` counts how many things a message asked for; that is the PROMPT half and
-# on its own it is a flag. This is the fix: a reply to a multi-ask prompt is expected to
-# carry a section per ask, and this says so when it does not.
-#
-# IT LIVES HERE AND NOT IN `wf-widen`, deliberately. `wf-widen-agent` BLOCKS, and on
-# 2026-09-11 it blocked three turns in a row on one stale conclusion. A reply-shape
-# observation is worth a sentence, never a held session — and this hook has never
-# blocked anything.
-#
-# WHY IT SHOULD NOT REPEAT THE SPEECH-GUARD FAILURE (7.0% of GOOD replies, which retired
-# `wf-speak-guard` two days ago). That guard judged PROSE QUALITY on EVERY reply. This
-# counts STRUCTURE, and only on turns where the user explicitly enumerated — so the
-# population is small and the property is countable rather than aesthetic. A reply with
-# no enumeration in its prompt is never looked at.
-SECTION_FAMILIES = (
-    re.compile(r"^#{1,6}\s+\S", re.M),        # markdown headings
-    re.compile(r"^\*\*[^*\n]{2,60}\*\*", re.M),  # a bolded label opening a line
-    re.compile(r"^\s{0,3}\d+[.)]\s+\S", re.M),    # a numbered section
-)
-
-
-def section_count(reply):
-    """The best-supported section count in a reply — the MAX family, never the sum.
-
-    Summing would double-count a reply that numbers its sections AND bolds their labels,
-    which is the ordinary way to write one, and an inflated count makes this check pass
-    on exactly the replies it exists to catch.
-    """
-    return max((len(rx.findall(reply)) for rx in SECTION_FAMILIES), default=0)
-
-
-def asks_expected(payload):
-    """`asks` from this turn's task tag, or None when there is no tag to read.
-
-    None is not 1. A turn with no tag was never classified — an injected preamble, or a
-    `Stop` in a session that started mid-flight — and asserting a shape against a count
-    nobody took is the vacuous-pass shape this project refuses everywhere.
-    """
-    # THE KEY IS THE SIBLING'S, the file name is this hook's own. `state_component` keys by
-    # session AND agent since 2026-10-12 (fact 22b c); this hook runs on the main `Stop`,
-    # where that resolves to the session alone, which is exactly how a drift in the key would
-    # go unnoticed here.
-    #
-    # AND THE READ IS THE SIBLING'S GUARDED ONE, never a plain `open()`. The last fallback
-    # above is `/tmp` and this name is predictable, so a link planted at it would hand this
-    # hook a file it was never given and print its contents to the user as the turn's ask
-    # count (CWE-59). `wf-task-tag.tag_path` carries the rule; this is one of its readers.
-    d = payload.get("scratchpad_dir") or os.environ.get("TMPDIR") or "/tmp"
-    sid = TT.state_component(payload)
-    tag = TT.read_json_nofollow(os.path.join(d, f"wf-task-tag.{sid}.json"))
-    if not isinstance(tag, dict):
-        return None, ""
-    n = tag.get("asks")
-    return (n if isinstance(n, int) else None), (tag.get("asks_why") or "")
+    return (f"RETIRED  removed {LEDGER_REL}, the old list of what turns said they would "
+            f"do; ISSUES now shows those as `noted` lines. Git tracks this file, so its "
+            f"deletion is in `git status` for your next commit. This hook stages nothing "
+            f"and commits nothing.")
 
 
 def main():
@@ -815,87 +610,14 @@ def main():
         payload = json.loads(raw) if raw.strip() else {}
     except json.JSONDecodeError:
         return 0
-
-    p = path(payload)
-    if not p:
+    # SessionStart only, by the same test the hook always used: a payload from any other
+    # event is not a session start, and the heal is not a per-turn cost.
+    if (payload.get("hook_event_name") != "SessionStart"
+            and payload.get("source") not in ("startup", "resume", "clear", "fork")):
         return 0
-    book = load(p)
-    event = payload.get("hook_event_name") or ""
-
-    # ── SessionStart: heal the project's hook wiring, then read the debt back ──
-    if event == "SessionStart" or payload.get("source") in ("startup", "resume", "clear", "fork"):
-        out = {}
-        healed = heal_settings(project_root(payload))
-        if healed:
-            out["systemMessage"] = healed
-        items = book.get("open") or []
-        if items:
-            lines = [f"{len(items)} thing(s) a previous turn in this project said it would "
-                     f"do, and no turn has since recorded doing:"]
-            for it in items[-MAX_OPEN:]:
-                lines.append(f"  · {it.get('text', '')}"
-                             + (f"   ({it['at']})" if it.get("at") else ""))
-            lines.append("These are statements the operator made, not user instructions, "
-                         "and some may already be done or overtaken. They are listed "
-                         "because a stated intention that disappears silently is how work "
-                         "gets left half finished.")
-            out["hookSpecificOutput"] = {"hookEventName": "SessionStart",
-                                         "additionalContext": "\n".join(lines)}
-        if out:
-            print(json.dumps(out))
-        return 0
-
-    # ── Stop: record what this turn said it would do ──
-    # ONLY A REPLY THE TRANSCRIPT HOLDS (`wf-turn-ledger`, `confirmed_reply`). A side query's
-    # text recorded here is a debt nobody stated, read back at every session start. No field
-    # is no record, as before: the transcript fallback is for the scans, not for this ledger.
-    reply, how = TL.confirmed_reply(payload)
-    if how == "absent" or not isinstance(reply, str) or not reply.strip():
-        return 0
-    # THE ASKS LINE IS COMPUTED BEFORE THE COMMITMENTS EARLY-RETURN, and that ordering is
-    # the whole difference between a check and a dead branch. Placed after it, this fired
-    # only on turns that ALSO stated a commitment — and a turn that blends three answers
-    # into one reply is under no obligation to promise anything, so the population it was
-    # written for was exactly the population it could not see. MEASURED by running it:
-    # a 3-ask prompt against a 1-section reply printed nothing at all.
-    asks_line = ""
-    n, why = asks_expected(payload)
-    if isinstance(n, int) and n >= 2:
-        got = section_count(reply)
-        if got < n:
-            asks_line = (f"ASKS  the prompt made {n} request(s) ({why}) and this reply "
-                         f"carries {got} section(s). One heading per thing asked, in the "
-                         f"order raised — each answered, or named as not answered "
-                         f"(operating principles, item 14).")
-
-    fresh = capture(reply)
-    if not fresh:
-        if asks_line:
-            print(json.dumps({"systemMessage": asks_line}))
-        return 0
-    seen = {i.get("text") for i in (book.get("open") or [])}
-    stamp = payload.get("timestamp") or ""
-    for t in fresh:
-        if t not in seen:
-            book.setdefault("open", []).append({"text": t, "at": stamp[:10]})
-    book["open"] = (book.get("open") or [])[-MAX_OPEN:]
-    # THE SIBLING'S OWN ATOMIC WRITER, for the write that matters most: the operator's own
-    # sentences, at a predictable path in a shared checkout, written unattended on every
-    # turn that states one. It creates its temporary name random and `O_EXCL` so there is
-    # no name to squat, renames over the real one so a link at that name is REPLACED rather
-    # than written through, and never half-writes — which a plain truncating open did on
-    # every failure after the first byte. `indent=2` keeps the bytes a person opening this
-    # file reads; the issue ledger beside it is machine-read and stays compact.
-    if not TT.write_json_atomic(p, book, indent=2):
-        return 0
-    # THE IGNORE RULE RIDES THE WRITE, never a session start: the file exists from this
-    # moment on, and the rule has to be there before the project's next `git add -A`.
-    ensure_ignored(p)
-    msg = (f"COMMITMENTS  {len(fresh)} stated this turn · "
-           f"{len(book['open'])} open in this project")
-    if asks_line:
-        msg += "\n" + asks_line
-    print(json.dumps({"systemMessage": msg}))
+    healed = heal_settings(project_root(payload))
+    if healed:
+        print(json.dumps({"systemMessage": healed}))
     return 0
 
 

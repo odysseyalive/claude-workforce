@@ -465,7 +465,7 @@ def session_component(payload):
 
     These paths are written and removed. A raw id of `x/../../escaped` walked out of the
     scratchpad whenever an intermediate directory existed. A real id is a UUID and passes
-    through unchanged. `wf-widen` and `wf-commitments` import this rather than restate it.
+    through unchanged. `wf-widen` imports this rather than restate it.
     """
     sid = str(payload.get("session_id") or "")
     sid = _UNSAFE_SID.sub("_", sid)
@@ -516,9 +516,8 @@ def tag_path(payload):
     which is world-writable, and this name is predictable from a session id other accounts
     on the machine can see. A link planted at it would aim the hook's write at any file the
     user can write and hand the hook's read a file it was never given (CWE-59). The same
-    rule covers `wf-asks.<sid>.json` beside it, `wf-widen`'s flag and closeout, and
-    `wf-commitments`' read of this file: one pattern, `wf-turn-budget`'s (3c7431c), never a
-    second design.
+    rule covers `wf-asks.<sid>.json` beside it and `wf-widen`'s flag and closeout: one
+    pattern, `wf-turn-budget`'s (3c7431c), never a second design.
     """
     d = payload.get("scratchpad_dir") or os.environ.get("TMPDIR") or "/tmp"
     sid = state_component(payload)
@@ -622,9 +621,8 @@ IGNORE_RULE = "*\n"
 # that delivered.
 AGENT_STATES = ("running", "returned", "handoff")
 
-# A LEDGER NOBODY CAN READ IS A LEDGER NOBODY READS, and the same bound `wf-widen` puts on
-# its open-commitment list. A session that genuinely opened 200 issues has a different
-# problem than this file can fix.
+# A LEDGER NOBODY CAN READ IS A LEDGER NOBODY READS. A session that genuinely opened 200
+# issues has a different problem than this file can fix.
 MAX_ISSUES = 40
 
 # THE WORDS A FINISHED ASK IS ACTUALLY GIVEN, declared once because two readers need the
@@ -660,13 +658,17 @@ MAX_CARRIED = 20
 # ask matches itself rather than nothing.
 CARRY_ASK = 200
 
+# HOW MANY STATED INTENTIONS ONE ISSUE KEEPS UNDER `noted`, newest last (`note_intentions`).
+# They are advisory and nothing judges them, so the bound only keeps the file readable.
+MAX_NOTED = 10
+
 
 def project_root(payload):
     """The project this hook fired for, as the HARNESS names it, or None.
 
     `${CLAUDE_PROJECT_DIR}` first, the payload's `cwd` second, and NO `os.getcwd()`
-    fallback — which is `wf-commitments`' `path()` rule, restated here for the reason that
-    rule exists. Both sources above are supplied by the harness and name the project this
+    fallback — `wf-heal.project_root`'s rule too, restated here for the reason that rule
+    exists. Both sources above are supplied by the harness and name the project this
     hook was fired for. `os.getcwd()` names wherever the process happens to be, so falling
     back to it turns a hand-run or a test from an unrelated directory into a confident
     write at `<cwd>/.claude/workforce/issues/`, a path nobody named. An unresolved root is
@@ -734,7 +736,7 @@ def read_json_nofollow(path, default=None):
     return d if isinstance(d, dict) else default
 
 
-def write_json_atomic(path, obj, indent=None):
+def write_json_atomic(path, obj):
     """Replace `path` atomically, and never through a link. True when it landed.
 
     THE TEMPORARY NAME IS RANDOM AND CREATED `O_EXCL`, which is `tempfile.mkstemp`'s whole
@@ -752,10 +754,6 @@ def write_json_atomic(path, obj, indent=None):
 
     ATOMIC ALSO MEANS NO HALF-LEDGER. Two concurrent agents stop at once; a plain
     open-and-write would let one read a file the other had truncated.
-
-    `indent` IS THE CALLER'S. This ledger is machine-read and writes compact; the
-    commitments ledger holds the operator's own sentences in their repository and asks for
-    2, so that a person who opens that file can read it.
     """
     import tempfile
     try:
@@ -765,7 +763,7 @@ def write_json_atomic(path, obj, indent=None):
         return False
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            json.dump(obj, fh, indent=indent)
+            json.dump(obj, fh)
         os.replace(tmp, path)
         return True
     except OSError:
@@ -782,8 +780,8 @@ def issues_dir(payload, create=False):
     ON FIRST CREATE IT WRITES ITS OWN `.gitignore` HOLDING `*`, and the hook does that
     rather than an audit: the ledger holds the user's prompts, which do not belong in a
     repository, and a rule only an audit adds reaches no project until somebody re-audits
-    it. The precedent is measured — the commitments ledger at
-    `.claude/workforce/commitments.json` is git-TRACKED in nsayka-wawa and odyssey-alive,
+    it. The precedent is measured — the retired commitments ledger at
+    `.claude/workforce/commitments.json` was git-TRACKED in nsayka-wawa and odyssey-alive,
     and on 2026-10-10 a local edit to it on a live server would have made a
     `git pull --ff-only` conflict.
 
@@ -1151,6 +1149,64 @@ def track_message(led, issue_id, written):
         target["items"] = [{"ask": text, "status": "open", "fallback": True}]
 
 
+def _note_key(text):
+    """One intention's identity for merging: case, spacing and trailing punctuation aside."""
+    return " ".join(text.lower().split()).rstrip(".,;:!")
+
+
+def note_intentions(led, issue_id, texts):
+    """Record what a reply SAID it would do next on the issue being worked, under `noted`.
+    `(issue id, the wordings newly noted)`, or `(None, [])` when nothing landed.
+
+    WHAT IT REPLACES. `wf-commitments` kept these in a per-project list that no turn could
+    close and that filled with fragments; the user retired it on 2026-10-14 ("Retire it,
+    fold in"). The issue they belong to is where they are worth reading.
+
+    A FIELD OF ITS OWN, AND NOTHING THAT JUDGES READS IT. `judge_issue`, `carry_forward`,
+    `unmet_asks` and both absorbs read `items`, never `noted`, so a noted intention can
+    never become a KICKBACK, a HANDOFF, a carried row or a reason an issue stays open. The
+    ledger never infers an undone item, and a regex reading the reply is inference. The
+    session may PROMOTE one by writing it into its checklist, which makes it an item the
+    session authored, judged like any other.
+
+    WHICH ISSUE: this message's own (`issue_id`) while it is open, else the newest open
+    issue (`current_issue`, the rule an agent is linked by), which is where a hand-back
+    turn's "I'll merge it" belongs. With no open issue there is nowhere to note it.
+
+    DUPLICATES MERGE. The same words, or one wording contained in the other, are one
+    intention; the longer wording is kept, so a turn restating its plan adds nothing.
+    """
+    target = None
+    for iss in open_issues(led):
+        if issue_id and iss.get("id") == issue_id:
+            target = iss
+    target = target or current_issue(led)
+    if target is None:
+        return None, []
+    noted = target.get("noted")
+    noted = ([n for n in noted if isinstance(n, str) and n.strip()]
+             if isinstance(noted, list) else [])
+    before = list(noted)
+    for t in texts:
+        k = _note_key(t) if isinstance(t, str) else ""
+        if not k:
+            continue
+        keys = [_note_key(n) for n in noted]
+        if any(k in o for o in keys):
+            continue
+        shorter = [i for i, o in enumerate(keys) if o in k]
+        if shorter:
+            noted[shorter[0]] = t
+            noted = [n for i, n in enumerate(noted) if i not in shorter[1:]]
+        else:
+            noted.append(t)
+    fresh = [n for n in noted if n not in before]
+    if not fresh:
+        return None, []
+    target["noted"] = noted[-MAX_NOTED:]
+    return target.get("id"), [n for n in fresh if n in target["noted"]]
+
+
 def link_agent(payload, led):
     """Link the starting agent to the issue being worked, as `running`. The issue id, or None.
 
@@ -1495,6 +1551,7 @@ def judge_issue(iss):
     wrote with a status it did not mark done — this project's rule that a blocking surface
     ships with no known wrong fire, applied to the verdicts that can reach the user. So every
     verdict above `tracked` reads `session_items`, and the fallback can reach none of them.
+    An issue's `noted` intentions (`note_intentions`) are read by nothing here at all.
     """
     agents = issue_agents(iss)
     waiting = [a for a in agents if a.get("state") == "running"]

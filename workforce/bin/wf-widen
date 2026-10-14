@@ -2394,6 +2394,107 @@ def with_checklist(payload):
         hand_checklist_to_jury(payload, record, items)
 
 
+# ── what the reply said it would do next, noted on its issue ─────────────────────
+# The capture `wf-commitments` ran at Stop, moved here when its per-project list was
+# retired (user, 2026-10-14: "Retire it, fold in"). HERE BECAUSE THE ISSUE LEDGER IS
+# WRITTEN HERE: hooks on one event run in parallel, and a second writer of the same ledger
+# file would drop one of the two updates. `TT.note_intentions` carries the ledger rule —
+# a `noted` field nothing judges — and this is only the capture.
+#
+# A STATED INTENTION, not a report: "I wired the manifest" is done and "I'll wire the
+# manifest" is not, so only the future tense is read. It must open a sentence, and it must
+# END one within 160 characters — a full stop followed by a space, a line break, or the end
+# of the reply — so a version number ("1.77.5") no longer cuts it to "regenerate the 1" and
+# a sentence that runs past the bound is dropped rather than truncated.
+INTENT = re.compile(
+    r"(?:^|(?<=[.!?\n]))\s*(?:now[, ]+)?"
+    r"(?:i['’]?ll|i will|i am going to|i['’]?m going to|next[,:]?\s+i)\s+"
+    r"(?:now\s+|then\s+|just\s+|go ahead and\s+)?"
+    r"([^\n]{6,160}?)(?=[.!?](?:\s|$)|\n|$)", re.I)
+# QUOTED TEXT IS NOT THE REPLY'S OWN PLAN: a fenced block and a `>` line quote somebody
+# else, or an example.
+_FENCED = re.compile(r"^\s*```.*?^\s*```[^\n]*$", re.M | re.S)
+_QUOTED = re.compile(r"^\s{0,3}>.*$", re.M)
+
+
+def capture(reply):
+    """Every intention the reply states, in order. `TT.note_intentions` merges duplicates.
+
+    TIGHTENED AGAINST WHAT THE RETIRED LIST ACTUALLY HELD. This repository's copy, read
+    2026-10-14, carried "lands:", "I check four things:", "I'll regenerate the 1",
+    "commit", and table cells like "fell to $275 two weeks later |". So: a lead-in ending in
+    a colon is dropped (the list after it is the content, and it is not a plan), a question
+    is not a plan, a table row is not prose, and the old comma-series reader ("then …",
+    "after that …") is gone — it matched anywhere in a reply, reports included, and the
+    tail of a sentence the intention reader already took is that sentence again.
+    """
+    text = _QUOTED.sub("", _FENCED.sub("", reply or ""))
+    out = []
+    for m in INTENT.finditer(text):
+        txt = " ".join(m.group(1).split()).rstrip(",;")
+        if text[m.end():m.end() + 1] == "?" or txt.endswith(":") or "|" in txt:
+            continue
+        out.append(txt)
+    return out
+
+
+# ── the reply half of `asks: N` ──────────────────────────────────────────────────
+# `wf-task-tag` counts how many things a message asked for; that is the PROMPT half and on
+# its own it is a flag. This says so when a reply to a multi-ask prompt does not carry a
+# section per ask. Moved here from `wf-commitments` with the list (2026-10-14).
+#
+# IT IS A LINE, NEVER A BLOCK. `main` joins it to `systemMessage` whatever `widen` decided,
+# and never to a block's `reason`: on 2026-09-11 a blocking reader held three turns in a
+# row on one stale conclusion, and a reply-shape observation is worth a sentence, never a
+# held session.
+#
+# WHY IT SHOULD NOT REPEAT THE SPEECH-GUARD FAILURE (7.0% of GOOD replies, which retired
+# `wf-speak-guard`). That guard judged PROSE QUALITY on EVERY reply. This counts STRUCTURE,
+# and only on turns where the user explicitly enumerated — so the population is small and
+# the property is countable rather than aesthetic.
+SECTION_FAMILIES = (
+    re.compile(r"^#{1,6}\s+\S", re.M),        # markdown headings
+    re.compile(r"^\*\*[^*\n]{2,60}\*\*", re.M),  # a bolded label opening a line
+    re.compile(r"^\s{0,3}\d+[.)]\s+\S", re.M),    # a numbered section
+)
+
+
+def section_count(reply):
+    """The best-supported section count in a reply — the MAX family, never the sum.
+
+    Summing would double-count a reply that numbers its sections AND bolds their labels,
+    which is the ordinary way to write one, and an inflated count makes this check pass
+    on exactly the replies it exists to catch.
+    """
+    return max((len(rx.findall(reply)) for rx in SECTION_FAMILIES), default=0)
+
+
+def asks_line(payload):
+    """The ASKS line for this main `Stop`, or "".
+
+    ONLY A REPLY THE TRANSCRIPT HOLDS, and no field is no check (`confirmed_reply` "absent"):
+    the transcript fallback is for the scans. AND ONLY WITH A COUNT: `asks` is None on a turn
+    nobody classified — an injected preamble, a `Stop` in a session that started mid-flight —
+    and asserting a shape against a count nobody took is a vacuous pass.
+    """
+    if payload.get("hook_event_name") == "SubagentStop":
+        return ""
+    reply, how = TL.confirmed_reply(payload)
+    if how == "absent" or not isinstance(reply, str) or not reply.strip():
+        return ""
+    tag = task_tag(payload) or {}
+    n = tag.get("asks")
+    if not isinstance(n, int) or n < 2:
+        return ""
+    got = section_count(reply)
+    if got >= n:
+        return ""
+    return (f"ASKS  the prompt made {n} request(s) ({tag.get('asks_why') or ''}) and this "
+            f"reply carries {got} section(s). One heading per thing asked, in the order "
+            f"raised — each answered, or named as not answered (operating principles, "
+            f"item 14).")
+
+
 # ── the one action a cut agent's issue takes (K8) ────────────────────────────
 # THE SESSION'S HABIT IS THE DEFECT. Measured 2026-10-12: resuming a cut agent with
 # `SendMessage` kept its whole context and gave it a fresh turn allowance — a coder cut at
@@ -2658,9 +2759,17 @@ def ledger_verdict(payload, decided):
     # list mark, set after this. A side query (`confirmed_reply` None) is mid-turn, before the
     # session may have written its list. `TT.track_message` carries the rule and its why.
     cl, record = checklist(payload)
+    reply, how = TL.confirmed_reply(payload)
     if (isinstance(record, dict) and not record.get("carry_only") and not record.get("ended")
-            and TL.confirmed_reply(payload)[0] is not None):
+            and reply is not None):
         TT.track_message(led, record.get("issue"), TT.checklist_items(cl))
+    # WHAT THE REPLY SAID IT WOULD DO NEXT lands on its issue as `noted`, which nothing that
+    # judges reads (`TT.note_intentions`). Only a reply the transcript holds, and no field is
+    # no record, as it was for the retired list: the fallback text is for the scans.
+    noted_on, noted = None, []
+    if how != "absent" and isinstance(reply, str) and reply.strip():
+        noted_on, noted = TT.note_intentions(
+            led, record.get("issue") if isinstance(record, dict) else None, capture(reply))
     rows = TT.judge_ledger(payload, led)
     if not rows:
         return "", ""
@@ -2683,11 +2792,16 @@ def ledger_verdict(payload, decided):
             out.append("         " + action)
             if quote:
                 quotes.append(quote)
+    # A NOTED LINE IS ADVISORY, NEVER A VERDICT: lower case where a verdict is upper, and not
+    # counted in the header. Only this turn's new wordings, so a plan is shown once.
+    for text in noted:
+        out.append(f"  {noted_on}  noted  {text}")
     if not out:
         return "", ""
     # THE COUNT IS OF ISSUES, NOT OF LINES. An issue asking for a resume carries a second
     # line, and `len(out)` would report two issues judged where one was.
-    return (f"ISSUES  {judged} open issue(s) judged\n" + "\n".join(out),
+    head = f"ISSUES  {judged} open issue(s) judged" if judged else "ISSUES"
+    return (head + "\n" + "\n".join(out),
             "\n".join(quotes))
 
 
@@ -2705,6 +2819,17 @@ def main():
         _issues, _quoted = ledger_verdict(payload, decided)
     except Exception:
         _issues, _quoted = "", ""
+    # THE ASKS LINE GOES TO `systemMessage` ONLY, never to a block's `reason`: it is an
+    # observation about the reply's shape and must never hold a session (`asks_line`).
+    try:
+        _asks = asks_line(payload)
+    except Exception:
+        _asks = ""
+    if _asks:
+        if not isinstance(decided, dict):
+            decided = {}
+        prior = decided.get("systemMessage") or ""
+        decided["systemMessage"] = (prior + "\n" if prior else "") + _asks
     if _issues:
         if isinstance(decided, dict):
             # Joined to the decision rather than replacing it: a blocked Stop still has to
