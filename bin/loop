@@ -6,6 +6,8 @@
     bin/loop categorize [--mine DIR] [--limit 30] [--judge-model M] [--dry-run]
     bin/loop categorize --recluster STAMP                             redo only the clustering call
     bin/loop categorize --accept STAMP                                after you read the taxonomy
+    bin/loop bank [--taxonomy STAMP] [--regression 10] [--seed N] [--dry-run]
+    bin/loop bank --accept STAMP                                      after you read bank.md
 
     Every subcommand takes `--state DIR` (default `${XDG_STATE_HOME:-~/.local/state}/workforce-loop`)
     and `--projects DIR` (default `${CLAUDE_CONFIG_DIR:-~/.claude}/projects`).
@@ -13,9 +15,9 @@
 WHAT IT IS FOR. The user, 2026-10-14: "see if we could put something together that would help
 with recursive improvement that we can run periodically and do an evaluation that can, you know,
 as the model capabilities grow, this feature would get better and better." The design is
-`plan/review-loop-2026-10-14.md`. This file is parts 1 (`mine`), 6 (`due`) and 2 (`categorize`);
-bank, replay, score, propose and gate are later subcommands of THIS script, each added as one more
-entry in `COMMANDS` at the bottom.
+`plan/review-loop-2026-10-14.md`. This file is parts 1 (`mine`), 6 (`due`), 2 (`categorize`) and
+3 (`bank`); replay, score, propose and gate are later subcommands of THIS script, each added as one
+more entry in `COMMANDS` at the bottom.
 
 NOT SHIPPED, AND IT WRITES NOTHING IN THE REPO OR IN ANY PROJECT. It reads every transcript on
 this machine, finance and tax sessions included, so it is not in `manifest.txt` and everything it
@@ -96,9 +98,11 @@ exit 0 either way.
        script then finds in the digest, and a kind (`KINDS`; `unknown` is allowed). An answer
        that is not exactly a JSON object, lacks a field, or quotes what the digest does not say
        is recorded UNPARSED with the reason, never repaired. `notes/<session>.json`.
-    4. CLUSTERING: one judge call over the coded notes. Every member must be a session of this
-       run, every session in exactly one category, every component in `COMPONENTS`; a failing
-       answer writes `taxonomy.json` with `valid: false` and exits 1.
+    4. CLUSTERING: one judge call over the coded notes, each under a short label (S01, S02, ...)
+       rather than its session id, which the judge mis-copies. Every member must be a label of
+       this run, every label in exactly one category, every component in `COMPONENTS`; labels
+       map back to session ids mechanically (`labels` in taxonomy.json). A failing answer writes
+       `taxonomy.json` with `valid: false` and exits 1.
     5. `taxonomy.json` + `taxonomy.md` (categories by count, two quoted examples each).
     6. `--accept STAMP` writes `accepted.json` beside it. Stage 3 banks only from that.
 
@@ -110,12 +114,59 @@ exit 0 either way.
     memory path or non-builtin plugin loaded, any hook event fired, the answering model is the
     proposer's, or the cwd is no longer empty. `--no-session-persistence` leaves no transcript
     for `mine` to rank. `--dry-run` writes the digests and prints the command; no model call.
+
+`bank` — THE FROZEN TASK SET STAGE 4 REPLAYS ("20-50 simple tasks drawn from real failures").
+    1. Input: an ACCEPTED taxonomy (`--taxonomy`, default the latest run; an unaccepted one is
+       refused with the command that accepts it) and the mine run it was built from.
+    2. CAPABILITY tasks, mechanical: every taxonomy session whose first failure is one of
+       `BANK_KINDS`. The evidence quote is located in categorize's own digest; that entry is
+       re-read from the transcript and must still say the same thing. The user words are the
+       human turn before it (its own turn when the failure is the first thing said) plus any
+       turns sent just before with no reply between, VERBATIM from the raw transcript records.
+       REGRESSION tasks: the `--regression` least-friction ranked sessions not in the taxonomy,
+       ties broken in seeded order; their user words open the session. (Requiring a `done`
+       close as well left no pool: most sessions predate the issue ledger.)
+    3. Project state: the newest commit on the project's current HEAD before the opening turn
+       (`git rev-list -1 --before`). No directory, no git, or no such commit: the task is kept,
+       `replayable: false`, with the reason, and gets no judge call. Workforce: this repo's
+       commit and WORKFORCE-VERSION at that time (the repo's; an install may have lagged).
+    4. One judge call per replayable task (the isolated judge above, `judge_setup` rules)
+       drafts a one-paragraph reference outcome and 1-3 graders: `{"script": "<check>"}` from
+       `SCRIPT_GRADERS`, or `{"judge": "<yes/no question>?"}`. A malformed answer is rejected
+       to rejected.jsonl with its reason, never repaired.
+    5. HELD-OUT: of each split's replayable tasks, round(25%) in seeded order. `--seed`
+       (default random) is recorded; the same seed and tasks always give the same split.
+    6. `<state>/bank/<stamp>/`: tasks.jsonl (not held out), heldout.jsonl, rejected.jsonl,
+       bank.json (seed, counts, source taxonomy; no held-out ids), bank.md (the review page; it
+       counts held-out tasks and never lists them). The seed is written to bank.json only, and
+       stdout and stderr never name a replayable task before the split, nor a held-out one
+       after. `--accept STAMP` writes accepted.json.
+
+    ONE TASK (a JSON line). Everything a replay needs; nothing it must guess:
+        id                 "cap-<session>" or "reg-<session>"; split "capability"|"regression"
+        heldout            true only in heldout.jsonl
+        source             {session, project_dir, transcript, title, friction}
+        failure            capability: {category, component, kind, note, evidence,
+                           anchor_entry (1-based digest entry), anchor_ts}; regression: null
+        project            {path, git_toplevel, subdir, commit}: check out `commit`, run in subdir
+        workforce          {commit, version} of this repo at the opening turn, or nulls
+        user_words         {turns: [{n, ts, uuid, text, prompt, images}], peers: [{ts, uuid,
+                           from, text}], session_human_turns}: send each `prompt` in order as
+                           one turn, then each peer `text` (capability only: peer messages
+                           between the user words and the failure); `text` is verbatim
+        replayable         false with `not_replayable` saying why; `caveats` lists what a replay
+                           lacks (earlier turns, images)
+        reference_outcome  one paragraph; graders [{type: script, name, arg} | {type: judge,
+                           question}]; judge {model, session, cost_usd}
+    `--dry-run` builds and prints the tasks (never their words) and the judge command, calls
+    no model and writes nothing.
 """
 
 import argparse
 import collections
 import datetime
 import glob
+import hashlib
 import importlib.machinery
 import importlib.util
 import json
@@ -760,9 +811,10 @@ independent reviewer. Group them into a failure taxonomy (axial coding). Answer 
 JSON object and nothing else:
 
 {"categories": [{"name": "<short name>", "definition": "<one line>",
-                 "component": "<hook|handbook|skill|script|none>", "members": ["<id>", ...]}]}
+                 "component": "<hook|handbook|skill|script|none>", "members": ["<label>", ...]}]}
 
-- Every id below must appear in exactly one category's members. Use only these ids, copied exactly.
+- Every label below (S01, S02, ...) must appear in exactly one category's members. Use only these
+  labels, copied exactly.
 - component: the Claude Workforce component the failure most likely lives in. hook, handbook,
   skill or script; none when it is not a Workforce failure (model behaviour, environment, tests).
 - Prefer a few distinct categories over many single-member ones, but never merge failures that
@@ -813,8 +865,10 @@ def short_ts(ts):
     return (ts or "")[5:16].replace("T", " ") or "?"
 
 
-def digest_entries(path):
-    """[(timestamp, tag, text, is_friction)] from the MAIN transcript, in file order.
+def digest_entries(path, turns=None):
+    """[(timestamp, tag, text, is_friction)] from the MAIN transcript, in file order. When
+    `turns` is a list, each USER and PEER entry's (entry index, tag, raw record) is appended to
+    it, so a caller can recover the VERBATIM words behind an entry the digest one-lined and capped.
 
     Subagent transcripts are left out on purpose: the digest is what the person and the
     dispatching session saw, and an agent's own tool errors reach it only through what it
@@ -848,7 +902,11 @@ def digest_entries(path):
                 if att.get("type") == "hook_system_message":
                     out.extend(issue_entries(ts, att.get("content") or "", issue_seen))
             elif kind == "user":
-                out.extend(user_entries(rec, ts, tools, replied, issue_seen))
+                got = user_entries(rec, ts, tools, replied, issue_seen)
+                if turns is not None and got and (got[-1][1] == "USER"
+                                                  or got[-1][1].startswith("PEER ")):
+                    turns.append((len(out), got[-1][1], rec))
+                out.extend(got)
     return out
 
 
@@ -929,13 +987,17 @@ def _fits(sizes, start, budget):
     return out
 
 
+def entry_line(i, entry):
+    """Entry `i` (0-based) as its digest line; the `[N]` is 1-based."""
+    return "[%d] %s %s: %s" % (i + 1, short_ts(entry[0]), entry[1], entry[2])
+
+
 def render_digest(row, entries, cap):
     """The digest text and how many entries the cap left out. Over the cap it keeps the first
     two fifths, then the region around the first friction signal (a quarter of what is left
     before it, the rest after); when that signal is already in the head, the head runs on to
     the cap. The anchor falls back to the first tool error. Each gap is marked."""
-    lines = ["[%d] %s %s: %s" % (i + 1, short_ts(ts), tag, text)
-             for i, (ts, tag, text, _) in enumerate(entries)]
+    lines = [entry_line(i, e) for i, e in enumerate(entries)]
     sizes = [len(l.encode("utf-8")) + 1 for l in lines]
     keep = list(range(len(lines)))
     cap -= 1024  # room for the header and the gap markers
@@ -1110,8 +1172,9 @@ def validate_note(obj, digest):
 
 
 def validate_taxonomy(obj, ids):
-    """(categories, []) or (None, [reasons]). Every id in exactly one category, every member an
-    id of this run, every component one of COMPONENTS. The count is computed, never read."""
+    """(categories, []) or (None, [reasons]). Every id (a clustering label) in exactly one
+    category, every member an id of this run, every component one of COMPONENTS. The count is
+    computed, never read."""
     if obj is None or not isinstance(obj.get("categories"), list) or not obj["categories"]:
         return None, ["answer is not an object with a non-empty categories list"]
     errors, seen, cats = [], {}, []
@@ -1182,9 +1245,9 @@ def taxonomy_md(tax):
     return "\n".join(out) + "\n"
 
 
-def new_run_dir(state):
-    """(stamp, `<state>/categorize/<stamp>`), created fresh: two runs never share one."""
-    base = private_dir(os.path.join(private_dir(state), "categorize"))
+def new_run_dir(state, stage):
+    """(stamp, `<state>/<stage>/<stamp>`), created fresh: two runs never share one."""
+    base = private_dir(os.path.join(private_dir(state), stage))
     while True:
         stamp = utc_stamp(time.time())
         try:
@@ -1214,30 +1277,35 @@ def build_digests(worst, projects, ddir):
     return picked
 
 
+def judge_setup(args, cmd):
+    """The claude binary for a judging subcommand, or None after printing why its judge
+    arguments (`add_judge_args`) are refused."""
+    why = None
+    if not MODEL_ID.match(args.judge_model):
+        why = "--judge-model %r is not a model id" % args.judge_model
+    elif is_proposer(args.judge_model) and not args.allow_same_model:
+        why = ("the judge must not be the proposer's model (%s); pass --allow-same-model to "
+               "override" % PROPOSER_MODEL)
+    elif args.timeout < 1:
+        why = "--timeout must be at least 1 second"
+    elif args.max_budget_usd <= 0 or args.max_total_usd <= 0:
+        why = "--max-budget-usd and --max-total-usd must be above 0"
+    elif not (args.claude or shutil.which("claude")):
+        why = "no `claude` on PATH; pass --claude"
+    if why:
+        print("loop %s: %s" % (cmd, why), file=sys.stderr)
+        return None
+    return args.claude or shutil.which("claude")
+
+
 def cmd_categorize(args):
     if args.accept:
         return accept_taxonomy(args)
-    if not MODEL_ID.match(args.judge_model):
-        print("loop categorize: --judge-model %r is not a model id" % args.judge_model,
-              file=sys.stderr)
-        return 2
-    if is_proposer(args.judge_model) and not args.allow_same_model:
-        print("loop categorize: the judge must not be the proposer's model (%s); pass "
-              "--allow-same-model to override" % PROPOSER_MODEL, file=sys.stderr)
-        return 2
-    if args.timeout < 1:
-        print("loop categorize: --timeout must be at least 1 second", file=sys.stderr)
-        return 2
-    if args.max_budget_usd <= 0 or args.max_total_usd <= 0:
-        print("loop categorize: --max-budget-usd and --max-total-usd must be above 0",
-              file=sys.stderr)
+    claude = judge_setup(args, "categorize")
+    if not claude:
         return 2
     if args.limit < 1:
         print("loop categorize: --limit must be at least 1", file=sys.stderr)
-        return 2
-    claude = args.claude or shutil.which("claude")
-    if not claude:
-        print("loop categorize: no `claude` on PATH; pass --claude", file=sys.stderr)
         return 2
     if args.recluster:
         return recluster(args, claude)
@@ -1249,7 +1317,7 @@ def cmd_categorize(args):
     rows, summary = load_mine(mine_dir)
     projects = summary.get("projects_dir") or args.projects
     worst = sorted((r for r in rows if r.get("ranked")), key=lambda r: -r["friction"])[:args.limit]
-    stamp, out = new_run_dir(args.state)
+    stamp, out = new_run_dir(args.state, "categorize")
     ddir = private_dir(os.path.join(out, "digests"))
     picked = build_digests(worst, projects, ddir)
     argv = judge_argv(claude, args.judge_model, args.max_budget_usd, args.timeout)
@@ -1266,19 +1334,26 @@ def cmd_categorize(args):
         print("  " + shlex.join(argv))
         print("Dry run: no model was called.")
         return 0
+    return judged("categorize", jcwd,
+                  lambda: categorize_run(args, out, jcwd, argv, picked, mine_dir, stamp))
+
+
+def judged(cmd, jcwd, run):
+    """`run()` with the empty judge cwd in place: exit 3 if a judge call was not independent,
+    and the cwd removed afterwards (left in place only when the judge wrote into it)."""
     private_dir(jcwd)
-    sys.stdout.flush()  # the listing above lands before the per-session progress on stderr
+    sys.stdout.flush()  # what was printed lands before the per-call progress on stderr
     try:
-        return categorize_run(args, out, jcwd, argv, picked, mine_dir, stamp)
+        return run()
     except IndependenceError as e:
         print(file=sys.stderr)
-        print("loop categorize: STOPPED, the judge was not independent: %s" % e, file=sys.stderr)
+        print("loop %s: STOPPED, the judge was not independent: %s" % (cmd, e), file=sys.stderr)
         return 3
     finally:
         try:
             os.rmdir(jcwd)
         except OSError:
-            pass  # left in place: it is not empty, and IndependenceError has said so
+            pass  # not empty, and IndependenceError has said so
 
 
 def categorize_run(args, out, jcwd, argv, picked, mine_dir, stamp):
@@ -1301,7 +1376,8 @@ def categorize_run(args, out, jcwd, argv, picked, mine_dir, stamp):
                "judge_session": res["session_id"], "judge_model": res["model"],
                "cost_usd": res["cost_usd"], "raw": res["text"], "note": note, "reason": reason}
         write_private(os.path.join(ndir, sid + ".json"), json.dumps(rec, indent=1) + "\n")
-        print(" %s" % (note["kind"] if note else "UNPARSED: " + reason), file=sys.stderr)
+        print(" %s" % (note["kind"] if note else "UNPARSED: " + one_line(reason, CAP_LINE)),
+              file=sys.stderr)
         (sessions if note else unparsed).append(rec)
     return cluster_and_write(args, out, jcwd, argv, sessions, unparsed, mine_dir, stamp, cost)
 
@@ -1315,9 +1391,16 @@ def cluster_and_write(args, out, jcwd, argv, sessions, unparsed, mine_dir, stamp
            "unparsed": [{"session": u["session"], "reason": u["reason"]} for u in unparsed],
            "categories": [], "valid": False, "errors": []}
     if sessions:
-        lines = "".join(json.dumps({"id": s["session"], "kind": s["note"]["kind"],
+        # SHORT OPAQUE LABELS, NOT SESSION IDS: asked to copy 36-character UUIDs, the judge kept
+        # each 8-character prefix and invented the rest (real run 20261014T194402Z, rejected
+        # twice). Labels are mapped back mechanically after validation; the map is recorded.
+        labels = {"S%0*d" % (max(2, len(str(len(sessions)))), n): s["session"]
+                  for n, s in enumerate(sessions, 1)}
+        tax["labels"] = labels
+        lines = "".join(json.dumps({"label": label, "kind": s["note"]["kind"],
                                     "first_failure": s["note"]["first_failure"],
-                                    "evidence": s["note"]["evidence"]}) + "\n" for s in sessions)
+                                    "evidence": s["note"]["evidence"]}) + "\n"
+                        for label, s in zip(labels, sessions))
         res = run_judge(argv, CLUSTERING + lines + "=== END NOTES ===\n", jcwd,
                         args.allow_same_model, args.timeout)
         cost += res["cost_usd"] or 0
@@ -1325,7 +1408,9 @@ def cluster_and_write(args, out, jcwd, argv, sessions, unparsed, mine_dir, stamp
         if res["error"]:
             tax["errors"] = [res["error"]]
         else:
-            cats, errs = validate_taxonomy(parse_answer(res["text"]), {s["session"] for s in sessions})
+            cats, errs = validate_taxonomy(parse_answer(res["text"]), set(labels))
+            for c in cats or []:
+                c["members"] = [labels[m] for m in c["members"]]
             tax["categories"], tax["errors"], tax["valid"] = cats or [], errs, cats is not None
     else:
         tax["errors"] = ["no session was coded, so there is nothing to cluster"]
@@ -1345,7 +1430,7 @@ def cluster_and_write(args, out, jcwd, argv, sessions, unparsed, mine_dir, stamp
         print("  %d. %-40s %3d  %-8s %s" % (n, one_line(c["name"], 40), c["count"], c["component"],
                                              " ".join(m[:8] for m in c["members"])))
     for u in unparsed:
-        print("  unparsed %s: %s" % (u["session"][:8], u["reason"][:120]))
+        print("  unparsed %s: %s" % (u["session"][:8], one_line(u["reason"], 120)))
     print("Written: %s/{taxonomy.json,taxonomy.md}  (not accepted; read it, then "
           "`bin/loop categorize --accept %s`)" % (out, stamp))
     return 0
@@ -1381,20 +1466,11 @@ def recluster(args, claude):
     except OSError:
         pass
     argv = judge_argv(claude, args.judge_model, args.max_budget_usd, args.timeout)
-    jcwd = private_dir(os.path.join(out, "judge-cwd"))
+    jcwd = os.path.join(out, "judge-cwd")
     print("loop categorize: reclustering %s from %d saved notes (%d unparsed); no coding calls"
           % (args.recluster, len(sessions), len(unparsed)))
-    try:
-        return cluster_and_write(args, out, jcwd, argv, sessions, unparsed, mine_dir,
-                                 args.recluster, 0.0)
-    except IndependenceError as e:
-        print("loop categorize: STOPPED, the judge was not independent: %s" % e, file=sys.stderr)
-        return 3
-    finally:
-        try:
-            os.rmdir(jcwd)
-        except OSError:
-            pass
+    return judged("categorize", jcwd, lambda: cluster_and_write(
+        args, out, jcwd, argv, sessions, unparsed, mine_dir, args.recluster, 0.0))
 
 
 def accept_taxonomy(args):
@@ -1418,11 +1494,568 @@ def accept_taxonomy(args):
     return 0
 
 
+# ---------------------------------------------------------------- bank
+
+BANK_KINDS = ("model_behaviour", "workforce_defect")  # every other kind is not a task to bank
+HELDOUT_FRACTION = 0.25
+VERSION_ANCHOR = "workforce/references/version.md"  # the file `bin/pre-commit-version` reads
+_TS = re.compile(r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d+)?Z$")
+_ARG_CONTROL = re.compile(r"[\x00-\x1f\x7f]")
+
+# THE SCRIPT-GRADER VOCABULARY: stage 4 (`score`) implements exactly these names and no others,
+# and the judge's prompt is generated from this table, so the two cannot drift. Paths and globs
+# are relative to the PROJECT directory (the session's cwd), and a grader reads only the replay:
+# its main transcript, and its diff from the starting commit. name -> (argument kind, meaning).
+SCRIPT_GRADERS = {
+    "no_turn_limit_hit": (None, "no agent in the replay stopped at its turn limit"),
+    "no_hook_not_met": (None, "no Stop hook in the replay reported its condition was not met"),
+    "no_kickback_at_end": (None, "the replay's last ISSUES block has no KICKBACK line"),
+    "file_exists": ("relpath", "after the replay, this literal path exists"),
+    "diff_touches": ("glob", "the replay's diff from the starting commit changes a path "
+                             "matching this glob"),
+    "transcript_absent": ("text", "this exact text (a literal, case-sensitive substring, not a "
+                                  "pattern) appears nowhere in the replay's main transcript text"),
+}
+
+BANKING = CONTEXT + """
+
+TASK: this session is being frozen into a REPLAY TASK. A replay starts a fresh Claude Code session
+on the same project at the git commit it was at, sends the USER WORDS below verbatim, and runs with
+no human in the loop. Graders then read only the replay: its transcript and its diff from that
+commit. %(situation)s
+
+Answer with exactly one JSON object and nothing else:
+
+{"reference_outcome": "<one paragraph>", "graders": [{"script": "<check>"}, {"judge": "<question>"}]}
+
+- reference_outcome: one paragraph saying what a good session would have produced for these words:
+  the end state of the project and what the final reply told the user. Concrete; not a summary of
+  what this session did.
+- graders: 1 to 3 objects, each with exactly one key. PREFER script graders; use a judge grader only
+  for what no script check can see. A script check is exactly one of these (paths and globs relative
+  to the project directory, never absolute, never containing ..):
+%(vocab)s
+  A judge grader is one yes/no question, on one line ending in "?", that a reviewer answers from
+  the replay's transcript and diff; it may also be answered unknown.
+- Every grader must pass on a good replay. %(fail_on)s
+
+=== USER WORDS (verbatim, in order) ===
+%(words)s
+=== END USER WORDS ===
+
+=== DIGEST ===
+"""
+
+SITUATION = {
+    "capability": ("This session FAILED. An independent reviewer noted its first failure:\n"
+                   "FAILURE: %(note)s\nEVIDENCE: %(evidence)s"),
+    "regression": ("This session went WELL by the transcript's friction signals (score "
+                   "%(friction)s, among the lowest on this machine). The task guards that work "
+                   "against a later change breaking it."),
+}
+FAIL_ON = {
+    "capability": "At least one must fail on a replay that repeats the failure above.",
+    "regression": "At least one must fail on a replay that does not do the work this session did.",
+}
+
+
+def git(cwd, *argv):
+    """Stripped stdout of one read-only git command in `cwd`, or None on any failure. Never a
+    shell; fsmonitor off, so reading a project's history runs nothing from its config."""
+    try:
+        r = subprocess.run(["git", "-c", "core.fsmonitor=false", "-C", cwd] + list(argv),
+                           stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=30,
+                           env=dict(os.environ, GIT_TERMINAL_PROMPT="0"))
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return r.stdout.strip() if r.returncode == 0 else None
+
+
+def project_state(path, ts):
+    """({path, git_toplevel, subdir, commit}, None) or (that, why it cannot be reconstructed).
+    `commit` is the newest commit on the project's CURRENT HEAD committed before `ts`."""
+    st = {"path": path, "git_toplevel": None, "subdir": None, "commit": None}
+    if not (isinstance(path, str) and os.path.isabs(path) and os.path.isdir(path)):
+        return st, "the project directory is gone (%s)" % path
+    top = git(path, "rev-parse", "--show-toplevel")
+    if not top:
+        return st, "not a git repository, so its state at the time cannot be reconstructed"
+    st["git_toplevel"] = top
+    st["subdir"] = os.path.relpath(os.path.realpath(path), os.path.realpath(top))
+    st["commit"] = git(path, "rev-list", "-1", "--before=" + ts, "HEAD") or None
+    if not st["commit"]:
+        return st, "no commit on HEAD before %s" % ts
+    return st, None
+
+
+def workforce_at(ts):
+    """This repo's commit and WORKFORCE-VERSION at `ts`. The repo's, not the installed copy's:
+    an install that lagged the repo is not recorded anywhere `bank` can read."""
+    commit = git(ROOT, "rev-list", "-1", "--before=" + ts, "HEAD") or None
+    text = git(ROOT, "show", "%s:%s" % (commit, VERSION_ANCHOR)) if commit else None
+    m = re.search(r"^WORKFORCE-VERSION:\s*(\S+)\s*$", text or "", re.M)
+    return {"commit": commit, "version": m.group(1) if m else None}
+
+
+def turn_record(n, rec):
+    """One human turn, VERBATIM. `text` is the transcript's own text content, unchanged (a list
+    of text blocks joined by one space); `prompt` is what a replay sends: the same text, except
+    that a slash command is sent as `/name args`, the way it was typed."""
+    text = record_text(rec)
+    name = re.search(r"<command-name>(.*?)</command-name>", text, re.S)
+    args = re.search(r"<command-args>(.*?)</command-args>", text, re.S)
+    prompt = text
+    if name:
+        prompt = ("%s %s" % (name.group(1).strip(), args.group(1).strip() if args else "")).strip()
+    content = (rec.get("message") or {}).get("content")
+    images = sum(1 for b in content if isinstance(b, dict) and b.get("type") == "image") \
+        if isinstance(content, list) else 0
+    return {"n": n, "ts": rec.get("timestamp"), "uuid": rec.get("uuid"), "text": text,
+            "prompt": prompt, "images": images}
+
+
+def anchor_entry(digest, quote):
+    """(0-based entry index, digest line) of the line where the evidence quote completes, or
+    (None, None). Read from categorize's own digest, the text the quote was checked against."""
+    lines = [l for l in digest.splitlines() if _ENTRY_LINE.match(l)]
+    if not quote or not quote_found(quote, "\n".join(lines)):
+        return None, None
+    lo, hi = 0, len(lines) - 1
+    while lo < hi:  # a prefix that contains the quote stays containing it: binary search
+        mid = (lo + hi) // 2
+        if quote_found(quote, "\n".join(lines[:mid + 1])):
+            hi = mid
+        else:
+            lo = mid + 1
+    return int(_ENTRY_LINE.match(lines[lo]).group(0)[1:-2]) - 1, lines[lo]
+
+
+def replied_between(entries, a, b):
+    """True when anything but another human turn lies between entries a and b: a reply, an
+    interrupt, a compaction, a tool error, a hook line. Only back-to-back messages are one ask;
+    "do A", tools, an interrupt, then "do B instead" are two."""
+    return any(e[1] != "USER" for e in entries[a + 1:b])
+
+
+def opening_turns(entries, turns, anchor):
+    """Indices into `turns` of the human message(s) that opened the work. For a failure, the
+    last human turn before the anchor entry (the anchor's own turn when the failure IS the first
+    thing the person said), with any turns sent just before it, no reply between. For a good
+    session (`anchor` None), the first human turn and any sent right after it."""
+    if not turns:
+        return []
+    if anchor is None:
+        last = 0
+        while last + 1 < len(turns) and not replied_between(entries, turns[last][0],
+                                                            turns[last + 1][0]):
+            last += 1
+        return list(range(0, last + 1))
+    before = [j for j, (ei, _) in enumerate(turns) if ei < anchor]
+    if before:
+        last = before[-1]
+    elif entries[anchor][1] == "USER":
+        last = next(j for j, (ei, _) in enumerate(turns) if ei == anchor)
+    else:
+        return []
+    first = last
+    while first > 0 and not replied_between(entries, turns[first - 1][0], turns[first][0]):
+        first -= 1
+    return list(range(first, last + 1))
+
+
+def build_task(split, row, projects, cat=None):
+    """(task, None) or (None, why it cannot be built). Mechanical; no model call. `cat` is the
+    taxonomy's record for a capability task: category, component, note, and its digest path."""
+    sid = row["session"]
+    path = os.path.join(projects, row["project_dir"], sid + ".jsonl")
+    if not os.path.isfile(path):
+        return None, "transcript gone (%s)" % path
+    found, anchor, failure, digest = [], None, None, None
+    try:
+        entries = digest_entries(path, found)
+    except OSError as e:
+        return None, "transcript unreadable (%s)" % e
+    turns = [(ei, rec) for ei, tag, rec in found if tag == "USER"]
+    if cat is not None:
+        try:
+            with open(cat["digest"], encoding="utf-8") as fh:
+                digest = fh.read()
+        except OSError:
+            return None, "categorize's digest is gone (%s)" % cat["digest"]
+        anchor, line = anchor_entry(digest, cat["note"]["evidence"])
+        if anchor is None:
+            return None, "the evidence quote is not in categorize's digest"
+        if anchor >= len(entries) or entry_line(anchor, entries[anchor]) != line:
+            return None, "the transcript changed since categorize: entry %d no longer reads " \
+                         "as the digest says" % (anchor + 1)
+        failure = {"category": cat["category"], "component": cat["component"],
+                   "kind": cat["note"]["kind"], "note": cat["note"]["first_failure"],
+                   "evidence": cat["note"]["evidence"], "anchor_entry": anchor + 1,
+                   "anchor_ts": entries[anchor][0]}
+    else:
+        digest = render_digest(row, entries, DIGEST_CAP)[0]
+    picked = opening_turns(entries, turns, anchor)
+    if not picked:
+        return None, "no human turn before the failure"
+    words = [turn_record(j + 1, turns[j][1]) for j in picked]
+    # Work that ARRIVED from another session between the user's words and the failure: without
+    # it a replay of the words alone has nothing to do. Verbatim, as the transcript holds it.
+    peers = [] if anchor is None else [
+        {"ts": rec.get("timestamp"), "uuid": rec.get("uuid"),
+         "from": (rec.get("origin") or {}).get("name"),
+         "text": (rec.get("origin") or {}).get("body") or record_text(rec)}
+        for ei, tag, rec in found if tag.startswith("PEER ") and turns[picked[-1]][0] < ei <= anchor]
+    ts = words[0]["ts"]
+    if not (isinstance(ts, str) and _TS.match(ts)):
+        return None, "the opening turn's timestamp %r is not ISO UTC" % ts
+    project, why = project_state(row["project"], ts)
+    caveats = []
+    if words[0]["n"] > 1:
+        caveats.append("opened at human turn %d of %d: the %d turn(s) before it are context a "
+                       "replay does not have" % (words[0]["n"], len(turns), words[0]["n"] - 1))
+    if peers:
+        caveats.append("the work arrived as %d peer message(s) after the user words; a replay "
+                       "must deliver user_words.peers too" % len(peers))
+    if any(w["images"] for w in words):
+        caveats.append("the user words carried %d image(s), which the bank does not store"
+                       % sum(w["images"] for w in words))
+    task = {
+        "id": "%s-%s" % (split[:3], sid), "split": split,
+        "source": {"session": sid, "project_dir": row["project_dir"], "transcript": path,
+                   "title": row.get("title"), "friction": row.get("friction")},
+        "failure": failure, "project": project, "workforce": workforce_at(ts),
+        "user_words": {"turns": words, "peers": peers, "session_human_turns": len(turns)},
+        "replayable": why is None, "not_replayable": why, "caveats": caveats,
+        "reference_outcome": None, "graders": None, "judge": None,
+    }
+    return (task, digest), None
+
+
+def check_grader_arg(kind, arg):
+    """None when `arg` is a well-formed argument of that kind, else why not."""
+    if not arg or len(arg) > 200 or _ARG_CONTROL.search(arg):
+        return "the argument must be 1 to 200 characters with no control character"
+    if kind in ("relpath", "glob"):
+        if arg.startswith(("/", "~", "-")) or "\\" in arg or ".." in arg.split("/"):
+            return "%r is not a path inside the project" % arg  # "-": never an option to a tool
+        if kind == "relpath" and re.search(r"[*?\[]", arg):
+            return "%r is a glob; file_exists takes a literal path" % arg
+        if kind == "glob" and not re.sub(r"[*?/\[\]!.]", "", arg):
+            return "%r matches every path" % arg
+        return None
+    # A LITERAL, never a regex: a model-written pattern run over a transcript is a ReDoS risk.
+    if len(arg.strip()) < 4:
+        return "%r is too short to be specific; it would match almost any transcript" % arg
+    return None
+
+
+def validate_grader(g):
+    """(normalized grader, None) or (None, reason). Never repairs one."""
+    if not isinstance(g, dict) or len(g) != 1:
+        return None, "grader %s is not an object with exactly one key" % json.dumps(g)[:120]
+    (key, val), = g.items()
+    if key not in ("script", "judge") or not isinstance(val, str) or not val.strip():
+        return None, "grader %s is not {\"script\": ...} or {\"judge\": ...}" % json.dumps(g)[:120]
+    val = val.strip()
+    if key == "judge":
+        if "\n" in val or len(val) > 300 or not val.endswith("?"):
+            return None, "judge grader %r is not one line of at most 300 characters ending " \
+                         "in '?'" % val[:120]
+        return {"type": "judge", "question": val}, None
+    name, sep, arg = val.partition(":")
+    if name not in SCRIPT_GRADERS:
+        return None, "script check %r is not one of %s" % (name[:60], ", ".join(SCRIPT_GRADERS))
+    kind = SCRIPT_GRADERS[name][0]
+    if kind is None:
+        if sep:
+            return None, "script check %s takes no argument" % name
+        return {"type": "script", "name": name, "arg": None}, None
+    why = check_grader_arg(kind, arg)
+    if why:
+        return None, "script check %s: %s" % (name, why)
+    return {"type": "script", "name": name, "arg": arg}, None
+
+
+def validate_bank_answer(obj):
+    """({reference_outcome, graders}, None) or (None, reason)."""
+    if obj is None:
+        return None, "answer is not a JSON object"
+    ref, graders = obj.get("reference_outcome"), obj.get("graders")
+    if not (isinstance(ref, str) and ref.strip()) or len(ref) > 1500 or "\n\n" in ref.strip():
+        return None, "reference_outcome is not one paragraph of at most 1500 characters"
+    if not isinstance(graders, list) or not 1 <= len(graders) <= 3:
+        return None, "graders is not a list of 1 to 3"
+    out = []
+    for g in graders:
+        norm, why = validate_grader(g)
+        if why:
+            return None, why
+        if norm in out:
+            return None, "grader %s appears twice" % json.dumps(g)[:120]
+        out.append(norm)
+    return {"reference_outcome": ref.strip(), "graders": out}, None
+
+
+def seeded_order(ids, seed, salt):
+    """`ids` in a fixed pseudo-random order for this seed: the same seed, salt and ids always
+    give the same order, and one id's place does not depend on which other ids are present."""
+    return sorted(ids, key=lambda i: hashlib.sha256(("%d:%s:%s" % (seed, salt, i)).encode())
+                  .hexdigest())
+
+
+def load_taxonomy(state, stamp):
+    """(stamp, run dir, taxonomy, None) or (.., .., None, the one-line refusal)."""
+    base = os.path.join(state, "categorize")
+    if stamp is None:
+        runs = sorted(glob.glob(os.path.join(glob.escape(base), "*", "taxonomy.json")))
+        if not runs:
+            return None, None, None, "no taxonomy in %s; run `bin/loop categorize` first" % base
+        stamp = os.path.basename(os.path.dirname(runs[-1]))
+    elif not STAMP.match(stamp):
+        return stamp, None, None, "--taxonomy takes a run stamp like 20261014T120000Z"
+    out = os.path.join(base, stamp)
+    try:
+        with open(os.path.join(out, "taxonomy.json"), encoding="utf-8") as fh:
+            tax = json.load(fh)
+    except (OSError, ValueError):
+        return stamp, out, None, "no readable taxonomy at %s" % out
+    if not isinstance(tax, dict) or not tax.get("valid"):
+        return stamp, out, None, "taxonomy %s was rejected by validation; it cannot be banked" % stamp
+    if not os.path.isfile(os.path.join(out, "accepted.json")):
+        return stamp, out, None, ("taxonomy %s is not accepted; read %s/taxonomy.md, then run "
+                                  "`bin/loop categorize --accept %s`" % (stamp, out, stamp))
+    return stamp, out, tax, None
+
+
+def bank_candidates(tax, cat_dir, rows, n_regression, seed):
+    """([(split, row, cat)], skipped counts by kind, regression pool size). Capability: every
+    taxonomy session of a BANK_KINDS kind. Regression: the `n_regression` least-friction ranked
+    sessions outside the taxonomy, ties broken in seeded order."""
+    by_id = {r["session"]: r for r in rows}
+    category = {m: c for c in tax.get("categories") or [] for m in c["members"]}
+    picked, skipped = [], collections.Counter()
+    for s in tax.get("sessions") or []:
+        kind = (s.get("note") or {}).get("kind")
+        if kind not in BANK_KINDS:
+            skipped[kind or "?"] += 1
+            continue
+        row, c = by_id.get(s["session"]), category.get(s["session"]) or {}
+        if row is None:
+            skipped["not in the mine run"] += 1
+            continue
+        picked.append(("capability", row, {
+            "category": c.get("name"), "component": c.get("component"), "note": s["note"],
+            "digest": os.path.join(cat_dir, "digests", s["session"] + ".txt")}))
+    taken = {s["session"] for s in tax.get("sessions") or []}
+    pool = seeded_order([r["session"] for r in rows if r.get("ranked") and r["session"] not in taken],
+                        seed, "regression")
+    pool.sort(key=lambda sid: by_id[sid]["friction"])  # stable: the seeded order breaks ties
+    for sid in pool[:n_regression]:
+        picked.append(("regression", by_id[sid], None))
+    return picked, skipped, len(pool)
+
+
+def cmd_bank(args):
+    if args.accept:
+        return accept_bank(args)
+    if args.regression < 0:
+        print("loop bank: --regression must be 0 or more", file=sys.stderr)
+        return 2
+    claude = judge_setup(args, "bank")
+    if not claude:
+        return 2
+    stamp, cat_dir, tax, refusal = load_taxonomy(args.state, args.taxonomy)
+    if refusal:
+        print("loop bank: " + refusal, file=sys.stderr)
+        return 2
+    mine_dir = tax.get("mine_dir")
+    if not mine_dir or not os.path.isfile(os.path.join(mine_dir, "sessions.jsonl")):
+        print("loop bank: taxonomy %s's mine run is gone (%s)" % (stamp, mine_dir), file=sys.stderr)
+        return 2
+    rows, summary = load_mine(mine_dir)
+    projects = summary.get("projects_dir") or args.projects
+    seed = args.seed if args.seed is not None else int.from_bytes(os.urandom(4), "big")
+    picked, skipped, pool = bank_candidates(tax, cat_dir, rows, args.regression, seed)
+    built, rejected = [], []
+    for split, row, cat in picked:
+        got, why = build_task(split, row, projects, cat)
+        if why:
+            rejected.append({"id": "%s-%s" % (split[:3], row["session"]), "split": split,
+                             "reason": why})
+        else:
+            built.append(got)
+    argv = judge_argv(claude, args.judge_model, args.max_budget_usd, args.timeout)
+    n_reg = sum(1 for s, _, _ in picked if s == "regression")
+    print("loop bank: taxonomy %s (accepted)" % stamp)  # the seed goes to bank.json only
+    print("  capability candidates %d (skipped by kind: %s); regression %d of %d requested "
+          "(least friction of %d ranked sessions outside the taxonomy: %s)"
+          % (len(picked) - n_reg, ", ".join("%s %d" % kv for kv in sorted(skipped.items()))
+             or "none", n_reg, args.regression, pool,
+             ", ".join("%g" % r["friction"] for s, r, _ in picked if s == "regression") or "none"))
+    replayable = sum(1 for t, _ in built if t["replayable"])
+    print("  built %d task(s): %d replayable, %d not replayable; %d rejected"
+          % (len(built), replayable, len(built) - replayable, len(rejected)))
+    # NO REPLAYABLE TASK IS NAMED BEFORE THE SPLIT: any of them may be held out. A task that is
+    # not replayable, or rejected, never enters the split, so it can be listed now.
+    print_rows([t for t, _ in built if not t["replayable"]], rejected)
+    if args.dry_run:
+        print("\nJudge command (prompt + digest on stdin, one call per replayable task; cwd an "
+              "empty directory; env keeps only %s):"
+              % ", ".join(k for k in JUDGE_ENV_KEEP if k in os.environ))
+        print("  " + shlex.join(argv))
+        print("Dry run: no model was called and nothing was written.")
+        return 0
+    bstamp, out = new_run_dir(args.state, "bank")
+    jcwd = os.path.join(out, "judge-cwd")
+    meta = {"stamp": bstamp, "taxonomy": stamp, "taxonomy_dir": cat_dir, "mine_dir": mine_dir,
+            "seed": seed, "heldout_fraction": HELDOUT_FRACTION, "judge_model": args.judge_model,
+            "judge_command": shlex.join(argv), "regression_requested": args.regression,
+            "regression_pool": pool, "skipped_by_kind": dict(skipped)}
+    return judged("bank", jcwd, lambda: bank_run(args, out, jcwd, argv, built, rejected, meta))
+
+
+def bank_run(args, out, jcwd, argv, built, rejected, meta):
+    """One judge call per replayable task, then the held-out split and the four files."""
+    tasks, cost, n_mech = [], 0.0, len(rejected)  # rejected so far: mechanical, already listed
+    total, n = sum(1 for t, _ in built if t["replayable"]), 0
+    for task, digest in built:
+        if not task["replayable"]:
+            tasks.append(task)  # kept, marked; no judge spend on a task replay cannot run
+            continue
+        if cost >= args.max_total_usd:
+            rejected.append({"id": task["id"], "split": task["split"],
+                             "reason": "not graded: run spend cap $%.2f reached" % args.max_total_usd})
+            continue
+        n += 1
+        print("  grading %d/%d ..." % (n, total), end="", file=sys.stderr, flush=True)
+        f = task["failure"] or {}
+        prompt = BANKING % {
+            "situation": SITUATION[task["split"]] % {
+                "note": f.get("note"), "evidence": f.get("evidence"),
+                "friction": task["source"]["friction"]},
+            "fail_on": FAIL_ON[task["split"]],
+            "vocab": "\n".join("    %-38s %s" % (n + (":<%s>" % k if k else ""), m)
+                               for n, (k, m) in SCRIPT_GRADERS.items()),
+            "words": "\n---\n".join([w["prompt"] for w in task["user_words"]["turns"]] +
+                                     ["[PEER MESSAGE from %s]\n%s" % (pm["from"], pm["text"])
+                                      for pm in task["user_words"]["peers"]]),
+        } + digest + "=== END DIGEST ===\n"
+        res = run_judge(argv, prompt, jcwd, args.allow_same_model, args.timeout)
+        cost += res["cost_usd"] or 0
+        ans, why = (None, res["error"]) if res["error"] else \
+            validate_bank_answer(parse_answer(res["text"]))
+        task["judge"] = {"model": res["model"], "session": res["session_id"],
+                         "cost_usd": res["cost_usd"]}
+        print(" %s" % ("ok" if ans else "REJECTED: " + one_line(why, CAP_LINE)), file=sys.stderr)
+        if ans is None:
+            rejected.append({"id": task["id"], "split": task["split"], "reason": why,
+                             "raw": res["text"]})
+            continue
+        task.update(ans)
+        tasks.append(task)
+    heldout = set()
+    for split in ("capability", "regression"):
+        ids = [t["id"] for t in tasks if t["split"] == split and t["replayable"]]
+        heldout.update(seeded_order(ids, meta["seed"], "heldout")[:int(len(ids) * HELDOUT_FRACTION + 0.5)])
+    for t in tasks:
+        t["heldout"] = t["id"] in heldout
+    shown = [t for t in tasks if not t["heldout"]]
+    hidden = [t for t in tasks if t["heldout"]]
+    counts = {s: {"tasks": sum(1 for t in tasks if t["split"] == s),
+                  "replayable": sum(1 for t in tasks if t["split"] == s and t["replayable"]),
+                  "heldout": sum(1 for t in hidden if t["split"] == s)}
+              for s in ("capability", "regression")}
+    meta.update(counts=counts, rejected=len(rejected), cost_usd=round(cost, 4))
+    for name, items in (("tasks", shown), ("heldout", hidden), ("rejected", rejected)):
+        write_private(os.path.join(out, name + ".jsonl"),
+                      "".join(json.dumps(t, sort_keys=True) + "\n" for t in items))
+    write_private(os.path.join(out, "bank.json"), json.dumps(meta, indent=1) + "\n")
+    write_private(os.path.join(out, "bank.md"), bank_md(meta, shown, rejected))
+    print("\nAfter the split (held-out tasks are counted, never listed):")
+    print_rows([t for t in shown if t["replayable"]], [])
+    print("\nBank %s: %s; %d rejected; judge %s, $%.2f"
+          % (meta["stamp"], "; ".join("%s %d (%d replayable, %d held out)"
+                                      % (s, c["tasks"], c["replayable"], c["heldout"])
+                                      for s, c in counts.items()),
+             len(rejected), args.judge_model, cost))
+    print_rows([], rejected[n_mech:])  # the mechanical ones were listed before grading
+    print("Written: %s/{tasks.jsonl,heldout.jsonl,rejected.jsonl,bank.json,bank.md}  (not "
+          "accepted; read bank.md, then `bin/loop bank --accept %s`)" % (out, meta["stamp"]))
+    return 0 if any(t["replayable"] for t in tasks) else 1
+
+
+def print_rows(tasks, rejected):
+    """One line per task and per rejection; never call it with a task that may be held out."""
+    for task in tasks:  # one_line throughout: a path or judge error may carry terminal escapes
+        p = task["project"]
+        print("  %-10s %s  %-24s commit %-10s turn %d/%d  %s"
+              % (task["split"], task["source"]["session"][:8],
+                 one_line(os.path.basename(p["path"] or ""), 24)[:24], (p["commit"] or "-")[:10],
+                 task["user_words"]["turns"][0]["n"], task["user_words"]["session_human_turns"],
+                 "replayable" if task["replayable"] else
+                 "NOT REPLAYABLE: " + one_line(task["not_replayable"], CAP_LINE)))
+    for r in rejected:
+        print("  %-10s %s  REJECTED: %s" % (r["split"], r["id"][4:12], one_line(r["reason"], CAP_LINE)))
+
+
+def bank_md(meta, shown, rejected):
+    """The review page. Held-out tasks are counted, never listed."""
+    hidden = sum(c["heldout"] for c in meta["counts"].values())
+    out = ["# Task bank %s" % meta["stamp"], "",
+           "From accepted taxonomy `%s`, judge `%s`. %d task(s) listed; %d held-out task(s) "
+           "are not listed here and never will be." % (meta["taxonomy"], meta["judge_model"],
+                                                       len(shown), hidden), "",
+           "**Not yet accepted.** Read it, then `bin/loop bank --accept %s`." % meta["stamp"], ""]
+    for t in shown:
+        p, f = t["project"], t["failure"]
+        out += ["## %s `%s` %s" % (t["split"], t["source"]["session"][:8],
+                                   md_safe(os.path.basename(p["path"] or ""), 60)), ""]
+        if f:
+            out += ["- category: %s (%s, %s)" % (md_safe(f["category"] or "?", 80),
+                                                 md_safe(f["component"]), md_safe(f["kind"])),
+                    "- failure: %s" % md_safe(f["note"]), "  > %s" % md_safe(f["evidence"])]
+        out += ["- project at: `%s`, workforce %s" % ((p["commit"] or "none")[:12],
+                                                      t["workforce"]["version"] or "unknown")]
+        if not t["replayable"]:
+            out += ["- NOT REPLAYABLE: %s" % md_safe(t["not_replayable"])]
+        out += ["- caveat: %s" % md_safe(c) for c in t["caveats"]]
+        out += ["- user words (turn %d): %s" % (w["n"], md_safe(w["prompt"])) for w in
+                t["user_words"]["turns"]]
+        if t["reference_outcome"]:
+            out += ["- reference: %s" % md_safe(t["reference_outcome"], 1500)]
+            out += ["- grader: %s" % md_safe(g["question"] if g["type"] == "judge" else
+                                             g["name"] + (":" + g["arg"] if g["arg"] else ""))
+                    for g in t["graders"]]
+        out.append("")
+    if rejected:
+        out += ["## Rejected (not in the bank)", ""]
+        out += ["- %s `%s`: %s" % (r["split"], r["id"][4:12], md_safe(r["reason"]))
+                for r in rejected]
+    return "\n".join(out) + "\n"
+
+
+def accept_bank(args):
+    if not STAMP.match(args.accept):
+        print("loop bank: --accept takes a bank stamp like 20261014T120000Z", file=sys.stderr)
+        return 2
+    out = os.path.join(args.state, "bank", args.accept)
+    try:
+        with open(os.path.join(out, "bank.json"), encoding="utf-8") as fh:
+            meta = json.load(fh)
+    except (OSError, ValueError):
+        print("loop bank: no readable bank at %s" % out, file=sys.stderr)
+        return 2
+    write_private(os.path.join(out, "accepted.json"),
+                  json.dumps({"accepted_at": utc_stamp(time.time())}) + "\n")
+    print("Accepted: bank %s (%s)" % (args.accept, "; ".join(
+        "%s %d" % (s, c["tasks"]) for s, c in (meta.get("counts") or {}).items())))
+    return 0
+
+
 # ---------------------------------------------------------------- dispatcher
 
-def add_categorize(p):
-    p.add_argument("--mine", metavar="DIR", help="a mine run directory (default: the latest)")
-    p.add_argument("--limit", type=int, default=30, help="worst N ranked sessions (default 30)")
+def add_judge_args(p, total_note):
+    """The judge flags every judging subcommand shares; `judge_setup` checks them."""
     p.add_argument("--judge-model", default=DEFAULT_JUDGE,
                    help="judge model; never the proposer's (default %(default)s)")
     p.add_argument("--allow-same-model", action="store_true",
@@ -1432,13 +2065,31 @@ def add_categorize(p):
     p.add_argument("--max-budget-usd", type=float, default=1.0,
                    help="spend cap per judge call (default 1.00)")
     p.add_argument("--max-total-usd", type=float, default=10.0,
-                   help="spend cap for the whole run; coding stops there and what was coded "
-                        "is still clustered (default 10.00)")
+                   help="spend cap for the whole run; %s (default 10.00)" % total_note)
+
+
+def add_categorize(p):
+    p.add_argument("--mine", metavar="DIR", help="a mine run directory (default: the latest)")
+    p.add_argument("--limit", type=int, default=30, help="worst N ranked sessions (default 30)")
+    add_judge_args(p, "coding stops there and what was coded is still clustered")
     p.add_argument("--recluster", metavar="STAMP",
                    help="redo only the clustering call of that run, from its saved notes")
     p.add_argument("--dry-run", action="store_true",
                    help="build digests, print sizes and the judge command; call no model")
     p.add_argument("--accept", metavar="STAMP", help="record that you reviewed that taxonomy")
+
+
+def add_bank(p):
+    p.add_argument("--taxonomy", metavar="STAMP",
+                   help="an ACCEPTED categorize run (default: the latest run, which must be accepted)")
+    p.add_argument("--regression", type=int, default=10,
+                   help="regression tasks drawn from good sessions (default 10)")
+    p.add_argument("--seed", type=int, help="seed for the regression sample and the held-out "
+                                            "split (default: random, recorded in bank.json)")
+    add_judge_args(p, "tasks past it are rejected as not graded")
+    p.add_argument("--dry-run", action="store_true",
+                   help="build the tasks, print them and the judge command; call no model, write nothing")
+    p.add_argument("--accept", metavar="STAMP", help="record that you reviewed that bank")
 
 
 def add_mine(p):
@@ -1457,6 +2108,8 @@ COMMANDS = {
             cmd_due),
     "categorize": ("an independent judge codes each worst session's first failure, then "
                    "clusters them into a taxonomy", add_categorize, cmd_categorize),
+    "bank": ("freeze replay tasks from an accepted taxonomy, with reference outcomes, graders "
+             "and a held-out split", add_bank, cmd_bank),
 }
 
 
