@@ -2751,7 +2751,11 @@ def ledger_verdict(payload, decided):
     # until the next message's absorb — which is the pile the user was looking at on
     # 2026-10-13. STATUS ONLY, onto the issue each row names: `TT.absorb_carried` cannot add,
     # reorder or resurrect an item on an issue this turn did not open.
-    TT.absorb_carried(led, TT.carried_items(checklist(payload)[0] or {}))
+    # THE TITLES FOR EARLIER UNTITLED ISSUES land here too, onto open issues only, so this
+    # Stop's ISSUES line already shows them (`TT.absorb_titles`).
+    earlier = checklist(payload)[0] or {}
+    TT.absorb_carried(led, TT.carried_items(earlier))
+    TT.absorb_titles(led, TT.checklist_titles(earlier))
     # AND THEN THE MESSAGE IS TRACKED, AFTER THE CARRY SO A FALLBACK THE SESSION MARKED IS NOT
     # SUPERSEDED OVER ITS MARK. Only at the Stop that ends a USER message's turn, which is the
     # tag's record saying so: a record exists only for a message that opened a checklist,
