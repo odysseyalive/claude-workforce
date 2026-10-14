@@ -1,6 +1,5 @@
 # Discovery — how much a finding is trusted, and what may be done about it
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 7 assertion(s) in bin/check name this file; 13 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — the tier caps the action. A finding may never be acted on above its tier. -->
 
 `conversion-taxonomy.md` classifies **what a skill is**. This file classifies **how much a finding

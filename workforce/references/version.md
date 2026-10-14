@@ -1,6 +1,5 @@
 # Version
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 0 assertion(s) in bin/check name this file; 2 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: LOW — the authoritative product version anchor. `version` and `update` read it. -->
 
 ```

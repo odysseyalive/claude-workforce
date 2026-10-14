@@ -93,7 +93,6 @@ An empty instance is the only instance:
 | Script | Implements | Load-bearing | Negative test |
 |---|---|---|---|
 | `workforce/bin/wf-map` | the three views above, the root containment rule, the read cap, and the refusal to execute anything in the mapped tree | yes — an employee with no map searches by hand, which is the 21-42% of tool calls this exists to remove | `map-escape-symlink`: a symlink out of the tree is handed to it → exits 2, names the path, reads nothing. Run 2026-10-12 |
-| `bin/prove --cases-for` (maintainer-only) | answers which assertions name a file, from the one case list. `bin/check --for` asks it; `wf-map` only PRINTS the command | yes — without it `bin/check --for` would keep a list that drifts from the cases | `map-tests-never-runs-project-prove`: a project whose `bin/prove` carries the copied docstring and writes a marker if run → the marker is absent and the command is printed. Run 2026-10-12 |
 | `bin/script-conformance --list` (maintainer-only) | answers which fixtures a change to a file can reach, transitively | no — its absence costs the transitive fixture list, not correctness | `map-tests-handbook-check`: a project with neither suite falls through to handbook `Check:` lines rather than reporting no coverage. Run 2026-10-12 |
 
 A maintainer reports; it never repairs. `wf-map` writes nothing anywhere, which is the
@@ -110,5 +109,4 @@ WF="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/workforce"; [ -d "$WF" ] || WF="$
 "$WF/bin/wf-map" --tests src/widget.py         # what covers it, and the command to run
 ```
 
-In this distribution's own repository the script is at `workforce/bin/wf-map`, and
-`bin/check --for <file>` reports only the assertions that cover that file.
+In this distribution's own repository the script is at `workforce/bin/wf-map`.

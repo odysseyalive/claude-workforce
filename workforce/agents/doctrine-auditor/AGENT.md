@@ -1,5 +1,4 @@
 ---
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 2 assertion(s) in bin/check name this file; 8 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 name: wf-doctrine-auditor
 description: "Reads this project's own doctrine adversarially and finds rules that nothing makes true — written correctly, enforced nowhere. Reports the gap, never the rule's merit."
 disallowedTools: Agent

@@ -1,6 +1,5 @@
 # sweep — complete a deferred deletion, and nothing else
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 14 assertion(s) in bin/check name this file; 14 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **Destructive, and it executes on invocation.** Typing the command is the consent — the same rule
 `audit` runs on, for the same reason. `--review` is the zero-write escape.
 

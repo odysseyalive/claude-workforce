@@ -7,7 +7,7 @@ and what uses it.
     python3 bin/components wf-widen              # one component, both directions
     python3 bin/components wf-widen:as_data      # one function: what it uses, what uses it
     python3 bin/components --json                # machine form
-    python3 bin/components --dependents <path>…  # what depends on these files (bin/prove --since)
+    python3 bin/components --dependents <path>…  # what depends on these files
 
 WHY IT EXISTS. 2026-09-13: a removal plan listed `wf-task-tag`'s NOTIFICATION keep-rule and
 the tag's `enforced` marker for deletion, and nothing flagged that the asks juror in
@@ -28,7 +28,6 @@ WHAT IT SEES, each edge from what it can read:
   field       a JSON key read in one component and written by a function of another that
               writes a hand-off file they share; an agent hook reads the backticked fields
               its prompt names
-  pinned      a `bin/prove` case whose literal sits inside the function
   names       a reference, skill or agent file naming the script. Never dangling: the record
               names retired scripts on purpose
 
@@ -100,32 +99,6 @@ function_roles = _LIVE.function_roles
 artifact_roles = _LIVE.artifact_roles
 
 
-def prove_cases(src):
-    """Every (name, path, mode, payload, line) case literal in `bin/prove`, read statically."""
-    try:
-        tree = ast.parse(src)
-    except SyntaxError:
-        return []
-    consts = {n.targets[0].id: n.value.value for n in tree.body
-              if isinstance(n, ast.Assign) and len(n.targets) == 1
-              and isinstance(n.targets[0], ast.Name) and _string(n.value)}
-
-    def lit(node):
-        if isinstance(node, ast.Constant):
-            return node.value
-        return consts.get(node.id) if isinstance(node, ast.Name) else None
-
-    rows = []
-    for n in ast.walk(tree):
-        if isinstance(n, ast.Tuple) and len(n.elts) == 4:
-            name, path, mode, payload = (lit(e) for e in n.elts)
-            # KEYED ON THE MODE, not on the path's shape: the mode is what makes a 4-tuple a case.
-            if isinstance(path, str) and mode in ("del", "delall", "append"):
-                rows.append((name, path, mode, payload, n.lineno))
-    return rows
-
-
-# ── The catalog ───────────────────────────────────────────────────────────────────────────
 def _string(n):
     return isinstance(n, ast.Constant) and isinstance(n.value, str)
 
@@ -317,14 +290,6 @@ def catalog():
     for rel, named in sorted(docs.items()):
         for name in sorted(named & set(scripts)):
             edge(rel, name, "names")
-    for case, path, mode, payload, _ln in prove_cases(_src("bin/prove")):
-        script = os.path.basename(path)
-        if path.startswith(BIN + "/") and script in trees and isinstance(payload, str) and mode != "append":
-            at = sources[script].find(payload)
-            line = sources[script].count("\n", 0, at) + 1 if at >= 0 else 0
-            fn = next((n.name for n in trees[script].body
-                       if isinstance(n, DEFS) and n.lineno <= line <= n.end_lineno), "")
-            edge(f"bin/prove: {case}", f"{script}:{fn}" if fn else script, "pinned")
     unique = {json.dumps(e, sort_keys=True): e for e in edges}
     return {"components": comps, "edges": list(unique.values()),
             "dangling": sorted(set(dangling)), "known": sorted(set(known))}
@@ -372,8 +337,8 @@ def main(argv):
                 print(f"      {dep:<18} " + " · ".join(
                     kind + (" " + ", ".join(sorted(w for w in ws if w)) if any(ws) else "")
                     for kind, ws in sorted(kinds.items())))
-            print(f"      {sum(e['kind'] == 'pinned' for e in deps)} bin/prove case(s) pin it"
-                  + ("" if by else "; nothing in code depends on it"))
+            if not by:
+                print("      nothing in code depends on it")
     elif asked:
         for target in asked:
             print(f"# {target}\n\n  uses:")
@@ -400,8 +365,7 @@ def main(argv):
             print(f"\n{name}  ({c['kind']}{events})")
             print(f"  uses     {', '.join(out) or '-'}")
             print(f"  used by  {', '.join(into) or '-'}")
-            print(f"  named by {len({e['from'] for e in deps if e['kind'] == 'names'})} doc(s) · "
-                  f"pinned by {len({e['from'] for e in deps if e['kind'] == 'pinned'})} bin/prove case(s)")
+            print(f"  named by {len({e['from'] for e in deps if e['kind'] == 'names'})} doc(s)")
         print("\nOne component: `bin/components <name>`. One function: `bin/components <name>:<function>`.")
     return 0
 

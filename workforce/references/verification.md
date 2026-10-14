@@ -1,6 +1,5 @@
 # Verification — how an employee proves its own work
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 9 assertion(s) in bin/check name this file; 16 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: CRITICAL — `## Verification` is mandatory in every handbook. A handbook without a
      runnable check is not releasable. -->
 

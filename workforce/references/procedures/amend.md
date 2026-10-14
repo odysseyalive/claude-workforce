@@ -1,6 +1,5 @@
 # amend — change a handbook or a data skill, with two keys
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 3 assertion(s) in bin/check name this file; 5 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **The only path by which a handbook's text or a data skill's schema changes.** Strict execution and
 instant amendment are one invariant: an employee never works around its handbook, and a wrong handbook
 changes immediately.

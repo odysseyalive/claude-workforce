@@ -1,6 +1,5 @@
 # Session artifact — one shareable page, grown as the work progresses
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 0 assertion(s) in bin/check name this file; 3 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 The mechanics for the 2026-08-28 directive (`SKILL.md` § Directives): complex issues and visual asset
 examples are communicated through a shareable Artifact, the same one is reused and updated across the
 session, and the examples inside it accumulate as a labeled progression rather than being overwritten.

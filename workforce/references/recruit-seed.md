@@ -1,6 +1,5 @@
 # Recruiter — shipped seed baselines
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 0 assertion(s) in bin/check name this file; 0 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- This is the SEED the recruiter degrades to when the network is genuinely
      unavailable (recruiter.md § When the network is genuinely unavailable). It is a
      FLOOR, not a substitute for research: a role authored from it is marked

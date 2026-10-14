@@ -1,5 +1,4 @@
 <!-- code-additions-version: 3 -->
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 2 assertion(s) in bin/check name this file; 13 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- origin: workforce | modifiable: true -->
 # Code-eval additions — authored by workforce
 

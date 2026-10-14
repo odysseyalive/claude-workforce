@@ -1,6 +1,5 @@
 # Personas and Names
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 0 assertion(s) in bin/check name this file; 1 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — name collisions are SILENT. Phase A lint is the blocking backstop. -->
 
 ## Names: collisions are silent, and that is the whole problem

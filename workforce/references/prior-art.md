@@ -1,6 +1,5 @@
 # Prior Art — search the user's own work before authoring a capability
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 0 assertion(s) in bin/check name this file; 3 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — the only step that looks outside the target project. Skipping it re-invents what the user already built, and nothing downstream can detect that. -->
 
 The step that runs **before** `hire` decides anything. Its question is not "who should do this work"

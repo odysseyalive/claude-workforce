@@ -1,6 +1,5 @@
 # Org Design — deriving a company from a project
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 12 assertion(s) in bin/check name this file; 23 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — the primary path. Conversion is the on-ramp for projects that already have
      skills; this is how a company gets designed in the general case. -->
 

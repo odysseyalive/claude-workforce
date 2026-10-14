@@ -21,7 +21,7 @@ Exit codes
 
 Usage
     bin/idempotence            # all writers
-    bin/idempotence coverage   # one, by name
+    bin/idempotence sync       # one, by name
 """
 
 import filecmp
@@ -78,10 +78,6 @@ sys.exit(subprocess.run([sys.executable, 'workforce/bin/wf-settings-apply', '--r
 
 # Each writer: how to invoke it, and which subtree it is allowed to touch.
 WRITERS = {
-    "coverage": {
-        "argv": ["bin/coverage", "--stamp"],
-        "watch": "workforce",
-    },
     # SEEDED, because `bin/sync` no longer CREATES a project install that was not
     # there (SKILL.md § Directives, 2026-09-09) — and this case exists to prove the
     # REFRESH is idempotent, not that the guard fires. Without the seed the run is a

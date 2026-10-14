@@ -1,6 +1,5 @@
 # discharge — drain the deferred queue by doing the work
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 4 assertion(s) in bin/check name this file; 11 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 Medium risk (writes into the project, never deletes); **display by default**, `--execute` writes.
 `/workforce discharge [--execute] [<id>…]`
 

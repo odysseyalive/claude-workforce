@@ -1,5 +1,4 @@
 ---
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 0 assertion(s) in bin/check name this file; 9 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 name: wf-settings-scout
 description: "Discovers the .claude settings and hooks that would stop a workforce audit from finishing, and resolves each to the one command a human runs. Runs FIRST, before any writing gate."
 disallowedTools: Agent
