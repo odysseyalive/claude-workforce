@@ -2783,19 +2783,23 @@ def ledger_verdict(payload, decided):
         return "", ""
     TT.save_ledger(payload, led)
     out, quotes = [], []
-    judged = 0
-    for iid, verdict, why, ask, iss in rows:
+    for iid, verdict, _why, ask, iss in rows:
         # An issue with nothing recorded against it is not reported. It is the shape a
-        # one-line message leaves behind, and naming it on every Stop would be noise.
-        if verdict == "open":
+        # one-line message leaves behind, and naming it on every Stop would be noise. A
+        # CLOSED one is not reported either (user, 2026-10-14: "why have a bunch of lines
+        # that say Closed?") — the ledger keeps it; the line would only grow the list.
+        if verdict in ("open", "closed"):
             continue
-        judged += 1
         title = TT.plain_text(iss.get("title"), TT.TITLE_MAX) if isinstance(iss, dict) else ""
         # HOLD READS AS "PROCESSING" to the user (2026-10-14): agents are working on it. The
         # agents themselves are not listed — "adding individual ... running agents to the
         # issues is going to confuse things and clutter things up."
         word = "PROCESSING" if verdict == "hold" else verdict.upper()
-        out.append(f"  {iid}  {word}  {title + ' · ' if title else ''}{why}  [{ask}]")
+        # STATUS AND TITLE, NOTHING ELSE (user, 2026-10-14: "We don't need to say one item's
+        # done or three agents returned ... The title just needs to go there."). The excerpt
+        # of the user's own words follows; it stands in for a title the session never wrote.
+        # `why` is not printed — the session reads the open items from its carried list.
+        out.append(f"  {iid}  {word}  {title + '  ' if title else ''}[{ask}]")
         # THE VERDICT ALONE IS NOT ENOUGH FOR THE TWO THAT ASK FOR SOMETHING. Every other
         # verdict is a status; these two are an instruction, and an instruction the reader
         # has to infer is one the reader infers wrong — which here means starting the work
@@ -2813,7 +2817,7 @@ def ledger_verdict(payload, decided):
         return "", ""
     # THE COUNT IS OF ISSUES, NOT OF LINES. An issue asking for a resume carries a second
     # line, and `len(out)` would report two issues judged where one was.
-    head = f"ISSUES  {judged} open issue(s) judged" if judged else "ISSUES"
+    head = "ISSUES"
     return (head + "\n" + "\n".join(out),
             "\n".join(quotes))
 
