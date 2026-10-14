@@ -39,8 +39,10 @@ and NOT to be made convoluted: the six senses, issue tracking, project managemen
 
 ## Build order
 
-Serialized, one coder at a time on this checkout: 1 → 6 (tiny, rides with 1) → 3 → 4 → 2 → 5. Each piece is
-demonstrated on real data or a throwaway project, then reviewed by an independent reader.
+Serialized, one coder at a time on this checkout: 1+6 done → 2 categorize → 3 bank → 4 replay/score →
+5 propose/gate. Categorize comes before bank because the task bank is drawn from categorized failures
+(user's decision, 2026-10-14). Each piece is demonstrated on real data or a throwaway project, then
+reviewed by an independent reader.
 
 ## Where the evidence is thin
 
