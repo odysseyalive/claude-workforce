@@ -2586,7 +2586,9 @@ def ledger_verdict(payload, decided):
                        agent dispatched three messages ago hands back after that turn
                        ended. A hold is a hold, a finished issue is closed, and an issue
                        whose agents are all back with items the session itself left open is
-                       kicked back. `judge_issue` carries which is which and why.
+                       kicked back. `judge_issue` carries which is which and why. An issue
+                       the session never itemized is TRACKED under the user's own message
+                       (`TT.track_message`), which is a status and never a kickback.
 
                        AN AGENT CUT AT ITS TURN CAP IS NOT A FINISHED AGENT (K8). Its entry
                        is marked `handoff` by `wf-turn-budget`, and an issue holding one
@@ -2649,6 +2651,16 @@ def ledger_verdict(payload, decided):
     # 2026-10-13. STATUS ONLY, onto the issue each row names: `TT.absorb_carried` cannot add,
     # reorder or resurrect an item on an issue this turn did not open.
     TT.absorb_carried(led, TT.carried_items(checklist(payload)[0] or {}))
+    # AND THEN THE MESSAGE IS TRACKED, AFTER THE CARRY SO A FALLBACK THE SESSION MARKED IS NOT
+    # SUPERSEDED OVER ITS MARK. Only at the Stop that ends a USER message's turn, which is the
+    # tag's record saying so: a record exists only for a message that opened a checklist,
+    # `carry_only` marks an injected or short turn, and `ended` is `with_checklist`'s once-per-
+    # list mark, set after this. A side query (`confirmed_reply` None) is mid-turn, before the
+    # session may have written its list. `TT.track_message` carries the rule and its why.
+    cl, record = checklist(payload)
+    if (isinstance(record, dict) and not record.get("carry_only") and not record.get("ended")
+            and TL.confirmed_reply(payload)[0] is not None):
+        TT.track_message(led, record.get("issue"), TT.checklist_items(cl))
     rows = TT.judge_ledger(payload, led)
     if not rows:
         return "", ""

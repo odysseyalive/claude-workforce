@@ -916,6 +916,13 @@ def issue_items(iss):
             if isinstance(i, dict) and isinstance(i.get("ask"), str) and i["ask"].strip()]
 
 
+def session_items(iss):
+    """The items THE SESSION wrote: `issue_items` without the hook's fallback. Every verdict
+    that can reach the user as a failure reads these alone (`judge_issue`, `unmet_asks`),
+    because a fallback is the hook's record of the message and never evidence of undone work."""
+    return [i for i in issue_items(iss) if i.get("fallback") is not True]
+
+
 def item_done(item):
     """Whether an item is FINISHED OR WITHDRAWN. The STATUS IS THE SESSION'S TO WORD, so this
     reads the words a session actually writes rather than demanding one token; anything
@@ -963,13 +970,14 @@ def add_issue(payload, led):
 
     THE GATE IS `start_checklist`'S, deliberately the same one: injected text is not the
     user's ask, and under a dozen words a message is almost always one ask and not a new
-    issue ("commit it", "yes"). Reusing the gate means a message either opens an issue AND
-    a checklist or neither, so the two can never disagree about whether work started.
+    issue ("commit it", "yes"). A slash command the user typed opens one at any length
+    (`SLASH_COMMAND`). Reusing the gate means a message either opens an issue AND a
+    checklist or neither, so the two can never disagree about whether work started.
 
     EARLIER OPEN ISSUES STAY. That is the whole point of the file.
     """
     prompt = payload.get("prompt") or ""
-    if INJECTED.search(prompt) or len(prompt.split()) < CHECKLIST_MIN_WORDS:
+    if not opens_issue(prompt):
         return None
     n = 1
     for iss in led.get("issues", []):
@@ -992,11 +1000,18 @@ def absorb_items(led, issue_id, items):
     session wrote survive on the issue and the next message cannot erase them. Replacing
     rather than appending is correct because the checklist is the live view of that one
     issue's items, statuses included: a merge would resurrect an item the session struck.
+
+    AN EMPTY LIST DOES NOT ERASE THE HOOK'S FALLBACK (`track_message`). A session that wrote
+    no items has no live view to replace it with, and erasing it here would make the turn
+    after `/agenda today` forget what that turn was working on. Items the session DID write
+    replace it, because they say the same thing better.
     """
     if not issue_id:
         return
     for iss in led.get("issues", []):
         if isinstance(iss, dict) and iss.get("id") == issue_id:
+            if not items and any(i.get("fallback") is True for i in issue_items(iss)):
+                return
             iss["items"] = [{"ask": i["ask"],
                              "status": i["status"] if isinstance(i.get("status"), str)
                              else "open"}
@@ -1093,6 +1108,47 @@ def absorb_carried(led, rows):
                     landed += 1
             break
     return landed
+
+
+def track_message(led, issue_id, written):
+    """At the Stop ending a USER message's turn: retire earlier fallbacks, and record this
+    message as one fallback item when the session itemized nothing.
+
+    THE GAP, MEASURED 2026-10-14 in odyssey-alive's session `a609a11d`: a session that never
+    writes its checklist leaves an issue with no items, `judge_issue` calls that `open`, and
+    `wf-widen` prints nothing — two hours of work on `/agenda today` showed no ISSUES at all.
+    The user: *"it gives transparency on what is being worked on."* So the message itself
+    becomes the item, `{"ask": <the message>, "status": "open", "fallback": true}`, ONLY when
+    the issue has no items and no agents and the session's own checklist (`written`) is empty.
+    The text is the message flattened to one line and cut to `CARRY_ASK`, the cut a carried
+    row gets, so the session can mark it through the carry like any other item.
+
+    IT IS NEVER A KICKBACK. The session did not write it, and the ledger never infers an
+    undone item, so `judge_issue` reads `session_items` for every failing verdict and gives a
+    fallback its own: `tracked`.
+
+    HOW LONG AN UNMARKED ONE LIVES: until the NEXT user message's turn ends. That is the
+    checklist's own precedent — a per-turn record is replaced by the next message
+    (`start_checklist`) — held one turn longer so the carry can reach it: that next turn is
+    handed the fallback as a carried row and can mark it `done`, `answered` or `dropped`, and
+    whatever it leaves unmarked is `superseded` here, which `DONE_STATUSES` already reads as
+    finished. Injected turns (a hand-back, a notification) are not user messages and supersede
+    nothing, so the line stays up while dispatched work comes back. ISSUES therefore shows at
+    most one fallback, the newest message's, and never a pile of stale one-liners.
+    """
+    target = None
+    for iss in open_issues(led):
+        if issue_id and iss.get("id") == issue_id:
+            target = iss
+            continue
+        for item in issue_items(iss):
+            if item.get("fallback") is True and not item_done(item):
+                item["status"] = "superseded"
+    if target is None or written or issue_items(target) or issue_agents(target):
+        return
+    text = " ".join(str(target.get("prompt") or "").split())[:CARRY_ASK]
+    if text:
+        target["items"] = [{"ask": text, "status": "open", "fallback": True}]
 
 
 def link_agent(payload, led):
@@ -1318,7 +1374,7 @@ def resume_action(ids):
 
 def unmet_asks(iss):
     """ONE issue's UNMET set — the asks the session itself has not marked done."""
-    return [i["ask"] for i in issue_items(iss) if not item_done(i)]
+    return [i["ask"] for i in session_items(iss) if not item_done(i)]
 
 
 def unmet_digest(iss):
@@ -1428,13 +1484,17 @@ def judge_issue(iss):
                 for, and `judge_ledger` flips it to `returned` as the issue closes. AN
                 ISSUE WITH NO ITEMS AT ALL IS NOT CLOSED OVER A CUT AGENT (2026-10-13):
                 see the `handoff` row above.
+      tracked   no item the session wrote and no agent, but the hook recorded the user's
+                message itself as a fallback item (`track_message`) and nothing has marked
+                it finished. A status, never a failure: it says what is being worked on.
       open      an issue with no recorded items and no agent is nothing to judge. It is the
                 shape a one-line message leaves behind, and a hook that kicked back on it
                 would fire on almost every turn.
 
     IT NEVER INFERS AN UNDONE ITEM. The only evidence it will act on is an item the session
     wrote with a status it did not mark done — this project's rule that a blocking surface
-    ships with no known wrong fire, applied to the verdicts that can reach the user.
+    ships with no known wrong fire, applied to the verdicts that can reach the user. So every
+    verdict above `tracked` reads `session_items`, and the fallback can reach none of them.
     """
     agents = issue_agents(iss)
     waiting = [a for a in agents if a.get("state") == "running"]
@@ -1442,7 +1502,7 @@ def judge_issue(iss):
         return "hold", "%d of %d agents still out: %s" % (
             len(waiting), len(agents),
             name_labelled(waiting, "state"))
-    items = issue_items(iss)
+    items = session_items(iss)
     undone = [i for i in items if not item_done(i)]
     cut = [a for a in agents if a.get("state") == "handoff"]
     # AN ISSUE WITH NO ITEMS AT ALL AND A CUT AGENT IS NOT A FINISHED ISSUE, and that is
@@ -1469,6 +1529,14 @@ def judge_issue(iss):
             len(undone), len(items), "; ".join(i["ask"][:80] for i in undone))
     if items or agents:
         return "closed", "%d items done, %d agents returned" % (len(items), len(agents))
+    fallback = issue_items(iss)
+    if any(not item_done(i) for i in fallback):
+        return "tracked", "not itemized by the session"
+    if fallback:
+        # THE STATUS IS NAMED, so a fallback the next message `superseded` is never read as
+        # one the session finished.
+        return "closed", "the message itself is %s" % " ".join(
+            fallback[0]["status"].split())[:40]
     return "open", "nothing recorded against it"
 
 
@@ -1517,6 +1585,27 @@ def judge_ledger(payload, led):
 # or "yes" is a chore the reader pays for on every short reply. Over 1,012 real prompts on
 # this machine, 275 are under eight words.
 CHECKLIST_MIN_WORDS = 12
+
+# A SLASH COMMAND THE USER TYPED IS A NEW PIECE OF WORK HOWEVER SHORT IT IS. The word gate
+# above exists for the continuation reply ("commit it", "yes"); `/agenda today` is two words
+# and invokes a whole procedure. MEASURED 2026-10-14 in odyssey-alive's session `a609a11d`:
+# the user's first message was `/agenda today`, it opened no issue because it was under the
+# gate, and ISSUES printed nothing for two hours of work on it. The hook sees the command as
+# typed — that session's ledger records the later one as "/org for now, could you …" — so
+# the command's name and its arguments ARE the prompt. One component after the slash, then
+# whitespace or the end, so a path like "/home/francis/x is broken" is not a command.
+SLASH_COMMAND = re.compile(r"\A\s*/[A-Za-z][\w:.-]*(?=\s|\Z)")
+
+
+def opens_issue(prompt):
+    """Whether this message opens an issue AND a checklist. The ONE gate both use, so the two
+    can never disagree about whether work started (`add_issue`). Injected text never does: it
+    is not the user's ask."""
+    prompt = prompt or ""
+    if INJECTED.search(prompt):
+        return False
+    return len(prompt.split()) >= CHECKLIST_MIN_WORDS or bool(SLASH_COMMAND.match(prompt))
+
 
 # THE TWO SENTENCES WITH TWO READERS, EACH WRITTEN ONCE. A turn that opens no asks of its
 # own still names the same file and the same carried rows (`carry_only_checklist`), so both
@@ -1614,7 +1703,7 @@ def start_checklist(payload, prev=None):
     # Injected text opens no list of its own: it is not the user's ask. IT STILL CARRIES,
     # when this session has earlier open items — see `carry_only_checklist`, which is where
     # the measured hand-back case is written down.
-    if INJECTED.search(prompt) or len(prompt.split()) < CHECKLIST_MIN_WORDS:
+    if not opens_issue(prompt):
         return carry_only_checklist(p, carried)
     if not write_json_atomic(p, {"prompt": prompt[:2000], "items": [],
                                  "carried": carried}):
