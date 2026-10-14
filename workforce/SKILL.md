@@ -213,7 +213,8 @@ and time to re-derive a finding nobody can act on, and it confuses people applyi
 own projects. Build the **auto-apply mechanism**, always — then let each pass declare its verdict
 against it. Mechanics at `references/passes.md` § What a pass may do; the companion rule that a
 `REPORT` verdict must cite a **measured** precision figure and where it was measured lives there too,
-and `bin/check` fails on a `REPORT` pass with no measurement.*
+and `bin/check` failed on a `REPORT` pass with no measurement until it was retired on 2026-10-14; the
+reviewer of a pass change is who checks it now.*
 
 > **"the sweep should happen automatically without confirmation"**
 
@@ -609,7 +610,9 @@ re-pointed at carriers that exist; no quoted user text was touched, and the rest
 user's rules as they were written, not a fresh paraphrase. The lesson is recorded rather than
 generalized: **a commit that removes a mechanism may not also be the commit that asserts the mechanism
 survives elsewhere** — the assertion has to be checked against the tree, and here nothing checked it,
-because a deleted numbered item leaves no hole anybody counts. `bin/check` now counts them.*
+because a deleted numbered item leaves no hole anybody counts. `bin/check` counted them from then until
+it was retired on 2026-10-14; nothing counts them mechanically now, so a change that removes an item is
+read for exactly this by its reviewer.*
 
 > **"I've given explicit instructions that the five evaluations and workforce should be
 > self-contained in the user during install so that I don't have to run an audit every time
