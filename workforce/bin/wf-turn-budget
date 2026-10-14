@@ -172,7 +172,7 @@ def keyed(marker, round_):
 
 
 def final_pending(home, state, cap):
-    """True when THIS round's final notice has already gone out.
+    """True when THIS round's warning or final notice has already gone out.
 
     IT IS WHAT LICENSES A PROMPT ROW TO BE READ AS A NEW ALLOWANCE (`count_turns`'s
     `pending`), so both readers of the transcript have to answer it the same way: the
@@ -184,8 +184,16 @@ def final_pending(home, state, cap):
     there is no marker to ask, and the cap-multiple backstop in `turn_round` answers
     instead — the direction this hook has already chosen everywhere else.
     """
-    return bool(home) and os.path.exists(
-        os.path.join(home, keyed("fired-final", turn_round(state, cap)[1] - 1)))
+    # EITHER NOTICE ENDS A ROUND. The warning itself tells the agent to write HANDOFF.md and
+    # return, so an agent that obeys it stops at 80% and never sees the final notice.
+    # MEASURED 2026-10-14: a coder handed off at the warning (turn 64 of 80), was resumed,
+    # and was cut again at turn 77, because only the final marker licensed the resume as a
+    # new allowance and the count ran on from zero.
+    if not home:
+        return False
+    k = turn_round(state, cap)[1] - 1
+    return any(os.path.exists(os.path.join(home, keyed(m, k)))
+               for m in ("fired-final", "fired-warn"))
 
 
 # ── the continuation brief's shape ───────────────────────────────────────────
