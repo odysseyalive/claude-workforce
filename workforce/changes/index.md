@@ -8,6 +8,7 @@
 
 | Version | Date | Surface | Org | Change |
 |---|---|---|---|---|
+| 1.78.0 | 2026-10-14 | docs | no | (pending — message lands on the next regeneration) |
 | 1.77.5 | 2026-10-13 | changes, hooks, scripts, installer | no | Release 1.77.5: the turn a dispatched item finishes on can close its issue |
 | 1.77.4 | 2026-10-13 | changes, hooks, scripts, installer | no | Release 1.77.4: a cut agent is resumed, never respawned, and an issue's items can close |
 | 1.77.3 | 2026-10-13 | changes, scripts, installer | no | Release 1.77.3: an agent that stops on its own after a resume is returned, not re-marked as cut |
