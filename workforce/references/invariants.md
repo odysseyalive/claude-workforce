@@ -1,6 +1,5 @@
 # Run Invariants — the promises a run must print, not just keep
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 18 assertion(s) in bin/check name this file; 21 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 <!-- Enforcement: HIGH — every invariant here emits a line. A run that cannot print one did not uphold it. -->
 
 A normative claim in this project is one of three things, and **each kind has exactly one place it can
@@ -39,7 +38,7 @@ missing line is silence, and silence is indistinguishable from a gate that never
 
 ## The set
 
-Thirty-seven, and the list is closed: adding a procedural invariant means adding a row here and a
+Thirty-eight, and the list is closed: adding a procedural invariant means adding a row here and a
 line to the report, in the same change.
 
 *(It was ten until 2026-07-31, eleven until 2026-08-01, twelve and then thirteen on 2026-08-04, and
@@ -134,6 +133,7 @@ reference-wiring, and printed as `INV-SOURCES`/`INV-SEAM`.)*
 | 36 | the project ledger's records are counted by type and status, and no `proposed` record predates the run | `INV-KNOWLEDGE` | references/procedures/verify.md |
 | 37 | the symlinked handbooks in `.claude/agents` were enumerated before the first bulk write and re-read after, and none was lost or retargeted | `INV-SYMLINK` | workforce/SKILL.md |
 | 38 | every Core companion skill was force-refreshed to shipped source, or each unrefreshed one names the precondition that stopped it | `INV-CORE` | references/procedures/audit.md |
+| 39 | every file that pins a model was judged into a lane and runs that lane's selection, or is shipped, or names why it was not written | `INV-LANES` | references/procedures/audit.md |
 
 **Row 30 landed 2026-09-03, and it is the first row added because a gate disagreed with the person it
 was built for.** Every other row here counts something the run did. This one counts whether the org can

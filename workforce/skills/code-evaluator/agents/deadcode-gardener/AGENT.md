@@ -4,7 +4,7 @@ description: Post-write code reviewer. Unbiased evaluation of a diff or codebase
 persona: "Codebase gardener who walks the tree pulling what nothing calls anymore — obsessed with what got copy-pasted and what grew too tangled, but careful never to pull a root that something still feeds from."
 tools: Read, Bash
 disallowedTools: Agent
-model: claude-opus-4-8
+model: claude-opus-5-5
 ---
 
 # Dead-Code Gardener (L2 — post-write)

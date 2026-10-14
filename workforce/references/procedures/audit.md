@@ -1,6 +1,5 @@
 # audit — survey the project and build its company
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 85 assertion(s) in bin/check name this file; 194 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **The main entry point.** Surveys the project, decides what becomes an employee, builds the org, and
 executes its own recommendations.
 
@@ -575,6 +574,10 @@ So, in order:
    default and reassignable with a stated reason. **Home generative work in a department in the creative
    family**
    wherever the department budget allows. That is the list to check the roster against.
+   **The set is every file that pins a model, not the roster alone.** Adopted agents, agents bundled
+   inside a skill, and skills carrying `model:` are judged by the same rules, from the description
+   `wf-model-lanes` prints for each (Step 6-M). A file whose description has not changed since its
+   last judgment keeps its recorded lane and is not re-judged.
 2. **Where the budget does not allow it** — a merge forced by the department cap — say so per employee:
    name the employee, the department it landed in, and **the model it will therefore actually run on.**
    A roster that quietly routes image work to the coding model has made a model decision the receipt
@@ -1743,7 +1746,7 @@ the same.
 ## Step 6 — Execute
 
 Order: **conversions (each reduced at T7b) → **staging the removal set (Step 6-S)** → handbooks → the canary re-attempt (Step 6a) → data skills → charter and
-principles → model rewrite → `org index` → `org embed` → **seed evaluator additions + refresh house rules (Step 6-E)** →
+principles → model rewrite (Step 6-M) → `org index` → `org embed` → **seed evaluator additions + refresh house rules (Step 6-E)** →
 `wf-claude-md` → `checksums` → `verify` → **discharge (Step 6b)** → the sweep.** *(Step 6-G, the git pin-guard install, sits between `checksums` and `verify`. The install is RETIRED — its script was removed on the user's marks — and the step now REMOVES a stranded guard instead of installing one, through the `--heal` this audit already runs. Measured 2026-10-10: four repositories on one workstation were still running the retired copy on every commit.)*
 
 **`org index` runs UNCONDITIONALLY here — every audit, every mode.** It maintains the project-local
@@ -2046,6 +2049,42 @@ department derivation from a residual — four things that produce the same cell
 Then per-task ✓ / ✗ with the step any failure reached — **and every ✗ carries `path:line`, the field or
 rule at fault by name, and the literal text that would fix it** (`verify.md` § Output). A bare ✗ with a
 T-step tells the user something broke; it does not tell them what to type.
+
+### Step 6-M — Reconcile every model pin to its lane (every audit)
+
+**Runs on every audit, not only when a budget cell changed.** A `model:` line used to move only with
+a changed cell, and a re-audit offers the recorded value as `(current)`, so a pin no answer reached
+survived every run. MEASURED 2026-10-14: this distribution's own code employee ran ~57M tokens in two
+weeks on the code pick its lane had left three weeks earlier, and four more projects carried the same
+stale pin, one inside a skill-bundled agent no step read.
+
+```bash
+WF="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
+"$WF/bin/wf-model-lanes" --root "${CLAUDE_PROJECT_DIR:-$PWD}"            # plan: every pin, its lane, its target
+"$WF/bin/wf-model-lanes" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --execute \
+  --judge <path> <lane> "<why>"                                           # one --judge per JUDGE row
+```
+
+1. **The plan lists every file that pins a model** — `.claude/agents/**`, `.claude/skills/*/agents/*/AGENT.md`,
+   and each `.claude/skills/*/SKILL.md` carrying `model:` — and resolves each lane from this project's
+   `org-config.md` in the order `org-config.template.md` § Resolution states. An Employee-override row
+   is the user's own choice and wins.
+2. **Judge each `JUDGE` row from the description it prints**, by Step 2's rules: generative text →
+   `creative-text`; graphics or frontend design → `creative-visual`; writing or testing software →
+   `code`; coordinating → `analytical-lead`; anything else → `analytical-ic`. A row is `JUDGE` when it
+   has no recorded lane or its description changed since the last judgment
+   (`.claude/workforce/model-lanes.json` holds each lane beside the description's hash). The judgment
+   is the main session's; the script never guesses a lane.
+3. **`--execute` records the judgments and rewrites only the `model:` and `effort:` lines that differ**,
+   through a symlink and never over it, re-reading each file. Every change prints as
+   `path: old → new (lane, why; source)`. A pin outside the pool is corrected like any other. It exits
+   1 while a file is unjudged or its lane selects no model: judge the rest and re-run. An `UNRESOLVED`
+   lane is never written as "inherit".
+4. **A shipped file is reported `SHIPPED` and never written.** `update` overwrites it, so its pin is held
+   to the template's lane pick at release instead.
+
+Its `WROTE` lines extend the Lane assignment block above to every pinned file. Print its `INV-LANES` and
+`INV-SYMLINK` lines in the closing report. Under `--review`: the plan only.
 
 ### Step 6-E — Seed evaluator additions and refresh the house rules
 

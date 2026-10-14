@@ -1,0 +1,570 @@
+#!/usr/bin/env python3
+"""wf-model-lanes — keep every model-pinned file on the model its lane selects.
+
+    wf-model-lanes --root <tree>                          plan: list, resolve, report, write nothing
+    wf-model-lanes --root <tree> --judge PATH LANE WHY …  plan with these lane judgments applied
+    wf-model-lanes --root <tree> [--judge …] --execute    record the judgments, rewrite what drifted
+    wf-model-lanes --root <tree> --check                  verify: read-only, exit 1 on any drift
+
+WHY THIS EXISTS. A `model:` line was rewritten only when a budget cell changed
+(`procedures/model-map.md` § Model Rewrite), and a re-audit offers the recorded value as the
+one-click `(current)` option, so a pin that no budget answer reached survived forever. MEASURED
+2026-10-14: this repository's own `engineering-coder` spent ~57M tokens in two weeks on the
+retired code pick, three weeks after the code lane had moved, and the same stale pin sat in four
+more projects — one of them inside a skill-bundled agent that no audit step ever read. The user's
+directive that day: audit examines the description of each file that selects a model, makes the
+model match the function, and uses "the model the user already selected in the lineup". No
+successor table: a file's LANE is judged, and the lane's selection is what it runs on.
+
+THE JUDGMENT IS NOT MADE HERE. Which lane a description describes is a reading, and the audit's
+main session makes it (`procedures/audit.md` Step 2), applying the floor rules in
+`org-config.template.md` § Creative. This script does the four mechanical parts around it:
+
+  enumerate  every file under the project's `.claude/` that pins a `model:` — `.claude/agents/**`
+             (a symlinked file is read through its link), `.claude/skills/*/agents/*/AGENT.md`,
+             and `.claude/skills/*/SKILL.md`
+  resolve    each lane's model and effort from the project's `org-config.md`, in the order
+             `org-config.template.md` § Resolution states — employee override, then lane, then
+             the analytical tier row. With no project config the shipped template's values are
+             the lineup, and the source says so
+  remember   each file's judged lane beside a hash of its description, in RECORD_REL, so the
+             next audit re-judges only a file whose description moved
+  apply      only the `model:` and `effort:` lines that differ, written THROUGH a symlink with
+             `open(path, "w")` (SKILL.md Atomic-or-Absent rule 3) and verified by re-reading
+
+A SHIPPED FILE IS REPORTED, NEVER WRITTEN. `update` overwrites anything under the workforce skill
+and any path `.installed-external` records, so a rewrite there is undone by the next install; the
+distribution's own pins are held to the template's lane picks at release instead. A symlink that
+resolves outside the project is reported the same way: that file belongs to somebody else.
+
+EXIT  0  the plan printed, or every write verified
+      1  --check found drift; or --execute left a file unjudged or unresolved, a write failed
+         to verify, or a symlink was lost or retargeted
+      2  usage: no `.claude/` under the root, no lineup to resolve, an unknown lane, or a
+         --judge path that names no model-pinned file
+"""
+
+import argparse
+import datetime
+import glob
+import hashlib
+import json
+import os
+import re
+import sys
+
+RECORD_REL = os.path.join(".claude", "workforce", "model-lanes.json")
+CONFIG_REL = os.path.join(".claude", "workforce", "org-config.md")
+TEMPLATE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        "references", "org-config.template.md")
+
+# The five employee-bearing lanes of `org-config.template.md` § The four lanes, spelled as
+# one argv token each. The analytical lane carries the tier split, so it is two tokens.
+LANES = ("analytical-lead", "analytical-ic", "creative-text", "creative-visual", "code")
+RUNGS = ("max", "xhigh", "high", "medium", "low")
+KEY_RX = re.compile(r"^([A-Za-z_][\w-]*)\s*:(.*)$")
+MODEL_RX = re.compile(r"^[A-Za-z0-9][\w.\[\]-]*$")
+BLOCK_SCALARS = ("", ">", "|", ">-", "|-", ">+", "|+")
+
+
+# ── reading a file's frontmatter ─────────────────────────────────────────────
+
+def _unquote(v):
+    v = v.strip()
+    if len(v) >= 2 and v[0] == v[-1] and v[0] in "\"'":
+        return v[1:-1]
+    return v
+
+
+def frontmatter(text):
+    """`(fields, line index per key, the file's lines)` or None when there is no `---` block.
+
+    The lines keep their `\\r`, so a rewrite puts back the ending each line came with.
+    `description:` may be folded over several indented lines; it is read whole, because the
+    hash that decides a re-judgment must see the whole description, not its first line.
+    """
+    lines = text.split("\n")
+    if not lines or lines[0].rstrip("\r") != "---":
+        return None
+    end = next((i for i in range(1, len(lines)) if lines[i].rstrip("\r") == "---"), None)
+    if end is None:
+        return None
+    fields, index, i = {}, {}, 1
+    while i < end:
+        m = KEY_RX.match(lines[i].rstrip("\r"))
+        if not m:
+            i += 1
+            continue
+        key, val = m.group(1), m.group(2).strip()
+        index.setdefault(key, i)
+        j = i + 1
+        cont = []
+        while j < end and (lines[j][:1] in (" ", "\t") or not lines[j].strip()):
+            cont.append(lines[j].strip())
+            j += 1
+        if key == "description" and cont:
+            head = [] if val in BLOCK_SCALARS else [val]
+            val = " ".join(head + [c for c in cont if c])
+        fields.setdefault(key, _unquote(val))
+        i = j
+    return fields, index, lines
+
+
+def description_hash(desc):
+    return hashlib.sha256(" ".join((desc or "").split()).encode("utf-8")).hexdigest()[:16]
+
+
+# ── the lineup ───────────────────────────────────────────────────────────────
+
+def _model_cell(cell):
+    tok = re.findall(r"`([^`]+)`", cell)
+    v = (tok[0] if tok else cell).strip()
+    return v if v and MODEL_RX.match(v) else None
+
+
+def _effort_cell(cell):
+    v = cell.replace("`", "").strip().lower()
+    return v if v in RUNGS else None
+
+
+def _lane_of(key):
+    """The lane a row's first cell names, or None. `analytical · Lead` and `analytical / IC`
+    are the receipt's spelling; `Lead (2)` and `IC (3)` are the analytical table's."""
+    key = re.sub(r"[·/()]", " ", key)
+    key = " ".join(key.split())
+    if re.match(r"^(analytical )?lead\b", key):
+        return "analytical-lead"
+    if re.match(r"^(analytical )?ic\b", key):
+        return "analytical-ic"
+    for lane in ("creative-text", "creative-visual", "code"):
+        if key.startswith(lane) or key.startswith(lane.replace("-", " ")):
+            return lane
+    return "creative" if key.startswith("creative") else None
+
+
+def parse_lineup(text):
+    """`({lane: {"model", "effort"}}, {employee: {"model", "effort"}})` from an org-config.
+
+    TOLERANT BY MEASUREMENT. Six live configs on one workstation spell the lineup five ways:
+    `| Creative-text model | … |` rows, a `| creative-text (writing & copy) | model | effort |`
+    table, a pre-split `| Creative model |` that covers both creative lanes, `| Lead (2) | model
+    | effort |` under the analytical heading, and — in two projects — no lane tables at all,
+    only a `## Budget` receipt whose rows read `| analytical · Lead | model | effort | source |`.
+    A row is read only under a heading that names its lane (or a budget receipt, which fills
+    only what the lane tables left blank), so the `## Model statics` pool and the effort ladder,
+    which reuse the same lane words, are never mistaken for a selection.
+    """
+    tables = {k: {"model": None, "effort": None} for k in LANES + ("creative",)}
+    receipt = {k: {"model": None, "effort": None} for k in LANES + ("creative",)}
+    overrides = {}
+    section = ""
+    for raw in text.splitlines():
+        line = raw.strip()
+        if line.startswith("#"):
+            section = line.lstrip("#").strip().lower()
+            continue
+        if not (line.startswith("|") and line.endswith("|")) or re.match(r"^\|[\s:|-]+\|$", line):
+            continue
+        cells = [c.strip() for c in line.strip("|").split("|")]
+        key = cells[0].replace("`", "").replace("*", "").strip().lower()
+        if section.startswith("employee overrides"):
+            if len(cells) >= 3 and key and key != "employee":
+                overrides[key] = {"model": _model_cell(cells[1]), "effort": _effort_cell(cells[2])}
+            continue
+        if section.startswith("budget"):
+            into = receipt
+        elif section.startswith(("analytical", "creative", "code")):
+            into = tables
+        else:
+            continue
+        lane = _lane_of(key)
+        if lane is None or len(cells) < 2:
+            continue
+        target = into[lane]
+        if len(cells) >= 3 and "model" not in key and "effort" not in key:
+            target["model"], target["effort"] = _model_cell(cells[1]), _effort_cell(cells[2])
+        elif "model" in key:
+            target["model"] = _model_cell(cells[1])
+        elif "effort" in key:
+            target["effort"] = _effort_cell(cells[1])
+    lanes = {}
+    for lane in LANES:
+        fallbacks = [tables[lane], receipt[lane]]
+        if lane.startswith("creative"):
+            fallbacks += [tables["creative"], receipt["creative"]]
+        lanes[lane] = {f: next((c[f] for c in fallbacks if c[f]), None) for f in ("model", "effort")}
+    return lanes, overrides
+
+
+def load_lineup(root):
+    """`(lanes, overrides, source label)`, or None when neither file can be read."""
+    for path, label in ((os.path.join(root, CONFIG_REL), CONFIG_REL),
+                        (TEMPLATE, "the shipped org-config.template.md (no project org-config.md)")):
+        try:
+            with open(path, encoding="utf-8") as fh:
+                lanes, overrides = parse_lineup(fh.read())
+        except (OSError, UnicodeDecodeError):
+            continue
+        return lanes, overrides, label
+    return None
+
+
+def resolve(lane, name, tier, lanes, overrides):
+    """`(model, effort, source)` for one file, per `org-config.template.md` § Resolution.
+
+    Model and effort fall through the levels separately: a blank cell disables its level for
+    that field alone. The bottom is the analytical row for the file's tier — Lead when the
+    lane is the Lead tier or the handbook's ORG-RECORD says tier 2, IC otherwise.
+
+    A blank all the way down is `None`, and `None` is NEVER WRITTEN. A blank cell and a config
+    this parser could not read look identical from here, and treating the second as "inherit"
+    would strip the pin from every file in the project. So a missing model is reported
+    UNRESOLVED and the file is left as it is; a missing effort leaves the `effort:` line alone.
+    """
+    analytical = lanes["analytical-lead" if lane == "analytical-lead" or tier == "2"
+                       else "analytical-ic"]
+    levels = []
+    if name and name.lower() in overrides:
+        levels.append(("employee override", overrides[name.lower()]))
+    if lane not in ("analytical-lead", "analytical-ic"):
+        levels.append((lane + " lane", lanes[lane]))
+    levels.append(("analytical tier", analytical))
+    out, src = {}, []
+    for field in ("model", "effort"):
+        out[field] = None
+        for label, cells in levels:
+            if cells.get(field):
+                out[field] = cells[field]
+                if label not in src:
+                    src.append(label)
+                break
+    # `claude-haiku-4-5` takes no effort setting (`org-config.template.md` § Effort statics),
+    # so no lane rung is written onto a file pinned to it.
+    if out["model"] and out["model"].startswith("claude-haiku"):
+        out["effort"] = None
+    return out["model"], out["effort"], " + ".join(src) or "inherit"
+
+
+# ── enumeration ──────────────────────────────────────────────────────────────
+
+def _realpath(p):
+    try:
+        return os.path.realpath(p)
+    except OSError:
+        return p
+
+
+def installer_paths(root):
+    """Every path a workforce install recorded writing, from both possible records."""
+    cfg = os.environ.get("CLAUDE_CONFIG_DIR") or os.path.join(os.path.expanduser("~"), ".claude")
+    out = set()
+    for base in (os.path.join(root, ".claude"), cfg):
+        try:
+            with open(os.path.join(base, "skills", "workforce", ".installed-external"),
+                      encoding="utf-8") as fh:
+                out.update(_realpath(l.strip()) for l in fh if l.strip())
+        except (OSError, UnicodeDecodeError):
+            continue
+    return out
+
+
+def candidates(root):
+    """Every file that could pin a model, in a stable order, project-relative."""
+    out = []
+    agents = os.path.join(root, ".claude", "agents")
+    # Recursive and NOT following directory links, the walk `wf-org-sync.project_agents` uses
+    # and for the reason it records: `**` descends a symlinked directory and can loop.
+    for dp, dn, fn in os.walk(agents):
+        dn.sort()
+        out += [os.path.join(dp, f) for f in sorted(fn) if f.endswith(".md")]
+    skills = os.path.join(root, ".claude", "skills")
+    out += sorted(glob.glob(os.path.join(skills, "*", "agents", "*", "AGENT.md")))
+    out += sorted(glob.glob(os.path.join(skills, "*", "SKILL.md")))
+    return [os.path.relpath(p, root) for p in out if os.path.isfile(p)]
+
+
+def _read(path):
+    try:
+        with open(path, encoding="utf-8", newline="") as fh:
+            return fh.read()
+    except (OSError, UnicodeDecodeError):
+        return None
+
+
+def enumerate_files(root):
+    """One row per distinct file that pins a model. A second path to the same file — the
+    registration symlink beside the AGENT.md it points at — is folded into the first."""
+    shipped = installer_paths(root)
+    inside = _realpath(root).rstrip(os.sep) + os.sep
+    rows, seen = [], {}
+    for rel in candidates(root):
+        path = os.path.join(root, rel)
+        real = _realpath(path)
+        if real in seen:
+            seen[real]["aliases"].append(rel)
+            continue
+        text = _read(path)
+        fm = frontmatter(text) if text is not None else None
+        if not fm or not fm[0].get("model") or fm[0]["model"].lower() == "inherit":
+            continue
+        fields = fm[0]
+        tier = re.search(r"<!--\s*tier:\s*(\d)", text)
+        row = {
+            "rel": rel, "path": path, "real": real, "aliases": [],
+            "kind": "skill" if rel.endswith("SKILL.md") else "agent",
+            "name": fields.get("name") or os.path.splitext(os.path.basename(rel))[0],
+            "description": fields.get("description", ""),
+            "model": fields.get("model"), "effort": fields.get("effort"),
+            "tier": tier.group(1) if tier else None,
+            "link": os.path.islink(path),
+            # A link that leaves the project is somebody else's file: reported, never written.
+            "outside": not real.startswith(inside),
+            "shipped": real in shipped or rel.startswith(os.path.join(".claude", "skills", "workforce") + os.sep),
+        }
+        row["hash"] = description_hash(row["description"])
+        seen[real] = row
+        rows.append(row)
+    return rows
+
+
+# ── the record ───────────────────────────────────────────────────────────────
+
+def load_record(root):
+    try:
+        with open(os.path.join(root, RECORD_REL), encoding="utf-8") as fh:
+            data = json.load(fh)
+        return data.get("files", {}) if isinstance(data, dict) else {}
+    except (OSError, ValueError, UnicodeDecodeError):
+        return {}
+
+
+def save_record(root, files):
+    path = os.path.join(root, RECORD_REL)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    body = {"_about": "Written by wf-model-lanes. Each model-pinned file's judged lane and the "
+                      "hash of the description it was judged from; a moved hash re-judges it.",
+            "files": dict(sorted(files.items()))}
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump(body, fh, indent=2, ensure_ascii=False)
+        fh.write("\n")
+
+
+# ── the rewrite ──────────────────────────────────────────────────────────────
+
+def rewrite(row, model, effort):
+    """Set `model:` and `effort:` in place and re-read; return the error, or None.
+
+    Writes THROUGH a symlink — `open(path, "w")` truncates the target, so the link survives
+    and the file that owns the registration receives the edit. Never rename-in-place.
+    `None` leaves that line alone. Only an agent gains an `effort:` line it did not carry; a
+    skill's is rewritten only where the skill already declares one.
+    """
+    text = _read(row["path"])
+    fm = frontmatter(text) if text is not None else None
+    if not fm:
+        return "unreadable or its frontmatter moved during the run"
+    _fields, index, lines = fm
+    edits = {}
+    for key, want in (("model", model), ("effort", effort)):
+        if key in index and want is not None:
+            cr = "\r" if lines[index[key]].endswith("\r") else ""
+            edits[index[key]] = f"{key}: {want}{cr}"
+    if effort and "effort" not in index and row["kind"] == "agent":
+        at = index["model"]
+        cr = "\r" if lines[at].endswith("\r") else ""
+        edits[at] = [edits.get(at, lines[at]), f"effort: {effort}{cr}"]
+    out = []
+    for i, line in enumerate(lines):
+        if i not in edits:
+            out.append(line)
+        elif isinstance(edits[i], list):
+            out.extend(edits[i])
+        else:
+            out.append(edits[i])
+    try:
+        with open(row["path"], "w", encoding="utf-8", newline="") as fh:
+            fh.write("\n".join(out))
+    except OSError as exc:
+        return f"write failed: {exc.strerror}"
+    back = frontmatter(_read(row["path"]) or "")
+    got = (back[0].get("model"), back[0].get("effort")) if back else (None, None)
+    if got != (model, effort if effort is not None else row["effort"]):
+        return f"re-read shows model {got[0]} · effort {got[1]}"
+    return None
+
+
+def _symlinks(rows):
+    return {r["rel"]: r["real"] for r in rows if r["link"]}
+
+
+# ── main ─────────────────────────────────────────────────────────────────────
+
+def main():
+    ap = argparse.ArgumentParser(description="Keep every model-pinned file on its lane's model.")
+    ap.add_argument("--root", required=True)
+    ap.add_argument("--judge", nargs=3, action="append", default=[], metavar=("PATH", "LANE", "WHY"),
+                    help="record PATH's lane (one of: %s) and the reason, read from its description"
+                    % ", ".join(LANES))
+    ap.add_argument("--execute", action="store_true", help="write the record and the rewrites")
+    ap.add_argument("--check", action="store_true", help="read-only; exit 1 on any drift")
+    args = ap.parse_args()
+    if args.check and (args.execute or args.judge):
+        ap.error("--check is read-only; it takes neither --execute nor --judge")
+
+    root = os.path.abspath(args.root)
+    if not os.path.isdir(os.path.join(root, ".claude")):
+        print(f"wf-model-lanes: no .claude under {root}", file=sys.stderr)
+        return 2
+    lineup = load_lineup(root)
+    if lineup is None:
+        print(f"wf-model-lanes: no lineup — neither {CONFIG_REL} nor {TEMPLATE} is readable",
+              file=sys.stderr)
+        return 2
+    lanes, overrides, source = lineup
+    rows = enumerate_files(root)
+    by_rel = {r["rel"]: r for r in rows}
+    for r in rows:
+        for a in r["aliases"]:
+            by_rel[a] = r
+
+    record = load_record(root)
+    judged = {}
+    for path, lane, why in args.judge:
+        rel = os.path.relpath(os.path.abspath(os.path.join(root, path)), root)
+        if lane not in LANES:
+            print(f"wf-model-lanes: unknown lane {lane!r} for {rel} — one of {', '.join(LANES)}",
+                  file=sys.stderr)
+            return 2
+        if rel not in by_rel:
+            print(f"wf-model-lanes: --judge {rel}: not a model-pinned file under .claude/",
+                  file=sys.stderr)
+            return 2
+        if by_rel[rel]["shipped"] or by_rel[rel]["outside"]:
+            print(f"wf-model-lanes: --judge {rel}: a shipped file or one outside the project — "
+                  f"not this project's to rewrite",
+                  file=sys.stderr)
+            return 2
+        judged[by_rel[rel]["rel"]] = (lane, why.strip())
+
+    print(f"wf-model-lanes — {root}")
+    print(f"lineup from {source}")
+    for lane in LANES:
+        c = lanes[lane]
+        print(f"  {lane:<16} {c['model'] or '(none selected)'} · {c['effort'] or '(none selected)'}")
+    for emp, c in sorted(overrides.items()):
+        print(f"  override {emp:<7} {c['model'] or '-'} · {c['effort'] or '-'}")
+    # AN OVERRIDE THAT NAMES NOBODY IS THE USER'S PIN LOST SILENTLY: the lane default would be
+    # written where they chose a model by hand. It is matched by the agent's `name:` or its
+    # file name, and one that matches neither stops `--execute` until the row is corrected.
+    known = {str(r["name"] or "").lower() for r in rows} | {
+        os.path.splitext(os.path.basename(r["rel"]))[0].lower() for r in rows}
+    orphans = sorted(emp for emp in overrides if emp not in known)
+    for emp in orphans:
+        print(f"  ! override {emp} matches no model-pinned agent here by name or file name — "
+              f"correct the row in {source}; --execute will not run until it does")
+    if orphans and args.execute:
+        args.execute = False
+        print("  nothing is written while an override names nobody — this run is the plan only")
+    print()
+
+    links_before = _symlinks(rows)
+    today = datetime.date.today().isoformat()
+    new_record = dict(record)
+    counts = {k: 0 for k in ("ok", "drift", "judge", "shipped", "written", "failed", "unresolved")}
+    lineup_models = {c["model"] for c in lanes.values() if c["model"]} | {
+        c["model"] for c in overrides.values() if c["model"]}
+
+    for r in rows:
+        rel = r["rel"]
+        also = f"  (also {', '.join(r['aliases'])})" if r["aliases"] else ""
+        have = f"{r['model']} · {r['effort'] or '-'}"
+        if r["shipped"]:
+            counts["shipped"] += 1
+            print(f"  = SHIPPED  {rel}  {have} — `update` owns it; never rewritten here{also}")
+            continue
+        if r["outside"]:
+            counts["shipped"] += 1
+            print(f"  = OUTSIDE  {rel}  {have} — links to {r['real']}, outside this project; "
+                  f"never rewritten here{also}")
+            continue
+        entry = record.get(rel)
+        if rel in judged:
+            lane, why = judged[rel]
+        elif entry and entry.get("hash") == r["hash"] and entry.get("lane") in LANES:
+            lane, why = entry["lane"], entry.get("why", "")
+        else:
+            counts["judge"] += 1
+            was = f"; was {entry.get('lane')} until its description changed" if entry else ""
+            off = "" if r["model"] in lineup_models else "  OFF-LINEUP: no lane selects this model"
+            print(f"  ? JUDGE    {rel}  {have}{off}{was}{also}")
+            print(f"             name: {r['name']}")
+            print(f"             description: {r['description'] or '(none — judge from the body)'}")
+            if args.check and off:
+                counts["drift"] += 1
+            continue
+        stem = os.path.splitext(os.path.basename(rel))[0]
+        key = r["name"] if str(r["name"] or "").lower() in overrides else stem
+        model, effort, src = resolve(lane, key, r["tier"], lanes, overrides)
+        judged_on = today if rel in judged else (entry or {}).get("judged", today)
+        new_record[rel] = {"lane": lane, "why": why, "hash": r["hash"], "judged": judged_on}
+        if model is None:
+            counts["unresolved"] += 1
+            print(f"  ? UNRESOLVED {rel}  {have}  ({lane}): {source} selects no model for this "
+                  f"lane — left as it is{also}")
+            continue
+        # A skill gains no `effort:` line; an agent does, because the lane sets one. With no
+        # rung selected the line stays exactly as it is.
+        effort_target = r["effort"] if effort is None or (
+            r["effort"] is None and r["kind"] != "agent") else effort
+        if (r["model"], r["effort"]) == (model, effort_target):
+            counts["ok"] += 1
+            print(f"  + OK       {rel}  {have}  ({lane}, {src}){also}")
+            continue
+        counts["drift"] += 1
+        change = []
+        if r["model"] != model:
+            change.append(f"model {r['model']} → {model}")
+        if r["effort"] != effort_target:
+            change.append(f"effort {r['effort'] or '(none)'} → {effort_target}")
+        line = f"{rel}: {', '.join(change)} ({lane}, {why}; {src})" if why else \
+            f"{rel}: {', '.join(change)} ({lane}; {src})"
+        if not args.execute:
+            print(f"  ✗ DRIFT    {line}{also}")
+            continue
+        err = rewrite(r, model, effort_target if effort_target != r["effort"] else None)
+        if err:
+            counts["failed"] += 1
+            print(f"  ! FAILED   {line} — {err}{also}")
+        else:
+            counts["written"] += 1
+            print(f"  ✓ WROTE    {line}{also}")
+
+    if args.execute:
+        live = {r["rel"] for r in rows}
+        save_record(root, {k: v for k, v in new_record.items() if k in live})
+        after = _symlinks(enumerate_files(root))
+        lost = [k for k in links_before if k not in after]
+        moved = [k for k in links_before if k in after and after[k] != links_before[k]]
+        print(f"\nINV-SYMLINK  {len(links_before)} symlinked handbook(s) before · {len(after)} after · "
+              f"lost {len(lost)} · retargeted {len(moved)}")
+        if lost or moved:
+            counts["failed"] += len(lost) + len(moved)
+
+    print(f"\nINV-LANES  {len(rows)} model-pinned file(s) · {counts['ok']} on their lane · "
+          f"{counts['drift']} drifted · {counts['written']} rewritten · {counts['judge']} unjudged · "
+          f"{counts['shipped']} shipped or outside (report only) · {counts['unresolved']} unresolved · "
+          f"{counts['failed']} failed")
+    if orphans:
+        return 1
+    if args.check:
+        return 1 if counts["drift"] else 0
+    if args.execute:
+        if counts["judge"]:
+            print("  unjudged files were not written: judge each from its description and re-run "
+                  "with --judge PATH LANE WHY", file=sys.stderr)
+        return 1 if (counts["failed"] or counts["judge"] or counts["unresolved"]) else 0
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

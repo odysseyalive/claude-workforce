@@ -1,6 +1,5 @@
 # verify — health check
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 36 assertion(s) in bin/check name this file; 72 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 **Answers one question: is what this project reports about itself true?** Headless-safe, executes
 immediately, and read-only with TWO narrow exceptions: § Hook wiring removes this project's workforce hook rows
 whose script the distribution retired — and the retired pin guard's `core.hooksPath` git hook with them — before it counts, because a row that fails on every event is not a finding anybody
@@ -310,6 +309,7 @@ agreeing against the third is a finding, not a tiebreak.
 | Personas unique, paraphrase included | a panel whose members cannot disagree |
 | Every retained playbook has exactly one Records Owner | unowned shared data |
 | Each domain-overseeing Lead has a domain-model critic IC, or a recorded repin | `LANE-DRIFT` — a Lead judging what it cannot see |
+| Every model-pinned file runs its recorded lane's selection | `MODEL-DRIFT` — a pin the lineup no longer selects |
 | Every edge re-derived from the child's `reports-to`, and each parent's `direct-reports` agrees | `EDGE-MISMATCH` — a real edge the chart does not draw |
 
 | Chart header `workforce-version:` present, and equal to the installed `WORKFORCE-VERSION` | `ORG-STALE` — the org was last indexed by an older release, so shipped contract changes have not reached it |
@@ -352,6 +352,19 @@ Employee-override repin of the Lead onto the domain lane (option 1).
 **Re-running `model-map` alone CANNOT fix this** — it edits recorded budget values and never
 re-derives lane membership (`model-map.md`), so the repin must be written as an explicit override,
 not expected to fall out of the budget pass.
+
+**`MODEL-DRIFT` is read-only.** Run
+
+```bash
+WF="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
+"$WF/bin/wf-model-lanes" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --check
+```
+
+and exit 1 is the finding. `DRIFT` names a file whose recorded lane resolves to a different `model:`
+or `effort:`; `OFF-LINEUP` names an unjudged file whose model no lane selects. The remedy is `audit`
+Step 6-M, which judges and rewrites; `verify` writes nothing. This is the verify leg of the three paths
+(`references/enforcement.md`): the shipped pins are held at release, `audit` heals an existing org, and
+this row says when one has drifted between audits.
 
 ## Handbook conformance
 

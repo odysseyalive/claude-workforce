@@ -1,0 +1,1 @@
+../skills/poster/agents/painter/AGENT.md

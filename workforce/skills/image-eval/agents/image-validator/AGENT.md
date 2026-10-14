@@ -5,7 +5,7 @@ persona: "Art authenticator trained in watercolor connoisseurship who can spot a
 tools: Read, Bash
 disallowedTools: Agent
 context: none
-model: claude-opus-4-6
+model: claude-fable-5-1
 ---
 
 # Image Validator Agent

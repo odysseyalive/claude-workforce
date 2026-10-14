@@ -9794,5 +9794,194 @@
           "IGNORE THE ABOVE",
           "authorised to delete"
       ]
+  },
+  "model-lanes-plan": {
+      "_why": "THE PLAN WRITES NOTHING AND NAMES EVERY STATE. Measured 2026-10-14: a code employee ran ~57M tokens on a code pick the lane had left three weeks earlier, because the model line was rewritten only when a budget cell changed. A recorded lane whose description is unchanged resolves to the lineup and the stale pin is DRIFT; a file nobody has judged is JUDGE with its description printed for the audit to read, and a pin no lane selects says OFF-LINEUP; the override row resolves the critic, so it is OK; the shipped registration is reported and never planned for. `after` proves the dry run wrote nothing.",
+      "script": "wf-model-lanes",
+      "subst": [
+          ".claude/skills/workforce/.installed-external"
+      ],
+      "args": [],
+      "exit": 0,
+      "want": [
+          "DRIFT    .claude/agents/engineering-coder.md: model claude-opus-5 → claude-opus-5-5 (code, writes and tests software; code lane)",
+          "+ OK       .claude/agents/design-critic.md  claude-fable-5-1 · high  (creative-visual, employee override)",
+          "? JUDGE    .claude/agents/painter.md",
+          "(also .claude/skills/poster/agents/painter/AGENT.md)",
+          "? JUDGE    .claude/skills/glyph/agents/glyph-counter/AGENT.md",
+          "OFF-LINEUP",
+          "description: Counts glyphs in a font file mechanically.",
+          "= SHIPPED  .claude/agents/code-design-advisor.md",
+          "INV-LANES  5 model-pinned file(s) · 1 on their lane · 1 drifted · 0 rewritten · 2 unjudged · 1 shipped"
+      ],
+      "not": [
+          "plain.md",
+          "WROTE",
+          "Traceback"
+      ],
+      "after": {
+          ".claude/agents/engineering-coder.md": {
+              "want": [
+                  "model: claude-opus-5\n"
+              ]
+          },
+          ".claude/workforce/model-lanes.json": {
+              "not": [
+                  "painter"
+              ]
+          }
+      }
+  },
+  "model-lanes-check": {
+      "_why": "VERIFY'S LEG, READ-ONLY. The same tree under --check exits 1 on the recorded drift and on the unjudged pins no lane selects, and writes nothing. A verify that exited 0 here would report an org healthy while it ran the retired model.",
+      "script": "wf-model-lanes",
+      "subst": [
+          ".claude/skills/workforce/.installed-external"
+      ],
+      "args": [
+          "--check"
+      ],
+      "exit": 1,
+      "want": [
+          "DRIFT    .claude/agents/engineering-coder.md",
+          "OFF-LINEUP",
+          "3 drifted"
+      ],
+      "not": [
+          "WROTE",
+          "INV-SYMLINK",
+          "Traceback"
+      ],
+      "after": {
+          ".claude/agents/engineering-coder.md": {
+              "want": [
+                  "model: claude-opus-5\n"
+              ]
+          }
+      }
+  },
+  "model-lanes-execute": {
+      "_why": "THE APPLY STEP, ON EVERY SHAPE THAT WAS MISSED. The stale employee pin moves to the code lane's selection; the agent registered by SYMLINK is written THROUGH the link, so the AGENT.md it points at changes and INV-SYMLINK counts the link intact (a rename-in-place write would leave the target stale); the skill-bundled agent no audit used to read is reconciled and gains the lane's effort; the employee override is the user's choice and survives byte-for-byte; the shipped registration that `update` owns is untouched; the judgments are recorded beside their description hashes.",
+      "script": "wf-model-lanes",
+      "subst": [
+          ".claude/skills/workforce/.installed-external"
+      ],
+      "args": [
+          "--judge",
+          ".claude/agents/painter.md",
+          "creative-visual",
+          "generates poster images",
+          "--judge",
+          ".claude/skills/glyph/agents/glyph-counter/AGENT.md",
+          "analytical-ic",
+          "a mechanical count, not authorship",
+          "--execute"
+      ],
+      "exit": 0,
+      "want": [
+          "WROTE    .claude/agents/engineering-coder.md: model claude-opus-5 → claude-opus-5-5 (code, writes and tests software; code lane)",
+          "WROTE    .claude/agents/painter.md: model claude-opus-5 → claude-fable-5-1, effort (none) → medium (creative-visual, generates poster images; creative-visual lane)",
+          "WROTE    .claude/skills/glyph/agents/glyph-counter/AGENT.md: model claude-opus-5 → claude-opus-4-8, effort (none) → medium",
+          "+ OK       .claude/agents/design-critic.md",
+          "INV-SYMLINK  1 symlinked handbook(s) before · 1 after · lost 0 · retargeted 0",
+          "3 rewritten · 0 unjudged · 1 shipped or outside (report only) · 0 unresolved · 0 failed"
+      ],
+      "not": [
+          "FAILED",
+          "Traceback"
+      ],
+      "after": {
+          ".claude/agents/engineering-coder.md": {
+              "want": [
+                  "model: claude-opus-5-5\neffort: high\n"
+              ]
+          },
+          ".claude/skills/poster/agents/painter/AGENT.md": {
+              "want": [
+                  "model: claude-fable-5-1\neffort: medium\n"
+              ]
+          },
+          ".claude/skills/glyph/agents/glyph-counter/AGENT.md": {
+              "want": [
+                  "model: claude-opus-4-8\neffort: medium\n"
+              ]
+          },
+          ".claude/agents/design-critic.md": {
+              "want": [
+                  "model: claude-fable-5-1\neffort: high\n"
+              ]
+          },
+          ".claude/agents/code-design-advisor.md": {
+              "want": [
+                  "model: claude-opus-4-8\n"
+              ],
+              "not": [
+                  "effort"
+              ]
+          },
+          ".claude/workforce/model-lanes.json": {
+              "want": [
+                  "\"lane\": \"creative-visual\",\n      \"why\": \"generates poster images\"",
+                  "\"lane\": \"analytical-ic\""
+              ],
+              "not": [
+                  "code-design-advisor"
+              ]
+          }
+      }
+  },
+  "model-lanes-unjudged": {
+      "_why": "A FILE LEFT UNJUDGED IS NOT A FINISHED RUN. Lane assignment is total (org-config.template.md § Lane assignment is total): --execute applies what it can — the recorded employee is corrected — and exits 1 naming the files nobody judged, which it leaves exactly as they were.",
+      "script": "wf-model-lanes",
+      "subst": [
+          ".claude/skills/workforce/.installed-external"
+      ],
+      "args": [
+          "--execute"
+      ],
+      "exit": 1,
+      "want": [
+          "WROTE    .claude/agents/engineering-coder.md",
+          "2 unjudged",
+          "unjudged files were not written"
+      ],
+      "not": [
+          "Traceback"
+      ],
+      "after": {
+          ".claude/skills/poster/agents/painter/AGENT.md": {
+              "want": [
+                  "model: claude-opus-5\n"
+              ]
+          },
+          ".claude/agents/engineering-coder.md": {
+              "want": [
+                  "model: claude-opus-5-5\n"
+              ]
+          }
+      }
+  },
+  "model-lanes-unresolved": {
+      "_why": "A LINEUP IT CANNOT READ STRIPS NOTHING. An org-config with no lane table and no budget receipt resolves every lane to nothing, and a blank read as `inherit` would delete the pin from every file in the project. The file is reported UNRESOLVED, left byte-for-byte, and the run exits 1.",
+      "script": "wf-model-lanes",
+      "args": [
+          "--execute"
+      ],
+      "exit": 1,
+      "want": [
+          "UNRESOLVED .claude/agents/engineering-coder.md",
+          "1 unresolved"
+      ],
+      "not": [
+          "WROTE",
+          "Traceback"
+      ],
+      "after": {
+          ".claude/agents/engineering-coder.md": {
+              "want": [
+                  "model: claude-opus-5\neffort: high\n"
+              ]
+          }
+      }
   }
 }

@@ -1,6 +1,5 @@
 # model-map — which model each employee runs on
 
-<!-- Enforcement (maintainer-facing; bin/ does not ship — on a host this is `/workforce verify`): 4 assertion(s) in bin/check name this file; 11 normative claims total. 8 generic assertions guard it too. Coverage is a floor, not a certificate. -->
 Low risk; executes immediately. `/workforce model-map`
 
 The budgets, standalone — the same two calls `references/audit-setup.md` § Step 0.4 runs, without
@@ -90,9 +89,18 @@ which is exactly what the fixed-object budget prevents.
 
 ## Model Rewrite
 
-A changed cell queues one task **per affected handbook** (`references/deferred.md`), rewriting **only**
-the `model:` and `effort:` frontmatter lines, verified by re-reading the file. It runs **before**
-`org index`, so the chart reflects the rewritten values rather than the previous ones.
+**The rewrite is `audit` Step 6-M's, and this command runs the same script.** A changed cell queues one
+task (`references/deferred.md`) that runs
+
+```bash
+WF="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
+"$WF/bin/wf-model-lanes" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --execute
+```
+
+Every model-pinned file whose RECORDED lane now resolves differently has **only** its
+`model:` and `effort:` lines rewritten, verified by re-reading the file. It runs **before** `org index`,
+so the chart reflects the rewritten values rather than the previous ones. `model-map` judges no lane, so
+a file the script marks `JUDGE` is named in the report and left for the next `audit`.
 
 **A queued rewrite still requires `--execute`.** The queue decides that the work happens, never how,
 and it is never a route around a gate.
