@@ -24,9 +24,9 @@ itself. Two processes, one file, and only one of them knew the file was a histor
 
 | Store | Answers | Written when |
 |---|---|---|
-| `bin/check` assertion | *"can this defect come back?"* | always, for anything structural — and **proven by breaking it** |
+| a demonstration, quoted in the commit | *"does this change do what it should, and would it show the defect?"* | every change: run it on a throwaway project, then plant the defect in a copy and show the run catches it. `bin/check` and `bin/prove` were retired for this on 2026-10-14 |
 | `fixtures/scripts/` | *"can this SCRIPT regress?"* | any behavior a shipped script must keep. `bin/script-conformance` re-runs them |
-| `bin/idempotence` | *"is this writer a no-op the second time?"* | every tool that writes. Run it after touching one — `bin/coverage --stamp` duplicated its header for hours because nothing ran it twice |
+| `bin/idempotence` | *"is this writer a no-op the second time?"* | every tool that writes. Run it after touching one |
 | `corpus/` via `bin/corpus` | *"does this still do the right thing on a REAL org?"* | every change to a script an audit runs. The only store whose input this project did not write |
 | `measurements/` | *"is this platform fact true on a host?"* | every MEASURED fact in `platform.md`, with its evidence |
 | `plan/<topic>-<date>.md` | *"why is it built this way, and what did running it cost?"* | mock audits, design records, negative-test results |
@@ -34,10 +34,8 @@ itself. Two processes, one file, and only one of them knew the file was a histor
 
 **Before removing a mechanism, ask `bin/components <name>` what runs through it.** The catalog is
 generated from the code on every run: every shipped script, per-session hand-off file and agent hook,
-with what each loads, uses, reads, writes and registers, and which `bin/prove` cases pin it.
-`bin/components <name>:<function>` narrows it to one function, `bin/prove --since` prints the
-dependents of whatever changed, and `bin/check` fails when a component still depends on something that
-no longer exists. It cannot see coupling that runs through no shared file, name, call or JSON key;
+with what each loads, uses, reads, writes and registers. `bin/components <name>:<function>` narrows it
+to one function, and `bin/components --dependents <path>` prints what depends on a changed file. It cannot see coupling that runs through no shared file, name, call or JSON key;
 its header lists what that leaves out. *Built 2026-09-13, after a removal plan marked the
 NOTIFICATION keep-rule and the tag's `enforced` marker for deletion while the asks juror depended on
 both.*

@@ -7,16 +7,15 @@ be enforced.** Filing a claim under the wrong kind is how a rule ends up written
 
 | Kind | Example | Enforced by — **on a host** | …**in this repo** |
 |---|---|---|---|
-| **Structural** — a property of files | marker pairing, an orphaned reference, a restated constant | a **`/workforce verify`** check | a `bin/check` assertion |
+| **Structural** — a property of files | marker pairing, an orphaned reference, a restated constant | a **`/workforce verify`** check | a demonstration on a throwaway project, read by an independent reviewer |
 | **Procedural** — a property of a *run* | backup before the first write, extraction before deletion | **a counted line in the run report** |
 | **Advisory** — guidance for a reader | "prefer the explicit `Read` for narrow needs" | nothing, and it says so |
 
-**`bin/check` does not ship, and this table used to name it as the only structural mechanism.** The
-manifest carries 66 files, all under `workforce/`; `bin/` is not among them. So a project that
-installs this skill, writes a rule, classifies it structural, and follows this table was being sent to
-a tool it does not have. **On a host the structural mechanism is `verify`** — which does ship, and
-whose whole job is detecting silent-failure classes. `bin/check` is this repo's own equivalent, and
-naming it here is correct only as the maintainer-side column.
+**On a host the structural mechanism is `verify`**, which ships and whose whole job is detecting
+silent-failure classes. In this repository the maintainer-side mechanism was `bin/check` until
+2026-10-14, when the user retired it with `bin/prove` (*"let's go ahead and retire it so that it's not
+used going forward"*): a structural change here is now proven by demonstrating it on a throwaway
+project, with a planted defect the demonstration must catch, and one independent review.
 
 Found 2026-07-31 while answering what the distribution actually installs.
 
@@ -198,7 +197,7 @@ imbalance is `NOT UPHELD`, which blocks the sweep.** An empty set under `success
 finding about the staging step, never a description of the tree.
 
 **Row 23 is the companion gate's own report, and its predicate is fixed** (the shared contract
-`audit-setup.md` § Step 0.3 owes and `bin/check` enforces): **after any `audit` run, the three Core
+`audit-setup.md` § Step 0.3 owes): **after any `audit` run, the three Core
 companions exist at `${CLAUDE_PROJECT_DIR}/.claude/skills/<name>/SKILL.md` for name ∈ {org,
 operating-principles, personnel-ledger}, and the three evaluators — code-evaluator, text-eval,
 security-evaluator — are reachable in EITHER scope, project first. Absence of any is
@@ -250,9 +249,9 @@ forbids a single canary attempt becoming a DEGRADED verdict. **None of them can 
 each is four numbers or a per-skill rule name.
 
 **The token is the link, and it is what makes the pairing checkable.** Each `INV-*` token appears in
-exactly two places: this table, and the procedure that owes the count. `bin/check` resolves every row's
-token into its named owner and fails if the owner does not carry it — so a row cannot be added,
-reworded, or repointed without the procedure changing in the same edit.
+exactly two places: this table, and the procedure that owes the count. A row is added, reworded, or repointed only
+in the same edit that changes its owner's procedure; since `bin/check` was retired on 2026-10-14 the
+reviewer of that edit is who checks the pairing.
 
 An earlier form of this table carried the literal line text and named its owners in a prose sentence.
 Both were unenforceable: an audit replaced all ten line texts with the word "garbage" and the check
