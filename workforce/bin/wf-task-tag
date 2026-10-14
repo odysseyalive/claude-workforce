@@ -552,6 +552,11 @@ def open_agent_tag(payload):
 # WHAT AN ITEM IS, defined beside the list it belongs to. `wf-widen` counts these toward the
 # hand-off to the widening agent. The status is the session's to word; only the ask decides
 # whether an entry is an item.
+def checklist_title(cl):
+    """The short title the session gave this message's issue, made safe for one line."""
+    return plain_text(cl.get("title") if isinstance(cl, dict) else None, TITLE_MAX)
+
+
 def checklist_items(cl):
     """The items on a checklist: JSON objects with a non-empty string `ask`. An `items` that is
     not a list holds no items, so a malformed file reads as an empty checklist."""
@@ -990,7 +995,7 @@ def add_issue(payload, led):
     return iss
 
 
-def absorb_items(led, issue_id, items):
+def absorb_items(led, issue_id, items, title=""):
     """Copy a finished checklist's items onto their issue, replacing what is there.
 
     THIS IS WHAT MAKES THE WIPE SAFE. `start_checklist` removes the checklist file on every
@@ -1006,15 +1011,45 @@ def absorb_items(led, issue_id, items):
     """
     if not issue_id:
         return
-    for iss in led.get("issues", []):
-        if isinstance(iss, dict) and iss.get("id") == issue_id:
-            if not items and any(i.get("fallback") is True for i in issue_items(iss)):
-                return
-            iss["items"] = [{"ask": i["ask"],
-                             "status": i["status"] if isinstance(i.get("status"), str)
-                             else "open"}
-                            for i in items]
-            return
+    own = next((i for i in led.get("issues", [])
+                if isinstance(i, dict) and i.get("id") == issue_id), None)
+    if own is None:
+        return
+    # A CONTINUATION JOINS ITS ISSUE. An item the session tagged `"issue": "<open id>"`
+    # belongs to that earlier issue, so it lands there, merged by its wording so a re-absorb
+    # never duplicates it. The session decides what continues what; nothing here infers it.
+    opened = {i.get("id"): i for i in open_issues(led) if i is not own}
+    mine, moved = [], 0
+    for it in items:
+        row = {"ask": it["ask"],
+               "status": it["status"] if isinstance(it.get("status"), str) else "open"}
+        dest = opened.get(it.get("issue")) if isinstance(it.get("issue"), str) else None
+        if dest is None:
+            mine.append(row)
+            continue
+        moved += 1
+        have = dest.setdefault("items", [])
+        same = next((x for x in have if isinstance(x, dict) and x.get("ask") == row["ask"]), None)
+        if same is None:
+            have.append(row)
+        else:
+            same["status"] = row["status"]
+    if title:
+        own["title"] = title
+    if moved and not mine and not any(a.get("state") == "running" for a in issue_agents(own)):
+        # EVERYTHING THIS MESSAGE ASKED CONTINUES AN EARLIER ISSUE, so it opens nothing of
+        # its own: folded, which `open_issues` reads as closed. Never over a running agent,
+        # whose result would land on an issue nobody reads.
+        own["state"] = "closed"
+        own["merged"] = True
+        own["items"] = []
+        return
+    if own.pop("merged", None):
+        # A FOLD IS UNDONE when the same message later gets items of its own.
+        own.pop("state", None)
+    if not mine and any(i.get("fallback") is True for i in issue_items(own)):
+        return
+    own["items"] = mine
 
 
 def carry_forward(led, skip=None):
@@ -1207,6 +1242,92 @@ def note_intentions(led, issue_id, texts):
     return target.get("id"), [n for n in fresh if n in target["noted"]]
 
 
+ISSUE_ID = re.compile(r"(?<![\w-])(i\d{1,4})(?![\w-])")
+TITLE_MAX = 60
+TASK_MAX = 200
+
+
+def plain_text(value, limit):
+    """Session- or agent-written text made safe for one status line: one line, no control
+    characters, cut to `limit`. "" for anything that is not a non-empty string."""
+    if not isinstance(value, str):
+        return ""
+    one = " ".join("".join(c if c.isprintable() else " " for c in value).split())
+    return one[:limit]
+
+
+def agent_task(payload, aid):
+    """The task description the session gave an agent when it started it, or "".
+
+    THE HARNESS ALREADY RECORDS IT: every agent has `subagents/agent-<id>.meta.json` beside
+    the session transcript, holding `agentType` and `description`. Read, never trusted as a
+    path: `aid` is checked as one bare component before it is joined, and the file is read
+    without following a link."""
+    if not bare_name(aid):
+        return ""
+    tp = payload.get("transcript_path")
+    sid = payload.get("session_id")
+    if not isinstance(tp, str) or not tp:
+        return ""
+    base = os.path.dirname(tp)
+    names = [os.path.join(base, "subagents", f"agent-{aid}.meta.json")]
+    if bare_name(sid):
+        names.insert(0, os.path.join(base, sid, "subagents", f"agent-{aid}.meta.json"))
+    for path in names:
+        meta = read_json_nofollow(path)
+        if isinstance(meta, dict):
+            return plain_text(meta.get("description"), TASK_MAX)
+    return ""
+
+
+def issue_named(led, text):
+    """The open issue a piece of text names by id (`i11`, `[i11]`), or None. The first id
+    that is an OPEN issue wins; an id that names nothing open is ignored, never invented."""
+    if not isinstance(text, str):
+        return None
+    opened = {i.get("id"): i for i in open_issues(led)}
+    for m in ISSUE_ID.finditer(text):
+        if m.group(1) in opened:
+            return opened[m.group(1)]
+    return None
+
+
+def agents_stopped(led, transcript_path):
+    """Mark `stopped` every running agent the main transcript says was stopped. The count.
+
+    A STOPPED AGENT FIRES NO `SubagentStop`, so without this its entry reads `running`
+    forever and its issue holds on an agent that is gone (measured 2026-10-14: three issues
+    held for hours on coders stopped with TaskStop). The harness writes a
+    `<task-notification>` naming the task id and `<status>killed</status>` into the main
+    transcript; that row, not an inference, is what this reads."""
+    if not isinstance(transcript_path, str) or not transcript_path:
+        return 0
+    running = {}
+    for iss in open_issues(led):
+        for a in issue_agents(iss):
+            if a.get("state") == "running":
+                running[a["agent_id"]] = a
+    if not running:
+        return 0
+    try:
+        with open(transcript_path, "rb") as fh:
+            raw = fh.read().decode("utf-8", "replace")
+    except OSError:
+        return 0
+    n = 0
+    for m in STOPPED_NOTICE.finditer(raw):
+        a = running.get(m.group(1))
+        if a is not None and a.get("state") == "running":
+            a["state"] = "stopped"
+            n += 1
+    return n
+
+
+STOPPED_NOTICE = re.compile(
+    r"<task-id>([\w-]{1,64})</task-id>(?:(?!</task-notification>).){0,600}?"
+    r"<status>(?:killed|stopped|cancell?ed)</status>", re.S)
+
+
 def link_agent(payload, led):
     """Link the starting agent to the issue being worked, as `running`. The issue id, or None.
 
@@ -1218,7 +1339,10 @@ def link_agent(payload, led):
     aid = agent_component(payload)
     if not aid:
         return None
-    iss = current_issue(led)
+    task = agent_task(payload, aid)
+    # THE ISSUE THE TASK NAMES, when it names an open one, and only then the newest: an agent
+    # started for i11 while the user is already on i23 belongs to i11 (measured 2026-10-14).
+    iss = issue_named(led, task) or current_issue(led)
     if iss is None:
         return None
     for a in issue_agents(iss):
@@ -1556,9 +1680,8 @@ def judge_issue(iss):
     agents = issue_agents(iss)
     waiting = [a for a in agents if a.get("state") == "running"]
     if waiting:
-        return "hold", "%d of %d agents still out: %s" % (
-            len(waiting), len(agents),
-            name_labelled(waiting, "state"))
+        return "hold", ("1 agent working" if len(waiting) == 1
+                        else "%d agents working" % len(waiting))
     items = session_items(iss)
     undone = [i for i in items if not item_done(i)]
     cut = [a for a in agents if a.get("state") == "handoff"]
@@ -1742,7 +1865,7 @@ def start_checklist(payload, prev=None):
         cl = read_json_nofollow(p) or {}
         landed = absorb_carried(led, carried_items(cl))
         if prev is not None:
-            absorb_items(led, prev.get("issue"), checklist_items(cl))
+            absorb_items(led, prev.get("issue"), checklist_items(cl), checklist_title(cl))
         iss = add_issue(payload, led)
         issue_id = iss.get("id") if iss else None
         if iss is not None or prev is not None or landed:
@@ -1776,7 +1899,9 @@ def start_checklist(payload, prev=None):
             "\"status\": \"open\"}, written before the work starts; statuses are updated as the "
             "work goes, and an ask found along the way is added. A finished ask is \"done\", or "
             "\"answered\" when the work was answering it; one the user withdrew or sent by "
-            "mistake is \"dropped\". The reply gives each item its "
+            "mistake is \"dropped\". Give the issue a short \"title\" of a few words; an item "
+            "that continues an earlier open issue carries \"issue\": <its id> and is added "
+            "there. The reply gives each item its "
             "own section. At Stop the widening agent checks the list and the reply against the "
             "message."
             + (f" These items belong to issue {issue_id} in this project's issue ledger, "

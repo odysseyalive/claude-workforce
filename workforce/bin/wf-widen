@@ -2760,6 +2760,14 @@ def ledger_verdict(payload, decided):
     # session may have written its list. `TT.track_message` carries the rule and its why.
     cl, record = checklist(payload)
     reply, how = TL.confirmed_reply(payload)
+    # THIS TURN'S LIST LANDS ON ITS ISSUE AT ITS OWN STOP, title and continuations included,
+    # rather than at the next message: an issue's items and title were one turn behind.
+    # Gated exactly like `track_message` below: a side query is mid-turn, before the list is
+    # finished, and absorbing a half-written list could fold this issue on a partial view.
+    if (isinstance(record, dict) and not record.get("carry_only") and record.get("issue")
+            and not record.get("ended") and reply is not None):
+        TT.absorb_items(led, record.get("issue"), TT.checklist_items(cl), TT.checklist_title(cl))
+    TT.agents_stopped(led, payload.get("transcript_path"))
     if (isinstance(record, dict) and not record.get("carry_only") and not record.get("ended")
             and reply is not None):
         TT.track_message(led, record.get("issue"), TT.checklist_items(cl))
@@ -2782,7 +2790,12 @@ def ledger_verdict(payload, decided):
         if verdict == "open":
             continue
         judged += 1
-        out.append(f"  {iid}  {verdict.upper()}  {why}  [{ask}]")
+        title = TT.plain_text(iss.get("title"), TT.TITLE_MAX) if isinstance(iss, dict) else ""
+        # HOLD READS AS "PROCESSING" to the user (2026-10-14): agents are working on it. The
+        # agents themselves are not listed — "adding individual ... running agents to the
+        # issues is going to confuse things and clutter things up."
+        word = "PROCESSING" if verdict == "hold" else verdict.upper()
+        out.append(f"  {iid}  {word}  {title + ' · ' if title else ''}{why}  [{ask}]")
         # THE VERDICT ALONE IS NOT ENOUGH FOR THE TWO THAT ASK FOR SOMETHING. Every other
         # verdict is a status; these two are an instruction, and an instruction the reader
         # has to infer is one the reader infers wrong — which here means starting the work
