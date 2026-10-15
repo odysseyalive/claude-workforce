@@ -4579,6 +4579,38 @@
       "10 of 106"
     ]
   },
+  "widen-report-back-after-own-work-still-blocks": {
+    "_why": "THE REPORT-BACK HOLD IS TAKEN ONLY WHEN IT IS THE TAIL'S ONE PROMISE. Found by independent review of the hold, 2026-10-15: \"Next I'll run the tests. I'll report what they show.\" with a task running passed, because a bare \"I'll report\" anywhere in the tail spared the whole tail, while the report is about work the turn never started. It blocks on main and must block here. PROMISE alone cannot see the first promise -- it anchors at a sentence start and \"Next I'll run\" is not one -- so the check counts every first-person future phrase (FUTURE).",
+    "exit": 0,
+    "script": "wf-widen",
+    "env": {
+      "WF_BLIND_SAMPLE": "0"
+    },
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"The retry limit is now five. Next I'll run the tests. I'll report what they show.\", \"background_tasks\": [{\"id\": \"bdevsrv01\", \"status\": \"running\"}]}",
+    "want": [
+      "stopped mid-work",
+      "CONTINUING"
+    ],
+    "not": [
+      "not judged"
+    ]
+  },
+  "widen-curly-apostrophe-promise-blocks": {
+    "_why": "A PROMISE TYPED WITH A CURLY APOSTROPHE IS THE SAME PROMISE. PROMISE read only the straight `'`, so \"I’ll fix the test next.\" never matched and the turn stopped unremarked. Found by independent review, 2026-10-15. The replay of every main Stop on this machine moved by nothing when PROMISE, REPORT_BACK and WAITING learned `’` (1 tail in 1,576 carries one, and it does not end on a promise).",
+    "exit": 0,
+    "script": "wf-widen",
+    "env": {
+      "WF_BLIND_SAMPLE": "0"
+    },
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"The failure is the off-by-one in the retry count. I’ll fix the test next.\"}",
+    "want": [
+      "stopped mid-work",
+      "CONTINUING"
+    ],
+    "not": [
+      "not judged"
+    ]
+  },
   "widen-waiting-words-alone-still-block": {
     "_why": "THE NEGATIVE THAT KEEPS THE FIX FROM WIDENING INTO SILENCE. Byte for byte the reply of widen-between-batches-is-silent, with no task running and no notification tag on disk: nothing is pending, nobody was asked anything, and the turn ended on \"Continuing.\" That is the measured stop defect - 10 of 106 turns - and it must still be blocked, or a guard is retired by a phrase any turn can write.",
     "exit": 0,
@@ -9316,7 +9348,8 @@
       ".claude/workforce/issues/s1.json": {
         "want": [
           "\"ask\": \"order the picks in that order on the agenda\", \"status\": \"done\"",
-          "\"state\": \"closed\""
+          "\"id\": \"i1\", \"prompt\": \"why don't you order the picks in that order on the agenda?\", \"state\": \"closed\"",
+          "\"id\": \"i2\", \"prompt\": \"widen tech and food to the top forty each and re-score\", \"state\": \"open\""
         ]
       }
     },

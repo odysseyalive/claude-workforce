@@ -407,7 +407,7 @@ CLAIM_SENSE = {
 # explains it: `report` is the most common by a factor of three (10 uses) and was not on
 # the list. The single promise most often made was the one promise not detected.
 PROMISE = re.compile(
-    r"(?:^|[.\n]\s*)(?:now[, ]+)?(?:i'?ll|i am|i'?m|let me)\s+"
+    r"(?:^|[.\n]\s*)(?:now[, ]+)?(?:i['’]?ll|i am|i['’]?m|let me)\s+"
     r"(?:now\s+|then\s+|just\s+|go ahead and\s+)?"
     r"(?:start|continue|keep|carry|build|do|go|move|fix|wire|write|run|land|finish"
     r"|report|add|revise|bring|state|clear)\b"
@@ -493,7 +493,7 @@ WAITING = re.compile(
     r"|\b(?:let|letting) (?:it|them|those|the \w+) finish\b"
     r"|\bcontinuing to wait\b"
     # the dispatched work, named as in progress
-    r"|\b(?:is|are|'s|'re) (?:now |currently )?(?:still )?"
+    r"|\b(?:is|are|['’]s|['’]re) (?:now |currently )?(?:still )?"
     r"(?:running|checking|reviewing|re-?checking|re-?sweeping|sweeping|gathering"
     r"|verifying|in progress|under way|underway)\b"
     r"|\bstill (?:reviewing|checking|verifying|gathering|going)\b"
@@ -516,9 +516,23 @@ WAITING = re.compile(
 # being judged lives. Only the running-task half takes it: a turn opened by a completion
 # notification with nothing left running has the result in hand, so a report promised
 # there is owed now.
+#
+# AND ONLY WHEN IT IS THE TAIL'S ONE PROMISE. "Next I'll run the tests. I'll report what
+# they show." promises work the turn has not started, and the report is about that work,
+# not about the running task. Every first-person future phrase in the tail has to sit
+# inside a report-back, or the hold is not taken. It is read with FUTURE, not PROMISE,
+# because PROMISE anchors at a sentence start and never sees "Next I'll run".
 REPORT_BACK = re.compile(
-    r"\bi'?ll report\b"
-    r"|\bi'?ll (?:post|share|send)\b[^.\n]{0,80}\b(?:when|once)\b", re.I)
+    r"\bi['’]?ll report\b"
+    r"|\bi['’]?ll (?:post|share|send)\b[^.\n]{0,80}\b(?:when|once)\b", re.I)
+FUTURE = re.compile(r"\b(?:i['’]?ll|i will|let me|i['’]?m going to)\b", re.I)
+
+
+def report_back_only(tail):
+    """True when the tail promises a report-back and nothing else."""
+    spans = [m.span() for m in REPORT_BACK.finditer(tail)]
+    return bool(spans) and all(any(a <= f.start() < b for a, b in spans)
+                               for f in FUTURE.finditer(tail))
 
 
 def just_finished(payload):
@@ -553,7 +567,7 @@ def declared_hold(payload, reply):
     running = payload.get("background_tasks")
     if payload.get("hook_event_name") == "SubagentStop":
         running = None
-    if running and REPORT_BACK.search((reply or "")[-TAIL:]):
+    if running and report_back_only((reply or "")[-TAIL:]):
         return "a task is still running and the turn promised to report on it"
     if not WAITING.search(reply or ""):
         return None
