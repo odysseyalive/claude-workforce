@@ -1174,7 +1174,7 @@ def judge_argv(claude, model, seconds):
     return [shutil.which("timeout") or "timeout", "-k", "10", str(seconds), claude, "-p",
             "--model", model, "--safe-mode", "--setting-sources", "", "--tools", "",
             "--strict-mcp-config", "--disable-slash-commands", "--no-session-persistence",
-            "--output-format", "stream-json", "--verbose",
+            "--output-format", "stream-json", "--verbose", "--settings", json.dumps(ACCOUNT_SYNC_OFF),
             "--include-hook-events", "--system-prompt", JUDGE_SYSTEM]
 
 
@@ -2263,6 +2263,13 @@ EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 MIRROR_SKIP = ("hooks", "enabledPlugins", "extraKnownMarketplaces", "statusLine", "apiKeyHelper",
                "awsAuthRefresh", "awsCredentialExport", "otelHeadersHelper",
                "agentPushNotifEnabled", "voice", "voiceEnabled")
+# claude.ai account sync, OFF for every replay and judge call. MEASURED 2026-10-15 on 2.1.296: a
+# replay's copied OAuth login let turn 1 sync the account's plugins into the throwaway config in
+# the background (source `<name>@synced`), and turn 2's `--resume` loaded them, which the
+# isolation tripwire caught. The CLI reads these setting keys (`syncClaudeAiPlugins`, policy
+# allow_account_plugins_sync; `syncClaudeAiSkills`, allow_account_skills_sync): false in any
+# settings source turns the sync off.
+ACCOUNT_SYNC_OFF = {"syncClaudeAiPlugins": False, "syncClaudeAiSkills": False}
 PEER_TURN = ("Another Claude session sent a message:\n<cross-session-message from-name=\"%s\" "
              "delivered-by=\"replay\">\n%s\n</cross-session-message>")
 
@@ -2486,6 +2493,7 @@ def replay_settings(installed, user, deny):
     perms["allow"] = list(dict.fromkeys((pi.get("allow") or []) + (pu.get("allow") or [])))
     perms["deny"] = list(dict.fromkeys((pi.get("deny") or []) + (pu.get("deny") or []) + deny))
     out["permissions"] = perms
+    out.update(ACCOUNT_SYNC_OFF)
     return out
 
 
@@ -2586,7 +2594,7 @@ def replay_argv(claude, seconds, turns, model, resume, sandbox=()):
     argv = [shutil.which("timeout") or "timeout", "-k", "10", str(seconds)] + list(sandbox) + [
             claude, "-p",
             "--output-format", "stream-json", "--verbose", "--strict-mcp-config",
-            "--max-turns", str(turns)]
+            "--max-turns", str(turns), "--settings", json.dumps(ACCOUNT_SYNC_OFF)]
     if model:
         argv += ["--model", model]
     if resume:
@@ -2975,10 +2983,11 @@ def replay_line(i, n, key, task, hidx):
 
 
 def ran_task(path):
-    """A task record that counts as run. An interrupted task, or one stopped before its first
-    session, is a task not run: `--resume` runs it again."""
+    """A task record that counts as run. An interrupted task, one the isolation tripwire
+    stopped (`unsafe`), or one stopped before its first session is a task not run: `--resume`
+    runs it again."""
     rec = read_json(path, None)
-    return isinstance(rec, dict) and rec.get("exit") != "interrupted" and \
+    return isinstance(rec, dict) and rec.get("exit") not in ("interrupted", "unsafe") and \
         not (rec.get("exit") == "cap" and not rec.get("sessions"))
 
 
