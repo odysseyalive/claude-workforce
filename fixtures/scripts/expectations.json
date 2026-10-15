@@ -8889,16 +8889,16 @@
     "not": [
       "Traceback",
       "KICKBACK",
-      "CLOSED"
+      "CLOSED",
+      "HOLD",
+      "a2 (running)"
     ],
     "script": "wf-widen",
     "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"session_id\": \"s1\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"Both batches are still running.\"}",
     "want": [
       "ISSUES",
-      "i1  HOLD",
-      "i2  HOLD",
-      "agents still out",
-      "a2 (running)"
+      "i1  PROCESSING",
+      "i2  PROCESSING"
     ]
   },
   "widen-handoff-cut-agent-is-resumed": {
@@ -8919,12 +8919,12 @@
     "script": "wf-widen",
     "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"session_id\": \"s1\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"Everything is handed back.\"}",
     "want": [
-      "ISSUES  2 open issue(s) judged",
-      "i1  HANDOFF  a1 (engineering-coder) stopped at its turn cap with 1 of 2 items still open: ship the turn boundary",
+      "ISSUES",
+      "i1  HANDOFF  [finish the turn limit work and prove it with a fixture]",
       "RESUME a1 with SendMessage",
       "continue from its own HANDOFF.md",
       "fresh turn allowance",
-      "i2  KICKBACK  1 of 1 items unaddressed"
+      "i2  KICKBACK  [explain the skul-dev migration error in plain words]"
     ]
   },
   "widen-handoff-stalled-escalates": {
@@ -8944,8 +8944,8 @@
     "script": "wf-widen",
     "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"session_id\": \"s1\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"Everything is handed back.\"}",
     "want": [
-      "i1  ESCALATE  a1 (engineering-coder) stopped at its turn cap twice with the same unmet set",
-      "1 of 1 items still open: ship the turn boundary",
+      "i1  ESCALATE  [finish the turn limit work and prove it with a fixture]",
+      "a1 stopped at its cap twice with the same work open",
       "DECIDE THIS ONE YOURSELF",
       "Its own HANDOFF section 1 is quoted below",
       "HANDOFF SECTION 1, QUOTED AS DATA",
@@ -9011,13 +9011,13 @@
       "HANDOFF",
       "ESCALATE",
       "KICKBACK",
-      "RESUME"
+      "RESUME",
+      "ISSUES"
     ],
     "script": "wf-widen",
     "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"session_id\": \"s1\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"Everything is handed back.\"}",
     "want": [
-      "ISSUES  1 open issue(s) judged",
-      "i1  CLOSED  2 items done, 1 agents returned"
+      "WIDEN"
     ]
   },
   "widen-handoff-no-items-still-resumes": {
@@ -9049,7 +9049,7 @@
     "script": "wf-widen",
     "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"session_id\": \"s1\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"Everything is handed back.\"}",
     "want": [
-      "i1  HANDOFF  a9 (filer) stopped at its turn cap and this issue records no items",
+      "i1  HANDOFF  [dispatch the filer and finish the twenty notes]",
       "RESUME a9 with SendMessage"
     ]
   },
@@ -9182,7 +9182,8 @@
     "after": {
       ".claude/workforce/issues/s1.json": {
         "want": [
-          "\"id\": \"i1\", \"prompt\": \"fix the skul-dev deploy failure\", \"state\": \"closed\""
+          "\"id\": \"i1\", \"prompt\": \"fix the skul-dev deploy failure\", \"state\": \"closed\"",
+          "\"id\": \"i2\", \"prompt\": \"finish the turn limit work\", \"state\": \"open\""
         ]
       }
     },
@@ -9192,16 +9193,14 @@
     "exit": 0,
     "not": [
       "Traceback",
-      "i2  HOLD"
+      "i2  HOLD",
+      "i1  "
     ],
     "script": "wf-widen",
     "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"session_id\": \"s1\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"Everything is handed back.\"}",
     "want": [
       "ISSUES",
-      "i2  KICKBACK",
-      "items unaddressed",
-      "ship the turn boundary",
-      "i1  CLOSED"
+      "i2  KICKBACK  [finish the turn limit work]"
     ]
   },
   "issues-done-and-returned-closes": {
@@ -9225,14 +9224,13 @@
     "not": [
       "Traceback",
       "HOLD",
-      "KICKBACK"
+      "KICKBACK",
+      "i1  "
     ],
     "script": "wf-widen",
     "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"session_id\": \"s1\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"The deploy is fixed and both agents are back.\"}",
     "want": [
-      "ISSUES",
-      "i1  CLOSED",
-      "agents returned"
+      "WIDEN"
     ]
   },
   "issues-stop-with-no-agent-id-is-not-keyable": {
@@ -9278,13 +9276,13 @@
     "not": [
       "Traceback",
       "KICKBACK",
-      "HOLD"
+      "HOLD",
+      "i1  "
     ],
     "script": "wf-widen",
     "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"session_id\": \"s1\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"Both questions are answered in the reply above.\"}",
     "want": [
-      "ISSUES",
-      "i1  CLOSED"
+      "WIDEN"
     ]
   },
   "issues-dropped-or-withdrawn-closes-its-item": {
@@ -9303,13 +9301,13 @@
     "not": [
       "Traceback",
       "KICKBACK",
-      "HOLD"
+      "HOLD",
+      "i1  "
     ],
     "script": "wf-widen",
     "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"session_id\": \"s1\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"Those asks were all withdrawn before anyone started them.\"}",
     "want": [
-      "ISSUES",
-      "i1  CLOSED"
+      "WIDEN"
     ]
   },
   "issues-carried-item-done-closes-its-earlier-issue": {
@@ -9328,13 +9326,12 @@
     "exit": 0,
     "not": [
       "Traceback",
-      "i1  KICKBACK"
+      "i1  "
     ],
     "script": "wf-widen",
     "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"session_id\": \"s1\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"The agenda is republished in that order.\"}",
     "want": [
       "ISSUES",
-      "i1  CLOSED",
       "i2  KICKBACK"
     ]
   },
@@ -9405,6 +9402,9 @@
         "want": [
           "\"ask\": \"order the picks in that order on the agenda\", \"status\": \"done\"",
           "\"ask\": \"Widen tech + food to top 40 each\", \"status\": \"dropped\""
+        ],
+        "not": [
+          "\"state\": \"open\""
         ]
       }
     },
@@ -9415,18 +9415,13 @@
     "not": [
       "Traceback",
       "KICKBACK",
-      "HOLD"
+      "HOLD",
+      "ISSUES"
     ],
     "script": "wf-widen",
     "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"session_id\": \"s1\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"Every open issue is closed out above.\"}",
     "want": [
-      "ISSUES  6 open issue(s) judged",
-      "i2  CLOSED",
-      "i3  CLOSED",
-      "i4  CLOSED",
-      "i5  CLOSED",
-      "i6  CLOSED",
-      "i7  CLOSED"
+      "WIDEN"
     ]
   },
   "issues-handback-turn-carries-the-open-item": {
@@ -9505,13 +9500,13 @@
     "exit": 0,
     "not": [
       "Traceback",
-      "KICKBACK"
+      "KICKBACK",
+      "i1  "
     ],
     "script": "wf-widen",
     "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"session_id\": \"s1\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"The event is on the calendar for 16 January 2027 and the invitation is drafted.\"}",
     "want": [
-      "ISSUES  1 open issue(s) judged",
-      "i1  CLOSED"
+      "WIDEN  not scored"
     ]
   },
   "spawn-guard-cut-agent-of-the-same-role-is-denied": {
@@ -9616,7 +9611,7 @@
       },
       "exit": 0,
       "want": [
-          "i1  HANDOFF  a2f36ec5bd3897c7e (filer), a05452b6f336572cc (filer) stopped at its turn cap",
+          "i1  HANDOFF  [dispatch the filer and finish the twenty notes]",
           "RESUME a2f36ec5bd3897c7e, a05452b6f336572cc with SendMessage"
       ],
       "not": [
