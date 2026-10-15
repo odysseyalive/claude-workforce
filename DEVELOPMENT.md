@@ -196,11 +196,63 @@ Run the steps in this order. Costs are what was measured on 2026-10-14 and 2026-
 4. **The user reads `taxonomy.md`.** Then run `bin/loop categorize --accept <stamp>`.
 5. `bin/loop bank`. Freezes the replay tasks and holds out a quarter of them. Measured cost: $2.68 for 34 tasks.
 6. **The user reads `bank.md`.** Then run `bin/loop bank --accept <stamp>`.
+   To correct an existing bank without judging it again, run `bin/loop bank --recommit <stamp>
+   [--retire <task id> --reason "..."]`. It writes a new, unaccepted stamp with the same tasks,
+   graders and held-out split. Each task's commit is looked up again from the project's HEAD
+   reflog at the opening turn. A commit moves only when the reflog reaches back that far;
+   otherwise it is listed as kept. Held-out tasks are counted, never shown.
 7. `bin/loop replay --bank <stamp> --split all --workforce main`, then `bin/loop score <replay stamp>`.
    This is the baseline. `main` is resolved to one commit when the run starts. The run includes the
    held-out split. If the run is interrupted, `bin/loop replay --resume <stamp>` runs only what is
    left; then score it. There is no spend limit. Measured so far: $0.01 to $10.94 per replayed task,
    and about $0.03 per task to judge.
+   - **Budget.** Each `claude` call gets `--timeout` seconds (1800). A call the limit stops
+     mid-work is resumed in the same session, up to `--max-resumes` times per task (3, so about
+     2 h). A call stopped after the agent ended its turn is not resumed, even when a background
+     watch (a Monitor, an inbox watch) was still waiting. A background subagent still running is
+     work in progress: that call is resumed, and the resume prompt names what was stopped. A task
+     still unresolved when the resumes run out ends `timeout`, never `ok`. `--max-turns` is 600 by default, so the time budget binds first.
+     A killed call's cost is not in its stream: it is shown as `+ unknown`, never as $0.
+   - **Peer messages** go in as their own turn. The call before one is stopped at its first end of
+     turn with no background subagent running, which is when the original session received the
+     message, and the session is resumed with it; the message is prefixed with a note naming any
+     background task the stop killed. When the resumes run out with a peer still to deliver, it is
+     delivered anyway and the task stays `timeout`. A peer after a `/clear` opens a fresh session,
+     as it reached the original's cleared conversation, and the record says so.
+   - **Permissions.** The replay runs in the user's mode (auto) inside bwrap. The sandbox's private
+     `/tmp` and the replay's own `work/` are allowed directories. The safety floor is that the
+     sandbox holds no credentials; the guard below is a second layer, tuned so it never denies
+     ordinary work, because a wrong deny distorts what the loop measures.
+     Publishing, deploying, releasing, pushing and uploading are refused by
+     `bin/loop-release-hook`, a PreToolUse hook on Bash and Monitor that reads the command's tokens
+     the way a shell does (compound commands, wrappers, runners, heredocs): `pnpm -r publish`,
+     `npm run release` and `scripts/deploy.sh` are denied; `pnpm test -- deploy.spec.ts`,
+     `make -C deploy test` and anything with `--dry-run` run. It fails closed: a command it cannot
+     read is denied, it denies by itself after 10 s (measured: a hook Claude Code times out lets
+     the call through, even with `|| exit 2`), and it runs as `... || exit 2`, so a crash
+     blocks. Code an interpreter runs (`python -c`, `node -e`, `... | bash`, `bash < file`) is
+     not read: a documented limit. The hook and the deny list reach the replay through a
+     flag settings file in one read-only mount at `/run/loop` (it cannot be moved or written
+     in the sandbox), run by the system python's absolute path, with PATH, LD_PRELOAD,
+     LD_LIBRARY_PATH, BASH_ENV and ENV pinned there to the rig's own values (PATH is the one
+     replays always ran with). That file (`--settings`, outside `work/`) outranks the user settings
+     the replay can write, so a replay that rewrites its user settings, as workforce's own heal
+     and `audit` do, keeps the guard), and the rig hashes the guard's files after every call: a
+     change to them stops the run as unsafe. The other denies (curl, `git stash`, `git tag`,
+     `git worktree`, `claude`, ...) stay glob rules, and the hook applies them to Monitor too.
+     Check both with `bin/loop deny-check` (free: the glob list and the hook itself, run in a
+     scratch project) or `bin/loop deny-check --live` (a real `claude -p` in a replay's sandbox
+     and settings, about 25 minutes), against `fixtures/loop/deny-commands.txt`, where a
+     `monitor: ` prefix sends a case to Monitor. `bin/loop denials <replay stamp>` classifies every denial
+     of a run by cause.
+   - **The judge** sees the user words, the final reply, the diff stat, the diff itself (bounded,
+     with every cut stated) and the session's tool calls with their exit status. It may answer `env`
+     when the session was blocked by something the replay lacks by construction and handled that
+     honestly. `score` accepts `env` only when the named path exists in the source project's working
+     tree and is not in git at the commit, or the named device or service is one the sandbox
+     withholds, and in every case the replay itself named it. `env` counts as unknown and is printed
+     on its own line. It excuses a `diff_touches` or `file_exists` failure only when that check is
+     about the missing path.
 8. Write each fix in a worktree as a branch built on that baseline commit, with one
    `Loop-Category: <category>` trailer for each category it addresses. `bin/loop` runs only from a
    clean checkout of the baseline commit. Also write ablations, which are branches that only remove a rule,
@@ -214,8 +266,12 @@ Run the steps in this order. Costs are what was measured on 2026-10-14 and 2026-
    - NEUTRAL: nothing moved.
    - REGRESSES: a regression or held-out pass was lost.
    - REMOVABLE: an ablation lost no pass.
-   - INCONCLUSIVE: a task had no after-score, a guarded task went from decided to unknown, or the
-     grader changed between the two scores.
+   - INCONCLUSIVE: a task had no after-score, a guarded task went from decided to unknown, a
+     capability task went from pass to `env`, the grader changed between the two scores, or the
+     baseline ran another version of the rig. `replay.json` and `summary.json` record the replay
+     format and a sha of the judge prompt. A baseline without them, or with different ones, is
+     not like-for-like: `gate` and `propose` refuse it before anything runs, as they refuse a
+     changed grader. Replay and score a new baseline with the current rig first.
 
    Unknowns never count either way.
 10. **The user decides:** `bin/loop decide <proposal stamp> --approve|--reject --note "..."`. The

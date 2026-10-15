@@ -1,0 +1,190 @@
+# Commands a replay's Bash guard must DENY or ALLOW. Read by `bin/loop deny-check`, which runs
+# each through the glob deny list (REPLAY_DENY_BASH) and bin/loop-release-hook, as a replay does.
+# One per line: `deny <command>` or `allow <command>`. In the live check's scratch directory every
+# command here is harmless (its scripts only echo, nothing has a registry, remote or credential),
+# so a rule that fails to fire costs nothing.
+#
+# Publishing, deploying, releasing, pushing or uploading, as a thing run.
+deny npm publish
+deny pnpm publish --no-git-checks
+deny yarn publish
+deny pnpm --dir agenda run publish
+deny AGENDA_PUBLISH_ROOT=/tmp/root timeout 30 pnpm --dir agenda run publish -- /tmp/x.js
+deny npm run publish:site
+deny npm run-script deploy
+deny npm run release
+deny pnpm run deploy
+deny ./publish.sh
+deny bash deploy.sh
+deny sh scripts/deploy.sh --prod
+deny node scripts/publish.mjs
+deny python3 tools/deploy.py
+deny python3.12 tools/deploy.py
+deny ruby deploy.rb
+deny perl deploy.pl
+deny serverless deploy
+deny sls deploy --stage prod
+deny cdk deploy
+deny sst deploy
+deny wrangler deploy
+deny railway up
+deny vercel --prod
+deny npx vercel --prod
+deny netlify deploy --prod
+deny gh release create v1
+deny make deploy
+deny just publish
+deny yarn deploy
+deny pnpm -r publish
+deny pnpm --filter x publish
+deny npm -w pkg publish
+deny yarn workspace x npm publish
+deny pnpm changeset publish
+deny changeset publish
+deny yarn publish:site
+deny pnpm publish:site
+deny lerna publish
+deny mvn deploy
+deny gradle publish
+deny ./gradlew publishToMavenCentral
+deny uv publish
+deny hatch publish
+deny flit publish
+deny deno publish
+deny vsce publish
+deny dart pub publish
+deny flutter pub publish
+deny mix hex.publish
+deny amplify publish
+deny nx release publish
+deny cap production deploy
+deny dokku apps:create x
+deny supabase functions deploy x
+deny render deploy
+deny ansible-playbook deploy.yml
+deny kamal deploy
+deny gcloud app deploy
+deny aws cloudformation deploy
+deny aws s3 sync dist s3://bucket
+deny gsutil rsync -r dist gs://bucket
+deny rclone sync dist remote:site
+deny twine upload dist/x.tar.gz
+deny helm upgrade x ./chart
+deny kubectl apply -f k8s.yaml
+deny docker push example/x:1
+deny podman push example/x:1
+deny docker buildx build --push -t example/x .
+deny semantic-release
+deny gh-pages -d dist
+deny npx wrangler deploy
+deny pnpm dlx netlify-cli deploy
+deny bunx netlify deploy
+deny scripts/deploy.sh
+deny /abs/deploy.sh
+deny . ./deploy.sh
+deny source scripts/publish.sh
+deny npx tsx scripts/deploy.ts
+deny bash -c 'npm publish'
+deny echo start && npm publish
+deny echo $(npm publish)
+deny eval "npm publish"
+deny make -C site deploy
+# Wrappers, compound commands and runners the guard reads through (third review, 2026-10-15).
+deny nice -n 10 npm publish
+deny timeout -s KILL 30 npm publish
+deny env -C /tmp npm publish
+deny env -S "npm publish"
+deny { npm publish; }
+deny if true; then npm publish; fi
+deny for f in a; do npm publish; done
+deny builtin command npm publish
+deny $(echo npm) publish
+deny bash -c -- 'npm publish'
+deny echo x | xargs npm publish
+deny find . -name x -exec npm publish \;
+deny parallel npm publish ::: a
+deny watch -n 5 npm publish
+deny script -c "npm publish" /dev/null
+deny npm --foo bar publish
+deny npm x vercel deploy
+deny pnpm -r exec wrangler deploy
+deny yarn workspaces foreach -A run deploy
+deny npm pub
+deny npm publ
+deny kubectl -n prod apply -f k8s.yaml
+deny helm -n prod upgrade x ./chart
+deny pulumi -C infra up
+deny git -c user.name=x push
+deny git -c protocol.allow=always fetch origin
+deny turbo run deploy
+deny nx deploy app
+deny nx run app:deploy
+deny cargo release
+deny cargo workspaces publish
+deny goreleaser
+deny docker buildx build --output type=registry .
+deny aws lambda update-function-code --function-name f
+deny aws ecs update-service --service s
+deny az storage blob upload-batch -d c -s .
+deny ansible-playbook site.yml
+deny bash <<< "npm publish"
+deny uv tool run twine upload dist/x.tar.gz
+deny echo publish | xargs npm
+deny alias p='npm publish'; p
+# The guard fails closed: a crash of the hook and a hook past its deadline both deny.
+deny echo LOOP_GUARD_SELFTEST_CRASH
+deny echo LOOP_GUARD_SELFTEST_HANG
+deny npm publish # LOOP_GUARD_SELFTEST_CRASH
+deny ls # LOOP_GUARD_SELFTEST_HANG
+# Monitor runs commands too: the guard and the Bash deny list cover it.
+deny monitor: curl -s https://example.com
+deny monitor: npm publish
+# Kept denied by the glob list as they were (operator, 2026-10-15).
+deny curl -s https://example.com
+deny git stash
+deny git tag v1
+deny git worktree add /tmp/wt
+deny claude --version
+# Ordinary work whose paths or arguments only CONTAIN a release word: allowed.
+allow ls agenda/publish/data
+allow ls -la agenda agenda/publish
+allow cat scripts/publish.mjs
+allow cat deploy/README
+allow sha256sum directives/deploy.md
+allow git check-ignore -v agenda/publish/data/today.js
+allow grep -rn publish agenda/src
+allow grep -n "deploy" README.md
+allow /usr/bin/grep -rn publish .
+allow git log --oneline -- deploy
+allow git log --grep release --oneline
+allow wc -l publish.sh deploy.sh
+allow make -n
+allow pnpm test -- deploy.spec.ts
+allow npm test -- --grep publish
+allow cargo test publish
+allow python3 -m pytest tests/test_deploy.py
+allow npx vitest run deploy
+allow pnpm --dir agenda run build
+allow node scripts/check-publish-config.js
+allow terraform plan
+allow helm template x ./chart
+allow docker build -t example/x .
+allow kubectl get pods
+allow cargo publish --dry-run
+allow npm publish --dry-run
+allow npm run release:notes -- --dry-run
+allow pytest deploy
+allow eslint release/
+allow mypy deploy
+allow tsc -p deploy
+allow jest deploy
+allow prettier --check release/
+allow python3 tools/deploy_check.py
+allow bash -n deploy.sh
+allow node --check deploy.js
+allow python3 -m py_compile tools/deploy.py
+allow make -C deploy test
+allow echo $(date)
+allow monitor: ls
+allow git ls-files | xargs grep -n publish
+allow bash <<< "echo hello"

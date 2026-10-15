@@ -1,0 +1,519 @@
+#!/usr/bin/env python3
+"""The review loop's release guard: a PreToolUse hook on Bash and Monitor in every replay.
+
+It denies a command that would PUBLISH, DEPLOY, RELEASE, PUSH or UPLOAD something, decided from
+the command's tokens, never from a substring: `pnpm test -- deploy.spec.ts`, `cargo test publish`
+and `grep -rn publish .` run; `pnpm -r publish`, `npm run release`, `scripts/deploy.sh` and
+`docker buildx build --push .` do not. It replaced the `*publish*` / `*deploy*` glob rules
+(2026-10-15), which denied paths that only contained the word and still missed real releases.
+
+WHAT IT IS NOT. The replay's sandbox holds no credentials; that is the floor. This is a second
+layer, and a wrong deny distorts what the loop measures more than a narrow leak does, so it reads
+commands the way a shell does and denies only a release it can see. Code an interpreter runs
+(`python -c`, `node -e`, `... | bash`, `bash < file`) is not read: a documented limit.
+
+Input: the hook's JSON on stdin. Output: a PreToolUse `deny` decision on stdout, or nothing.
+FAILS CLOSED: a command it cannot parse, any error of its own, or running past its own
+`DEADLINE` is denied; bin/loop runs it as `python3 -I ... || exit 2`, so a crash or a missing
+file blocks the call too.
+
+`classify(command, cwd)` returns the reason a command is denied, or None. `bin/loop deny-check`
+runs this file, as the replay does, over fixtures/loop/deny-commands.txt.
+"""
+import json
+import os
+import re
+import shlex
+import signal
+import sys
+
+DEADLINE = 10  # seconds; Claude Code's own hook timeout lets the call through, so decide first
+WORDS = ("publish", "deploy", "release")
+NOT_A_RELEASE = {"check", "checks", "test", "tests", "spec", "lint", "notes", "dry", "dryrun",
+                 "preview", "plan", "validate", "verify", "config", "utils", "util", "helpers",
+                 "lib", "docs", "status", "list", "diff", "local", "template"}
+SAFE_FLAGS = {"--dry-run", "--dryrun", "--help", "--version", "--check", "--syntax-check",
+              "--list-tasks", "--list-hosts", "--plan", "--noop", "--what-if"}
+FLAGS = {"--prod", "--production", "--push"}
+OPERATORS = {";", "&&", "||", "|", "&", "(", ")", "|&", ";;", "{", "}"}
+REDIRECTS = re.compile(r"^\d*(>|>>|<|<<<|>&|<&|&>|&>>|>\|)$")
+ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+KEYWORDS = {"if", "then", "else", "elif", "fi", "do", "done", "while", "until", "!", "time",
+            "builtin", "command", "exec", "{", "}", "coproc"}
+DATA_KEYWORDS = {"for", "select", "case", "function", "esac", "in"}
+# Wrappers that run the rest of their arguments as a command, and their options with a value.
+WRAPPERS = {
+    "env": {"-u", "--unset", "-C", "--chdir"}, "nice": {"-n", "--adjustment"},
+    "nohup": set(), "stdbuf": {"-i", "-o", "-e"}, "ionice": {"-c", "-n", "-p", "--class"},
+    "timeout": {"-s", "--signal", "-k", "--kill-after"}, "caffeinate": set(), "doas": {"-u"},
+    "sudo": {"-u", "-g", "-C", "-D", "-h", "-p", "-U"}, "chrt": set(), "taskset": set(),
+    "setsid": set(), "unbuffer": set(), "flock": {"-w", "-E"}, "watch": {"-n", "--interval", "-d"},
+    "xargs": {"-I", "-i", "-n", "-P", "-L", "-l", "-d", "-E", "-s", "-a", "--max-args",
+              "--max-procs", "--delimiter", "--arg-file", "--replace"},
+}
+RUNNERS = {("uv", "tool", "run"), ("npx",), ("bunx",), ("pnpx",), ("uvx",), ("pnpm", "dlx"), ("pnpm", "exec"),
+           ("yarn", "dlx"), ("yarn", "exec"), ("npm", "exec"), ("npm", "x"), ("bun", "x"),
+           ("uv", "run"), ("poetry", "run"), ("pipx", "run"), ("pdm", "run"), ("hatch", "run"),
+           ("rye", "run"), ("mise", "exec"), ("bundle", "exec"), ("corepack",)}
+SHELLS = {"bash", "sh", "zsh", "dash", "ksh", "fish"}
+INTERPRETERS = re.compile(r"^(python[\d.]*|pypy[\d.]*|node|nodejs|ruby|perl|php|tsx|ts-node|"
+                          r"bun|deno|Rscript|lua|osascript)$")
+PMS = {"npm", "pnpm", "yarn", "bun"}
+PM_RELEASE = re.compile(r"^(pub(l(i(sh?)?)?)?|unpub\w*|dist-tag|deprecate|owner)$")
+PM_VALUE_OPTS = {"--filter", "-F", "--dir", "-C", "-w", "--workspace", "--prefix", "--cwd",
+                 "--registry", "--tag", "--otp", "--access", "--reporter", "--loglevel",
+                 "--userconfig", "--cache", "-c", "--config", "--scope", "--workspace-root"}
+PM_BUILTINS = {"install", "i", "add", "remove", "rm", "uninstall", "update", "up", "upgrade",
+               "test", "t", "tst", "build", "ci", "ls", "list", "outdated", "audit", "why",
+               "init", "create", "link", "unlink", "pack", "view", "info", "show", "config",
+               "start", "stop", "restart", "version", "help", "store", "prune", "dedupe",
+               "rebuild", "fund", "doctor", "cache", "env", "root", "bin", "explain", "query",
+               "search", "whoami", "login", "logout", "import", "patch", "patch-commit",
+               "licenses", "setup", "fetch", "recursive", "dev", "lint", "format", "typecheck",
+               "check", "tsc", "vitest", "jest", "node", "outdated", "approve-builds"}
+# Tools whose subcommand decides: tool -> (release verbs, how many leading positionals to look
+# at, options of theirs that take a value). None verbs: the tool only releases.
+SUBCOMMANDS = {
+    "gcloud": ({"deploy"}, 4, {"--project", "--region", "--account", "--configuration"}),
+    "aws": ({"deploy", "sync", "put-object", "publish", "update-function-code",
+             "update-function-configuration", "update-service", "publish-version",
+             "create-deployment", "create-invalidation", "upload-archive"}, 3,
+            {"--profile", "--region", "--endpoint-url", "--output"}),
+    "az": ({"deploy", "up", "publish", "upload", "upload-batch", "sync"}, 4,
+           {"--subscription", "-o", "--output", "--query"}),
+    "gsutil": ({"rsync"}, 1, {"-o", "-h", "-u"}),
+    "rclone": ({"sync", "copy", "move", "copyto", "moveto", "bisync"}, 1, {"--config"}),
+    "docker": ({"push"}, 2, {"-H", "--host", "-c", "--context", "--config", "-l"}),
+    "podman": ({"push"}, 2, {"--url", "-c", "--connection"}), "buildah": ({"push"}, 1, set()),
+    "skopeo": ({"copy"}, 1, set()),
+    "kubectl": ({"apply", "replace", "rollout", "patch", "delete", "create", "set", "scale",
+                 "edit"}, 1, {"-n", "--namespace", "--context", "--kubeconfig", "--cluster",
+                              "--user", "-s", "--server", "--token"}),
+    "helm": ({"upgrade", "install", "uninstall", "rollback", "push"}, 1,
+             {"-n", "--namespace", "--kube-context", "--kubeconfig", "--registry-config"}),
+    "terraform": ({"apply", "destroy", "import"}, 1, set()), "tofu": ({"apply", "destroy"}, 1, set()),
+    "pulumi": ({"up", "destroy", "update"}, 1, {"-C", "--cwd", "-s", "--stack"}),
+    "cdk": ({"deploy", "destroy"}, 1, {"--profile", "-a", "--app"}),
+    "sls": ({"deploy", "remove"}, 1, set()), "serverless": ({"deploy", "remove"}, 1, set()),
+    "sst": ({"deploy", "remove"}, 1, set()), "sam": ({"deploy", "publish", "sync"}, 1, set()),
+    "kamal": ({"deploy", "redeploy", "rollback", "setup"}, 1, set()),
+    "cap": ({"deploy"}, 3, set()), "supabase": ({"deploy", "push"}, 3, set()),
+    "render": ({"deploy"}, 2, set()), "amplify": ({"publish", "push"}, 1, set()),
+    "firebase": ({"deploy"}, 1, {"--project", "-P"}), "netlify": ({"deploy"}, 1, set()),
+    "wrangler": ({"deploy", "publish"}, 2, set()), "railway": ({"up", "deploy"}, 1, set()),
+    "fly": ({"deploy"}, 1, set()), "flyctl": ({"deploy"}, 1, set()),
+    "twine": ({"upload", "register"}, 1, set()), "hatch": ({"publish"}, 1, set()),
+    "flit": ({"publish"}, 1, set()), "poetry": ({"publish"}, 1, set()),
+    "uv": ({"publish"}, 1, {"--directory", "--project"}),
+    "cargo": ({"publish", "yank", "owner", "release"}, 1, {"-p", "--package", "-Z", "--manifest-path"}),
+    "lerna": ({"publish", "version"}, 1, set()), "changeset": ({"publish"}, 1, set()),
+    "changesets": ({"publish"}, 1, set()), "deno": ({"publish"}, 1, set()),
+    "vsce": ({"publish"}, 1, set()), "ovsx": ({"publish"}, 1, set()), "jsr": ({"publish"}, 1, set()),
+    "dart": ({"publish"}, 2, set()), "flutter": ({"publish"}, 2, set()),
+    "mix": ({"hex.publish"}, 1, set()), "gem": ({"push", "yank", "owner"}, 1, set()),
+    "dotnet": ({"push"}, 2, set()), "nuget": ({"push"}, 1, set()),
+    "mvn": ({"deploy", "release:perform", "release:prepare"}, 3, {"-f", "-P", "-pl", "-s", "-D"}),
+    "git": ({"push", "send-email", "request-pull"}, 1, {"-C", "-c", "--git-dir", "--work-tree"}),
+    "gh": ({"release", "pr", "repo", "workflow", "api", "gist", "secret"}, 1, {"-R", "--repo"}),
+    "glab": ({"release", "mr", "repo", "api"}, 1, {"-R", "--repo"}),
+    "vercel": ({"deploy", "promote", "alias", "rollback"}, 1, {"--cwd", "--scope", "-t"}),
+    "dokku": (None, 0, set()), "heroku": (None, 0, set()), "surge": (None, 0, set()),
+    "gh-pages": (None, 0, set()), "semantic-release": (None, 0, set()),
+    "release-it": (None, 0, set()), "np": (None, 0, set()), "ansible-playbook": (None, 0, set()),
+    "goreleaser": ({"release"}, 1, set()),
+}
+# Package names a runner (`npx`, `pnpm dlx`) is given, for the tool they install; a version
+# suffix (`wrangler@3`) is dropped first.
+TOOL_ALIASES = {"netlify-cli": "netlify", "firebase-tools": "firebase", "aws-cdk": "cdk",
+                "@railway/cli": "railway", "@vercel/cli": "vercel", "@azure/static-web-apps-cli":
+                "swa", "@sentry/cli": "sentry-cli", "@changesets/cli": "changeset",
+                "serverless-framework": "serverless", "@semantic-release/cli": "semantic-release"}
+# Tools whose task or target names a release: `turbo run deploy`, `nx run app:deploy`.
+TASK_RUNNERS = {"turbo": {"--filter", "-F", "--cwd"}, "nx": {"-p", "--projects", "--target", "-t"},
+                "make": {"-C", "-f", "--file", "--directory", "-j", "-I", "-o", "-W"},
+                "just": {"-f", "--justfile", "-d", "--working-directory"},
+                "task": {"-d", "--dir", "-t", "--taskfile"}, "rake": {"-f", "-C"},
+                "mage": {"-d", "-w"}, "gradle": {"-p", "-b", "-c"}, "gradlew": {"-p", "-b", "-c"}}
+SAFE = {"grep", "egrep", "fgrep", "rg", "ag", "ls", "cat", "head", "tail", "wc", "sha256sum",
+        "md5sum", "sed", "awk", "echo", "printf", "test", "[", "[[", "diff", "cmp", "less", "more",
+        "file", "stat", "jq", "yq", "tree", "realpath", "dirname", "basename", "sort", "uniq",
+        "cut", "tr", "true", "false", "cd", "pwd", "mkdir", "touch", "cp", "mv", "rm", "chmod",
+        "ln", "tee", "column", "fd", "bat", "nl", "od", "xxd", "hexdump", "strings", "date",
+        "sleep", "which", "type", "readlink", "du", "df", "ps", "pgrep", "kill", "read",
+        "pytest", "eslint", "mypy", "tsc", "jest", "prettier", "vitest", "ruff", "black",
+        "flake8", "pylint", "shellcheck", "stylelint", "biome", "mocha", "ava", "tap"}
+
+
+class Unreadable(Exception):
+    """A command the guard cannot read as a shell would; denied."""
+
+
+def stem(path):
+    base = os.path.basename(path.rstrip("/"))
+    return base.rsplit(".", 1)[0].lower() if "." in base[1:] else base.lower()
+
+
+def scripted(path):
+    """True when a script's or task's name says it releases: its first word is publish, deploy
+    or release (`deploy.sh`, `publish:site`, `release-prod`), and no later word says it only
+    checks (`deploy_check.py`, `release:notes`, `deploy.spec`)."""
+    words = [w for w in re.split(r"[-_.:]+", stem(path)) if w]
+    return bool(words) and words[0] in WORDS + ("publishing", "deploying", "releasing") and \
+        not NOT_A_RELEASE.intersection(words[1:])
+
+
+def strip_heredocs(command):
+    """The command with each heredoc's body removed, unless the heredoc feeds a shell (`bash
+    <<EOF`, `cat <<EOF | sh`): a body is data, not commands, and an apostrophe in it is not a
+    quote. A body that feeds a shell stays, as lines of commands."""
+    lines, out, i = command.split("\n"), [], 0
+    while i < len(lines):
+        line = lines[i]
+        marks = re.findall(r"(?<!<)<<(-?)\s*(['\"]?)([A-Za-z_][\w-]*)\2", line)
+        out.append(re.sub(r"(?<!<)<<-?\s*(['\"]?)[A-Za-z_][\w-]*\1", " ", line) if marks else line)
+        i += 1
+        feeds = bool(re.search(r"(^|[;&|(]\s*)(\w+=\S*\s+)*(bash|sh|zsh|dash|ksh)\b[^|]*<<", line)
+                     or re.search(r"\|\s*(bash|sh|zsh|dash|ksh)\b", line))
+        for dash, _, delim in marks:
+            while i < len(lines) and (lines[i].lstrip("\t") if dash else lines[i]) != delim:
+                if feeds:
+                    out.append(lines[i])
+                i += 1
+            i += 1
+    return "\n".join(out)
+
+
+def segments(command):
+    """The simple commands of a command line, each a token list. Raises Unreadable."""
+    command = strip_heredocs(command)
+    if re.search(r"(^|[;&|(\n{]|\b(then|do|else)\b)\s*([A-Za-z_]\w*=\S*\s+)*(\$\(|`)", command):
+        raise Unreadable("its command word is computed by a substitution")
+    text = command.replace("`", " ; ").replace("$(", " ( ").replace("\n", " ; ")
+    try:
+        lex = shlex.shlex(text, posix=True, punctuation_chars=True)
+        lex.whitespace_split = True
+        toks = list(lex)
+    except ValueError as e:
+        raise Unreadable("unbalanced quoting (%s)" % e)
+    out, cur, skip = [], [], False
+    for tok in toks:
+        if skip:
+            skip = False
+        elif tok in OPERATORS or set(tok) <= set(";&|(){}"):
+            if cur:
+                out.append(cur)
+            cur = []
+        elif tok == "<<<" and cur and os.path.basename(cur[0]) in SHELLS:
+            cur.append("-c")  # `bash <<< "cmd"`: the here-string is the shell's command
+        elif REDIRECTS.match(tok) or set(tok) <= set("<>&"):
+            skip = True  # its target
+        elif not cur and tok in KEYWORDS:
+            continue
+        else:
+            cur.append(tok)
+    if cur:
+        out.append(cur)
+    return [s for s in out if s[0] not in DATA_KEYWORDS and not re.match(r"^\w+\(\)$", s[0])]
+
+
+def positionals(argv, value_opts=frozenset()):
+    out, skip = [], False
+    for tok in argv:
+        if skip:
+            skip = False
+        elif tok == "--":
+            break
+        elif tok.startswith("-") and len(tok) > 1:
+            skip = tok in value_opts
+        else:
+            out.append(tok)
+    return out
+
+
+def a_path(tok, cwd):
+    return bool(cwd) and os.path.lexists(os.path.join(cwd, tok))
+
+
+def classify(command, cwd=None, depth=0):
+    """Why `command` is a release, or None."""
+    if depth > 6:
+        raise Unreadable("nested too deeply to read")
+    for argv in segments(command):
+        why = classify_argv(argv, cwd, depth)
+        if why:
+            return why
+    return None
+
+
+def unwrap(argv, value_opts):
+    """argv after a wrapper's own options."""
+    rest, skip = argv[1:], False
+    while rest:
+        tok = rest[0]
+        if skip:
+            skip = False
+        elif tok == "--":
+            rest = rest[1:]
+            break
+        elif tok.startswith("-") or ASSIGNMENT.match(tok):
+            skip = tok in value_opts
+        else:
+            break
+        rest = rest[1:]
+    return rest
+
+
+def classify_argv(argv, cwd, depth):
+    while argv and ASSIGNMENT.match(argv[0]):
+        argv = argv[1:]
+    if not argv:
+        return None
+    if "$(" in argv[0] or "`" in argv[0]:
+        raise Unreadable("its command word is computed by a substitution")
+    prog = TOOL_ALIASES.get(re.sub(r"(?<=.)@[^/]*$", "", argv[0]),
+                            os.path.basename(re.sub(r"(?<=.)@[^/]*$", "", argv[0])))
+    if any(a in SAFE_FLAGS or a.split("=", 1)[0] in SAFE_FLAGS for a in argv[1:]):
+        return None  # a dry run, a check, or help
+    if prog == "alias":  # `alias p='npm publish'`: the alias is read where it is defined
+        for a in argv[1:]:
+            why = classify(a.split("=", 1)[1], cwd, depth + 1) if "=" in a else None
+            if why:
+                return "alias for %s" % why
+        return None
+    if prog == "eval":
+        return classify(" ".join(argv[1:]), cwd, depth + 1)
+    if argv[0] in (".", "source"):
+        return "sources %s" % argv[1] if len(argv) > 1 and scripted(argv[1]) else None
+    if prog == "env" and any(a in ("-S", "--split-string") or a.startswith("-S") for a in argv[1:2]):
+        payload = argv[2] if argv[1] in ("-S", "--split-string") and len(argv) > 2 else argv[1][2:]
+        return classify(payload + " " + " ".join(argv[3:]), cwd, depth + 1)
+    if prog in WRAPPERS:
+        rest = unwrap(argv, WRAPPERS[prog])
+        if prog == "xargs" and rest and not positionals(rest[1:]) and releaser(rest[0]):
+            return "xargs gives %s arguments the guard cannot see" % rest[0]
+        if prog == "timeout" and rest and re.match(r"^[\d.]+[smhd]?$", rest[0]):
+            rest = rest[1:]
+        if prog == "watch":
+            return classify(" ".join(rest), cwd, depth + 1)
+        return classify_argv(rest, cwd, depth)
+    if prog == "find":
+        for i, tok in enumerate(argv):
+            if tok in ("-exec", "-execdir", "-ok", "-okdir"):
+                end = next((j for j in range(i + 1, len(argv)) if argv[j] in (";", "+", "\\;")), len(argv))
+                why = classify_argv(argv[i + 1:end], cwd, depth)
+                if why:
+                    return why
+        return None
+    if prog == "parallel":
+        cmd = [t for t in argv[1:] if not t.startswith("-")]
+        cmd = cmd[:cmd.index(":::")] if ":::" in cmd else cmd
+        return classify(" ".join(cmd), cwd, depth + 1) if cmd else None
+    if prog == "script":
+        for i, tok in enumerate(argv[1:], 1):
+            if tok in ("-c", "--command") and i + 1 < len(argv):
+                return classify(argv[i + 1], cwd, depth + 1)
+        return None
+    for n in (3, 2, 1):
+        if tuple(argv[:n]) in RUNNERS:
+            rest = argv[n:]
+            while rest and rest[0].startswith("-"):
+                rest = rest[1:]
+            return classify_argv(rest, cwd, depth)
+    if prog in SHELLS:
+        for i, tok in enumerate(argv[1:], 1):
+            if re.match(r"^-[a-z]*c[a-z]*$", tok):
+                rest = argv[i + 1:]
+                rest = rest[1:] if rest[:1] == ["--"] else rest
+                return classify(rest[0], cwd, depth + 1) if rest else None
+        if any(re.match(r"^-[a-z]*n[a-z]*$", t) for t in argv[1:]):
+            return None  # `bash -n`: a syntax check
+        script = next((t for t in argv[1:] if not t.startswith("-")), None)
+        return "runs %s" % script if script and scripted(script) else None
+    if INTERPRETERS.match(prog):
+        return interpreter(prog, argv[1:], cwd, depth)
+    if "/" in argv[0] and scripted(argv[0]):
+        return "runs %s" % argv[0]
+    if prog in SAFE:
+        return None
+    hit = [f for f in argv[1:] if f in FLAGS or f.split("=", 1)[0] in FLAGS
+           or "type=registry" in f or "push=true" in f]
+    if hit:
+        return "%s with %s" % (prog, hit[0])
+    if prog in PMS:
+        return pm(argv, cwd, depth)
+    if prog in TASK_RUNNERS:
+        return task_runner(prog, argv, cwd)
+    if prog in SUBCOMMANDS:
+        return subcommand(prog, argv)
+    pos = positionals(argv[1:])
+    if pos and pos[0] in WORDS + ("push", "upload") and not a_path(pos[0], cwd):
+        return "%s %s" % (prog, pos[0])  # an unknown tool told to release
+    return None
+
+
+def releaser(cmd):
+    """True for a tool the guard knows can release, by its command word alone."""
+    prog = os.path.basename(cmd)
+    return prog in PMS or prog in SUBCOMMANDS or prog in TASK_RUNNERS or \
+        prog in {r[0] for r in RUNNERS} or prog in SHELLS or bool(INTERPRETERS.match(prog))
+
+
+def interpreter(prog, rest, cwd, depth):
+    if rest[:1] == ["-m"] and len(rest) > 1:
+        return None if rest[1] == "py_compile" else classify_argv(rest[1:], cwd, depth)
+    if rest[:1] and rest[0] in ("-c", "-e", "--eval", "-p", "--print", "--check", "-n"):
+        return None  # code given inline (a documented limit), or a syntax check
+    if prog == "deno" and rest[:1] and rest[0] != "run":
+        return subcommand("deno", ["deno"] + rest)
+    script = next((t for t in rest if not t.startswith("-")), None)
+    if script == "run":  # `deno run x.ts`, `bun run x`
+        script = next((t for t in rest[rest.index("run") + 1:] if not t.startswith("-")), None)
+    if script and scripted(script):
+        return "runs %s" % script
+    if prog.startswith("bun") and script and not re.search(r"[./]", script):
+        return pm(["bun"] + rest, cwd, depth)  # `bun test`, `bun run x`: a package manager
+    return None
+
+
+def subcommand(prog, argv):
+    verbs, depth_n, value_opts = SUBCOMMANDS[prog]
+    if verbs is None:
+        return "%s releases" % prog
+    if prog == "git":
+        for i, tok in enumerate(argv[1:-1], 1):
+            if tok == "-c" and argv[i + 1].lower().startswith("protocol."):
+                return "git -c %s overrides the replay's transport block" % argv[i + 1]
+    pos = positionals(argv[1:], value_opts)
+    found = [t for t in pos[:depth_n] if t in verbs]
+    if prog == "cargo" and pos[:1] == ["workspaces"] and pos[1:2] and pos[1] in ("publish", "release"):
+        found = [pos[1]]
+    if prog == "aws" and not found and pos[:2] == ["s3", "cp"] and pos[-1].startswith("s3://"):
+        found = ["s3 cp"]
+    if prog == "gsutil" and not found and pos[:1] == ["cp"] and pos[-1].startswith("gs://"):
+        found = ["cp"]
+    if prog == "goreleaser" and pos[:1] not in (["check"], ["build"], ["init"], ["healthcheck"]):
+        found = ["release"]
+    return "%s %s" % (prog, found[0]) if found else None
+
+
+def task_runner(prog, argv, cwd):
+    """make, just, task, rake, mage, turbo, nx, gradle: a target or task named for a release."""
+    pos = positionals(argv[1:], TASK_RUNNERS[prog])
+    targets = [t for t in argv[1:] if t.startswith(("--target=", "-t="))]
+    targets = [t.split("=", 1)[1] for t in targets] + pos
+    if prog in ("turbo", "nx") and pos[:1] in (["run"], ["run-many"]):
+        targets = pos[1:] + targets
+    if prog == "nx" and pos[:1] and pos[0] in ("release", "deploy", "publish"):
+        return "nx %s" % pos[0]
+    if prog in ("gradle", "gradlew"):
+        hit = [t for t in targets if t.split(":")[-1].lower().startswith("publish")]
+    else:
+        hit = [t for t in targets if scripted(t.split(":")[-1]) or scripted(t)]
+    return "%s %s" % (prog, hit[0]) if hit else None
+
+
+def pm(argv, cwd=None, depth=0):
+    """npm, pnpm, yarn, bun: their publish subcommands (and npm's abbreviations of them), a `run`
+    of a release script, a script run by name (yarn/pnpm/bun) named so, and what their own
+    runners (`exec`, `dlx`, `x`, `workspaces foreach`) run."""
+    pos = positionals(argv[1:], PM_VALUE_OPTS)
+    if not pos:
+        return None
+    for p in pos[:3]:  # an unknown option's value may come first: `npm --foo bar publish`
+        if PM_RELEASE.match(p):
+            return "%s %s" % (argv[0], p)
+        if p in PM_BUILTINS or p in ("run", "run-script", "exec", "dlx", "x", "workspace",
+                                     "workspaces", "npm"):
+            break
+    sub = next((p for p in pos[:3] if p in PM_BUILTINS or p in (
+        "run", "run-script", "exec", "dlx", "x", "workspace", "workspaces", "npm")), pos[0])
+    after = argv[argv.index(sub) + 1:] if sub in argv else []
+    if sub in ("run", "run-script"):
+        script = positionals(after)
+        return "%s run %s" % (argv[0], script[0]) if script and scripted(script[0]) else None
+    if sub in ("exec", "dlx", "x"):
+        rest = after
+        while rest and rest[0].startswith("-"):
+            rest = rest[1:]
+        return classify_argv(rest, cwd, depth + 1)
+    if sub == "workspace" and len(positionals(after)) > 1:
+        return pm([argv[0]] + after[after.index(positionals(after)[0]) + 1:], cwd, depth)
+    if sub == "workspaces" and "foreach" in after:
+        rest = after[after.index("foreach") + 1:]
+        while rest and rest[0].startswith("-"):
+            rest = rest[1:]
+        return pm([argv[0]] + rest, cwd, depth)
+    if sub == "npm" and len(pos) > 1 and PM_RELEASE.match(pos[1]):
+        return "%s npm %s" % (argv[0], pos[1])
+    if sub in PM_BUILTINS:
+        return None
+    if scripted(sub):  # `yarn deploy`, `pnpm publish:site`, `pnpm release`
+        return "%s %s" % (argv[0], sub)
+    if argv[0] != "npm":  # pnpm/yarn/bun run a package bin by name: `pnpm changeset publish`
+        return classify_argv(argv[argv.index(sub):], cwd, depth + 1)
+    return None
+
+
+_WRAPPER = re.compile(r"^(?:[A-Za-z_][A-Za-z0-9_]*=(?:'[^']*'|\"[^\"]*\"|\S*)\s+|timeout\s+"
+                      r"(?:-k\s+\S+\s+)?\S+\s+|nice\s+|env\s+)+")
+
+
+def glob_hit(cmd, patterns):
+    """The first glob deny pattern (`git push`, `curl`, `git -C * push*`) matching a subcommand
+    of `cmd`, or None: an EMULATION of Claude Code's Bash rule matcher. The command is split at
+    ; && || | newlines and $( ` ( ); each part is tried as written and without leading
+    VAR=value / timeout / nice / env; a pattern with `*` must match the whole part, one without
+    matches it or a prefix ending at a space. Used for Monitor, which Claude Code's Bash rules
+    may not cover, and by `bin/loop deny-check`."""
+    import fnmatch
+    for part in re.split(r"&&|\|\||;|\||\n|\$\(|`|\(|\)", cmd):
+        part = part.strip()
+        for form in dict.fromkeys((part, _WRAPPER.sub("", part))):
+            for pat in patterns:
+                if ("*" in pat and fnmatch.fnmatchcase(form, pat.replace("[", "[[]").replace("?", "[?]"))) \
+                        or form == pat or form.startswith(pat + " "):
+                    return pat
+    return None
+
+
+def selftest(command):
+    """Markers `bin/loop deny-check --live` uses to prove the guard fails closed."""
+    if "LOOP_GUARD_SELFTEST_CRASH" in command:
+        os._exit(70)  # a crash with no output: `|| exit 2` must still block
+    if "LOOP_GUARD_SELFTEST_HANG" in command:
+        signal.pause()  # past DEADLINE: the alarm must still deny
+
+
+def deny(why):
+    print(json.dumps({"hookSpecificOutput": {
+        "hookEventName": "PreToolUse", "permissionDecision": "deny",
+        "permissionDecisionReason": "Denied by the replay's release guard: %s. A replay never "
+                                    "publishes, deploys or releases." % why}}), flush=True)
+    os._exit(0)
+
+
+def main():
+    signal.signal(signal.SIGALRM, lambda *_: deny("it did not decide within %ds" % DEADLINE))
+    signal.alarm(DEADLINE)
+    try:
+        payload = json.load(sys.stdin)
+        if payload.get("tool_name") not in ("Bash", "Monitor"):
+            return 0
+        command = str((payload.get("tool_input") or {}).get("command") or "")
+        selftest(command)
+        why = classify(command, payload.get("cwd"))
+        if not why and payload.get("tool_name") == "Monitor" and len(sys.argv) > 1:
+            with open(sys.argv[1], encoding="utf-8") as fh:  # the Bash deny globs, for Monitor
+                hit = glob_hit(command, [p[:-2] if p.endswith(":*") else p for p in json.load(fh)])
+            why = "Monitor runs %r, denied for Bash" % hit if hit else None
+    except Unreadable as e:
+        why = "it cannot read this command: %s" % e
+    except Exception as e:  # FAIL CLOSED: what cannot be read is not run
+        why = "it could not read this command (%s)" % e.__class__.__name__
+    if why:
+        deny(why)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
