@@ -4546,6 +4546,39 @@
       "not judged"
     ]
   },
+  "widen-report-back-while-a-render-runs-is-a-hold": {
+    "_why": "A REPORT-BACK PROMISE WITH A TASK RUNNING IS A HOLD. Measured 2026-10-15 in ComfyUI session e76f95be: a turn opened by the user ended \"T1 is rendering now, with the 768p test queued after it. I'll report both, with the zoom measured against Z1\" while two shells ran, the render and its queued waiter, and it was blocked because no clause of WAITING reads \"I'll report\". Replaying every main Stop on this machine, it was the one block the change moves (9 before, 8 after). The tail here is that reply's; the second fact is in the payload.",
+    "exit": 0,
+    "script": "wf-widen",
+    "env": {
+      "WF_BLIND_SAMPLE": "0"
+    },
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"Great to hear. I've written your reaction into the skill's test notes. T1 is rendering now, with the 768p test queued after it. I'll report both, with the zoom measured against Z1.\", \"background_tasks\": [{\"id\": \"bkwhj5dcz\", \"status\": \"running\"}, {\"id\": \"b9arve96h\", \"status\": \"running\"}]}",
+    "want": [
+      "not scored"
+    ],
+    "not": [
+      "not judged",
+      "stopped mid-work"
+    ]
+  },
+  "widen-report-back-alone-still-blocks": {
+    "_why": "THE NEGATIVE FOR THE ROW ABOVE: the same reply with nothing in flight. \"I'll report\" with no task running is a promise of work the turn has not started, and it must still block, or the report-back hold becomes a phrase any turn can write. Two live blocks on this machine are that shape (session a5e39517, \"I'll report the before/after\" with no task running) and both stay blocked.",
+    "exit": 0,
+    "script": "wf-widen",
+    "env": {
+      "WF_BLIND_SAMPLE": "0"
+    },
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"Great to hear. I've written your reaction into the skill's test notes. T1 is rendering now, with the 768p test queued after it. I'll report both, with the zoom measured against Z1.\"}",
+    "want": [
+      "stopped mid-work",
+      "CONTINUING"
+    ],
+    "not": [
+      "not judged",
+      "10 of 106"
+    ]
+  },
   "widen-waiting-words-alone-still-block": {
     "_why": "THE NEGATIVE THAT KEEPS THE FIX FROM WIDENING INTO SILENCE. Byte for byte the reply of widen-between-batches-is-silent, with no task running and no notification tag on disk: nothing is pending, nobody was asked anything, and the turn ended on \"Continuing.\" That is the measured stop defect - 10 of 106 turns - and it must still be blocked, or a guard is retired by a phrase any turn can write.",
     "exit": 0,

@@ -505,6 +505,20 @@ WAITING = re.compile(
     r"|\b(?:when|once|after|until)\b[^.\n]{0,40}"
     r"\b(?:runs?|agents?|batch(?:es)?|tasks?|reviews?|checks?|gates?|sweeps?|surveys?)\b",
     re.I)
+# A REPORT-BACK PROMISE IS A HOLD WHEN A TASK IS RUNNING, and only then. MEASURED
+# 2026-10-15 in ComfyUI session e76f95be: a turn opened by the user ended "T1 is rendering
+# now, with the 768p test queued after it. I'll report both, with the zoom measured
+# against Z1" with two shells running, the render and its queued waiter. It was blocked,
+# because no clause of WAITING reads "I'll report". Replaying every main Stop on this
+# machine (1,569), the promise trigger blocked 9 before this and 8 after, and that turn is
+# the one that moved; the two "I'll report" blocks with nothing running stay blocked
+# (`widen-report-back-alone-still-blocks`). Read in the TAIL, where the promise
+# being judged lives. Only the running-task half takes it: a turn opened by a completion
+# notification with nothing left running has the result in hand, so a report promised
+# there is owed now.
+REPORT_BACK = re.compile(
+    r"\bi'?ll report\b"
+    r"|\bi'?ll (?:post|share|send)\b[^.\n]{0,80}\b(?:when|once)\b", re.I)
 
 
 def just_finished(payload):
@@ -536,11 +550,13 @@ def declared_hold(payload, reply):
     SESSION's (fact 22b, measured 2026-10-12), so it says nothing about the agent that is
     stopping, and a subagent does not hold for a batch its parent dispatched.
     """
-    if not WAITING.search(reply or ""):
-        return None
     running = payload.get("background_tasks")
     if payload.get("hook_event_name") == "SubagentStop":
         running = None
+    if running and REPORT_BACK.search((reply or "")[-TAIL:]):
+        return "a task is still running and the turn promised to report on it"
+    if not WAITING.search(reply or ""):
+        return None
     if running:
         return "a task it named is still running"
     if just_finished(payload):
@@ -2026,9 +2042,8 @@ def widen(payload):
             "reason": (
                 f'The turn ended immediately after saying "{promise}", and asked '
                 f"nothing. Nothing interrupted it — the stop was the turn's own.\n\n"
-                "In this session 10 of 106 turns ended that way: work announced, then "
-                "the turn closed with the work not started. The cause is structural "
-                "rather than a change of mind — a text block with no tool call after it "
+                "Work announced and then left unstarted is structural rather than a "
+                "change of mind — a text block with no tool call after it "
                 "IS the end of the turn, so writing the sentence is the act of "
                 "stopping, and from inside it reads as narrating progress.\n\n"
                 "The announced work has not been done yet. Stopping mid-task is correct "
