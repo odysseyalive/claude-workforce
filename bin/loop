@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S python3 -I
 """loop — the review loop: workforce evaluating itself from real use. MAINTAINER-ONLY; not shipped.
 
     bin/loop mine [--since YYYY-MM-DD] [--project SUBSTR] [--cycle]   per-session outcome signals
@@ -9,9 +9,14 @@
     bin/loop bank [--taxonomy STAMP] [--regression 10] [--seed N] [--dry-run]
     bin/loop bank --accept STAMP                                      after you read bank.md
     bin/loop replay --bank STAMP [--split capability|regression|heldout|all] [--task ID...]
-                    [--workforce REF|installed] [--max-task-usd 15] [--max-total-usd 150]
+                    [--with-heldout] [--workforce REF|installed]
                     [--max-turns 100] [--timeout 1800] [--model M] [--dry-run]
     bin/loop score REPLAY_STAMP [--judge-model M] [--force] [--dry-run]
+    bin/loop gate|propose BRANCH|COMMIT --bank STAMP --baseline REPLAY_STAMP [--ablation]
+                    [--category NAME]                                gate runs and writes nothing
+    bin/loop replay --resume REPLAY_STAMP                             finish an interrupted run
+    bin/loop decide PROPOSAL_STAMP --approve|--reject [--note TEXT]  the user's decision
+    bin/loop status                                                   one screen of state
 
     Every subcommand takes `--state DIR` (default `${XDG_STATE_HOME:-~/.local/state}/workforce-loop`)
     and `--projects DIR` (default `${CLAUDE_CONFIG_DIR:-~/.claude}/projects`).
@@ -20,8 +25,8 @@ WHAT IT IS FOR. The user, 2026-10-14: "see if we could put something together th
 with recursive improvement that we can run periodically and do an evaluation that can, you know,
 as the model capabilities grow, this feature would get better and better." The design is
 `plan/review-loop-2026-10-14.md`. This file is parts 1 (`mine`), 6 (`due`), 2 (`categorize`),
-3 (`bank`) and 4 (`replay`, `score`); propose and gate are later subcommands of THIS script, each
-added as one more entry in `COMMANDS` at the bottom.
+3 (`bank`), 4 (`replay`, `score`) and 5 (`gate`, `propose`, `decide`, `status`). The cycle, in
+order, is the "Running a review cycle" runbook in DEVELOPMENT.md.
 
 NOT SHIPPED, AND IT WRITES NOTHING IN THE REPO OR IN ANY PROJECT. It reads every transcript on
 this machine, finance and tax sessions included, so it is not in `manifest.txt` and everything it
@@ -191,8 +196,11 @@ exit 0 either way.
        before a slash command), then each peer
        message as its own turn wrapped as a cross-session message. The first call opens a session;
        later ones `--resume` it. Each call runs under coreutils `timeout` in its own process group,
-       killed as a group when it ends, with `--max-budget-usd` and `--max-turns` set to what the
-       task and the run have left. A killed call is charged its whole allowance.
+       killed as a group when it ends, with `--max-turns` set to what the task has left. There
+       is no spend limit (the user, 2026-10-15: a dollar cap "might keep the work from actually
+       getting done"); cost is reported per turn, task and run, and a killed call that reported
+       none is counted as such, never guessed. `--workforce REF` is resolved to a sha ONCE, at
+       the start, and stored in replay.json: every task and every `--resume` runs that sha.
     4. RECORD, in `<state>/replay/<stamp>/tasks/<key>/`: record.json (turns, exit, cost, model
        turns, permission denials, final reply, refs changed in the project), the transcripts
        copied out of the throwaway config, turn-N.stream.jsonl, install.log, and the diff from
@@ -232,6 +240,30 @@ exit 0 either way.
     A task passes only when every grader passes and the replay finished (exit ok, no error); any fail
     fails it; otherwise it is unknown, never a pass. scores.jsonl has one row per task NOT held out; summary.json and stdout give
     per split pass/fail/unknown counts and pass rate, held-out tasks as aggregate counts only.
+
+`propose` — A PROPOSAL IS A COMMIT OF THIS REPO, judged against a scored baseline replay.
+    GATE (`proposal_gate`, also `bin/loop gate`), each refusal one line, before anything runs:
+    the baseline must be scored on --bank, have replayed ONE workforce commit (its base) and
+    every held-out task; this checkout must be that base commit exactly, clean, with nothing
+    untracked (bin/loop and wf-task-tag run from it unsandboxed; `python3 -I` keeps a stray
+    bin/*.py off sys.path); the proposal must descend from that base, change something, touch nothing
+    `GATED` (bin/loop, plan/review-loop-*, wf-task-tag, the state dir if inside it), and name its
+    categories (`Loop-Category:` trailers on base..commit, or --category) unless --ablation.
+    TASKS: capability tasks in those categories (an ablation: all), all regression, all held-out,
+    each shown task only if the baseline scored it. REPLAY + SCORE with `--workforce <commit>`
+    under the baseline's model, turn limit, timeout and judge, with wf-task-tag loaded right
+    after the gate and its loaded bytes' hash compared to the baseline's (a mismatch after
+    scoring is INCONCLUSIVE). COMPARE per task
+    (`compare`); a task unknown on either side is counted as neither gain nor loss; held-out
+    by line of heldout.jsonl (score keeps those rows in a private heldout.jsonl; only counts are
+    shown). VERDICT (`proposal_verdict`): REGRESSES on any lost guarded pass; else INCONCLUSIVE
+    when a planned task has no after-score or a regression/held-out task (any task, for an
+    ablation) went from decided to unknown; else IMPROVES, NEUTRAL, or for an ablation
+    REMOVABLE. The baseline must be `done` with every task run, counted from its records
+    (`replay --resume` finishes an interrupted one), and scored with this wf-task-tag. Replays take capability, regression and
+    held-out tasks in turn. `<state>/proposals/<stamp>/proposal.{json,md}`.
+    `decide` writes decision.json once and appends `<state>/lineage.jsonl`; it runs no git
+    command. Approving prints the merge command and the commit to revert.
 """
 
 import argparse
@@ -241,8 +273,6 @@ import datetime
 import fnmatch
 import glob
 import hashlib
-import importlib.machinery
-import importlib.util
 import io
 import json
 import os
@@ -253,23 +283,52 @@ import signal
 import subprocess
 import sys
 import tarfile
+import types
 import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
+TT_PATH = "workforce/bin/wf-task-tag"
+
+
 def _wf_task_tag():
     """`wf-task-tag`'s ledger readers, imported rather than restated, so the definition of a done
-    item cannot drift between the hook that writes the ledger and the loop that reads it."""
+    item cannot drift between the hook that writes the ledger and the loop that reads it. It is
+    code from the working tree, run unsandboxed: loaded only on first use (mine, categorize,
+    bank, score), never by gate, propose's gate, decide, status or replay. A proposal may not
+    change it (`GATED`), and `propose` refuses when the working copy is not the baseline's."""
     sys.dont_write_bytecode = True  # never drop a __pycache__ into the shipped directory
-    path = os.path.join(ROOT, "workforce", "bin", "wf-task-tag")
-    loader = importlib.machinery.SourceFileLoader("_wf_task_tag", path)
-    mod = importlib.util.module_from_spec(importlib.util.spec_from_loader(loader.name, loader))
-    loader.exec_module(mod)
+    path = os.path.join(ROOT, TT_PATH)
+    with open(path, "rb") as fh:
+        src = fh.read()
+    mod = types.ModuleType("_wf_task_tag")
+    mod.__file__ = path
+    exec(compile(src, path, "exec"), mod.__dict__)
+    mod.loop_sha256 = hashlib.sha256(src).hexdigest()  # of the bytes that ran, never a re-read
     return mod
 
 
-TT = _wf_task_tag()
+class _LazyTT:
+    def __getattr__(self, name):
+        if "mod" not in self.__dict__:
+            self.__dict__["mod"] = _wf_task_tag()
+        return getattr(self.__dict__["mod"], name)
+
+
+TT = _LazyTT()
+
+
+def tt_sha256():
+    """The hash of the wf-task-tag bytes this process loaded and grades with (loading it if it
+    is not yet); recorded in every score summary."""
+    return TT.loop_sha256
+
+
+def tt_file_sha256():
+    """The hash of the wf-task-tag file as it is now, read without running it (the gate)."""
+    with open(os.path.join(ROOT, TT_PATH), "rb") as fh:
+        return hashlib.sha256(fh.read()).hexdigest()
 
 # The second half of `DONE_STATUSES`: an ask taken back rather than met. `wf-task-tag` treats both
 # halves alike (either lets an issue close); the loop splits them, because a withdrawn ask is not
@@ -1107,7 +1166,7 @@ def render_digest(row, entries, cap):
     return "\n".join(head + body) + "\n", len(lines) - len(keep)
 
 
-def judge_argv(claude, model, budget, seconds):
+def judge_argv(claude, model, seconds):
     """The exact judge command. No tools, no MCP, no skills or slash commands, no settings files
     (so no user or project hooks), safe mode (no CLAUDE.md, plugins or memory), no transcript,
     and the default system prompt replaced. Stream-json with hook events, so `run_judge` can
@@ -1115,7 +1174,7 @@ def judge_argv(claude, model, budget, seconds):
     return [shutil.which("timeout") or "timeout", "-k", "10", str(seconds), claude, "-p",
             "--model", model, "--safe-mode", "--setting-sources", "", "--tools", "",
             "--strict-mcp-config", "--disable-slash-commands", "--no-session-persistence",
-            "--max-budget-usd", "%.2f" % budget, "--output-format", "stream-json", "--verbose",
+            "--output-format", "stream-json", "--verbose",
             "--include-hook-events", "--system-prompt", JUDGE_SYSTEM]
 
 
@@ -1364,8 +1423,6 @@ def judge_setup(args, cmd):
                "override" % PROPOSER_MODEL)
     elif args.timeout < 1:
         why = "--timeout must be at least 1 second"
-    elif args.max_budget_usd <= 0 or args.max_total_usd <= 0:
-        why = "--max-budget-usd and --max-total-usd must be above 0"
     elif not (args.claude or shutil.which("claude")):
         why = "no `claude` on PATH; pass --claude"
     if why:
@@ -1396,7 +1453,7 @@ def cmd_categorize(args):
     stamp, out = new_run_dir(args.state, "categorize")
     ddir = private_dir(os.path.join(out, "digests"))
     picked = build_digests(worst, projects, ddir)
-    argv = judge_argv(claude, args.judge_model, args.max_budget_usd, args.timeout)
+    argv = judge_argv(claude, args.judge_model, args.timeout)
     jcwd = os.path.join(out, "judge-cwd")
     print("loop categorize: %d of the worst ranked sessions from %s" % (len(picked), mine_dir))
     for rank, row, _, digest, _, n, omitted in picked:
@@ -1437,10 +1494,6 @@ def categorize_run(args, out, jcwd, argv, picked, mine_dir, stamp):
     sessions, unparsed, cost = [], [], 0.0
     for rank, row, path, digest, dpath, _, _ in picked:
         sid = row["session"]
-        if cost >= args.max_total_usd:  # stop coding, keep what was coded, still cluster it
-            unparsed.append({"session": sid, "reason": "not coded: run spend cap $%.2f reached"
-                             % args.max_total_usd})
-            continue
         print("  coding %s ..." % sid[:8], end="", file=sys.stderr, flush=True)
         res = run_judge(argv, OPEN_CODING + digest + "=== END DIGEST ===\n", jcwd,
                         args.allow_same_model, args.timeout)
@@ -1541,7 +1594,7 @@ def recluster(args, claude):
         os.remove(os.path.join(out, "accepted.json"))
     except OSError:
         pass
-    argv = judge_argv(claude, args.judge_model, args.max_budget_usd, args.timeout)
+    argv = judge_argv(claude, args.judge_model, args.timeout)
     jcwd = os.path.join(out, "judge-cwd")
     print("loop categorize: reclustering %s from %d saved notes (%d unparsed); no coding calls"
           % (args.recluster, len(sessions), len(unparsed)))
@@ -2001,7 +2054,7 @@ def cmd_bank(args):
                              "reason": why})
         else:
             built.append(got)
-    argv = judge_argv(claude, args.judge_model, args.max_budget_usd, args.timeout)
+    argv = judge_argv(claude, args.judge_model, args.timeout)
     n_reg = sum(1 for s, _, _ in picked if s == "regression")
     print("loop bank: taxonomy %s (accepted)" % stamp)  # the seed goes to bank.json only
     print("  capability candidates %d (skipped by kind: %s); regression %d of %d requested "
@@ -2038,10 +2091,6 @@ def bank_run(args, out, jcwd, argv, built, rejected, meta):
     for task, digest in built:
         if not task["replayable"]:
             tasks.append(task)  # kept, marked; no judge spend on a task replay cannot run
-            continue
-        if cost >= args.max_total_usd:
-            rejected.append({"id": task["id"], "split": task["split"],
-                             "reason": "not graded: run spend cap $%.2f reached" % args.max_total_usd})
             continue
         n += 1
         print("  grading %d/%d ..." % (n, total), end="", file=sys.stderr, flush=True)
@@ -2196,10 +2245,19 @@ REPLAY_DENY_BASH = (
 REPLAY_GIT_ENV = {"GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "protocol.allow",
                   "GIT_CONFIG_VALUE_0": "never", "GIT_TERMINAL_PROMPT": "0",
                   "GIT_LFS_SKIP_SMUDGE": "1"}
-# Dropped from the replay's environment, by name: this session's own CLAUDE_* (its messaging
-# socket reaches live sessions), API keys, tokens and agent sockets a tool call could use.
-_REPLAY_ENV_DROP = re.compile(r"^(CLAUDE|ANTHROPIC|SSH_|GPG_|AWS_|GH_|GITHUB_|NPM_)|TOKEN|SECRET|"
-                              r"PASSW|API_?KEY|CREDENTIAL|AUTH_SOCK|^XDG_RUNTIME_DIR$|^DBUS_|^WAYLAND_|^DISPLAY$", re.I)
+# THE ONLY VARIABLES A REPLAY INHERITS (`replay_env` sets the rest). An allowlist, because a
+# denylist lets through whatever secret is oddly named (INDEXNOW_KEY, AZURE_SPEECH_KEY), and a
+# replay has the network. MEASURED 2026-10-15 on 2.1.296: a real `--model haiku` replay with
+# exactly these, workforce hooks included, ran its tools and finished.
+REPLAY_ENV_KEEP = ("HOME", "PATH", "LANG", "LC_ALL", "LC_CTYPE", "LC_MESSAGES", "USER", "LOGNAME",
+                   "SHELL", "TERM", "TZ", "HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY", "https_proxy",
+                   "http_proxy", "no_proxy")
+# Every git command the loop runs reads no system or user config (so no filter, textconv or
+# fsmonitor driver the user configured can be steered by a tree's .gitattributes) and no
+# system attributes file.
+GIT_SAFE_ENV = {"GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": "/dev/null",
+                "GIT_ATTR_NOSYSTEM": "1", "GIT_TERMINAL_PROMPT": "0", "GIT_LFS_SKIP_SMUDGE": "1"}
+EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 # User settings keys a replay does not mirror: hooks come from the workforce under test; the rest
 # run a command, reach a service, or need a plugin the throwaway config does not have.
 MIRROR_SKIP = ("hooks", "enabledPlugins", "extraKnownMarketplaces", "statusLine", "apiKeyHelper",
@@ -2217,21 +2275,24 @@ class ReplayUnsafe(Exception):
     """A replay loaded something it must not have; the whole run stops."""
 
 
-def gitx(cwd, *argv, timeout=300):
-    """(returncode, stdout, stderr) of one git command, raw. Hooks and fsmonitor off, so a
-    worktree add or a diff runs nothing from the project's config."""
+def gitx(cwd, *argv, timeout=300, sandbox=(), env=None):
+    """(returncode, stdout, stderr) of one git command, raw. Hooks and fsmonitor off and
+    `GIT_SAFE_ENV`, so a clone, checkout or archive runs nothing a tree or the user's config
+    names. `sandbox` (a bwrap prefix) and `env` run it inside a replay's sandbox: for a clone
+    the replay has had write access to, whose own .git/config may name a filter or a gitdir."""
+    env = dict(env if env is not None else os.environ, **GIT_SAFE_ENV)
     try:
-        r = subprocess.run(["git", "-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false",
-                            "-C", cwd] + list(argv), stdin=subprocess.DEVNULL, capture_output=True,
-                           timeout=timeout, env=dict(os.environ, GIT_TERMINAL_PROMPT="0",
-                                                     GIT_LFS_SKIP_SMUDGE="1"))
+        r = subprocess.run(list(sandbox) + [
+            shutil.which("git") or "git", "-c", "core.hooksPath=/dev/null", "-c",
+            "core.fsmonitor=false", "-C", cwd] + list(argv), stdin=subprocess.DEVNULL,
+            capture_output=True, timeout=timeout, env=env)
     except (OSError, subprocess.TimeoutExpired) as e:
         return 1, b"", str(e).encode()
     return r.returncode, r.stdout, r.stderr
 
 
-def gitx_ok(cwd, *argv, timeout=300):
-    rc, out, err = gitx(cwd, *argv, timeout=timeout)
+def gitx_ok(cwd, *argv, timeout=300, sandbox=(), env=None):
+    rc, out, err = gitx(cwd, *argv, timeout=timeout, sandbox=sandbox, env=env)
     if rc != 0:
         raise ReplayError("git %s failed: %s" % (argv[0], one_line(err.decode("utf-8", "replace"), 300)))
     return out.decode("utf-8", "replace")
@@ -2264,6 +2325,8 @@ def select_tasks(args, shown, hidden):
         if missing:
             raise ReplayError("not in this bank's tasks.jsonl: %s" % ", ".join(missing))
         picked = [(i, by_id[i], None) for i in dict.fromkeys(args.task)]
+        if args.with_heldout:
+            picked += [("heldout-%02d" % (n + 1), t, n + 1) for n, t in enumerate(hidden)]
     else:
         picked = [] if args.split == "heldout" else [
             (t["id"], t, None) for t in shown if args.split in ("all", t["split"])]
@@ -2284,8 +2347,13 @@ def resolve_workforce(spec, task):
     ref = spec or (task.get("workforce") or {}).get("commit")
     if not ref:
         return None, "the task records no workforce commit; pass --workforce"
+    return resolve_ref(ref)
+
+
+def resolve_ref(ref):
+    """(the commit sha `ref` names in this repo, None) or (None, why)."""
     if ref.startswith("-") or _ARG_CONTROL.search(ref):
-        return None, "--workforce %r is not a git ref" % ref
+        return None, "%r is not a git ref" % ref
     sha = git(ROOT, "rev-parse", "--verify", "--quiet", ref + "^{commit}")
     return (sha, None) if sha else (None, "%r is not a commit in %s" % (ref, ROOT))
 
@@ -2308,12 +2376,16 @@ def read_json(path, default):
         return default
 
 
-def install_workforce(sha, work, config, log_path):
+def install_workforce(sha, work, config, log_path, sandbox):
     """Put the workforce under test into the throwaway `config`; returns the settings it wired.
-    A commit: `git archive` of this repo into `work/src`, then THAT tree's own `install --user
-    --config-dir`, from a local file:// URL, with HOME pointed at an empty `work/home`, so the
-    installer cannot write anywhere real. `installed`: a copy of the user's install as it is,
-    its sibling files from `.installed-external`, and the user's hooks re-aimed at the copy."""
+    A commit: `git archive` of this repo into `work/src` (attributes read from the empty tree,
+    so the tree's .gitattributes name no filter), then THAT tree's own `install --user
+    --config-dir` from a local file:// URL. The tree may be a proposal, AI-written, so its
+    install runs INSIDE `sandbox` (the replay's bwrap with no network): only `work/` is
+    writable, HOME is `work/home`, the real home is an empty tmpfs. `config` must still be a
+    real directory afterwards, or the install swapped it for a link that later writes would
+    follow out of the sandbox: ReplayUnsafe. `installed`: a copy of the user's install as it
+    is, its sibling files from `.installed-external`, and the user's hooks re-aimed at it."""
     if sha == "installed":
         wf = os.path.join(USER_CONFIG, "skills", "workforce")
         if not os.path.isfile(os.path.join(wf, "SKILL.md")):
@@ -2334,25 +2406,41 @@ def install_workforce(sha, work, config, log_path):
         text = json.dumps(hooks).replace(USER_CONFIG.rstrip("/") + "/skills/", config + "/skills/")
         return {"hooks": json.loads(text)}
     src, home = private_dir(os.path.join(work, "src")), private_dir(os.path.join(work, "home"))
-    rc, tar, err = gitx(ROOT, "archive", "--format=tar", sha)
+    rc, tar, err = gitx(ROOT, "--attr-source=" + EMPTY_TREE, "archive", "--format=tar", sha)
     if rc != 0:
         raise ReplayError("git archive %s failed: %s" % (sha[:10], one_line(err.decode(), 300)))
     with tarfile.open(fileobj=io.BytesIO(tar)) as tf:
         tf.extractall(src, filter="data")
-    env = {k: os.environ[k] for k in ("PATH", "LANG", "LC_ALL", "TMPDIR") if k in os.environ}
-    env.update(HOME=home, CLAUDE_CONFIG_DIR=config, WORKFORCE_REPO_URL="file://" + src)
+    env = {k: os.environ[k] for k in ("PATH", "LANG", "LC_ALL") if k in os.environ}
+    env.update(HOME=home, TMPDIR="/tmp", CLAUDE_CONFIG_DIR=config,
+               WORKFORCE_REPO_URL="file://" + src)
     with open(log_path, "wb") as log:
         try:
-            r = subprocess.run(["bash", os.path.join(src, "install"), "--user", "--config-dir",
-                                config], cwd=home, env=env, stdin=subprocess.DEVNULL, stdout=log,
+            r = subprocess.run(list(sandbox) + ["--unshare-net", "--chdir", home, "bash",
+                                                os.path.join(src, "install"), "--user",
+                                                "--config-dir", config],
+                               cwd=home, env=env, stdin=subprocess.DEVNULL, stdout=log,
                                stderr=subprocess.STDOUT, timeout=300)
             rc = r.returncode
         except (OSError, subprocess.TimeoutExpired) as e:
             rc = "%s" % e
+    config_intact(work, config, "the install")
     if rc != 0 or not os.path.isfile(os.path.join(config, "skills", "workforce", "SKILL.md")):
         raise ReplayError("installing workforce %s into the throwaway config failed (rc %s); "
                           "see %s" % (sha[:10], rc, log_path))
-    return read_json(os.path.join(config, "settings.json"), {})
+    settings = os.path.join(config, "settings.json")
+    if os.path.islink(settings):  # it would read any JSON file it names into the replay
+        raise ReplayUnsafe("the install made %s a link" % settings)
+    return read_json(settings, {})
+
+
+def config_intact(work, config, who):
+    """Raise ReplayUnsafe unless `config` is still a real directory inside `work`. Sandboxed
+    code had write access to `work/`; a link put in place of the config would carry the
+    settings, the copied token or the transcript copy out of it."""
+    if os.path.islink(config) or not os.path.isdir(config) or \
+            not os.path.realpath(config).startswith(os.path.realpath(work) + os.sep):
+        raise ReplayUnsafe("%s replaced the throwaway config %s" % (who, config))
 
 
 def hidden_dirs(state):
@@ -2424,13 +2512,13 @@ def copy_auth(config):
 
 
 def replay_env(config):
-    """(env, names dropped). Never this session's CLAUDE_* (its messaging socket), never a key."""
-    dropped = sorted(k for k in os.environ if _REPLAY_ENV_DROP.search(k))
-    env = {k: v for k, v in os.environ.items() if k not in dropped}
+    """(env, names inherited). Only `REPLAY_ENV_KEEP` comes from this process: never this
+    session's CLAUDE_* (its messaging socket), never a key, whatever it is called."""
+    kept = sorted(k for k in REPLAY_ENV_KEEP if k in os.environ)
+    env = {k: os.environ[k] for k in kept}
     env.update(REPLAY_GIT_ENV, CLAUDE_CONFIG_DIR=config, ENABLE_CLAUDEAI_MCP_SERVERS="false",
-               TMPDIR="/tmp",
-               DISABLE_AUTOUPDATER="1")
-    return env, dropped
+               TMPDIR="/tmp", DISABLE_AUTOUPDATER="1")
+    return env, kept
 
 
 # Home-relative toolchain roots a replay may RUN from, bound read-only (plus every PATH entry
@@ -2494,11 +2582,11 @@ def sandbox_gitconfig(work):
         write_private(os.path.join(work, "gitconfig"), "[user]\n" + "\n".join(lines) + "\n")
 
 
-def replay_argv(claude, seconds, budget, turns, model, resume, sandbox=()):
+def replay_argv(claude, seconds, turns, model, resume, sandbox=()):
     argv = [shutil.which("timeout") or "timeout", "-k", "10", str(seconds)] + list(sandbox) + [
             claude, "-p",
             "--output-format", "stream-json", "--verbose", "--strict-mcp-config",
-            "--max-budget-usd", "%.2f" % budget, "--max-turns", str(turns)]
+            "--max-turns", str(turns)]
     if model:
         argv += ["--model", model]
     if resume:
@@ -2609,14 +2697,21 @@ def git_refs(top):
     return dict(l.split(" ", 1) for l in out.decode().splitlines() if " " in l) if rc == 0 else None
 
 
-def capture_diff(wt, sub, commit, tdir):
+def capture_diff(wt, sub, commit, tdir, sandbox, env):
     """The replay's change from the starting commit, as the project sees it: committed, staged,
     modified and untracked-not-ignored (`git add -A` in the throwaway clone first). Paths are
-    relative to the project directory; one outside it is dropped from `paths`."""
-    gitx_ok(wt, "add", "-A", "--", ".")
-    names = gitx_ok(wt, "diff", "--cached", "--name-only", "-z", "--no-renames", commit, "--")
-    stat = gitx_ok(wt, "diff", "--cached", "--stat=200", commit, "--")
-    rc, patch, err = gitx(wt, "diff", "--cached", "--binary", commit, "--")
+    relative to the project directory; one outside it is dropped from `paths`. Every git call
+    runs in the replay's own sandbox, without network: the replay could write the clone's
+    .git (a clean filter, a textconv, a `gitdir:` pointing at a real repository), and what
+    that config names must run where the replay did, never out here."""
+    box = list(sandbox) + ["--unshare-net"]
+    gitx_ok(wt, "add", "-A", "--", ".", sandbox=box, env=env)
+    names = gitx_ok(wt, "diff", "--cached", "--name-only", "-z", "--no-renames", commit, "--",
+                    sandbox=box, env=env)
+    stat = gitx_ok(wt, "diff", "--cached", "--no-textconv", "--no-ext-diff", "--stat=200",
+                   commit, "--", sandbox=box, env=env)
+    rc, patch, err = gitx(wt, "diff", "--cached", "--no-textconv", "--no-ext-diff", "--binary",
+                          commit, "--", sandbox=box, env=env)
     if rc != 0:
         raise ReplayError("git diff failed: %s" % one_line(err.decode("utf-8", "replace"), 300))
     with open(os.path.join(tdir, "diff.patch"), "wb") as fh:
@@ -2688,17 +2783,22 @@ def replay_task(args, claude, key, task, hidx, tdir, meta):
         sha, why = resolve_workforce(args.workforce, task)
         if why:
             raise ReplayError(why)
-        installed = install_workforce(sha, work, config, os.path.join(tdir, "install.log"))
+        installed = install_workforce(sha, work, config, os.path.join(tdir, "install.log"),
+                                      sandbox_argv(claude, work, (), config))
+        left = sorted(set(os.listdir(work)) - {"config", "src", "home"})
+        if left or os.path.lexists(wt):  # e.g. work/repo as a link the clone would follow out
+            raise ReplayUnsafe("the install left %s in %s" % (", ".join(left) or "repo", work))
         rec["workforce"] = {"spec": args.workforce or "task", "commit": None if sha == "installed"
                             else sha, "version": installed_version(config)}
         user = read_json(os.path.join(USER_CONFIG, "settings.json"), {})
         deny = replay_deny(config, args.state, top)
         settings = replay_settings(installed, user, deny)
         write_private(os.path.join(config, "settings.json"), json.dumps(settings, indent=1) + "\n")
-        if os.path.isfile(os.path.join(USER_CONFIG, "CLAUDE.md")):
-            shutil.copyfile(os.path.join(USER_CONFIG, "CLAUDE.md"), os.path.join(config, "CLAUDE.md"))
+        if os.path.isfile(os.path.join(USER_CONFIG, "CLAUDE.md")):  # never through a link
+            with open(os.path.join(USER_CONFIG, "CLAUDE.md"), encoding="utf-8") as fh:
+                write_private(os.path.join(config, "CLAUDE.md"), fh.read())
         rec["auth_expires"] = utc_stamp(copy_auth(config))
-        env, rec["env_dropped"] = replay_env(config)
+        env, rec["env_kept"] = replay_env(config)
         if gitx(top, "rev-parse", "--verify", "--quiet", commit + "^{commit}")[0] != 0:
             raise ReplayError("commit %s is not in %s" % (commit[:10], top))
         refs_before = git_refs(top)
@@ -2724,7 +2824,7 @@ def replay_task(args, claude, key, task, hidx, tdir, meta):
         sandbox_gitconfig(work)
         sandbox = sandbox_argv(claude, work, objects, config)
         replay_turns(args, claude, prompts, rec, tdir, cwd, env, meta, sandbox)
-        rec["diff"] = capture_diff(wt, sub, commit, tdir)
+        rec["diff"] = capture_diff(wt, sub, commit, tdir, sandbox, env)
         rec["exists"] = file_checks(task, cwd, wt)
     except (ReplayError, OSError, ValueError, subprocess.SubprocessError) as e:
         rec["error"], rec["exit"] = "%s" % e, "error"  # never left "ok" by the turns before it
@@ -2738,11 +2838,17 @@ def replay_task(args, claude, key, task, hidx, tdir, meta):
         with signals_held():  # a Ctrl-C now waits until the cleanup is done
             try:
                 projects = os.path.join(config, "projects")
+                config_intact(work, config, "the replay")
+                if os.path.islink(projects):
+                    raise ReplayUnsafe("the replay replaced %s with a link" % projects)
                 if os.path.isdir(projects):  # the transcripts, before the config goes
                     shutil.copytree(projects, os.path.join(tdir, "transcripts"), symlinks=True,
                                     dirs_exist_ok=True)
             except (OSError, shutil.Error) as e:
                 rec["transcript_copy_error"] = one_line(e, 300)
+            except ReplayUnsafe as e:  # recorded, not raised: this is already a finally
+                rec["transcript_copy_error"] = rec["error"] = str(e)
+                rec["exit"] = "unsafe"
             finally:
                 try:
                     shutil.rmtree(work, ignore_errors=True)
@@ -2814,14 +2920,12 @@ def replay_turns(args, claude, prompts, rec, tdir, cwd, env, meta, sandbox):
             sid = None
             rec["turns"].append({"n": n, "kind": "clear"})
             continue
-        budget = min(args.max_task_usd - rec["cost_usd"], args.max_total_usd - meta["cost_usd"])
         turns_left = args.max_turns - rec["model_turns"]
-        if budget < 0.01 or turns_left < 1:
+        if turns_left < 1:
             rec["exit"] = "cap"
-            rec["turns"].append({"n": n, "kind": kind, "skipped": "spend cap reached"
-                                 if budget < 0.01 else "turn cap reached"})
+            rec["turns"].append({"n": n, "kind": kind, "skipped": "turn cap reached"})
             break
-        argv = replay_argv(claude, args.timeout, budget, turns_left, args.model, sid, sandbox)
+        argv = replay_argv(claude, args.timeout, turns_left, args.model, sid, sandbox)
         stream = os.path.join(tdir, "turn-%d.stream.jsonl" % n)
         rc, backstop, err, init, result = run_turn(argv, prompt, cwd, env, args.timeout, stream)
         t = {"n": n, "kind": kind, "resume": sid, "exit": rc, "timed_out": backstop or rc == 124,
@@ -2832,12 +2936,12 @@ def replay_turns(args, claude, prompts, rec, tdir, cwd, env, meta, sandbox):
              "denials": [one_line("%s %s" % (d.get("tool_name"), json.dumps(d.get("tool_input"))), 240)
                          for d in (result or {}).get("permission_denials") or []],
              "error": None if result else one_line(err[-400:], 400) or "no result event"}
-        if t["cost_usd"] is None:  # killed or crashed: assume it spent everything it was allowed
-            t["cost_assumed"] = round(budget, 4)
         rec["turns"].append(t)
-        spent = t["cost_usd"] if t["cost_usd"] is not None else budget
-        rec["cost_usd"] = round(rec["cost_usd"] + spent, 4)
-        meta["cost_usd"] = round(meta["cost_usd"] + spent, 4)
+        if t["cost_usd"] is None:  # killed or crashed: no cost reported; counted, never guessed
+            rec["cost_unreported_turns"] = rec.get("cost_unreported_turns", 0) + 1
+            meta["cost_unreported_turns"] = meta.get("cost_unreported_turns", 0) + 1
+        rec["cost_usd"] = round(rec["cost_usd"] + (t["cost_usd"] or 0), 4)
+        meta["cost_usd"] = round(meta["cost_usd"] + (t["cost_usd"] or 0), 4)
         rec["model_turns"] += t["num_turns"] or 0
         if init:
             rec["model"] = rec["model"] or init.get("model")
@@ -2870,13 +2974,74 @@ def replay_line(i, n, key, task, hidx):
         (task.get("workforce") or {}).get("version") or "?")
 
 
+def ran_task(path):
+    """A task record that counts as run. An interrupted task, or one stopped before its first
+    session, is a task not run: `--resume` runs it again."""
+    rec = read_json(path, None)
+    return isinstance(rec, dict) and rec.get("exit") != "interrupted" and \
+        not (rec.get("exit") == "cap" and not rec.get("sessions"))
+
+
+def ran_count(rdir):
+    """How many of a replay run's tasks count as run, from their records (never a counter)."""
+    return sum(1 for p in glob.glob(os.path.join(glob.escape(rdir), "tasks", "*", "record.json"))
+               if ran_task(p))
+
+
+def interleave(picked):
+    """Run order: capability, regression and held-out tasks in turn, so a run that stops early
+    has some of each instead of leaving the last split (held-out) unrun."""
+    lanes = {}
+    for p in picked:
+        lanes.setdefault("heldout" if p[2] else p[1]["split"], []).append(p)
+    lanes = [lanes[k] for k in ("capability", "regression", "heldout") if k in lanes]
+    return [lane[i] for i in range(max(map(len, lanes), default=0)) for lane in lanes
+            if i < len(lane)]
+
+
+def resume_args(args):
+    """The recorded run's meta, with `args` set to its selection, workforce commit, model, turn
+    limit and timeout, or None after printing why it cannot resume."""
+    meta = read_json(os.path.join(args.state, "replay", args.resume, "replay.json"), None) \
+        if STAMP.match(args.resume) else None
+    if not isinstance(meta, dict):
+        print("loop replay: no readable replay %s in %s" % (args.resume, args.state), file=sys.stderr)
+        return None
+    if ran_count(os.path.join(args.state, "replay", args.resume)) >= meta.get("tasks", 0):
+        print("loop replay: %s already ran every task" % args.resume, file=sys.stderr)
+        return None
+    caps = meta.get("caps") or {}
+    args.bank, args.model, args.task = meta["bank"], meta.get("model"), meta.get("task_ids")
+    args.split = meta.get("split") or "all"
+    args.with_heldout = bool(meta.get("with_heldout"))
+    wf = meta.get("workforce")
+    if wf in ("task", "installed") or re.fullmatch(r"[0-9a-f]{40}([0-9a-f]{24})?", wf or ""):
+        args.workforce = None if wf == "task" else wf
+    else:  # a run from before the ref was resolved once: its records say what it ran
+        ran = {(read_json(p, {}).get("workforce") or {}).get("commit") for p in glob.glob(
+            os.path.join(glob.escape(args.state), "replay", args.resume, "tasks", "*",
+                         "record.json"))} - {None}
+        if len(ran) != 1:
+            print("loop replay: %s recorded the ref %r and its tasks ran %d commits of it; it "
+                  "cannot be finished as one run" % (args.resume, wf, len(ran)), file=sys.stderr)
+            return None
+        args.workforce = ran.pop()
+    args.max_turns, args.timeout = caps["turns"], caps["timeout"]
+    return meta
+
+
 def cmd_replay(args):
+    meta = resume_args(args) if args.resume else None
+    if args.resume and meta is None:
+        return 2
+    if not args.bank:
+        print("loop replay: --bank is required (or --resume STAMP)", file=sys.stderr)
+        return 2
     claude = args.claude or shutil.which("claude")
+    workforce_ref = args.workforce
     why = None
     if not claude:
         why = "no `claude` on PATH; pass --claude"
-    elif args.max_task_usd <= 0 or args.max_total_usd <= 0:
-        why = "--max-task-usd and --max-total-usd must be above 0"
     elif args.max_turns < 1 or args.timeout < 1:
         why = "--max-turns and --timeout must be at least 1"
     elif args.model and not MODEL_ID.match(args.model):
@@ -2893,20 +3058,33 @@ def cmd_replay(args):
         print("loop replay: %s" % e, file=sys.stderr)
         return 2
     empty = [p for p in picked if nothing_to_send(p[1])]
-    picked = [p for p in picked if not nothing_to_send(p[1])]
+    picked = interleave([p for p in picked if not nothing_to_send(p[1])])
     n_hidden = sum(1 for p in picked if p[2])
+    if meta is not None:
+        if len(picked) != meta["tasks"]:
+            print("loop replay: %s planned %d task(s); its selection now gives %d, so the bank "
+                  "changed; not resumed" % (args.resume, meta["tasks"], len(picked)), file=sys.stderr)
+            return 2
+        picked = [p for p in picked if not ran_task(os.path.join(
+            args.state, "replay", args.resume, "tasks", p[0], "record.json"))]
+        print("loop replay: resuming %s: %d of %d task(s) already have a record, %d left"
+              % (args.resume, meta["tasks"] - len(picked), meta["tasks"], len(picked)))
     print("loop replay: bank %s%s; %d task(s) (%d held out, not named), split %s, workforce %s"
           % (args.bank, "" if accepted else " (NOT ACCEPTED: scores are provisional)",
-             len(picked), n_hidden, args.split if not args.task else "--task",
+             len(picked), sum(1 for p in picked if p[2]), args.split if not args.task else "--task",
              args.workforce or "as recorded on each task"))
     if empty:  # a bank defect: the session's only human turn was a /clear
         print("  not run, nothing to send (user words only /clear): %s" % ", ".join(
             [k for k, _, h in empty if not h] + (["%d held-out" % sum(1 for p in empty if p[2])]
                                                  if any(p[2] for p in empty) else [])))
-    print("  caps: $%.2f per task, $%.2f total (at most $%.2f for this set), %d model turns per "
-          "task, %ds per claude call" % (args.max_task_usd, args.max_total_usd,
-                                         min(args.max_total_usd, args.max_task_usd * len(picked)),
-                                         args.max_turns, args.timeout))
+    if args.workforce and args.workforce != "installed" and meta is None:
+        sha, why = resolve_ref(args.workforce)  # ONCE: every task, and every resume, runs this sha
+        if why:
+            print("loop replay: --workforce %s" % why, file=sys.stderr)
+            return 2
+        args.workforce = sha
+    print("  limits: %d model turns per task, %ds per claude call (no spend limit; cost is "
+          "reported)" % (args.max_turns, args.timeout))
     if args.dry_run:
         for i, (key, task, hidx) in enumerate(picked, 1):
             line = replay_line(i, len(picked), key, task, hidx)
@@ -2916,11 +3094,11 @@ def cmd_replay(args):
             print(line)
         cfg = "<state>/replay/<stamp>/tasks/<key>/work/config"
         print("\nFirst turn (prompt on stdin; cwd the clone at the task's commit; "
-              "CLAUDE_CONFIG_DIR=%s; env drops %s):" % (cfg, ", ".join(
+              "CLAUDE_CONFIG_DIR=%s; env inherits only %s):" % (cfg, ", ".join(
                   replay_env(cfg)[1]) or "nothing"))
-        print("  " + shlex.join(replay_argv(claude, args.timeout, args.max_task_usd,
+        print("  " + shlex.join(replay_argv(claude, args.timeout,
                                             args.max_turns, args.model, None)))
-        print("Later turns add: --resume <session id>, with the budget and turns left.")
+        print("Later turns add: --resume <session id>, with the turns left.")
         print("Deny list (%d rules), e.g.: %s" % (
             len(replay_deny(cfg, args.state, "<project>")),
             ", ".join(replay_deny(cfg, args.state, "<project>")[:12])))
@@ -2928,14 +3106,22 @@ def cmd_replay(args):
         return 0
     for work in sweep_stale(args.state):
         print("  removed a stale replay left by a killed run: %s" % work)
-    stamp, out = new_run_dir(args.state, "replay")
-    meta = {"stamp": stamp, "bank": args.bank, "bank_dir": bdir, "bank_accepted": accepted,
-            "split": None if args.task else args.split, "workforce": args.workforce or "task",
-            "model": args.model, "claude": claude, "caps": {
-                "task_usd": args.max_task_usd, "total_usd": args.max_total_usd,
-                "turns": args.max_turns, "timeout": args.timeout},
-            "tasks": len(picked), "heldout": n_hidden, "done": 0, "cost_usd": 0.0,
-            "status": "running"}
+    if meta is not None:
+        stamp, out = args.resume, os.path.join(args.state, "replay", args.resume)
+        meta["resumes"] = meta.get("resumes", []) + [{"at": utc_stamp(time.time()),
+                                                      "cost_before": meta["cost_usd"]}]
+        meta["status"] = "running"
+    else:
+        stamp, out = new_run_dir(args.state, "replay")
+        meta = {"stamp": stamp, "bank": args.bank, "bank_dir": bdir, "bank_accepted": accepted,
+                "split": None if args.task else args.split, "task_ids": args.task,
+                "with_heldout": args.with_heldout, "workforce": args.workforce or "task",
+                "workforce_ref": workforce_ref,
+                "model": args.model, "claude": claude, "caps": {
+                    "turns": args.max_turns, "timeout": args.timeout},
+                "tasks": len(picked), "heldout": n_hidden, "done": 0, "cost_usd": 0.0,
+                "status": "running"}
+    args.run_stamp = stamp  # how `propose` finds the run it started
     write_private(os.path.join(out, "replay.json"), json.dumps(meta, indent=1) + "\n")
 
     def on_signal(signum, frame):
@@ -2945,13 +3131,9 @@ def cmd_replay(args):
     try:
         for i, (key, task, hidx) in enumerate(picked, 1):
             line = replay_line(i, len(picked), key, task, hidx)
-            if meta["cost_usd"] >= args.max_total_usd:
-                print(line + "  NOT RUN: total spend cap reached")
-                continue
             print(line + " ...", flush=True)
             tdir = private_dir(os.path.join(out, "tasks", key))
             rec = replay_task(args, claude, key, task, hidx, tdir, meta)
-            meta["done"] += 1
             print("      %s, $%.2f, %d model turn(s), %s path(s) changed%s%s" % (
                 rec["exit"], rec["cost_usd"], rec["model_turns"],
                 len(rec["diff"]["paths"]) if rec["diff"] else "?",
@@ -2975,9 +3157,12 @@ def cmd_replay(args):
         with signals_held():
             for s, h in old.items():
                 signal.signal(s, h)
+            meta["done"] = ran_count(out)  # counted from the records, never incremented
             write_private(os.path.join(out, "replay.json"), json.dumps(meta, indent=1) + "\n")
-    print("Replay %s: %d of %d task(s) run, $%.2f. Written: %s/  (score it: `bin/loop score %s`)"
-          % (stamp, meta["done"], len(picked), meta["cost_usd"], out, stamp))
+    print("Replay %s (%s): %d of %d task(s) run, $%.2f%s. Written: %s/  (score it: `bin/loop score %s`)"
+          % (stamp, meta["status"], meta["done"], meta["tasks"], meta["cost_usd"],
+             " (+%d turn(s) killed before reporting cost)" % meta["cost_unreported_turns"]
+             if meta.get("cost_unreported_turns") else "", out, stamp))
     return rc
 
 
@@ -3209,7 +3394,7 @@ def cmd_score(args):
                   % args.judge_model, file=sys.stderr)
             return 2
         recs.append((os.path.dirname(path), rec, task))
-    argv = judge_argv(claude, args.judge_model, args.max_budget_usd, args.timeout)
+    argv = judge_argv(claude, args.judge_model, args.timeout)
     jcwd = os.path.join(out, "judge-cwd")
     print("loop score: replay %s, bank %s%s, %d task(s) (%d held out, counted only); judge %s"
           % (args.replay, meta["bank"], "" if accepted else " (NOT ACCEPTED: provisional)",
@@ -3230,8 +3415,6 @@ def score_run(args, out, jcwd, argv, recs, meta, accepted):
         for g in task.get("graders") or []:
             if g["type"] == "script":
                 verdict, detail = script_grade(g, rec, tdir, task)
-            elif cost >= args.max_total_usd:
-                verdict, detail = "unknown", "not judged: spend cap $%.2f reached" % args.max_total_usd
             else:
                 print("  judging %s ..." % ("a held-out task" if hid else rec["key"]),
                       end="", file=sys.stderr, flush=True)
@@ -3242,8 +3425,8 @@ def score_run(args, out, jcwd, argv, recs, meta, accepted):
         row = {"split": task["split"], "verdict": task_verdict([x["result"] for x in graders],
                                                                rec.get("exit") == "ok"
                                                                and not rec.get("error"))}
-        if hid:
-            hidden_rows.append(row)  # counted, never written or printed one by one
+        if hid:  # counted on screen; kept per line of heldout.jsonl only in a file never printed
+            hidden_rows.append(dict(row, index=rec["heldout_index"]))
             continue
         row.update(task=task["id"], graders=graders, replay={
             "exit": rec.get("exit"), "error": rec.get("error"), "cost_usd": rec.get("cost_usd"),
@@ -3253,7 +3436,9 @@ def score_run(args, out, jcwd, argv, recs, meta, accepted):
     summary = {"replay": args.replay, "bank": meta["bank"], "bank_accepted": accepted,
                "judge_model": args.judge_model, "judge_cost_usd": round(cost, 4),
                "replay_cost_usd": meta.get("cost_usd"), "splits": tally(shown_rows),
-               "heldout": tally(hidden_rows)}
+               "heldout": tally(hidden_rows), "grader": {"wf_task_tag_sha256": tt_sha256()}}
+    write_private(os.path.join(out, "heldout.jsonl"),
+                  "".join(json.dumps(r, sort_keys=True) + "\n" for r in hidden_rows))
     write_private(os.path.join(out, "scores.jsonl"),
                   "".join(json.dumps(r, sort_keys=True) + "\n" for r in shown_rows))
     write_private(os.path.join(out, "summary.json"), json.dumps(summary, indent=1) + "\n")
@@ -3271,9 +3456,519 @@ def score_run(args, out, jcwd, argv, recs, meta, accepted):
     return 0
 
 
+# ---------------------------------------------------------------- propose, gate, decide, status
+
+# What no proposal may change: the loop itself (graders, gate, judge prompts) and its design
+# record, so nothing it proposes can rewrite how it is judged (the Darwin Gödel Machine deleted
+# the markers that caught it). `gated_paths` adds the state dir when it lies inside this repo.
+GATED = ("bin/loop", "plan/review-loop-*", TT_PATH)
+CATEGORY_TRAILER = "Loop-Category"
+
+
+def rgit(*argv):
+    """Decoded stdout of one git command in this repo, under `gitx`'s safe config, or None."""
+    rc, out, _ = gitx(ROOT, *argv, timeout=60)
+    return out.decode("utf-8", "replace") if rc == 0 else None
+
+
+def gated_paths(state):
+    pats = list(GATED)
+    rel = os.path.relpath(os.path.realpath(state), os.path.realpath(ROOT))
+    if rel == ".":
+        pats.append("*")
+    elif rel != ".." and not rel.startswith(".." + os.sep):
+        pats += [rel, rel + "/*"]
+    return pats
+
+
+def usable(task):
+    return task.get("replayable") and not nothing_to_send(task)
+
+
+def load_baseline(state, stamp):
+    """(score summary, {task id: score row}, {held-out index: score row} or None when the score
+    kept none, replay meta, {workforce commits its tasks ran}), or raise ReplayError. A
+    baseline is a SCORED replay: `--baseline` is the replay's stamp."""
+    if not STAMP.match(stamp or ""):
+        raise ReplayError("--baseline takes a scored replay stamp like 20261014T120000Z")
+    sdir, rdir = os.path.join(state, "score", stamp), os.path.join(state, "replay", stamp)
+    summary = read_json(os.path.join(sdir, "summary.json"), None)
+    meta = read_json(os.path.join(rdir, "replay.json"), None)
+    if not isinstance(summary, dict) or not isinstance(meta, dict):
+        raise ReplayError("no scored replay %s in %s" % (stamp, state))
+    try:
+        with open(os.path.join(sdir, "scores.jsonl"), encoding="utf-8") as fh:
+            rows = {r["task"]: r for r in (json.loads(l) for l in fh if l.strip())}
+    except (OSError, ValueError, KeyError, TypeError) as e:
+        raise ReplayError("unreadable scores.jsonl in %s (%s)" % (sdir, e))
+    held = None
+    if os.path.isfile(os.path.join(sdir, "heldout.jsonl")):
+        with open(os.path.join(sdir, "heldout.jsonl"), encoding="utf-8") as fh:
+            held = {r["index"]: r for r in (json.loads(l) for l in fh if l.strip())}
+    commits = {(read_json(p, {}).get("workforce") or {}).get("commit") for p in
+               glob.glob(os.path.join(glob.escape(rdir), "tasks", "*", "record.json"))}
+    return summary, rows, held, meta, {c for c in commits if c}
+
+
+def proposal_commits(base, sha):
+    """[{sha, subject}] of base..sha, and the `Loop-Category` trailer values they carry."""
+    log = rgit("log", "--format=%H%x1f%s%x1f%(trailers:key=" + CATEGORY_TRAILER +
+               ",valueonly,separator=%x1e)%x1d", base + ".." + sha)
+    commits, named = [], []
+    for entry in (log or "").split("\x1d"):
+        entry = entry.strip("\n")
+        if entry:
+            h, subject, trailers = (entry.split("\x1f") + ["", ""])[:3]
+            commits.append({"sha": h, "subject": subject})
+            named += [one_line(c, 120) for c in trailers.split("\x1e") if c.strip()]
+    return commits, named
+
+
+def proposal_gate(args):
+    """(refusals, plan). Mechanical, before anything is spent; each refusal is one line."""
+    sha, why = resolve_ref(args.commit)
+    if why:
+        return ["the proposal: " + why], None
+    try:
+        _, shown, hidden, accepted = load_bank(args.state, args.bank)
+        summary, before, before_held, bmeta, commits = load_baseline(args.state, args.baseline)
+    except ReplayError as e:
+        return [str(e)], None
+    no = []
+    if summary.get("bank") != args.bank:
+        no.append("the baseline %s was scored on bank %s, not --bank %s"
+                  % (args.baseline, summary.get("bank"), args.bank))
+    ran = ran_count(os.path.join(args.state, "replay", args.baseline))
+    if bmeta.get("status") != "done" or ran != bmeta.get("tasks"):
+        no.append("the baseline replay is %s, %d of %s task(s) run; finish it with `bin/loop "
+                  "replay --resume %s`, then score it" % (bmeta.get("status"), ran,
+                                                          bmeta.get("tasks"), args.baseline))
+    if (summary.get("grader") or {}).get("wf_task_tag_sha256") != tt_file_sha256():
+        no.append("the baseline was scored with another %s than the one here (or before "
+                  "scores recorded it); re-score it: `bin/loop score %s --force`"
+                  % (TT_PATH, args.baseline))
+    if bmeta.get("workforce") == "installed" or len(commits) != 1:
+        return no + ["the baseline replay ran %d workforce commits (spec %s), so nothing it "
+                     "scored is one version to compare against; replay a baseline with "
+                     "`--workforce <ref>`" % (len(commits), bmeta.get("workforce"))], None
+    base = next(iter(commits))
+    if not re.fullmatch(r"[0-9a-f]{40}([0-9a-f]{24})?", base):
+        return no + ["the baseline records %r as its workforce commit, not a sha" % base[:80]], None
+    # bin/loop and the wf-task-tag it grades with run from THIS checkout, unsandboxed: it must
+    # be the baseline commit exactly, with nothing changed or added (a proposal's bin/json.py
+    # would otherwise be one interpreter flag away from running here).
+    if rgit("rev-parse", "HEAD^{tree}") != rgit("rev-parse", base + "^{tree}"):
+        no.append("this checkout (%s) is not at the baseline's workforce commit %s; run bin/loop "
+                  "from a checkout of that commit, and write proposals in a worktree"
+                  % (ROOT, base[:10]))
+    dirty = rgit("status", "--porcelain", "--untracked-files=all")
+    if dirty is None or dirty.strip():
+        no.append("this checkout has uncommitted or untracked files (%s); bin/loop runs only "
+                  "from a clean checkout" % one_line((dirty or "git status failed").replace(
+                      "\n", "; "), 200))
+    if git(ROOT, "merge-base", "--is-ancestor", base, sha) is None:
+        return no + ["the proposal %s is not built on the baseline's workforce commit %s; "
+                     "rebase it onto that commit" % (sha[:10], base[:10])], None
+    names = rgit("diff", "--name-only", "-z", "--no-renames", base, sha, "--")
+    if names is None:
+        return no + ["git diff %s %s failed" % (base[:10], sha[:10])], None
+    paths = [p for p in names.split("\0") if p]
+    if not paths:
+        no.append("the proposal changes nothing against the baseline commit %s" % base[:10])
+    hit = [p for p in paths if any(fnmatch.fnmatchcase(p, g) for g in gated_paths(args.state))]
+    if hit:
+        no.append("the diff touches what judges it (%s); bin/loop, plan/review-loop-* and "
+                  "the state dir are out of a proposal's reach" % one_line(", ".join(hit[:5]), 300))
+    log, named = proposal_commits(base, sha)
+    named = list(dict.fromkeys(named + [one_line(c, 120) for c in args.category or []]))
+    known = sorted({(t.get("failure") or {}).get("category") for t in shown + hidden
+                    if t["split"] == "capability"} - {None})
+    unknown = [c for c in named if c not in known]
+    if unknown:
+        no.append("not a category of bank %s: %s (it has: %s)"
+                  % (args.bank, "; ".join(unknown), "; ".join(known) or "none"))
+    if not args.ablation and not named:
+        no.append("name what it fixes: a `%s: <category>` trailer in its commit message or "
+                  "--category (an ablation passes --ablation)" % CATEGORY_TRAILER)
+    held_index = {}
+    for n, t in enumerate(hidden, 1):
+        if usable(t):
+            held_index.setdefault(t["split"], []).append(n)
+    held = {k: len(v) for k, v in held_index.items()}
+    if held and before_held is None:
+        no.append("the baseline's score kept no per-task held-out rows (scored before they "
+                  "were kept); re-score it: `bin/loop score %s --force`" % args.baseline)
+    if sum(held.values()) and bmeta.get("heldout") != sum(held.values()):
+        no.append("the baseline replayed %s of the bank's %d held-out task(s); replay a "
+                  "baseline with --split all" % (bmeta.get("heldout"), sum(held.values())))
+    want = [t for t in shown if usable(t) and (
+        t["split"] == "regression" or args.ablation
+        or (t.get("failure") or {}).get("category") in named)]
+    picked = [t for t in want if t["id"] in before]
+    if not picked and not held:
+        no.append("no task to replay: none of the chosen tasks was scored in the baseline")
+    plan = {"kind": "ablation" if args.ablation else "fix", "ref": args.commit, "commit": sha,
+            "base": base, "bank": args.bank, "bank_accepted": accepted,
+            "baseline": args.baseline, "commits": log, "paths": paths, "categories": named,
+            "tasks": {"capability": [t["id"] for t in picked if t["split"] == "capability"],
+                      "regression": [t["id"] for t in picked if t["split"] == "regression"],
+                      "heldout": sum(held.values())},
+            "heldout_by_split": held, "heldout_index": held_index,
+            "not_in_baseline": [t["id"] for t in want if t["id"] not in before],
+            "replay_model": bmeta.get("model"), "caps": bmeta.get("caps") or {},
+            "baseline_cost_usd": bmeta.get("cost_usd") or 0.0, "baseline_tasks": ran,
+            "judge_model": summary.get("judge_model") or DEFAULT_JUDGE,
+            "grader": (summary.get("grader") or {}).get("wf_task_tag_sha256")}
+    return no, plan
+
+
+def print_plan(plan):
+    t = plan["tasks"]
+    print("Proposal %s (%s), %s: %d commit(s) on the baseline's workforce %s, %d path(s): %s"
+          % (plan["commit"][:10], one_line(plan["ref"], 40), plan["kind"], len(plan["commits"]),
+             plan["base"][:10], len(plan["paths"]), one_line(", ".join(plan["paths"][:8]), 400)))
+    print("  categories: %s" % ("; ".join(plan["categories"]) or
+                                ("none (an ablation replays every capability task)"
+                                 if plan["kind"] == "ablation" else "none")))
+    print("  replays %d capability (%s), %d regression, %d held-out (not named); bank %s%s, "
+          "baseline %s" % (len(t["capability"]), ", ".join(t["capability"]) or "-",
+                           len(t["regression"]), t["heldout"], plan["bank"],
+                           "" if plan["bank_accepted"] else " (NOT ACCEPTED: provisional)",
+                           plan["baseline"]))
+    if plan["not_in_baseline"]:
+        print("  not in the baseline, so not replayed: %s" % ", ".join(plan["not_in_baseline"]))
+    caps, n = plan["caps"], len(t["capability"]) + len(t["regression"]) + t["heldout"]
+    per = plan["baseline_cost_usd"] / plan["baseline_tasks"] if plan["baseline_tasks"] else 0
+    print("  as the baseline ran: model %s, %s turns, %ss per call, judge %s; the baseline cost "
+          "$%.2f a task, so about $%.2f for these %d (a measurement, not a limit)" % (
+              plan["replay_model"] or "the user's default", caps.get("turns"), caps.get("timeout"),
+              plan["judge_model"], per, per * n, n))
+
+
+def compare(plan, before, after, before_held, after_held):
+    """Before and after on the same tasks: shown tasks by id, held-out tasks by their line in
+    heldout.jsonl (rows from score's private heldout.jsonl; only counts leave this function).
+    `missing` counts planned tasks with no after-score (not run, interrupted, no record);
+    `blinded` counts tasks decided before (pass or fail) and unknown or missing after."""
+    groups = [(s, [(i, before[i]["verdict"], (after.get(i) or {}).get("verdict"))
+                   for i in plan["tasks"][s]], True) for s in ("capability", "regression")]
+    groups += [("held-out " + s, [(n, (before_held.get(n) or {}).get("verdict", "unknown"),
+                                   (after_held.get(n) or {}).get("verdict")) for n in idx], False)
+               for s, idx in sorted(plan["heldout_index"].items())]
+    out = {}
+    for name, items, shown in groups:
+        row = {"tasks": len(items), "before": dict.fromkeys(VERDICTS, 0),
+               "after": dict.fromkeys(VERDICTS, 0), "gained": 0, "lost": 0, "kept": 0,
+               "undecided": 0, "missing": 0, "blinded": 0, "moved": []}
+        for key, b, a in items:
+            row["missing"] += a is None
+            a = a or "unknown"
+            row["before"][b] += 1
+            row["after"][a] += 1
+            row["blinded"] += b != "unknown" and a == "unknown"
+            move = "undecided" if "unknown" in (b, a) else "kept" if a == b else \
+                "gained" if a == "pass" else "lost"
+            row[move] += 1
+            if shown and a != b:
+                row["moved"].append({"task": key, "before": b, "after": a})
+        out[name] = row
+    return out
+
+
+def proposal_verdict(cmp, ablation, same_grader=True):
+    """(verdict, why). An unknown is never a gain or a loss. A loss is REGRESSES; otherwise a
+    planned task with no after-score, or a regression or held-out task (any task, for an
+    ablation) that was decided before and is unknown after, is INCONCLUSIVE: what it would
+    have shown is not known, so the run cannot say IMPROVES or REMOVABLE."""
+    cap = cmp["capability"]
+    guarded = [n for n in cmp if n != "capability" or ablation]
+    lost = ["%s lost %d pass(es)" % (n, cmp[n]["lost"]) for n in guarded if cmp[n]["lost"]]
+    undecided = sum(r["undecided"] for r in cmp.values())
+    note = "; %d task(s) unknown on a side, not counted" % undecided if undecided else ""
+    if not same_grader:
+        return "INCONCLUSIVE", "before and after were graded with different %s" % TT_PATH
+    if lost:
+        return "REGRESSES", "; ".join(lost) + note
+    blind = ["%d planned task(s) have no after-score" % sum(r["missing"] for r in cmp.values())] \
+        if any(r["missing"] for r in cmp.values()) else []
+    blind += ["%s: %d decided before, unknown after" % (n, cmp[n]["blinded"])
+              for n in guarded if cmp[n]["blinded"]]
+    if blind:
+        return "INCONCLUSIVE", "; ".join(blind) + note
+    net = cap["gained"] - cap["lost"]
+    if ablation:
+        if not any(r["gained"] + r["lost"] + r["kept"] for r in cmp.values()):
+            return "NEUTRAL", "nothing was decided on both sides, so nothing says it is " \
+                              "safe to remove" + note
+        return "REMOVABLE", "no split lost a pass without it (capability %+d)%s" % (net, note)
+    if net > 0:
+        return "IMPROVES", "capability %+d (%d gained, %d lost); no regression or held-out " \
+                           "pass lost%s" % (net, cap["gained"], cap["lost"], note)
+    return "NEUTRAL", "capability %+d (%d gained, %d lost); nothing lost elsewhere%s" % (
+        net, cap["gained"], cap["lost"], note)
+
+
+def proposal_md(prop, shown):
+    fmt = lambda c: "%d / %d / %d" % (c["pass"], c["fail"], c["unknown"])
+    cmp, cost = prop["comparison"], prop["cost"]
+    out = ["# Proposal %s: %s" % (prop["stamp"], prop["verdict"]), "", md_safe(prop["reason"]), "",
+           "- Kind: %s" % ("ablation: it removes something; REMOVABLE means no split lost a "
+                           "pass without it" if prop["kind"] == "ablation" else "fix"),
+           "- Commit: `%s` (`%s`), built on the baseline's workforce `%s`"
+           % (prop["commit"], md_safe(prop["ref"], 60), prop["base"][:12]),
+           "- Bank `%s`%s; baseline score `%s`; this replay `%s`"
+           % (prop["bank"], "" if prop["bank_accepted"] else " (NOT ACCEPTED: provisional)",
+              prop["baseline"], prop["replay"]),
+           "- Same conditions as the baseline: replay model %s, judge %s"
+           % (md_safe(prop["replay_model"] or "the user's default", 60), prop["judge_model"]),
+           "", "## What changed", ""]
+    out += ["- `%s` %s" % (c["sha"][:10], md_safe(c["subject"], 200)) for c in prop["commits"]]
+    out += ["", "```", _CONTROL.sub("", prop.get("stat") or "").replace("`", "'").rstrip(), "```", "",
+            "## Why", ""]
+    if not prop["categories"]:
+        out += ["An ablation names no category: it asks whether workforce still needs what it "
+                "removes. Every capability task was replayed.", ""]
+    for cat in prop["categories"]:
+        tasks = [t for t in shown if (t.get("failure") or {}).get("category") == cat]
+        out += ["- **%s**: %d task(s) in the bank" % (md_safe(cat, 120), len(tasks))]
+        for t in tasks[:2]:
+            f, src = t["failure"], t.get("source") or {}
+            out += ["  - session `%s` %s: %s" % (src.get("session", "?")[:8],
+                                                 md_safe(src.get("title") or "", 80),
+                                                 md_safe(f.get("note") or "", 300)),
+                    "    > %s" % md_safe(f.get("evidence") or "", 300)]
+    out += ["", "## Before and after, the same tasks (pass / fail / unknown)", "",
+            "| split | tasks | before | after | gained | lost | unknown on a side | no after-score |",
+            "|---|---|---|---|---|---|---|---|"]
+    for split, r in cmp.items():
+        out.append("| %s | %d | %s | %s | %d | %d | %d | %d |" % (
+            split, r["tasks"], fmt(r["before"]), fmt(r["after"]), r["gained"], r["lost"],
+            r["undecided"], r["missing"]))
+    moved = [m for r in cmp.values() for m in r["moved"]]
+    if moved:
+        out += ["", "Moved: " + ", ".join("`%s` %s to %s" % (m["task"], m["before"], m["after"])
+                                          for m in moved)]
+    out += ["", "## Cost", "", "Replay $%.2f + judge $%.2f = $%.2f." % (
+        cost["replay_usd"], cost["judge_usd"], cost["replay_usd"] + cost["judge_usd"]), "",
+            "## Your decision", "",
+            "`bin/loop decide %s --approve` or `--reject`, with `--note \"...\"`. Approving "
+            "records it and prints the merge command; it merges and pushes nothing." % prop["stamp"]]
+    return "\n".join(out) + "\n"
+
+
+def write_proposal(pdir, prop):
+    write_private(os.path.join(pdir, "proposal.json"), json.dumps(prop, indent=1) + "\n")
+
+
+def gated(args):
+    """The plan, printed, or None after printing each refusal on its own line."""
+    no, plan = proposal_gate(args)
+    for line in no:
+        print("loop %s: REFUSED: %s" % (args.cmd, line), file=sys.stderr)
+    if no:
+        return None
+    print_plan(plan)
+    return plan
+
+
+def cmd_gate(args):
+    if not gated(args):
+        return 2
+    print("Gate passed. Nothing was replayed, scored or written.")
+    return 0
+
+
+def cmd_propose(args):
+    plan = gated(args)
+    if not plan:
+        return 2
+    plan["grader_loaded"] = tt_sha256()  # loaded now, right after the gate; score grades with it
+    if plan["grader_loaded"] != plan["grader"]:
+        print("loop propose: REFUSED: the %s loaded is not the one the baseline was scored with"
+              % TT_PATH, file=sys.stderr)
+        return 2
+    stamp, pdir = new_run_dir(args.state, "proposals")
+    prop = dict(plan, stamp=stamp, status="replaying", replay=None, verdict=None,
+                stat=rgit("diff", "--stat=100", "--no-textconv", "--no-ext-diff", plan["base"],
+                          plan["commit"], "--"))
+    write_proposal(pdir, prop)
+    t, caps = plan["tasks"], plan["caps"]
+    ns = argparse.Namespace(
+        state=args.state, projects=args.projects, bank=args.bank, claude=args.claude,
+        split="all" if t["capability"] or t["regression"] else "heldout",
+        task=(t["capability"] + t["regression"]) or None, with_heldout=bool(t["heldout"]),
+        workforce=plan["commit"], model=plan["replay_model"],
+        max_turns=caps.get("turns") or 100, timeout=caps.get("timeout") or 1800,
+        dry_run=False, run_stamp=None, resume=None)
+    rc = cmd_replay(ns)
+    prop["replay"] = ns.run_stamp
+    if rc == 0:
+        rc = cmd_score(argparse.Namespace(
+            state=args.state, projects=args.projects, replay=ns.run_stamp,
+            judge_model=plan["judge_model"], allow_same_model=False, claude=args.claude,
+            timeout=args.judge_timeout, force=False, dry_run=False))
+    if rc != 0 or not ns.run_stamp:
+        prop["status"] = "failed (exit %d); no verdict" % rc
+        write_proposal(pdir, prop)
+        print("loop propose: %s %s" % (stamp, prop["status"]), file=sys.stderr)
+        return rc or 2
+    _, before, before_held, _, _ = load_baseline(args.state, args.baseline)
+    after_sum, after, after_held, _, _ = load_baseline(args.state, ns.run_stamp)
+    shown = load_bank(args.state, args.bank)[1]
+    prop["comparison"] = compare(plan, before, after, before_held, after_held or {})
+    prop["verdict"], prop["reason"] = proposal_verdict(
+        prop["comparison"], plan["kind"] == "ablation",
+        (after_sum.get("grader") or {}).get("wf_task_tag_sha256") == plan["grader"])
+    prop["cost"] = {"replay_usd": after_sum.get("replay_cost_usd") or 0.0,
+                    "judge_usd": after_sum.get("judge_cost_usd") or 0.0}
+    prop["status"] = "open"
+    write_proposal(pdir, prop)
+    md = proposal_md(prop, shown)
+    write_private(os.path.join(pdir, "proposal.md"), md)
+    print("\n" + md + "Written: %s/{proposal.json,proposal.md}" % pdir)
+    return 0
+
+
+def write_new(path, text, append=False):
+    """Create `path` 0600 and write `text`: never through a link; with append=False, never
+    over an existing file (a decision is made once)."""
+    flags = os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW | (os.O_APPEND if append else os.O_EXCL)
+    with os.fdopen(os.open(path, flags, 0o600), "a" if append else "w", encoding="utf-8") as fh:
+        fh.write(text)
+
+
+def cmd_decide(args):
+    """Record the USER's decision on a proposal, with its lineage. Runs no git command."""
+    if not STAMP.match(args.proposal):
+        print("loop decide: takes a proposal stamp like 20261014T120000Z", file=sys.stderr)
+        return 2
+    pdir = os.path.join(args.state, "proposals", args.proposal)
+    prop = read_json(os.path.join(pdir, "proposal.json"), None)
+    why = None
+    if not isinstance(prop, dict):
+        why = "no readable proposal at %s" % pdir
+    elif not prop.get("verdict"):
+        why = "proposal %s has no verdict (%s); there is nothing to decide" % (
+            args.proposal, prop.get("status"))
+    elif os.path.lexists(os.path.join(pdir, "decision.json")):
+        why = "proposal %s is already decided (%s); a decision is recorded once" % (
+            args.proposal, prop.get("status"))
+    if why:
+        print("loop decide: " + why, file=sys.stderr)
+        return 2
+    cmp = prop["comparison"]
+    decision = {
+        "proposal": args.proposal, "decision": "approved" if args.approve else "rejected",
+        "note": args.note, "decided_at": utc_stamp(time.time()), "verdict": prop["verdict"],
+        "kind": prop["kind"], "commit": prop["commit"], "ref": prop["ref"], "base": prop["base"],
+        "bank": prop["bank"], "baseline_score": prop["baseline"], "proposal_score": prop["replay"],
+        "scores": {s: {"before": r["before"], "after": r["after"]} for s, r in cmp.items()},
+        "revert": prop["commit"]}
+    try:
+        write_new(os.path.join(pdir, "decision.json"), json.dumps(decision, indent=1) + "\n")
+    except FileExistsError:
+        print("loop decide: proposal %s is already decided" % args.proposal, file=sys.stderr)
+        return 2
+    write_new(os.path.join(private_dir(args.state), "lineage.jsonl"),
+              json.dumps(decision, sort_keys=True) + "\n", append=True)
+    prop["status"] = decision["decision"]
+    write_proposal(pdir, prop)
+    print("Recorded: proposal %s %s (%s)%s. Lineage: %s"
+          % (args.proposal, decision["decision"].upper(), prop["verdict"],
+             ": " + one_line(args.note, 200) if args.note else "",
+             os.path.join(args.state, "lineage.jsonl")))
+    if args.approve:
+        print("Nothing was merged or pushed. To apply it, in %s:\n  git merge --no-ff %s\n"
+              "or, as separate commits:\n  git cherry-pick %s..%s\nTo revert later: the "
+              "recorded commit is %s (base %s)." % (ROOT, prop["commit"], prop["base"],
+                                                     prop["commit"], prop["commit"],
+                                                     prop["base"][:12]))
+    return 0
+
+
+def newest(state, pattern):
+    """The newest `<state>/<pattern>` match's run directory, or None."""
+    runs = sorted(glob.glob(os.path.join(glob.escape(state), pattern)))
+    return os.path.dirname(runs[-1]) if runs else None
+
+
+def split_line(label, c):
+    return "    %-22s pass %d  fail %d  unknown %d  of %d%s" % (
+        label, c["pass"], c["fail"], c["unknown"], c["total"],
+        "  (%.0f%%)" % (100 * c["pass_rate"]) if c.get("pass_rate") is not None else "")
+
+
+def cmd_status(args):
+    st = args.state
+    m = latest_mine(st)
+    ms = load_mine(m)[1] if m else {}
+    print("Review loop state: %s" % st)
+    print("  last mine:      %s" % ("%s, %s sessions" % (os.path.basename(m), ms.get("sessions"))
+                                    if m else "none"))
+    t = newest(st, "categorize/*/accepted.json")
+    tax = read_json(os.path.join(t, "taxonomy.json"), {}) if t else {}
+    print("  taxonomy:       %s" % ("%s accepted, %d categories over %s coded sessions" % (
+        os.path.basename(t), len(tax.get("categories") or []), tax.get("coded"))
+                                    if t else "none accepted"))
+    b = newest(st, "bank/*/accepted.json")
+    bm = read_json(os.path.join(b, "bank.json"), {}) if b else {}
+    print("  bank:           %s" % ("%s accepted, %s" % (os.path.basename(b), "; ".join(
+        "%s %s" % (s, c.get("tasks")) for s, c in (bm.get("counts") or {}).items()))
+                                    if b else "none accepted"))
+    props = [read_json(p, {}) for p in sorted(glob.glob(os.path.join(
+        glob.escape(st), "proposals", "*", "proposal.json")))]
+    after = {p.get("replay") for p in props}
+    scored = [d for d in sorted(glob.glob(os.path.join(glob.escape(st), "score", "*",
+                                                        "summary.json")))
+              if os.path.basename(os.path.dirname(d)) not in after]
+    if scored:
+        s = read_json(scored[-1], {})
+        meta = read_json(os.path.join(st, "replay", s.get("replay", ""), "replay.json"), {})
+        print("  baseline score: %s (bank %s, workforce %s, judge %s; cost $%.2f replay + $%.2f "
+              "judge)" % (s.get("replay"), s.get("bank"), str(meta.get("workforce"))[:12],
+                          s.get("judge_model"), s.get("replay_cost_usd") or 0,
+                          s.get("judge_cost_usd") or 0))
+        for label, block in (("", s.get("splits") or {}), ("held-out ", s.get("heldout") or {})):
+            for split, c in block.items():
+                if c.get("total"):
+                    print(split_line(label + split, c))
+    else:
+        print("  baseline score: none")
+    print("  proposals:      %d (%d open)" % (len(props), sum(1 for p in props
+                                                         if p.get("status") == "open")))
+    for p in props[-10:]:
+        c = p.get("cost") or {}
+        print("    %s  %-12s %-9s %s %-24s $%.2f" % (
+            p.get("stamp"), p.get("verdict") or "-", p.get("status"), (p.get("commit") or "")[:10],
+            one_line(p.get("ref") or "", 24), (c.get("replay_usd") or 0) + (c.get("judge_usd") or 0)))
+    print("  ", end="")
+    return cmd_due(args)
+
+
+def add_propose(p):
+    p.add_argument("commit", metavar="BRANCH|COMMIT", help="the proposal: a commit of this repo")
+    p.add_argument("--bank", required=True, metavar="STAMP", help="the bank to replay")
+    p.add_argument("--baseline", required=True, metavar="REPLAY_STAMP",
+                   help="the scored replay to compare against (same bank)")
+    p.add_argument("--ablation", action="store_true",
+                   help="it REMOVES a rule, hook or handbook line: replay every capability task")
+    p.add_argument("--category", action="append", metavar="NAME",
+                   help="a category it fixes (adds to its %s trailers)" % CATEGORY_TRAILER)
+    p.add_argument("--claude", metavar="PATH", help="the claude binary (default: on PATH)")
+    p.add_argument("--judge-timeout", type=int, default=300, help="seconds per judge call")
+
+
+def add_decide(p):
+    p.add_argument("proposal", metavar="PROPOSAL_STAMP")
+    g = p.add_mutually_exclusive_group(required=True)
+    g.add_argument("--approve", action="store_true", help="the user approves it")
+    g.add_argument("--reject", action="store_true", help="the user rejects it")
+    p.add_argument("--note", help="the user's reason, recorded with the decision")
+
+
 # ---------------------------------------------------------------- dispatcher
 
-def add_judge_args(p, total_note):
+def add_judge_args(p):
     """The judge flags every judging subcommand shares; `judge_setup` checks them."""
     p.add_argument("--judge-model", default=DEFAULT_JUDGE,
                    help="judge model; never the proposer's (default %(default)s)")
@@ -3281,16 +3976,12 @@ def add_judge_args(p, total_note):
                    help="let the judge be %s, the proposer's model" % PROPOSER_MODEL)
     p.add_argument("--claude", metavar="PATH", help="the claude binary (default: on PATH)")
     p.add_argument("--timeout", type=int, default=300, help="seconds per judge call (default 300)")
-    p.add_argument("--max-budget-usd", type=float, default=1.0,
-                   help="spend cap per judge call (default 1.00)")
-    p.add_argument("--max-total-usd", type=float, default=10.0,
-                   help="spend cap for the whole run; %s (default 10.00)" % total_note)
 
 
 def add_categorize(p):
     p.add_argument("--mine", metavar="DIR", help="a mine run directory (default: the latest)")
     p.add_argument("--limit", type=int, default=30, help="worst N ranked sessions (default 30)")
-    add_judge_args(p, "coding stops there and what was coded is still clustered")
+    add_judge_args(p)
     p.add_argument("--recluster", metavar="STAMP",
                    help="redo only the clustering call of that run, from its saved notes")
     p.add_argument("--dry-run", action="store_true",
@@ -3305,26 +3996,27 @@ def add_bank(p):
                    help="regression tasks drawn from good sessions (default 10)")
     p.add_argument("--seed", type=int, help="seed for the regression sample and the held-out "
                                             "split (default: random, recorded in bank.json)")
-    add_judge_args(p, "tasks past it are rejected as not graded")
+    add_judge_args(p)
     p.add_argument("--dry-run", action="store_true",
                    help="build the tasks, print them and the judge command; call no model, write nothing")
     p.add_argument("--accept", metavar="STAMP", help="record that you reviewed that bank")
 
 
 def add_replay(p):
-    p.add_argument("--bank", required=True, metavar="STAMP", help="the bank to replay")
+    p.add_argument("--bank", metavar="STAMP", help="the bank to replay")
+    p.add_argument("--resume", metavar="REPLAY_STAMP",
+                   help="continue an interrupted run at the tasks not yet run, with its own "
+                        "selection, workforce commit, model, turn limit and timeout")
     p.add_argument("--split", choices=REPLAY_SPLITS, default="all",
                    help="which tasks (default all, held-out included and never named)")
     p.add_argument("--task", nargs="+", metavar="ID", help="only these ids from tasks.jsonl")
+    p.add_argument("--with-heldout", action="store_true",
+                   help="with --task, also every held-out task (never named)")
     p.add_argument("--workforce", metavar="REF|installed",
                    help="workforce under test: a git ref of this repo, or `installed` for a copy "
                         "of the user's install (default: the commit recorded on each task)")
     p.add_argument("--model", help="the replay's model (default: the user's settings)")
     p.add_argument("--claude", metavar="PATH", help="the claude binary (default: on PATH)")
-    p.add_argument("--max-task-usd", type=float, default=15.0,
-                   help="spend cap per task, over all its turns (default 15.00)")
-    p.add_argument("--max-total-usd", type=float, default=150.0,
-                   help="spend cap for the run; tasks past it are not run (default 150.00)")
     p.add_argument("--max-turns", type=int, default=100,
                    help="model turns per task, over all its claude calls (default 100)")
     p.add_argument("--timeout", type=int, default=1800,
@@ -3335,7 +4027,7 @@ def add_replay(p):
 
 def add_score(p):
     p.add_argument("replay", metavar="REPLAY_STAMP", help="the replay run to score")
-    add_judge_args(p, "judge graders past it are reported unknown")
+    add_judge_args(p)
     p.add_argument("--force", action="store_true", help="score a replay that was scored before")
     p.add_argument("--dry-run", action="store_true",
                    help="list the tasks and the judge command; call no model, write nothing")
@@ -3363,6 +4055,14 @@ COMMANDS = {
                add_replay, cmd_replay),
     "score": ("grade a replay: script graders mechanically, judge graders by the isolated judge",
               add_score, cmd_score),
+    "gate": ("check a proposal and list what `propose` would replay; runs and writes nothing",
+             add_propose, cmd_gate),
+    "propose": ("gate a proposal commit, replay and score it, compare with a baseline, verdict",
+                add_propose, cmd_propose),
+    "decide": ("record the user's approval or rejection of a proposal, with its lineage",
+               add_decide, cmd_decide),
+    "status": ("one screen: last mine, accepted taxonomy and bank, baseline, proposals, due",
+               lambda p: None, cmd_status),
 }
 
 

@@ -183,6 +183,51 @@ rather than do the work.** And the mock audit found a third defect neither `bin/
 could: the personal-install drift check was passing **vacuously**, which would have made a fresh test of
 this very patch run the old doctrine and look like a failure.
 
+## Running a review cycle
+
+`bin/loop` (maintainer-only, not shipped) checks workforce against real use. The design is in
+`plan/review-loop-2026-10-14.md`, and everything it writes goes to `~/.local/state/workforce-loop/`.
+Run the steps in this order. Costs are what was measured on 2026-10-14 and 2026-10-15.
+
+1. `bin/loop due`. Run a cycle when this prints DUE. It is free.
+2. `bin/loop mine --cycle`. Reads every transcript and ranks the worst sessions. Free, about 15s for 400 sessions.
+3. `bin/loop categorize`. An independent judge codes the first failure in each of the 30 worst
+   sessions and clusters them. Measured cost: $0.15 for 30.
+4. **The user reads `taxonomy.md`.** Then run `bin/loop categorize --accept <stamp>`.
+5. `bin/loop bank`. Freezes the replay tasks and holds out a quarter of them. Measured cost: $2.68 for 34 tasks.
+6. **The user reads `bank.md`.** Then run `bin/loop bank --accept <stamp>`.
+7. `bin/loop replay --bank <stamp> --split all --workforce main`, then `bin/loop score <replay stamp>`.
+   This is the baseline. `main` is resolved to one commit when the run starts. The run includes the
+   held-out split. If the run is interrupted, `bin/loop replay --resume <stamp>` runs only what is
+   left; then score it. There is no spend limit. Measured so far: $0.01 to $10.94 per replayed task,
+   and about $0.03 per task to judge.
+8. Write each fix in a worktree as a branch built on that baseline commit, with one
+   `Loop-Category: <category>` trailer for each category it addresses. `bin/loop` runs only from a
+   clean checkout of the baseline commit. Also write ablations, which are branches that only remove a rule,
+   hook or handbook line. A diff that touches `bin/loop`, `plan/review-loop-*`,
+   `workforce/bin/wf-task-tag` or the state dir is refused.
+9. Run `bin/loop gate <branch> --bank <stamp> --baseline <replay stamp> [--ablation]`. It shows what
+   would be replayed and what that cost at the baseline's rate, and runs nothing. Then run `bin/loop propose` with the
+   same arguments. That replays the proposal on the baseline's tasks and conditions, scores it, and
+   writes `proposal.md` with a verdict:
+   - IMPROVES: capability passes went up, and nothing was lost in the regression or held-out splits.
+   - NEUTRAL: nothing moved.
+   - REGRESSES: a regression or held-out pass was lost.
+   - REMOVABLE: an ablation lost no pass.
+   - INCONCLUSIVE: a task had no after-score, a guarded task went from decided to unknown, or the
+     grader changed between the two scores.
+
+   Unknowns never count either way.
+10. **The user decides:** `bin/loop decide <proposal stamp> --approve|--reject --note "..."`. The
+    decision is recorded with its lineage in `lineage.jsonl`. Approving merges nothing. It prints the
+    `git merge` command for the session to run, and the commit sha is what a revert undoes.
+
+`bin/loop status` shows the whole state on one screen.
+
+**The session that writes a fix never judges it.** Scoring is done by a judge that runs on another
+model with an empty context, and approval comes from the user. Neither the proposing session nor any agent it dispatched
+may run `decide`.
+
 ## Open, as of 2026-09-11
 
 **Landed 2026-09-11 — the five evaluators ship in the install; `update` is the whole path.**
