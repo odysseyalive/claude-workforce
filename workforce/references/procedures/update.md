@@ -147,28 +147,34 @@ locations have been looked at.
    five of them unasked is the wholesale read this record was structured to avoid. Name the command
    that shows one — `wf-changes --from <before>` without `--rows` — rather than pasting the text.
 
-   **If any row says the org must be healed, CENSUS THIS PROJECT FIRST, then say what follows from
-   it.** An org holds its own copies of handbook contracts, the chart format, the `/org` dispatch
-   checkpoint and the operating principles, and the install does not touch any of them — so a
-   heal-flagged row means updating the skill was not the whole update *for a project that has an
-   org*. Reporting a clean update over a stale org is the shape the say-the-state directive forbids.
+   **Then close with this project's own answer, by running:**
 
-   **But naming `audit` where there is nothing to heal is the same defect pointing the other way.**
-   It tells the reader their update is unfinished when it is finished, and it sends them to a
-   command that would find no employees. So the closing line is resolved from `.claude/agents/`,
-   which step 1 already has the tree for:
+   ```
+   wf-due --root <project root>
+   ```
 
-   | This project | Closing line |
+   and putting its first line in the report as written. **The release rows say what changed; they do
+   not say whether this project needs an audit.** A `yes` row is the same for every project, so it
+   cannot tell an org that already carries the change from one that does not, or a region the next
+   session start refreshes by itself from a handbook that waits for audit. `wf-due` measures that
+   here — the chart's stamp against the index, and each Core skill's state — and prints one of three
+   verdicts. Each is the closing line; do not soften or second-guess it:
+
+   | `wf-due` prints | Say |
    |---|---|
-   | has registered employees | the update is not complete here — name `audit` and the releases that need it |
-   | has none | **the update IS complete here.** Name the heal only as something other projects with an org need |
-   | is the workforce distribution itself | the update is complete. **Never name `audit`** — the Self-Exclusion Rule forbids workforce auditing itself, and `dev audit` is user-typed only |
+   | `NO AUDIT NEEDED` (exit 0) | the update is complete for this project. Nothing else to run |
+   | `AUDIT NEEDED` (exit 2) | the update reached the install, and this project also needs `/workforce audit` — name each reason it listed, in its words |
+   | `COULD NOT TELL` (exit 1) | what it could not read, from its own lines |
 
-   *Added 1.31.1: this step said "name `audit`" on any heal-flagged row with no census, so a run
-   against a repo with zero employees closed by telling the user their update was not finished and
-   to run `audit` — on the workforce repository, which the Self-Exclusion Rule forbids. The user's
-   reply was "did the update not work? and I shouldn't have to run audit on the actually workforce
-   installation itself". Both halves were right.*
+   It already answers the workforce repository itself (never audited) and a project with no org
+   (nothing to heal), so neither needs a rule here.
+
+   *Changed 1.79.1. This step used to decide from the `yes` rows and `.claude/agents/` alone. The
+   user, 2026-10-16: "when the workforce update is done, it requests the user to audit their project
+   again. I thought on the last several updates you mentioned that there was no need for an audit."
+   Both were true, because the answer was never measured per project — and four `yes` rows,
+   1.78.0 among them, flagged on nothing but a maintainer comment no org copies (`bin/gen-changes`
+   § `comment_only_change`).*
 
    **An absent index is reported, never worked around.** An install predating the change record has
    no `changes/index.md`; say that the range could not be shown and why, rather than printing two
@@ -252,7 +258,9 @@ the two.** A restated constant that nothing compares is the drift this project f
 **`update` never inspects the project's org.** It replaces the skill directory and reports the
 replacement. It does not read a handbook, walk the chart, reconcile a checksum, or evaluate
 conformance. Those belong to `verify` (detection) and `audit` (treatment), and the division is stated
-once in `verify.md` § Detection vs treatment.
+once in `verify.md` § Detection vs treatment. **`wf-due` in step 7 is not an exception**: it reads the
+chart's one stamp line and the three Core skills, a fixed cost of about a tenth of a second whatever
+the org's size, and it answers only whether an audit is due — never whether a handbook conforms.
 
 The reason is cost, and the cost is not incidental. A conformance sweep scales with the size of the
 **org**, not the size of the release, so bolting one onto `update` makes staying current expensive in
@@ -262,10 +270,10 @@ spec. An earlier version of this procedure ran `verify` as step 6 and paid that 
 It also contradicted the section above: **an update path people hesitate to run does not mitigate
 anything.** A command that is cheap to run gets run.
 
-So close by naming the next step rather than performing it:
+So close with `wf-due`'s answer rather than performing the audit:
 
-> Updated `<old>` → `<new>` at `<path>`. `<N>` release(s) in between, `<M>` of them needing an org
-> heal (`wf-changes --from <old>`). Run `/workforce verify` to check the org against this release.
+> Updated `<old>` → `<new>` at `<path>`. `<N>` release(s) in between (`wf-changes --from <old>`).
+> `<wf-due's verdict line, and its reasons when it says AUDIT NEEDED>`
 
 **Do not run `verify` for them, and do not run a "quick subset" of it.** A subset is a second copy of
 the rules, which is the drift `verify.md` § Detection vs treatment exists to prevent.

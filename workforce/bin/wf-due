@@ -1,0 +1,207 @@
+#!/usr/bin/env python3
+"""wf-due — does THIS project need `/workforce audit` after an update? One measured answer.
+
+    wf-due                 the project at $CLAUDE_PROJECT_DIR, or the working directory
+    wf-due --root <dir>    that project
+
+THE DEFECT. `update` closed by deciding "audit or not" from the release record alone: any
+release in the range flagged `Org: yes` meant "the update is not complete here — run
+audit". That flag is a property of a RELEASE, so it said the same thing to every project,
+including one whose org already carried the change, one whose only stale copy is a region
+the next session start refreshes by itself, and — before 2026-10-16 — every project at all
+for 1.78.0, which flagged on a deleted maintainer comment. The user, 2026-10-16: "when the
+workforce update is done, it requests the user to audit their project again. I thought on
+the last several updates you mentioned that there was no need for an audit." — and then:
+"if there is a necessary need for an audit, I'm good … but something might have changed."
+So the answer has to be measured per project, and has to say what changed when it is yes.
+
+WHAT IT READS, all of it already produced by a shipped script, none of it restated here:
+  - whether there is an org at all (`.claude/workforce/org-chart.md`, `.claude/agents/`)
+  - the OLDEST `workforce-version:` stamp among the handbooks workforce authored, and
+    `wf-changes`'s index for the releases since
+  - each Core skill's state from `wf-companion.evaluate`
+
+WHY THE HANDBOOK STAMPS AND NOT THE CHART'S. Audit Step 5d stamps each handbook it brings
+up to date, and that is where a `yes` release's work lands. The chart's stamp moves on
+other events and misses this one: `org index` rewrites it on every `hire`, `handbook` and
+`amend` without healing a handbook (a false "no audit"), and MEASURED 2026-10-16 on
+`odyssey-alive` an audit had stamped all 21 handbooks 1.79.0 while the chart still said
+1.76.0 (a false "audit"). The chart's stamp is used only when no authored handbook carries
+one. An adopted handbook — no ORG-RECORD, so workforce never authored it — is skipped, as
+it is everywhere else.
+
+WHAT COUNTS AS AUDIT WORK, and what does not:
+  audit    a release since the chart stamp whose change waits for audit (its index row says
+           `Org: yes`); a chart with no stamp; a Core skill ABSENT, INCOMPLETE, MIGRATE or
+           SUPPLEMENT — the states only `wf-companion --execute`, which audit runs, writes.
+  no       a DRIFTED region — `wf-heal` refreshes it at the next session start
+           (`refresh_drifted`), so nothing has to be run. UNMANAGED / NO-REGION are reported
+           states audit does not change either, so they never make the answer yes.
+
+A READ THAT FAILS IS "COULD NOT TELL", NEVER "FINE". A false "no audit" leaves an org
+stale with nothing to say so, so every unreadable input — a missing root, a Core skill
+that does not decode, an agents directory that cannot be listed — makes the answer
+unknown unless a measured reason already makes it yes.
+
+WRITES NOTHING. EXIT CODES: 0 = no audit needed · 2 = audit needed · 1 = could not tell.
+Runs on Python 3.6+, the floor the other shipped scripts hold.
+"""
+import argparse
+import importlib.machinery
+import importlib.util
+import os
+import re
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+AUDIT_STATES = ("ABSENT", "INCOMPLETE", "MIGRATE", "SUPPLEMENT")
+UNKNOWN_STATES = ("UNDECODABLE", "UNREADABLE", "UNPRODUCIBLE")
+# The ORG-RECORD line workforce writes into every handbook it authors
+# (`personnel-templates.md`), and the stamp on it (`wf-conform`'s own pattern).
+ORG_RECORD_RX = re.compile(r"<!--\s*hired:")
+STAMP_RX = re.compile(r"workforce-version:\s*([0-9.]+)")
+
+
+def _sibling(name):
+    """A sibling script, imported so its readers are shared rather than restated."""
+    sys.dont_write_bytecode = True
+    path = os.path.join(HERE, name)
+    modname = name.replace("-", "_")
+    spec = importlib.util.spec_from_loader(
+        modname, importlib.machinery.SourceFileLoader(modname, path))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def handbooks(root):
+    """The `.md` files under `.claude/agents/`, or None when the directory exists and
+    cannot be listed. An absent directory is [] — no employees, which is an answer."""
+    agents = os.path.join(root, ".claude", "agents")
+    if not os.path.lexists(agents):
+        return []
+    try:
+        return [os.path.join(agents, n) for n in sorted(os.listdir(agents))
+                if n.endswith(".md")]
+    except OSError:
+        return None
+
+
+def handbook_stamps(paths):
+    """(stamps, unstamped, unreadable) over the handbooks workforce authored."""
+    stamps, unstamped, unreadable = [], [], []
+    for p in paths:
+        try:
+            with open(p, encoding="utf-8") as fh:
+                body = fh.read()
+        except (OSError, UnicodeDecodeError):
+            unreadable.append(os.path.basename(p))
+            continue
+        if not ORG_RECORD_RX.search(body):
+            continue
+        m = STAMP_RX.search(body)
+        (stamps if m else unstamped).append(m.group(1) if m else os.path.basename(p))
+    return stamps, unstamped, unreadable
+
+
+def is_distribution(root):
+    return (os.path.isfile(os.path.join(root, "workforce", "SKILL.md"))
+            and os.path.isfile(os.path.join(root, "manifest.txt")))
+
+
+def measure(root):
+    """(verdict, reasons, notes). verdict is 'none' | 'audit' | 'unknown'."""
+    if not os.path.isdir(root):
+        return "unknown", [], [f"{root} is not a directory."]
+    if is_distribution(root):
+        return "none", [], ["This is the workforce distribution itself. It is never "
+                            "audited (Self-Exclusion Rule)."]
+    paths = handbooks(root)
+    if paths is None:
+        return "unknown", [], [".claude/agents exists and cannot be listed."]
+    chart = os.path.join(root, ".claude", "workforce", "org-chart.md")
+    if not paths and not os.path.lexists(chart):
+        return "none", [], ["No org in this project, so there is nothing for audit to "
+                            "bring up to date."]
+
+    ch = _sibling("wf-changes")
+    rows = ch.read_index()
+    inst = ch.installed_version()
+    if rows is None or not inst:
+        return "unknown", [], ["The installed release has no change index or no version "
+                               "line, so what changed cannot be read. Re-run the installer."]
+    reasons, notes, unsure = [], [], []
+    stamps, unstamped, unreadable = handbook_stamps(paths)
+    if unreadable:
+        unsure.append("These handbooks could not be read: " + ", ".join(unreadable) + ".")
+    if unstamped:
+        reasons.append("These handbooks carry no `workforce-version:` stamp, so nothing "
+                       "records which release they were brought up to: "
+                       + ", ".join(unstamped) + ".")
+    if stamps:
+        stamp = min(stamps, key=ch.vkey)
+    else:
+        stamp = ch.chart_stamp(root)
+        if not stamp and not unstamped:
+            reasons.append("Neither the handbooks nor the org chart carry a "
+                           "`workforce-version:` stamp, so nothing records which release "
+                           "last brought this org up to date."
+                           if os.path.isfile(chart) else
+                           "There is no org chart and no handbook carries a "
+                           "`workforce-version:` stamp.")
+    if not stamp:
+        pass
+    elif ch.vkey(stamp) > ch.vkey(inst):
+        return "unknown", [], [f"The org was last updated by {stamp}, newer than the "
+                               f"installed {inst}. Update workforce before anything else."]
+    else:
+        for r in reversed(rows):
+            if ch.vkey(stamp) < ch.vkey(r["version"]) <= ch.vkey(inst) and r["heal"]:
+                subj, pre = r["subject"], f"Release {r['version']}: "
+                subj = subj[len(pre):] if subj.startswith(pre) else subj
+                reasons.append(f"{r['version']} changed what this org's handbooks carry: "
+                               f"{subj}")
+
+    co = _sibling("wf-companion")
+    wf = co.wf_source_root()
+    for entry in co.CORE:
+        try:
+            state = co.evaluate(root, wf, entry)[0]
+        except Exception as exc:  # a reader failing is "could not tell", never "fine"
+            unsure.append(f"`{entry['name']}` could not be read ({exc}).")
+            continue
+        if state in UNKNOWN_STATES:
+            unsure.append(f"`{entry['name']}` could not be read ({state}).")
+        elif state in AUDIT_STATES:
+            reasons.append(f"The `{entry['name']}` skill is {state} — only audit writes it.")
+        elif state == "DRIFTED":
+            notes.append(f"`{entry['name']}` is behind the release; it refreshes itself at "
+                         "the next session start. Nothing to run.")
+    if reasons:
+        return "audit", reasons, unsure + notes
+    return ("unknown" if unsure else "none"), [], unsure + notes
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--root", default=os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd())
+    root = os.path.abspath(ap.parse_args().root)
+    verdict, reasons, notes = measure(root)
+    if verdict == "audit":
+        print(f"AUDIT NEEDED  {root}")
+        print("Something this project holds a copy of changed. Run `/workforce audit` "
+              "here to bring it up to date:")
+        for r in reasons:
+            print(f"  - {r}")
+    elif verdict == "none":
+        print(f"NO AUDIT NEEDED  {root}")
+        print("The update is complete for this project.")
+    else:
+        print(f"COULD NOT TELL  {root}")
+    for n in notes:
+        print(f"  {n}")
+    return {"none": 0, "audit": 2}.get(verdict, 1)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

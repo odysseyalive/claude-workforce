@@ -874,7 +874,9 @@ authoritative for a given craft stays the audit's judgment, never a `verify` tas
 ## Output
 
 Opens with the provenance header (§ above). Then grouped by section, each finding naming the file and
-what would go wrong. Ends with a one-line verdict and, when the org is unreachable this session, the
+what would go wrong. Ends with a one-line verdict, then the first line of `wf-due --root <project>` as
+written — the measured answer to whether this project needs `/workforce audit` (`update.md` step 7
+carries the same line, so the two commands can never give different directions) — and, when the org is unreachable this session, the
 restart notice — **whose wording is `platform.md` fact 3's, quoted from there and never composed here.** `"restart required"` is a RETRACTED claim: agents and skills register on a delay, so the notice says a restart loads them *now*, never that one is needed. It has crept back into four shipped files once already.
 
 **Every finding carries three things, and a finding missing any of them is incomplete:**

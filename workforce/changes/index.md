@@ -8,9 +8,10 @@
 
 | Version | Date | Surface | Org | Change |
 |---|---|---|---|---|
+| 1.79.1 | 2026-10-16 | verify, update, changes, scripts, installer | no | Release 1.79.1: update and verify say whether THIS project needs an audit |
 | 1.79.0 | 2026-10-16 | update, changes, hooks, scripts, installer | no | Release 1.79.0: shareable docs always get the house style; the review loop is removed |
 | 1.78.1 | 2026-10-14 | changes, scripts, installer | no | Release 1.78.1: simpler ISSUES lines, closed issues not listed |
-| 1.78.0 | 2026-10-14 | handbook, chart, principles, audit, verify, update, changes, hooks, scripts, installer, platform | **yes** | Release 1.78.0: changes are proven by demonstration, and ISSUES says what is happening |
+| 1.78.0 | 2026-10-14 | handbook, chart, principles, audit, verify, update, changes, hooks, scripts, installer, platform | no | Release 1.78.0: changes are proven by demonstration, and ISSUES says what is happening |
 | 1.77.5 | 2026-10-13 | changes, hooks, scripts, installer | no | Release 1.77.5: the turn a dispatched item finishes on can close its issue |
 | 1.77.4 | 2026-10-13 | changes, hooks, scripts, installer | no | Release 1.77.4: a cut agent is resumed, never respawned, and an issue's items can close |
 | 1.77.3 | 2026-10-13 | changes, scripts, installer | no | Release 1.77.3: an agent that stops on its own after a resume is returned, not re-marked as cut |
@@ -23,7 +24,7 @@
 | 1.74.0 | 2026-10-02 | audit, changes, scripts, installer, platform | no | Release 1.74.0: the upstream inbox's own defects, and the four it filed |
 | 1.73.0 | 2026-10-02 | update, changes, hooks, scripts, installer | no | Release 1.73.0: shared-artifact, and the hook that applies it unasked |
 | 1.72.1 | 2026-09-25 | changes, scripts, installer | no | Release 1.72.1: wf-upstream --resolve takes the id --list prints, and never closes another project's row |
-| 1.72.0 | 2026-09-25 | handbook, chart, principles, audit, verify, update, changes, hooks, scripts, installer, platform | **yes** | Release 1.72.0: a local regression corpus measures every release against a real org, and workforce's own deferred rows reach workforce through an upstream inbox |
+| 1.72.0 | 2026-09-25 | handbook, chart, principles, audit, verify, update, changes, hooks, scripts, installer, platform | no | Release 1.72.0: a local regression corpus measures every release against a real org, and workforce's own deferred rows reach workforce through an upstream inbox |
 | 1.71.1 | 2026-09-25 | audit, changes, scripts, installer | no | Release 1.71.1: a house-rules refresh no longer crashes on a tree that already has a region, and a retired copy is not re-seeded |
 | 1.71.0 | 2026-09-25 | audit, changes, scripts, installer | no | Release 1.71.0: the house rules get a producer, and catalog migration keeps what a live reader cites and nothing else |
 | 1.70.0 | 2026-09-25 | changes, scripts, installer | no | Release 1.70.0: an agent handing back with its own shell still open is sent back to close it |
@@ -58,7 +59,7 @@
 | 1.51.2 | 2026-09-11 | changes, scripts, installer | no | The citation rule the detector could not see, as a release |
 | 1.51.1 | 2026-09-11 | changes, scripts, installer | no | Cover the two commits that landed after the bump |
 | 1.51.0 | 2026-09-11 | audit, update, changes, scripts, installer | no | The corpus shipped to the install and the five skills stayed behind |
-| 1.50.0 | 2026-09-10 | handbook, chart, principles, audit, verify, update, changes, hooks, scripts, installer, platform | **yes** | The corpus moved to the install and the readers were left pointing at the copy |
+| 1.50.0 | 2026-09-10 | handbook, chart, principles, audit, verify, update, changes, hooks, scripts, installer, platform | no | The corpus moved to the install and the readers were left pointing at the copy |
 | 1.49.0 | 2026-09-10 | audit, changes, hooks, scripts, installer, platform | no | A grant naming a tool the host does not have, and a ceiling that counts the wrong unit |
 | 1.48.0 | 2026-09-10 | audit, verify, changes, scripts, installer | no | No regex reads between the lines, so a share of everything gets an outside read |
 | 1.47.1 | 2026-09-10 | changes, installer | no | The hook that forced a version number per commit is gone |
@@ -116,7 +117,7 @@
 | 1.12.0 | 2026-09-03 | audit | no | recruit-remediate carries what it cannot mechanize |
 | 1.11.0 | 2026-09-03 | chart, principles, audit | **yes** | org log: the runtime surface diagnose never had |
 | 1.10.0 | 2026-09-03 | handbook, audit | **yes** | judgment roles: a gate is calibrated against the principal, not only its catalog |
-| 1.9.0 | 2026-09-02 | audit, hooks, scripts, installer | **yes** | wf-budget-guard: a hand-built budget picker is blocked, not restated |
+| 1.9.0 | 2026-09-02 | audit, hooks, scripts, installer | no | wf-budget-guard: a hand-built budget picker is blocked, not restated |
 | 1.8.0 | 2026-09-02 | audit, scripts, platform | **yes** | model defaults: code, creative-visual, and the session advisor on claude-fable-5-1 |
 | 1.7.0 | 2026-09-02 | handbook, principles, audit, verify, scripts | **yes** | context-wiring: the reference material the ask draws on |
 | 1.6.0 | 2026-09-01 | handbook, chart, principles, audit, verify, scripts | **yes** | dispatch fidelity: the ask survives the work |

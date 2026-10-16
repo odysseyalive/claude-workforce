@@ -113,6 +113,37 @@ def copied_regions(text):
     return None if start is not None else out
 
 
+def _prose_comments(text):
+    """The lines of `text` no org copies: whole-line HTML comments outside every code
+    fence that are not region markers. Returned as the list of every OTHER line, so two
+    texts whose remainders are equal differ in uncopied comments only."""
+    kept, fenced = [], False
+    for line in text.split("\n"):
+        s = line.strip()
+        if s.startswith("```"):
+            fenced = not fenced
+        elif (not fenced and s.startswith("<!--") and s.endswith("-->")
+              and not _MARKER_RX.match(s)):
+            continue
+        kept.append(line)
+    return kept
+
+
+def comment_only_change(before, after):
+    """True when the only lines that moved are HTML comments an org never copies.
+
+    MEASURED 2026-10-16: 1.78.0 deleted one maintainer header line, `<!-- Enforcement
+    (maintainer-facing; …) -->`, from five template files and was flagged
+    `Reaches an existing org: YES` — so every update across it told the user to re-audit
+    an org that held no copy of that line. An org copies fenced templates and marker
+    regions; a whole-line comment outside a fence is a note to whoever edits the file.
+    A marker line and anything inside a fence still count, and a file created or deleted
+    still flags, because None on either side is the uncertain answer."""
+    if before is None or after is None or before == after:
+        return False
+    return _prose_comments(before) == _prose_comments(after)
+
+
 def heal_hits(paths, old_text, new_text):
     """The heal paths through which a change reaches an existing org, in HEAL_PATHS order.
 
@@ -129,6 +160,8 @@ def heal_hits(paths, old_text, new_text):
         if h not in paths:
             continue
         regions = None
+        if h not in REGIONED and comment_only_change(old_text(h), new_text(h)):
+            continue
         if h in REGIONED:
             before, after = old_text(h), new_text(h)
             if before == after:
