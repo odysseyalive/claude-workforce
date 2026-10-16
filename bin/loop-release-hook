@@ -34,7 +34,7 @@ NOT_A_RELEASE = {"check", "checks", "test", "tests", "spec", "lint", "notes", "d
 SAFE_FLAGS = {"--dry-run", "--dryrun", "--help", "--version", "--check", "--syntax-check",
               "--list-tasks", "--list-hosts", "--plan", "--noop", "--what-if"}
 FLAGS = {"--prod", "--production", "--push"}
-ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(\[[^]]*\])?\+?=")  # x=, x+=, a[1]=
 KEYWORDS = {"if", "then", "else", "elif", "fi", "do", "done", "while", "until", "!", "builtin",
             "{", "}", "coproc"}
 DATA_KEYWORDS = {"for", "select", "case", "function", "esac", "in"}
@@ -174,10 +174,12 @@ class Word(str):
     def __new__(cls, text, bare="", vars=(), literal=True):
         w = str.__new__(cls, text)
         w.bare, w.vars, w.literal = bare, tuple(vars), literal
+        w.inner = []  # substitutions inside it with no placeholder (`${u:-$(cmd)}`, `$(( ))`)
         return w
 
 
 class Op(str):
+    inner = ()  # a heredoc's: the substitutions its unquoted body runs
     """An operator or redirect; a heredoc's `<<` carries its `body`."""
     body = None
 
@@ -401,29 +403,40 @@ def lex(text, substs):
         bare.append("_" * len(chars) if quoted else chars)
         literal = literal and lit and "\x00" not in chars  # an outer substitution's placeholder
 
+    inner = []  # the current word's substitutions that have no placeholder
+
     def flush():
-        nonlocal cur, bare, vars_, literal
+        nonlocal cur, bare, vars_, literal, inner
         if cur is not None:
             toks.append(Word(cur, "".join(bare), vars_, literal))
-        cur, bare, vars_, literal = None, [], [], True
+            toks[-1].inner = inner
+        cur, bare, vars_, literal, inner = None, [], [], True, []
+
+    def unplaced(bodies):
+        """Record substitutions with no placeholder, held by the word being read."""
+        for body in bodies:
+            entry = ("cmd", body)
+            substs.append(entry)
+            inner.append(entry)
 
     def subst(kind, body):
-        substs.append((kind, body))
+        entry = (kind, body)
+        substs.append(entry)
         key = len(SUBSTS)  # unique across nested reads: a payload carries its outer placeholders
-        SUBSTS[key] = (kind, body)
+        SUBSTS[key] = entry
         add("\x00%d\x00" % key, True, False)
 
     def arith(j, quoted):
         """$((expr)): a number; every substitution inside it is a command."""
         k = closing(text, j + 2)
-        substs.extend(("cmd", body) for body in inner_substs(text[j + 3:k - 2]))
+        unplaced(inner_substs(text[j + 3:k - 2]))
         add(text[j:k], quoted, False)
         return k
 
     def var(j, quoted):
         if text.startswith("${", j):  # a parameter expansion, read to its matching brace
             end, bodies = param_end(text, j + 2, in_dq=quoted)
-            substs.extend(("cmd", body) for body in bodies)
+            unplaced(bodies)
             vars_.append(re.match(r"[#!]?([A-Za-z_][A-Za-z0-9_]*|[0-9#?@*$!-]?)",
                                   text[j + 2:]).group(1))
             add(text[j:end], quoted, False)
@@ -493,6 +506,8 @@ def lex(text, substs):
             i = k
         elif c == "(" and (cur is not None or (
                 toks and isinstance(toks[-1], Word) and toks[-1] not in KEYWORDS and
+                toks[-1] != "in" and not (len(toks) > 1 and toks[-2] in ("for", "select",
+                                                                          "foreach")) and
                 toks[-1] not in WRAPPERS and toks[-1] not in ("time", "!", "then", "do", "else",
                                                              "elif", "if", "while", "until"))):
             # mid-word, or a word of its own after the command word: a zsh glob group or
@@ -507,7 +522,7 @@ def lex(text, substs):
             array = cur is not None and re.fullmatch(r"[A-Za-z_]\w*\+?=", cur)  # `ids=(a b c)`: an array, not a glob
             if not array and re.search(r"(?:^|[^A-Za-z])e[^A-Za-z0-9\s]|(?:^|[^\w])\+\w", body):
                 raise Unreadable("a zsh glob qualifier that runs code (e or +)")
-            substs.extend(("cmd", b) for b in inner_substs(body, in_dq=False))
+            unplaced(inner_substs(body, in_dq=False))
             add(text[i:k], False)
             i = k
         elif c == "`":
@@ -542,7 +557,8 @@ def lex(text, substs):
                     lines.append(line)
                 op.body = "\n".join(lines)
                 if isinstance(delim, Word) and delim.bare == str(delim):  # unquoted: it expands
-                    substs.extend(("cmd", body) for body in inner_substs(op.body))
+                    op.inner = [("cmd", body) for body in inner_substs(op.body)]
+                    substs.extend(op.inner)
             pending = []
         elif c in " \t":
             flush()
@@ -576,22 +592,55 @@ class Seg:
     piped into it."""
     def __init__(self):
         self.assigns, self.argv, self.redirs, self.pipe_from = [], [], [], None
+        self.ctx = "plain"  # "cond": may not run (after && or ||, in a branch, loop or
+        #                     pipeline stage); "sub": runs in the background, assigns nothing here
+        self.depth = 0  # how many ( ) subshells it runs in: their assignments end at the )
 
 
 SEPARATORS = {";", "&", "&&", "||", "\n", "(", ")", ";;"}
 
 
-def segments(toks):
-    out, cur, prev_pipe = [], Seg(), False
-    i = 0
+OPENERS = {"if": 1, "while": 1, "until": 1, "fi": -1, "done": -1}
+DATA_OPENERS = {"for": 1, "select": 1, "case": 1, "foreach": 1, "esac": -1, "end": -1}
+
+
+def segments(toks, keep_data=False):
+    """The simple commands of a token list, each with its context (`Seg.ctx`): whether its
+    assignments always happen, may not happen, or stay in a subshell."""
+    out, cur, i = [], Seg(), 0
+    block, paren, braces, cond_next, last_sep = 0, 0, [], False, None
+
+    def close(seg, op):
+        nonlocal block
+        if not (seg.argv or seg.assigns or seg.redirs):
+            return
+        if seg.argv and seg.argv[0] in DATA_OPENERS:
+            block = max(0, block + DATA_OPENERS[seg.argv[0]])
+        seg.depth = paren
+        if op == "&":
+            seg.ctx = "sub"
+        elif block or seg.ctx == "cond" or seg.pipe_from is not None or op in ("|", "|&"):
+            seg.ctx = "cond"
+        out.append(seg)
+
     while i < len(toks):
         t = toks[i]
         if isinstance(t, Op) and (t in SEPARATORS or t in ("|", "|&")):
-            if cur.argv or cur.assigns or cur.redirs:
-                out.append(cur)
+            close(cur, t)
             nxt = Seg()
             if t in ("|", "|&") and out and out[-1] is cur:
                 nxt.pipe_from = cur
+            # A case pattern ends at a `)` that opens no group: after `case ... in` or `;;`.
+            pattern = t == ")" and cur.argv and (
+                cur.argv[0] == "case" or (last_sep == ";;" and cur.argv[0] != "esac"))
+            if t == "(":
+                paren += 1
+            elif t == ")" and not pattern:
+                paren = max(0, paren - 1)
+            last_sep = t
+            cond_next = t in ("&&", "||") or (cond_next and t in ("|", "|&"))
+            if cond_next:
+                nxt.ctx = "cond"
             cur = nxt
         elif isinstance(t, Op):  # a redirect: its target is the next word
             target = toks[i + 1] if i + 1 < len(toks) and isinstance(toks[i + 1], Word) else Word("")
@@ -600,13 +649,24 @@ def segments(toks):
         elif not cur.argv and ASSIGNMENT.match(t):
             cur.assigns.append(t)
         elif not cur.argv and t in KEYWORDS:
-            pass
+            if t in OPENERS:
+                block = max(0, block + OPENERS[t])
+            elif t == "{":
+                braces.append(cond_next or cur.ctx == "cond")
+                block += braces[-1]
+            elif t == "}" and braces:
+                block = max(0, block - braces.pop())
         else:
             cur.argv.append(t)
         i += 1
-    if cur.argv or cur.assigns or cur.redirs:
-        out.append(cur)
-    return [s for s in out if not (s.argv and s.argv[0] in DATA_KEYWORDS)]
+    close(cur, None)
+    for seg in out:  # `function f {` / `function f() {`: the body's first command follows
+        if seg.argv and seg.argv[0] == "function":
+            rest = seg.argv[2:]
+            while rest and rest[0] in ("{", "()"):
+                rest = rest[1:]
+            seg.argv = rest
+    return out if keep_data else [s for s in out if not (s.argv and s.argv[0] in DATA_KEYWORDS)]
 
 
 def positionals(argv, value_opts=frozenset(), past_dashdash=False):
@@ -637,93 +697,257 @@ def classify(command, cwd=None, depth=0):
         raise Unreadable("nested too deeply to read")
     substs = []
     toks = lex(command, substs)
-    segs = segments(toks)
+    segs = segments(toks, keep_data=True)
     if any("IFS" in t.vars for t in toks if isinstance(t, Word)):
         raise Unreadable("a word expands $IFS")
     # IFS set for the shell itself (an assignment alone), not for one command (`IFS= read`).
     ifs_set = any(a.startswith("IFS=") for s in segs if not s.argv for a in s.assigns)
     if depth == 0:
-        KNOWN.clear()
-    learn(segs)
+        VALUES.clear()
+        ASSIGNED.clear()
+    ASSIGNED.update(assigned_names(segments(toks, keep_data=True)))
+    # A substitution runs in a subshell, when its command runs: read at the segment whose word
+    # (or heredoc) holds it, with the values of that moment, inside `isolated`. One that no
+    # segment holds (it cannot happen on a well-formed line) is read first.
+    placed = {}
     for seg in segs:
-        if not seg.argv:
-            continue
-        if ifs_set and seg.argv[0].bare.startswith("$"):
-            raise Unreadable("IFS is set and the command word is a variable")
-        only = re.fullmatch(r"\$(\{[^}]*\}|[A-Za-z_]\w*|[@*#?$!0-9-])", seg.argv[0])
-        if only and not seg.argv[0].literal:
-            words = resolve(only.group(1).strip("{}"))
-            if words is None:  # assigned elsewhere (a function's "$@", `$(which ...)`): a limit
-                seg.argv = []
-                continue
-            why = classify(" ".join(shlex_quote(w) for w in words + list(seg.argv[1:])),
-                           cwd, depth + 1)
+        held = [list(op.inner) for op, _ in seg.redirs]
+        for w in list(seg.argv) + list(seg.assigns) + [t for _, t in seg.redirs]:
+            held.append([SUBSTS.get(int(key)) for key in PLACEHOLDER.findall(w)])
+            held.append(list(getattr(w, "inner", [])))
+        for entry in (e for es in held for e in es):
+            if any(entry is e for e in substs):
+                placed.setdefault(id(seg), []).append(entry)
+    placed_ids = {id(e) for es in placed.values() for e in es}
+    for entry in substs:
+        if id(entry) not in placed_ids:
+            why = isolated(classify, entry[1], cwd, depth + 1)
             if why:
                 return why
-            seg.argv = []
-            continue
-        m = PLACEHOLDER.fullmatch(seg.argv[0])
-        if m:  # `$(cmd) args`: read when cmd's output is literal (`$(echo npm) publish`)
-            out = producer(SUBSTS[int(m.group(1))][1])
-            if out[0] == "literal":
-                why = classify(" ".join([out[1]] + [shlex_quote(w) for w in seg.argv[1:]]),
-                               cwd, depth + 1)
-                if why:
-                    return why
-            seg.argv = []  # otherwise code from a substitution: a documented limit
-            continue
-        if re.search(r"\{[^{}]*,[^{}]*\}", seg.argv[0].bare):
-            raise Unreadable("its command word is a brace expansion")
-    for kind, body in substs:
-        why = classify(body, cwd, depth + 1)
+    saved = []  # VALUES as each enclosing ( ) subshell began: restored where it ends
+    for seg in segs:  # in execution order: a name has the value assigned before this command
+        while len(saved) < seg.depth:
+            saved.append({k: list(v) for k, v in VALUES.items()})
+        while len(saved) > seg.depth:
+            VALUES.clear()
+            VALUES.update(saved.pop())
+        for entry in placed.get(id(seg), []):
+            why = isolated(classify, entry[1], cwd, depth + 1)
+            if why:
+                return why
+        why = classify_seg(seg, cwd, depth, substs, ifs_set)
         if why:
             return why
-    for seg in segs:
-        for a in seg.assigns:  # code the shell runs later
-            if a.startswith("PROMPT_COMMAND="):
-                why = nested(a.split("=", 1)[1], cwd, depth, "PROMPT_COMMAND")
-                if why:
-                    return why
-        why = classify_argv(list(seg.argv), cwd, depth, stdin_of(seg, substs), substs)
-        if why:
-            return why
+        learn(seg)
+    if saved:
+        VALUES.clear()
+        VALUES.update(saved[0])
     return None
 
 
-KNOWN = {}  # name -> [words]: literal assignments seen on this command line
+def classify_seg(seg, cwd, depth, substs, ifs_set):
+    """Why one simple command is a release, or None, with VALUES as of this command."""
+    if seg.argv and seg.argv[0] in DATA_KEYWORDS:  # `for v in ...`, `case ... in`: no command
+        return None
+    for a in seg.assigns:  # code the shell runs later
+        if a.startswith("PROMPT_COMMAND="):
+            why = nested(a.split("=", 1)[1], cwd, depth, "PROMPT_COMMAND")
+            if why:
+                return why
+    if seg.argv:
+        if ifs_set and seg.argv[0].bare.startswith("$"):
+            raise Unreadable("IFS is set and the command word is a variable")
+        if VAR_ONLY.fullmatch(seg.argv[0]) and not seg.argv[0].literal:
+            # Each value the line may give the name is tried as the command word; when it may
+            # also hold a value from elsewhere (`$X`, a function's "$@", `W=$(which x)`), what
+            # follows is read as a command of its own (`$X git push`).
+            got = resolve_word(seg.argv[0])
+            rest = list(seg.argv[1:])
+            if len(got["alts"]) * variant_count(rest) > CAP:
+                raise Unreadable("too many possible values to read")
+            for alt in got["alts"]:  # the rest keeps its own words, so `$a $b` reads both
+                why = classify_argv([Word(x) for x in alt] + rest, cwd, depth + 1,
+                                    stdin_of(seg, substs), substs)
+                if why:
+                    return why
+            if got["unset"] or got["unknown"]:
+                why = classify_argv(list(seg.argv[1:]), cwd, depth, stdin_of(seg, substs), substs)
+                return "%s %s" % (seg.argv[0], why) if why else None
+            return None
+        m = PLACEHOLDER.fullmatch(seg.argv[0])
+        if m:  # `$(cmd) args`: read when cmd's output is literal (`$(echo npm) publish`)
+            out = producer(SUBSTS[int(m.group(1))][1])
+            if out[0] != "literal":
+                return None  # code from a substitution: a documented limit
+            rest = list(seg.argv[1:])  # keeps its own words, so `$(echo git) $b` reads $b
+            if variant_count(rest) > CAP:
+                raise Unreadable("too many possible values to read")
+            return classify_argv([Word(x) for x in out[1].split()] + rest, cwd, depth + 1,
+                                 stdin_of(seg, substs), substs)
+        if re.search(r"\{[^{}]*,[^{}]*\}", seg.argv[0].bare):
+            raise Unreadable("its command word is a brace expansion")
+    return classify_argv(list(seg.argv), cwd, depth, stdin_of(seg, substs), substs)
 
 
-def learn(segs):
-    """Record the literal assignments a command line makes: `x=...`, `a=(...)`, `set -- ...`,
-    `read a b <<< 'literal'`, so a command word that only expands one of them can be read."""
+def isolated(fn, *a):
+    """fn(*a) with VALUES restored afterwards: code that runs in a subshell or a child shell."""
+    saved = {k: list(v) for k, v in VALUES.items()}
+    try:
+        return fn(*a)
+    finally:
+        VALUES.clear()
+        VALUES.update(saved)
+
+
+VALUES = {}  # name -> the values it may hold at this point of the line: each one [words], or
+#              None (a value the guard cannot tell), or OUTSIDE (whatever it held before the line)
+OUTSIDE = "outside"
+CAP = 50  # possible values per name; past it the name is a value the guard cannot tell
+ASSIGNED = set()  # every name this command line assigns, in any form
+DECLARERS = {"export", "declare", "local", "typeset", "readonly", "integer", "float"}
+NAME = re.compile(r"[A-Za-z_]\w*")
+
+
+def assigned_names(segs):
+    """Every name the command line assigns anywhere, in any form (`x=`, `x+=`, `a[1]=`,
+    export/declare/local, `for x in`, `read x`, `set --`, mapfile, getopts, `printf -v`). A
+    `for` list's values become the variable's possible values."""
+    names = set()
     for seg in segs:
-        for a in seg.assigns if not seg.argv else []:
-            name, _, val = a.partition("=")
-            if a.literal or re.fullmatch(r"\(.*\)", val, re.S):
-                KNOWN[name] = val[1:-1].split() if val.startswith("(") and val.endswith(")") \
-                    else [val]
-        if seg.argv and seg.argv[0] == "set" and seg.argv[1:2] == ["--"] and \
-                all(w.literal for w in seg.argv):
-            KNOWN["@"] = KNOWN["*"] = [str(w) for w in seg.argv[2:]]
-            for k, w in enumerate(seg.argv[2:], 1):
-                KNOWN[str(k)] = [str(w)]
-        if seg.argv and seg.argv[0] == "read":
-            names = [w for w in seg.argv[1:] if not w.startswith("-")]
-            here = next((t for op, t in seg.redirs if op == "<<<"), None)
-            if names and here is not None and here.literal:
-                parts = str(here).split()
-                for k, nm in enumerate(names):
-                    KNOWN[nm] = [" ".join(parts[k:])] if k == len(names) - 1 else parts[k:k + 1]
+        for a in seg.assigns:
+            names.add(NAME.match(a).group(0))
+        argv = [str(w) for w in seg.argv]
+        if not argv:
+            continue
+        if argv[0] in DECLARERS:
+            names.update(NAME.match(a).group(0) for a in argv[1:] if NAME.match(a))
+        elif argv[0] in ("for", "select", "foreach") and len(argv) > 1:
+            names.add(argv[1])
+        elif argv[0] in ("read", "mapfile", "readarray", "getopts"):
+            names.update(a for a in argv[1:] if NAME.fullmatch(a))
+        elif argv[0] == "set" and "--" in argv:
+            names.update(["@", "*"] + [str(k) for k in range(1, 10)])
+        if "-v" in argv[:-1] and argv[0] == "printf":
+            names.add(argv[argv.index("-v") + 1])
+    return names
 
 
-def resolve(name):
-    """[words] a parameter expands to from KNOWN, or None when it was not assigned literally."""
-    base = re.sub(r"\[[@*]\]$", "", name)
-    return KNOWN.get(base) if base in KNOWN else None
+def possible(name, value):
+    """Add one value a name may hold (a branch or loop may set it, or may not)."""
+    alts = VALUES.get(name, [OUTSIDE]) + [value]
+    VALUES[name] = alts if len(alts) <= CAP else [None]
 
 
-def shlex_quote(word):
-    return "'" + str(word).replace("'", "'\\''") + "'"
+def give(name, values, ctx):
+    """Record the values an assignment gives a name, by the context it runs in."""
+    if ctx == "sub":
+        return
+    if ctx == "cond":
+        for v in values:
+            possible(name, v)
+    else:
+        VALUES[name] = values[:CAP] if len(values) <= CAP else [None]
+
+
+def assign(text, literal, ctx):
+    """Record one `name=value`, `name+=value` or `name[i]=value`."""
+    m = re.match(r"([A-Za-z_]\w*)(\[[^]]*\])?(\+?)=(.*)", text, re.S)
+    if not m:
+        return
+    name, index, plus, val = m.groups()
+    array = re.fullmatch(r"\((.*)\)", val, re.S)
+    if index or not (literal or array):
+        give(name, [None], ctx)
+        return
+    words = array.group(1).split() if array else [val]
+    if not plus:
+        give(name, [words], ctx)
+        return
+    new = []
+    for old in VALUES.get(name, [OUTSIDE]):
+        if old is None:
+            new.append(None)
+        elif old == OUTSIDE:  # appended to a value from outside the line: unknown
+            new.append(None)
+        elif array:
+            new.append(old + words)
+        else:  # bash appends a scalar to element 0; an empty array is ""
+            first = old[0] if old else ""
+            new.append([first + val] + old[1:])
+    give(name, new, ctx)
+
+
+def learn(seg):
+    """Record the assignments a command makes, in execution order, by its context: an
+    assignment alone, export/declare/local, `set -- ...`, `read a b <<< 'literal'`. Prefix
+    assignments (`x=1 cmd`) only reach that one command, so they are not recorded."""
+    if not seg.argv:
+        for a in seg.assigns:
+            assign(str(a), a.literal, seg.ctx)
+        return
+    argv = seg.argv
+    if argv[0] in ("for", "select") and argv[2:3] == ["in"] and seg.ctx != "sub":
+        for w in argv[3:]:  # each list value is a value the loop variable may hold
+            possible(str(argv[1]), [str(w)] if w.literal else None)
+    elif argv[0] in DECLARERS:
+        for a in argv[1:]:
+            if "=" in a and NAME.match(a):
+                assign(str(a), a.literal, seg.ctx)
+    elif argv[0] == "set" and argv[1:2] == ["--"]:
+        values = [str(w) for w in argv[2:]]
+        literal = all(w.literal for w in argv)
+        give("@", [values] if literal else [None], seg.ctx)
+        give("*", [values] if literal else [None], seg.ctx)
+        for k in range(1, 10):
+            if not literal:
+                give(str(k), [None], seg.ctx)
+            elif k <= len(values):
+                give(str(k), [[values[k - 1]]], seg.ctx)
+            else:
+                give(str(k), [[]], seg.ctx)
+    elif argv[0] == "read":
+        names = [w for w in argv[1:] if NAME.fullmatch(w)]
+        here = next((t for op, t in seg.redirs if op == "<<<"), None)
+        parts = str(here).split() if here is not None and here.literal else None
+        for k, nm in enumerate(names):
+            if parts is None:
+                give(nm, [None], seg.ctx)
+            elif k == len(names) - 1:
+                give(nm, [[" ".join(parts[k:])]], seg.ctx)
+            else:
+                give(nm, [parts[k:k + 1]], seg.ctx)
+
+
+def resolve_word(word):
+    """What a word that is only one parameter expansion may give, as {alts: [[words], ...],
+    unknown: bool, unset: bool}: the values this line may have given it (split on whitespace
+    when the word is unquoted); `unknown` when the line assigns the name in a form the guard
+    cannot value (`a[1]=`, `${a[1]}`, `x=$(cmd)`); `unset` when it may still hold a value from
+    outside the line (never assigned here, or only in a branch): a documented limit."""
+    out = {"alts": [], "unknown": False, "unset": False}
+    m = VAR_ONLY.fullmatch(str(word))
+    if not m:
+        out["unset"] = True
+        return out
+    expr = m.group(1)
+    expr = expr[1:-1] if expr.startswith("{") else expr
+    base = re.match(r"[@*#?$!0-9-]|[A-Za-z_]\w*", expr)
+    base = base.group(0) if base else expr
+    plain = expr == base or re.fullmatch(re.escape(base) + r"\[[@*]\]", expr)
+    if base not in VALUES:
+        out["unknown" if base in ASSIGNED else "unset"] = True
+        return out
+    for alt in VALUES[base]:
+        if alt is None or not plain:
+            out["unknown"] = True
+        elif alt == OUTSIDE:
+            out["unset"] = True
+        else:
+            words = list(alt)
+            if getattr(word, "bare", "$").startswith("$"):  # unquoted: split on whitespace
+                words = [x for w in words for x in w.split()]
+            out["alts"].append(words)
+    return out
 
 
 def literal_output(seg, substs):
@@ -796,7 +1020,10 @@ def nested(text, cwd, depth, what):
     only a substitution's output (`eval "$(sed ...)"`), a documented limit."""
     if PLACEHOLDER.fullmatch(str(text).strip()):
         return None
-    why = classify(str(text), cwd, depth + 1)
+    if what == "eval":  # eval runs in this shell: what it assigns stays
+        why = classify(str(text), cwd, depth + 1)
+    else:  # a child shell, a trap, an alias: its assignments do not reach this line
+        why = isolated(classify, str(text), cwd, depth + 1)
     return "%s runs %s" % (what, why) if why else None
 
 
@@ -1003,9 +1230,9 @@ def interpreter(prog, rest, cwd, depth):
 def opaque_verb(word):
     """True when a word in a release-capable tool's verb position could expand into a verb the
     guard cannot see: a substitution, a brace list, a glob, or a variable mixed with text. A
-    word that is only one variable is resolved by `verb_words` instead."""
-    if VAR_ONLY.fullmatch(str(word)):
-        return False
+    word that is only one variable is resolved by `variants` instead."""
+    if VAR_ONLY.fullmatch(str(word)):  # one parameter: unknown on this line fails closed
+        return resolve_word(word)["unknown"]
     return not getattr(word, "literal", True) or \
         bool(re.search(r"[*?\[(|#~^]|\{[^{}]*,", getattr(word, "bare", str(word))))
 
@@ -1013,19 +1240,44 @@ def opaque_verb(word):
 VAR_ONLY = re.compile(r"\$(\{[^}]*\}|[A-Za-z_]\w*|[@*#?$!0-9-])")
 
 
-def verb_words(argv):
-    """argv with a verb-position word that is only a literally-assigned variable replaced by
-    its value (`v=publish; npm $v`); an unassigned one (a function's "$@") stays: a limit."""
-    out = []
+def variant_count(argv):
+    """How many combinations `variants` would give argv."""
+    n = 1
     for w in argv:
-        m = VAR_ONLY.fullmatch(str(w))
-        words = resolve(m.group(1).strip("{}")) if m else None
-        out += [Word(x) for x in words] if words is not None else [w]
+        if VAR_ONLY.fullmatch(str(w)) and not getattr(w, "literal", True):
+            got = resolve_word(w)
+            n *= len(got["alts"]) + bool(got["unset"] or got["unknown"] or not got["alts"])
+    return n
+
+
+def variants(argv):
+    """argv once for each combination of values its words that are one parameter may hold on
+    this line (`v=publish; npm $v`); a word that may hold an outside value also stays as it
+    is (a function's "$@": a documented limit). More than CAP combinations is unreadable."""
+    out = [[]]
+    for w in argv:
+        if VAR_ONLY.fullmatch(str(w)) and not getattr(w, "literal", True):
+            got = resolve_word(w)
+            choices = [[Word(x) for x in alt] for alt in got["alts"]]
+            if got["unset"] or got["unknown"] or not choices:
+                choices.append([w])
+        else:
+            choices = [[w]]
+        out = [o + c for o in out for c in choices]
+        if len(out) > CAP:
+            raise Unreadable("too many possible values to read")
     return out
 
 
 def subcommand(prog, argv):
-    argv = verb_words(argv)
+    for v in variants(argv):
+        why = one_subcommand(prog, v)
+        if why:
+            return why
+    return None
+
+
+def one_subcommand(prog, argv):
     verbs, depth_n, value_opts = SUBCOMMANDS[prog]
     if verbs is None:
         return "%s releases" % prog
@@ -1071,10 +1323,18 @@ def task_runner(prog, argv, cwd):
 
 
 def pm(argv, cwd=None, depth=0):
+    """`one_pm` over each combination of values the line's variables may hold."""
+    for v in variants(argv):
+        why = one_pm(v, cwd, depth)
+        if why:
+            return why
+    return None
+
+
+def one_pm(argv, cwd=None, depth=0):
     """npm, pnpm, yarn, bun: their publish subcommands (and npm's abbreviations of them), a `run`
     of a release script, a script run by name (yarn/pnpm/bun) named so, and what their own
     runners (`exec`, `dlx`, `x`, `workspaces foreach`) run."""
-    argv = verb_words(argv)
     pos = positionals(argv[1:], PM_VALUE_OPTS, past_dashdash=True)
     if not pos:
         return None

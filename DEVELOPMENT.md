@@ -222,58 +222,66 @@ Run the steps in this order. Costs are what was measured on 2026-10-14 and 2026-
    - **Permissions.** The replay runs in the user's mode (auto) inside bwrap. The sandbox's private
      `/tmp` and the replay's own `work/` are allowed directories. The safety floor is that the
      sandbox holds no credentials; the guard below is a second layer, tuned so it never denies
-     ordinary work, because a wrong deny distorts what the loop measures.
-     Publishing, deploying, releasing, pushing and uploading are refused by
-     `bin/loop-release-hook`, a PreToolUse hook on Bash and Monitor that reads the command's tokens
-     the way bash and zsh do (its own lexer: comments only where `#` starts a word, line
-     continuations, `$'...'`, heredoc delimiters with quotes removed, every `$(...)`, backtick,
-     `<(...)`, `>(...)` and substitution inside `${...}` read as a command; compound commands,
-     wrappers, runners): `pnpm -r publish`,
-     `npm run release` and `scripts/deploy.sh` are denied; `pnpm test -- deploy.spec.ts`,
-     `make -C deploy test` and anything with `--dry-run` run. It fails closed: a command it cannot
-     read is denied, it denies by itself after 10 s (measured: a hook Claude Code times out lets
-     the call through, even with `|| exit 2`), and it runs as `... || exit 2`, so a crash
-     blocks. Code handed to a shell is read
+     ordinary work, because a wrong deny distorts what the loop measures. Publishing, deploying,
+     releasing, pushing and uploading are refused by `bin/loop-release-hook`, a PreToolUse hook on
+     Bash and Monitor that reads the command's tokens the way bash and zsh do (its own lexer:
+     comments only where `#` starts a word, line continuations, `$'...'`, heredoc delimiters with
+     quotes removed, every `$(...)`, backtick, `<(...)`, `>(...)` and substitution inside `${...}`
+     read as a command; compound commands, wrappers, runners): `pnpm -r publish`, `npm run release`
+     and `scripts/deploy.sh` are denied; `pnpm test -- deploy.spec.ts`, `make -C deploy test` and
+     anything with `--dry-run` run. It fails closed: a command it cannot read is denied, it denies
+     by itself after 10 s (measured: a hook Claude Code times out lets the call through, even with
+     `|| exit 2`), and it runs as `... || exit 2`, so a crash blocks. Code handed to a shell is read
      when it is literal (`trap '...'`, `PROMPT_COMMAND=...`, `bash <<EOF`, `bash <<< '...'`,
-     `printf/echo/cat <literal> | bash`, `source <(echo ...)`, `$(echo npm) publish`), and
-     every substitution in an unquoted heredoc body, a `${...}` operand, an arithmetic
-     expansion or a zsh glob group is read as a command. Denied as unreadable: a brace-list
-     command word, any `$IFS` expansion, a variable command word after a standalone `IFS=`, a
-     zsh `e`/`+` glob qualifier, and a release tool's verb that expands
-     through a substitution, brace list or glob (`npm pu$()blish`, `npm {publish,}`,
-     `npm publ*`, `npm publ(i|x)sh`). A command word or verb that is only a variable is read
-     through literal assignments on the same command line (`x=npm; $x publish`,
-     `set -- npm publish; "$@"`, `a=(...)`, `read x <<< '...'`). Any program not known to be
-     safe is read for a release tool and its verb among its arguments (`ltrace npm publish`,
-     `op run -- npm publish`), and for a command line given to an option or to a known
-     command runner (`nodemon --exec '...'`, `concurrently '...'`, `su -c '...'`). NOT READ, a documented limit (operator,
-     2026-10-15), since none of it releases in the transcripts and the sandbox has no
-     credentials: code an interpreter runs (`python -c`, `node -e`, `perl -e`, awk's
-     `system()`, `sed .../e`, `make -f /dev/stdin`), a variable assigned elsewhere used as the
-     command word or verb (a function's `"$@"`, `$(which ...)`), a quoted command passed as
-     a plain argument to an unknown program (data, like a work order's check string), code
-     read from a file or a command's
-     output (`eval "$(sed ...)"`, `bash -c "$(sed ...)"`, `source <(sed ...)`,
-     `sed ... | bash`, `bash < file`), and a script file run by name (`bash x.sh` is judged
-     by its name only). The hook and the deny list reach the replay through a
-     flag settings file in one read-only mount at `/run/loop` (it cannot be moved or written
-     in the sandbox), run by the system python's absolute path, with PATH, LD_PRELOAD,
-     LD_LIBRARY_PATH, BASH_ENV and ENV pinned there to the rig's own values (PATH is the one
-     replays always ran with). That file (`--settings`, outside `work/`) outranks the user settings
-     the replay can write, so a replay that rewrites its user settings, as workforce's own heal
-     and `audit` do, keeps the guard), and the rig hashes the guard's files after every call: a
-     change to them stops the run as unsafe. The other denies (curl, `git stash`, `git tag`,
-     `git worktree`, `claude`, ...) stay glob rules, and the hook applies them to Monitor too.
-     Check both with `bin/loop deny-check` (free: the glob list and the hook itself, run in a
-     scratch project) or `bin/loop deny-check --live` (a real `claude -p` in a replay's sandbox
-     and settings, about 25 minutes), against `fixtures/loop/deny-commands.txt`, where a
-     `monitor: ` prefix sends a case to Monitor. **Before shipping a guard change, run `bin/loop guard-corpus`:** it runs the guard over every
-     real Bash and Monitor command in `~/.claude/projects` (subagents included; nothing is
-     written to disk) and prints the denies by reason. The known-intended ones (a real
-     release, a push, `gh`, a command zsh cannot parse either) are listed in
-     `fixtures/loop/guard-corpus-expected.txt`; the target is "0 unexpected", since a wrong
-     deny distorts what the loop measures. `bin/loop denials <replay stamp>` classifies every denial
-     of a run by cause.
+     `printf/echo/cat <literal> | bash`, `source <(echo ...)`, `$(echo npm) publish`), and every
+     substitution in an unquoted heredoc body, a `${...}` operand, an arithmetic expansion or a zsh
+     glob group is read as a command. Denied as unreadable: a brace-list command word, any `$IFS`
+     expansion, a variable command word after a standalone `IFS=`, a zsh `e`/`+` glob qualifier, and
+     a release tool's verb that expands through a substitution, brace list or glob (`npm
+     pu$()blish`, `npm {publish,}`, `npm publ*`, `npm publ(i|x)sh`). A command word or verb that is
+     only a variable is read through the values the same command line gives it, in execution order
+     (`v=push; git $v; v=status` is a push): plain assignments, `a=(...)`, `+=`,
+     export/declare/local, `set -- ...` and `read x <<< '...'`. An assignment that may not run
+     (after `&&` or `||`, in a branch, a loop or a pipeline stage) adds a possible value instead of
+     replacing the value, and every possible value is read (`v=push; false && v=status; git $v` is a
+     push); a `for` list's words become possible values where the loop is reached. A `( )`
+     subshell's assignments end at its `)` (a case pattern's `)` closes none), and every
+     substitution (a `$(...)`, backtick or `<(...)` body, and one inside a `${...}` operand, an
+     arithmetic expansion or an unquoted heredoc body) is read when its command runs, with the
+     values of that moment, its own assignments staying inside it. A verb the line assigns in a form
+     the guard cannot value (`a[1]=`, `${a[1]}`, `x=$(cmd)`) fails closed; a command word like that
+     is tried with each value the line may give it, and what follows a command word that may hold a
+     value the guard cannot tell (one from outside the line, or `x=$(cmd)`) is read as a command of
+     its own (`$X git push`). A name with more than 50 possible values, or one command with more
+     than 50 combinations of them, cannot be read. Any program not known to be safe is read for a
+     release tool and its verb among its arguments (`ltrace npm publish`, `op run -- npm publish`),
+     and for a command line given to an option or to a known command runner (`nodemon --exec '...'`,
+     `concurrently '...'`, `su -c '...'`). NOT READ, a documented limit (operator, 2026-10-15),
+     since none of it releases in the transcripts and the sandbox has no credentials: code an
+     interpreter runs (`python -c`, `node -e`, `perl -e`, awk's `system()`, `sed .../e`, `make -f
+     /dev/stdin`), a variable assigned elsewhere used as the command word or verb (a function's
+     `"$@"`, `$(which ...)`), a quoted command passed as a plain argument to an unknown program
+     (data, like a work order's check string), code read from a file or a command's output (`eval
+     "$(sed ...)"`, `bash -c "$(sed ...)"`, `source <(sed ...)`, `sed ... | bash`, `bash < file`),
+     and a script file run by name (`bash x.sh` is judged by its name only). The hook and the deny
+     list reach the replay through a flag settings file in one read-only mount at `/run/loop` (it
+     cannot be moved or written in the sandbox), run by the system python's absolute path, with
+     PATH, LD_PRELOAD, LD_LIBRARY_PATH, BASH_ENV and ENV pinned there to the rig's own values (PATH
+     is the one replays always ran with). That file (`--settings`, outside `work/`) outranks the
+     user settings the replay can write, so a replay that rewrites its user settings, as workforce's
+     own heal and `audit` do, keeps the guard; the rig hashes the guard's files after every call: a
+     change to them stops the run as unsafe. The other denies (curl, `git stash`, `git tag`, `git
+     worktree`, `claude`, ...) stay glob rules, and the hook applies them to Monitor too. Check both
+     with `bin/loop deny-check` (free: the glob list and the hook itself, run in a scratch project)
+     or `bin/loop deny-check --live` (a real `claude -p` in a replay's sandbox and settings, about
+     25 minutes), against `fixtures/loop/deny-commands.txt`, where a `monitor: ` prefix sends a case
+     to Monitor. **Before shipping a guard change, run `bin/loop guard-corpus`:** it runs the guard
+     over every real Bash and Monitor command in `~/.claude/projects` (subagents included; nothing
+     is written to disk) and prints the denies by reason. The known-intended ones (a real release, a
+     push, `gh`, a command zsh cannot parse either) are listed in
+     `fixtures/loop/guard-corpus-expected.txt`; the target is "0 unexpected", since a wrong deny
+     distorts what the loop measures. `bin/loop denials <replay stamp>` classifies every denial of a
+     run by cause.
    - **The judge** sees the user words, the final reply, the diff stat, the diff itself (bounded,
      with every cut stated) and the session's tool calls with their exit status. It may answer `env`
      when the session was blocked by something the replay lacks by construction and handled that

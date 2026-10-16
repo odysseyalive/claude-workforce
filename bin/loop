@@ -3788,8 +3788,8 @@ def cmd_guard_corpus(args):
             why = "it cannot read this command: %s" % e
             if zsh_rejects(cmd):  # the Bash tool's shell cannot parse it either: it never ran
                 why += " (zsh rejects it too)"
-        except RecursionError:
-            why = "it could not read this command (RecursionError)"
+        except Exception as e:  # a failure on one command is reported, never the whole run
+            why = "the guard failed on this command (%s: %s)" % (e.__class__.__name__, e)
         if not why:
             continue
         ok = any((k == "reason" and v.search(why)) or (k == "command" and v == cmd) for k, v in expected)

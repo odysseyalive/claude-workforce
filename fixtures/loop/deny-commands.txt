@@ -278,6 +278,82 @@ allow time (ls)
 allow ls agenda | xargs -I{} sh -c 'echo {}'
 allow git commit --dry-run -m "notes: run npm publish later"
 allow git log -1 --format=%x1e%H
+# Same-line variables in execution order, line-assigned names the guard can't value,
+# case/for syntax, unset command words, function bodies (review of 47d46b1, 2026-10-16).
+# `git $V origin` and kin stay allowed by the guard: V is not assigned on the line (documented
+# limit). `gh $V` is still denied, by the glob list, which refuses gh outright.
+deny $X git push
+deny "$CMD" git push origin main
+deny $UNSET npm publish
+allow git $V origin
+allow npm $V
+deny gh $V
+allow pnpm run $S
+deny v=push; git $v; v=status
+deny for v in push; do git $v; done
+deny export v=push; git $v
+deny declare v=push; git $v
+deny local v=push; git $v
+deny v+=push; git $v
+deny a=(status push); git ${a[1]}
+deny c="git push"; $c
+deny c="npm publish"; $c
+deny coproc git push
+deny case x in (x) git push;; esac
+deny for x (a) git push
+deny foreach x (a) git push; end
+deny f() { git push; }; f
+deny f() (git push); f
+deny function f { git push; }; f
+deny f() git push
+allow for p in /usr/bin/python3; do $p -V; done
+allow W=$(command -v ls); $W -la
+allow v=status; git $v
+allow v=push; v=status; git $v
+allow c="git status"; $c
+allow export v=status; git $v
+# A branch or loop may assign or not: its values are added, not substituted. A subshell's
+# assignments end at its ), a substitution's stay inside it (review of guardfix, 2026-10-16).
+deny v=push; false && v=status; git $v
+deny v=status; true && v=push; git $v
+deny v=status; if true; then v=push; fi; git $v
+deny v=status; for i in 1; do v=push; done; git $v
+deny v=status; echo x | v=push; git $v
+allow v=status; false && v=log; git $v
+deny a=(); a+=push; git $a
+allow a=(); a+=status; git $a
+deny (v=push; git $v)
+allow v=status; (v=push); git $v
+allow v=status; x=$(v=push); git $v
+deny x=$(v=push; git $v)
+deny PROMPT_COMMAND='npm publish' $X
+allow PROMPT_COMMAND='date' $X
+# Second review of guardfix (2026-10-16): the rest of a variable command word keeps its own
+# words, `for` values arrive in execution order, a case pattern's ) closes no subshell, and a
+# substitution is read when its command runs.
+deny a=git; b=push; $a $b
+allow a=git; b=status; $a $b
+deny v=status; for v in push; do git $v; done
+allow for v in status; do git $v; done
+deny v=push; (case x in a) v=status;; esac; v=status); git $v
+allow v=status; (case x in a) v=push;; esac; v=push); git $v
+allow v=status; x=$(git $v)
+deny v=push; x=$(git $v)
+deny foreach v (push) git $v; end
+# Third review of guardfix (2026-10-16): a substituted command word keeps the rest's own
+# words; parenthesised case patterns; a substitution inside a ${...} operand, an arithmetic
+# expansion or an unquoted heredoc body is read when its command runs.
+deny b=push; $(echo git) $b
+allow b=status; $(echo git) $b
+deny v=push; case x in (x) v=status;; esac; git $v
+allow v=status; case x in (x) true;; esac; git $v
+deny v=push; (case x in (a) v=status;; esac; v=status); git $v
+allow v=status; x=${u:-$(git $v)}
+deny v=push; x=${u:-$(git $v)}
+allow v=status; echo $(( $(git $v | wc -l) ))
+deny v=push; echo $(( $(git $v | wc -l) ))
+allow v=status; cat <<EOF⏎$(git $v)⏎EOF
+deny v=push; cat <<EOF⏎$(git $v)⏎EOF
 # The guard fails closed: a crash of the hook and a hook past its deadline both deny.
 deny echo LOOP_GUARD_SELFTEST_CRASH
 deny echo LOOP_GUARD_SELFTEST_HANG
