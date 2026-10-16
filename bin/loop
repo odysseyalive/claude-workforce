@@ -3406,6 +3406,30 @@ def same_rig(summary):
     return None
 
 
+def keep_attempt(tdir):
+    """Before a task is run again (`--resume` re-runs one a killed run left unfinished), keep its
+    earlier record as `record.<n>.json`, so that attempt's cost still counts."""
+    old = os.path.join(tdir, "record.json")
+    if os.path.isfile(old) and not os.path.islink(old):
+        n = 1
+        while os.path.lexists(os.path.join(tdir, "record.%d.json" % n)):
+            n += 1
+        os.rename(old, os.path.join(tdir, "record.%d.json" % n))
+
+
+def run_cost(rdir):
+    """(the cost every task record of a replay run reports, the calls that were killed before
+    reporting all of theirs), summed over the records on disk, earlier attempts' included
+    (`record.<n>.json`, kept by `keep_attempt`), so a run that was killed and finished with
+    `--resume` counts every task and every attempt, not just what the last run ran."""
+    known, unreported = 0.0, 0
+    for path in glob.glob(os.path.join(glob.escape(rdir), "tasks", "*", "record*.json")):
+        rec = read_json(path, {})
+        known += rec.get("cost_usd") or 0
+        unreported += rec.get("cost_unreported_turns") or 0
+    return round(known, 4), unreported
+
+
 def cost_text(known, unreported):
     """`$1.23`, or `$1.23 + unknown (2 call(s) killed before reporting all their cost)`: a
     killed call's cost is not in its stream, and is never shown as 0."""
@@ -3592,6 +3616,7 @@ def cmd_replay(args):
             line = replay_line(i, len(picked), key, task, hidx)
             print(line + " ...", flush=True)
             tdir = private_dir(os.path.join(out, "tasks", key))
+            keep_attempt(tdir)
             rec = replay_task(args, claude, key, task, hidx, tdir, meta)
             print("      %s, %s, %d model turn(s)%s, %s path(s) changed%s%s" % (
                 rec["exit"], cost_text(rec["cost_usd"], rec.get("cost_unreported_turns")),
@@ -3618,6 +3643,9 @@ def cmd_replay(args):
             for s, h in old.items():
                 signal.signal(s, h)
             meta["done"] = ran_count(out)  # counted from the records, never incremented
+            # The run's cost is every task record's, whichever run wrote it: a run that was
+            # killed never saved its total, and `--resume` starts from what was saved.
+            meta["cost_usd"], meta["cost_unreported_turns"] = run_cost(out)
             write_private(os.path.join(out, "replay.json"), json.dumps(meta, indent=1) + "\n")
     print("Replay %s (%s): %d of %d task(s) run, %s. Written: %s/  (score it: `bin/loop score %s`)"
           % (stamp, meta["status"], meta["done"], meta["tasks"],
@@ -4500,9 +4528,11 @@ def score_run(args, out, jcwd, argv, recs, meta, accepted):
             "model_turns": rec.get("model_turns"), "model": rec.get("model"),
             "workforce": rec.get("workforce")})
         shown_rows.append(row)
+    replay_cost, unreported = run_cost(os.path.join(args.state, "replay", args.replay))
     summary = {"replay": args.replay, "bank": meta["bank"], "bank_accepted": accepted,
                "judge_model": args.judge_model, "judge_cost_usd": round(cost, 4),
-               "replay_cost_usd": meta.get("cost_usd"), "splits": tally(shown_rows),
+               "replay_cost_usd": replay_cost, "replay_cost_unreported_calls": unreported,
+               "splits": tally(shown_rows),
                "heldout": tally(hidden_rows), "grader": {"wf_task_tag_sha256": tt_sha256()},
                "replay_format": meta.get("format"), "scoring_sha256": scoring_sha256()}
     write_private(os.path.join(out, "heldout.jsonl"),
@@ -4526,6 +4556,7 @@ def score_run(args, out, jcwd, argv, recs, meta, accepted):
     for r in shown_rows:
         for why in r.get("env") or []:
             print("    env %s: %s" % (r["task"], one_line(why, 300)))
+    print("  replay cost, from every task record: %s" % cost_text(replay_cost, unreported))
     print("Scored %s: judge %s, $%.2f. Written: %s/{scores.jsonl,summary.json}"
           % (args.replay, args.judge_model, cost, out))
     return 0
@@ -4614,6 +4645,7 @@ def proposal_gate(args):
         no.append("the baseline %s was scored on bank %s, not --bank %s"
                   % (args.baseline, summary.get("bank"), args.bank))
     ran = ran_count(os.path.join(args.state, "replay", args.baseline))
+    bcost, bunreported = run_cost(os.path.join(args.state, "replay", args.baseline))
     if bmeta.get("status") != "done" or ran != bmeta.get("tasks"):
         no.append("the baseline replay is %s, %d of %s task(s) run; finish it with `bin/loop "
                   "replay --resume %s`, then score it" % (bmeta.get("status"), ran,
@@ -4691,8 +4723,8 @@ def proposal_gate(args):
             "heldout_by_split": held, "heldout_index": held_index,
             "not_in_baseline": [t["id"] for t in want if t["id"] not in before],
             "replay_model": bmeta.get("model"), "caps": bmeta.get("caps") or {},
-            "baseline_cost_usd": bmeta.get("cost_usd") or 0.0, "baseline_tasks": ran,
-            "baseline_cost_unreported": bmeta.get("cost_unreported_turns") or 0,
+            "baseline_cost_usd": bcost, "baseline_tasks": ran,
+            "baseline_cost_unreported": bunreported,
             "judge_model": summary.get("judge_model") or DEFAULT_JUDGE,
             "baseline_rig": same_rig(summary),
             "grader": (summary.get("grader") or {}).get("wf_task_tag_sha256")}

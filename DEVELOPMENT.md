@@ -204,7 +204,9 @@ Run the steps in this order. Costs are what was measured on 2026-10-14 and 2026-
 7. `bin/loop replay --bank <stamp> --split all --workforce main`, then `bin/loop score <replay stamp>`.
    This is the baseline. `main` is resolved to one commit when the run starts. The run includes the
    held-out split. If the run is interrupted, `bin/loop replay --resume <stamp>` runs only what is
-   left; then score it. There is no spend limit. Measured so far: $0.01 to $10.94 per replayed task,
+   left; then score it. A run's cost is the sum of every task record, an earlier attempt's
+   included (a task `--resume` runs again keeps its first record as `record.<n>.json`). There is no
+   spend limit. Measured so far: $0.01 to $10.94 per replayed task,
    and about $0.03 per task to judge.
    - **Budget.** Each `claude` call gets `--timeout` seconds (1800). A call the limit stops
      mid-work is resumed in the same session, up to `--max-resumes` times per task (3, so about
