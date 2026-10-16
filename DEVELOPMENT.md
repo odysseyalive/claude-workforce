@@ -201,6 +201,18 @@ Run the steps in this order. Costs are what was measured on 2026-10-14 and 2026-
    graders and held-out split. Each task's commit is looked up again from the project's HEAD
    reflog at the opening turn. A commit moves only when the reflog reaches back that far;
    otherwise it is listed as kept. Held-out tasks are counted, never shown.
+   To correct a bank's script graders, run `bin/loop bank --revise <stamp> --revisions <file>`
+   (example: `fixtures/loop/bank-revisions-20261016.json`). Each revision names a task (or `*`),
+   a grader, optionally its arg, and either `set_arg` or `remove`, with a reason. A revision that
+   matches no grader is refused, and so is one that leaves a task with no grader. It writes a new,
+   unaccepted stamp; `bank.json` keeps every old→new change and the history of earlier
+   revisions. No model is called. **The user reads the new `bank.md` and runs `bin/loop bank
+   --accept <stamp>`** before a baseline is scored on it. Then `bin/loop score <replay stamp>
+   --bank <new stamp> --force` re-grades a replay against it. It reuses an old judge answer only
+   when the full rendered judge prompt and the task the judge sees (everything but its graders)
+   hash the same in both banks, and the same goes for held-out rows. A changed reference outcome
+   is asked again. A grader-only revision therefore costs $0. `--force` moves the old score to
+   `superseded-<stamp>/`, and `--dry-run` shows each task's old and new verdict and writes nothing.
 7. `bin/loop replay --bank <stamp> --split all --workforce main`, then `bin/loop score <replay stamp>`.
    This is the baseline. `main` is resolved to one commit when the run starts. The run includes the
    held-out split. If the run is interrupted, `bin/loop replay --resume <stamp>` runs only what is
@@ -236,6 +248,26 @@ Run the steps in this order. Costs are what was measured on 2026-10-14 and 2026-
    included (a task `--resume` runs again keeps its first record as `record.<n>.json`). There is no
    spend limit. Measured so far: $0.01 to $10.94 per replayed task,
    and about $0.03 per task to judge.
+   - **Repeats.** `--repeats N` (on `replay` and `propose`) runs each task N times, as
+     `<key>@2` … `<key>@N`, after one complete first pass. A task counts by its majority verdict:
+     the one more than N/2 of the N planned repeats reached. A task its repeats split on is
+     unknown, and so is one with too few: a repeat with no score is an unknown vote, and the task
+     is flagged UNDER-SAMPLED. The share of baseline tasks whose repeats disagree is printed
+     beside every verdict as its noise ("not measured" when each task ran once). Cost scales by N:
+     measured, the 20261016T060550Z baseline was $27.48 once, so about $82 at N=3. P1's and P3's
+     proposal replays were $36.91 and $47.87, so about $111 and $144 at N=3.
+   - **Self-repo tasks.** A task whose project is this repository (its commit is one of ours)
+     installs the task commit's own `workforce/` tree, never a later one. An install from the
+     code's future hands the agent the answer: cap-97ab04ca read "wf-model-lanes ... arrives in
+     1.78.0" off one. A proposal's replay installs that same tree with the proposal's
+     `workforce/` diff (base..proposal) applied. A diff that does not apply makes the task
+     SELF-REPO-UNPATCHABLE, and it is not replayed. So does a diff that makes a symlink with an
+     absolute or `..` target, or a tree with any symlink resolving outside it after the patch.
+     This is REPLAY_FORMAT 4, so a format-3 baseline is not like-for-like: replay a new one.
+     A format-3 record whose self-repo task ran a future install is not counted.
+   - **Idle stops.** A call the rig stops at its first idle end of turn, before a peer message,
+     is killed by signal. Its turn exit is recorded as `idle-stop`, with the signal (-9) in
+     `raw_exit`. It is not a crash: both -9 turns in 20261016T060550Z were these.
    - **Budget.** Each `claude` call gets `--timeout` seconds (1800). A call the limit stops
      mid-work is resumed in the same session, up to `--max-resumes` times per task (3, so about
      2 h). A call stopped after the agent ended its turn is not resumed, even when a background
@@ -334,14 +366,29 @@ Run the steps in this order. Costs are what was measured on 2026-10-14 and 2026-
    - NEUTRAL: nothing moved.
    - REGRESSES: a regression or held-out pass was lost.
    - REMOVABLE: an ablation lost no pass.
-   - INCONCLUSIVE: a task had no after-score, a guarded task went from decided to unknown, a
-     capability task went from pass to `env`, the grader changed between the two scores, or the
-     baseline ran another version of the rig. `replay.json` and `summary.json` record the replay
-     format and a sha of the judge prompt. A baseline without them, or with different ones, is
-     not like-for-like: `gate` and `propose` refuse it before anything runs, as they refuse a
-     changed grader. Replay and score a new baseline with the current rig first.
+   - NOT EXERCISED: nothing was lost, and no replayed task reached the diff.
+   - INCONCLUSIVE: a task had no after-score, a self-repo task the baseline decided could not be
+     tested (SELF-REPO-UNPATCHABLE, listed), an exercised guarded task went from fail to
+     unknown, the grader changed between the two scores, or the baseline ran another version of
+     the rig. (A pass that is unknown after, `env` included, is a loss: see Exercised below.)
+     `replay.json` and `summary.json` record the replay format and a sha of the judge prompt.
+     A baseline without them, or with different ones, is not like-for-like: `gate` and
+     `propose` refuse it before anything runs, as they refuse a changed grader. Replay and score
+     a new baseline with the current rig first.
 
-   Unknowns never count either way.
+   **Exercised.** A loss always counts: a pass that is fail or unknown after is lost on every
+   task. A gain counts only on a task that reached the diff. A task reaches it in these ways:
+   - a changed script ran (a hook row, a Bash command, or its install registration on an event
+     that fired), or a script that ran loaded it through `_sibling`;
+   - a changed agent was spawned;
+   - a changed skill was invoked, or preloaded by a spawned agent's `skills:`;
+   - a changed shipped file was read at its installed path, or a SessionStart hook injected it
+     (a 40+ character line of it is in what the hook added).
+
+   No hook's input is recorded, so old and new output are compared only through text that one
+   side alone contains. `bin/loop exercised <proposal stamp>` prints, per task, what it reached
+   and by which method, whether the proposal's patch applies to each self-repo task, and the
+   verdict the proposal would get now. It is read-only. Any other unknown counts neither way.
 10. **The user decides:** `bin/loop decide <proposal stamp> --approve|--reject --note "..."`. The
     decision is recorded with its lineage in `lineage.jsonl`. Approving merges nothing. It prints the
     `git merge` command for the session to run, and the commit sha is what a revert undoes.

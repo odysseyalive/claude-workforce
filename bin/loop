@@ -229,7 +229,10 @@ exit 0 either way.
     creates in the shared repository are reported (refs_changed), never undone: they may be the
     user's own concurrent work.
 
-`score` — GRADE A REPLAY, `<state>/score/<replay stamp>/`.
+`score` — GRADE A REPLAY, `<state>/score/<replay stamp>/`. `--bank STAMP` grades it against a
+    revision of its bank (`bank --revise STAMP --revisions FILE` corrects script graders and
+    records each change in bank.json), reusing a replaced score's judge answer only where the
+    full rendered judge prompt and the task the judge sees hash the same (`judge_key`); `--force` keeps the replaced score in `superseded-<stamp>/`.
     Script graders, mechanically, from the record and the copied transcripts: `SCRIPT_GRADERS`.
     no_turn_limit_hit and no_hook_not_met use `mine`'s session reader (subagents included);
     no_kickback_at_end reads the LAST ISSUES block; diff_touches is `glob_hit` over the diff's
@@ -259,7 +262,23 @@ exit 0 either way.
     shown). VERDICT (`proposal_verdict`): REGRESSES on any lost guarded pass; else INCONCLUSIVE
     when a planned task has no after-score or a regression/held-out task (any task, for an
     ablation) went from decided to unknown; else IMPROVES, NEUTRAL, or for an ablation
-    REMOVABLE. The baseline must be `done` with every task run, counted from its records
+    REMOVABLE. EXERCISED (`exercise_map`, also `bin/loop exercised STAMP`, read only) GATES
+    GAINS ONLY: a task counts as gained only when it reached the diff (a changed script ran, by
+    a hook row, a Bash command, or its install registration on an event that fired, or was
+    loaded through `_sibling` by one that did; a changed agent was spawned; a changed skill was
+    invoked or preloaded by a spawned agent's `skills:`; a changed shipped file was read at its
+    installed path or injected by a SessionStart hook), while a pass that is fail or unknown
+    after is lost on every task; NOT EXERCISED only when nothing was lost and no task reached
+    it. SELF-REPO (a task of this repository; format 4): the replay installs the task
+    commit's own workforce/, with the proposal's workforce/ diff applied on the proposal's
+    side; a diff that does not apply, or makes a symlink out of the tree, is
+    SELF-REPO-UNPATCHABLE: not replayed, and when the baseline decided it the verdict is
+    INCONCLUSIVE (it could not be tested, like a missing after-score),
+    and a format-3 record that ran a future install is not counted either. `--repeats N` replays each task N times; a task counts by its
+    majority verdict over the N planned (a missing repeat is an unknown vote, and the task is
+    UNDER-SAMPLED), a split counts as unknown, and the baseline's disagreeing share is printed
+    beside the verdict as its noise, with the self-repo count.
+    The baseline must be `done` with every task run, counted from its records
     (`replay --resume` finishes an interrupted one), and scored with this wf-task-tag. Replays take capability, regression and
     held-out tasks in turn. `<state>/proposals/<stamp>/proposal.{json,md}`.
     `decide` writes decision.json once and appends `<state>/lineage.jsonl`; it runs no git
@@ -2057,6 +2076,8 @@ def cmd_bank(args):
         return accept_bank(args)
     if args.recommit:
         return recommit_bank(args)
+    if args.revise or args.revisions:
+        return revise_bank(args)
     if args.retire:
         print("loop bank: --retire goes with --recommit", file=sys.stderr)
         return 2
@@ -2314,6 +2335,95 @@ def recommit_bank(args):
     return 0
 
 
+def revise_bank(args):
+    """A NEW bank stamp from `--revise STAMP --revisions FILE`: the same tasks, reference
+    outcomes, split and held-out set, with the script graders FILE names corrected. FILE is JSON:
+    {"revisions": [{"task": ID or "*", "grader": NAME, "arg": ARG (optional; matches that arg
+    only), "set_arg": NEW | "remove": true, "reason": WHY}]}. Each revision must match at least
+    one grader, so a typo is refused, not ignored; only script graders are revised (a judge
+    question is not a mechanical fix). No model is called; the new bank is not accepted.
+    bank.json keeps every change, old and new, and the history of every revision before it."""
+    if not STAMP.match(args.revise or "") or not args.revisions:
+        print("loop bank: --revise takes a bank stamp like 20261014T120000Z, with --revisions FILE",
+              file=sys.stderr)
+        return 2
+    try:
+        bdir, shown, hidden, _ = load_bank(args.state, args.revise)
+        meta = read_json(os.path.join(bdir, "bank.json"), None)
+        with open(os.path.join(bdir, "rejected.jsonl"), encoding="utf-8") as fh:
+            rejected = [json.loads(l) for l in fh if l.strip()]
+        with open(args.revisions, encoding="utf-8") as fh:
+            spec = json.load(fh)["revisions"]
+    except (ReplayError, OSError, ValueError, KeyError, TypeError) as e:
+        print("loop bank: %s" % e, file=sys.stderr)
+        return 2
+    no = []
+    for n, r in enumerate(spec, 1):
+        if not isinstance(r, dict) or not r.get("task") or not r.get("grader") or \
+                not str(r.get("reason") or "").strip() or bool(r.get("remove")) == ("set_arg" in r):
+            no.append("revision %d needs task, grader, reason, and one of set_arg or remove" % n)
+    if no or not isinstance(meta, dict):
+        print("loop bank: %s" % ("; ".join(no) or "no readable bank.json in %s" % bdir),
+              file=sys.stderr)
+        return 2
+    labelled = [(t["id"], t) for t in shown] + [("held-out %d" % (n + 1), t)
+                                                for n, t in enumerate(hidden)]
+    changes = []
+    for n, r in enumerate(spec, 1):
+        hit = 0
+        for label, t in labelled:
+            if r["task"] not in ("*", t["id"]):
+                continue
+            kept = []
+            for g in t.get("graders") or []:
+                if g.get("type") == "script" and g.get("name") == r["grader"] and \
+                        ("arg" not in r or g.get("arg") == r["arg"]):
+                    hit += 1
+                    new = None if r.get("remove") else dict(g, arg=r["set_arg"])
+                    changes.append({"task": label, "grader": g["name"], "old": g, "new": new,
+                                    "reason": r["reason"].strip()})
+                    if new is None:
+                        continue
+                    g = new
+                kept.append(g)
+            t["graders"] = kept
+        if not hit:
+            no.append("revision %d (%s %s) matches no script grader" % (n, r["task"], r["grader"]))
+    empty = [label for label, t in labelled if t.get("replayable") and not t.get("graders")]
+    no += ["%s would be left with no grader" % e for e in empty]
+    if no:
+        print("loop bank: REFUSED: %s; nothing was written" % "; ".join(no), file=sys.stderr)
+        return 2
+    stamp, out = new_run_dir(args.state, "bank")
+    history = list(meta.get("revision_history") or []) + [
+        {"from": args.revise, "to": stamp, "at": utc_stamp(time.time()),
+         "file": os.path.basename(args.revisions), "changes": changes}]
+    meta = dict(meta, stamp=stamp, derived_from=args.revise, derivation=(
+        "derived from bank %s with grader revisions only (%d script grader(s) changed, from %s); "
+        "tasks, reference outcomes, commits and the held-out split are unchanged, no model was "
+        "called" % (args.revise, len(changes), os.path.basename(args.revisions))),
+        revisions=changes, revision_history=history, cost_usd=0.0)
+    for name, items in (("tasks", shown), ("heldout", hidden), ("rejected", rejected)):
+        write_private(os.path.join(out, name + ".jsonl"),
+                      "".join(json.dumps(t, sort_keys=True) + "\n" for t in items))
+    write_private(os.path.join(out, "bank.json"), json.dumps(meta, indent=1) + "\n")
+    write_private(os.path.join(out, "bank.md"), bank_md(meta, shown, rejected).replace(
+        "\n\n", "\n\n%s.\n\n" % md_safe(meta["derivation"], 600), 1))
+    print("Bank %s from %s: %d grader(s) revised; no model called" % (stamp, args.revise,
+                                                                       len(changes)))
+    for c in changes:  # a held-out task is counted, never shown
+        if not c["task"].startswith("held-out "):
+            print("  %-44s %s %s -> %s: %s" % (c["task"], c["grader"], c["old"].get("arg"),
+                                                "removed" if c["new"] is None else c["new"]["arg"],
+                                                one_line(c["reason"], 160)))
+    held = sum(1 for c in changes if c["task"].startswith("held-out "))
+    if held:
+        print("  held-out: %d grader(s) revised (counted only)" % held)
+    print("Written: %s/  (not accepted; read bank.md, then `bin/loop bank --accept %s`; re-score "
+          "a baseline on it with `bin/loop score REPLAY --bank %s --force`)" % (out, stamp, stamp))
+    return 0
+
+
 def accept_bank(args):
     if not STAMP.match(args.accept):
         print("loop bank: --accept takes a bank stamp like 20261014T120000Z", file=sys.stderr)
@@ -2413,7 +2523,8 @@ def gitx(cwd, *argv, timeout=300, sandbox=(), env=None, input_text=None):
             shutil.which("git") or "git", "-c", "core.hooksPath=/dev/null", "-c",
             "core.fsmonitor=false", "-C", cwd] + list(argv),
             capture_output=True, timeout=timeout, env=env,
-            **({"input": input_text.encode("utf-8")} if input_text is not None
+            **({"input": input_text if isinstance(input_text, bytes) else
+                input_text.encode("utf-8")} if input_text is not None
                else {"stdin": subprocess.DEVNULL}))
     except (OSError, subprocess.TimeoutExpired) as e:
         return 1, b"", str(e).encode()
@@ -2505,7 +2616,54 @@ def read_json(path, default):
         return default
 
 
-def install_workforce(sha, work, config, log_path, sandbox):
+class Unpatchable(ReplayError):
+    """The proposal's diff cannot be installed on a self-repo task's own tree."""
+
+
+def patch_symlink_escapes(patch):
+    """The targets of every symlink (mode 120000) `patch` creates or retargets that is absolute
+    or climbs with `..`: a link the install would follow out of the tree."""
+    text = patch.decode("utf-8", "surrogateescape") if isinstance(patch, bytes) else patch
+    bad = []
+    for chunk in re.split(r"^(?=diff --git )", text, flags=re.M):
+        if re.search(r"^(?:new file mode|new mode) 120000$", chunk, re.M):
+            target = "".join(l[1:] for l in chunk.splitlines()
+                             if l.startswith("+") and not l.startswith("+++"))
+            if target.startswith("/") or ".." in target.split("/"):
+                bad.append(target)
+    return bad
+
+
+def tree_symlink_escapes(root):
+    """Every symlink under `root` that resolves outside it, as `path -> target`."""
+    top, bad = os.path.realpath(root), []
+    for d, dirs, files in os.walk(root):
+        for n in dirs + files:
+            p = os.path.join(d, n)
+            if os.path.islink(p) and not (os.path.realpath(p) + os.sep).startswith(top + os.sep):
+                bad.append("%s -> %s" % (os.path.relpath(p, root), os.readlink(p)))
+    return bad
+
+
+def apply_self_repo_patch(src, patch, sha):
+    """Apply the proposal's workforce/ diff to the extracted tree `src`, or raise Unpatchable:
+    the diff does not apply, it makes a symlink that is absolute or climbs with `..`, or after
+    it any symlink in the tree resolves outside `src` (the install runs over that tree, and a
+    link out of it would carry a host file into the replay's config)."""
+    bad = patch_symlink_escapes(patch)
+    if bad:
+        raise Unpatchable("symlink outside tree: the diff makes a link to %s" % ", ".join(bad[:3]))
+    rc, _, err = gitx(src, "apply", "--whitespace=nowarn", "-", input_text=patch,
+                      env=dict(os.environ, GIT_CEILING_DIRECTORIES=os.path.dirname(src)))
+    if rc != 0:
+        raise Unpatchable("the proposal's diff did not apply to %s's tree: %s" % (
+            sha[:10], one_line(err.decode("utf-8", "replace"), 300)))
+    bad = tree_symlink_escapes(src)
+    if bad:
+        raise Unpatchable("symlink outside tree: %s" % ", ".join(bad[:3]))
+
+
+def install_workforce(sha, work, config, log_path, sandbox, patch=None):
     """Put the workforce under test into the throwaway `config`; returns the settings it wired.
     A commit: `git archive` of this repo into `work/src` (attributes read from the empty tree,
     so the tree's .gitattributes name no filter), then THAT tree's own `install --user
@@ -2540,6 +2698,8 @@ def install_workforce(sha, work, config, log_path, sandbox):
         raise ReplayError("git archive %s failed: %s" % (sha[:10], one_line(err.decode(), 300)))
     with tarfile.open(fileobj=io.BytesIO(tar)) as tf:
         tf.extractall(src, filter="data")
+    if patch:  # a self-repo task's proposal side: the task tree plus the proposal's diff
+        apply_self_repo_patch(src, patch, sha)
     env = {k: os.environ[k] for k in ("PATH", "LANG", "LC_ALL") if k in os.environ}
     env.update(HOME=home, TMPDIR="/tmp", CLAUDE_CONFIG_DIR=config,
                WORKFORCE_REPO_URL="file://" + src)
@@ -2826,7 +2986,7 @@ def replay_argv(claude, seconds, turns, model, resume, sandbox=(), settings=None
 # subagent is work in progress), the release guard hook in read-only flag settings with the
 # glob deny list, /tmp and work/ allowed, the judge shown the patch and tool calls, and the
 # env outcome.
-REPLAY_FORMAT = 3
+REPLAY_FORMAT = 4  # 4: a task of this repository installs its own commit's workforce/
 CONTEXT_BLOCK = ("[Delivered by the replay, not a new request] Earlier in this conversation the "
                  "user said:\n%s\n[End of the earlier turns.]")
 
@@ -2935,7 +3095,12 @@ def run_turn(argv, prompt, cwd, env, seconds, stream_path, stop_on_idle=False):
     call = stream_summary(read_stream(stream_path))
     # `timeout` exits 124 on its TERM and 137 when its `-k` KILL follows; a call that ran the
     # whole limit was stopped by it whatever its exit says.
-    call.update(exit=proc.returncode, stderr=err.decode("utf-8", "replace"), stopped_idle=idle,
+    # A CALL THE RIG STOPPED AT IDLE (`stop_on_idle`: the agent ended its turn and no subagent
+    # runs, a peer message to deliver next) is killed by `killpg`, so its returncode is -9;
+    # MEASURED 2026-10-16 (UTC): both -9 turns in replay 20261016T060550Z were these, not a
+    # crash or the OOM killer. Its exit is `idle-stop`; the signal stays in `raw_exit`.
+    call.update(exit="idle-stop" if idle else proc.returncode, raw_exit=proc.returncode,
+                stderr=err.decode("utf-8", "replace"), stopped_idle=idle,
                 timed_out=not idle and (backstop or proc.returncode in (124, 137)
                                         or time.monotonic() - started >= seconds))
     return call
@@ -3380,7 +3545,9 @@ def replay_task(args, claude, key, task, hidx, tdir, meta):
            "workforce": None, "model": None, "turns": [], "sessions": [], "cost_usd": 0.0,
            "model_turns": 0, "exit": None, "error": None, "diff": None, "exists": {},
            "final_reply": None, "caveats": list(task.get("caveats") or []),
-           "config_removed": None, "refs_changed": None, "resumes": 0}
+           "config_removed": None, "refs_changed": None, "resumes": 0,
+           "repeat": int(key.rsplit("@", 1)[1]) if "@" in key else 1, "self_repo": None,
+           "hooks_registered": None}
     refs_before = None
     try:
         inside = [d for d in write_denied(args.state, top)
@@ -3391,13 +3558,50 @@ def replay_task(args, claude, key, task, hidx, tdir, meta):
         sha, why = resolve_workforce(args.workforce, task)
         if why:
             raise ReplayError(why)
-        installed = install_workforce(sha, work, config, os.path.join(tdir, "install.log"),
-                                      sandbox_argv(claude, work, (), config))
+        patch = None
+        if is_self_repo(p):
+            # A TASK OF THIS REPOSITORY RUNS ITS OWN COMMIT'S WORKFORCE, never a later one: the
+            # clone is that code, and an install from its future hands the agent the answer
+            # (cap-97ab04ca read "wf-model-lanes ... arrives in 1.78.0" off it). A proposal's
+            # replay (`patch_base`) installs the same tree with the proposal's workforce/ diff
+            # applied; a diff that does not apply leaves the task untestable, not replayed.
+            base = getattr(args, "patch_base", None)
+            if base and sha != "installed":
+                patch, why = self_repo_patch(commit, base, sha)
+                if why:
+                    rec["self_repo"] = {"mode": "unpatchable", "commit": commit, "why": why}
+                    rec["exit"] = "unpatchable"
+                    rec["caveats"].append("SELF-REPO-UNPATCHABLE: %s; not replayed, and no "
+                                          "verdict counts it" % why)
+                    return rec
+            rec["self_repo"] = {"mode": "patched" if patch is not None else "task-time",
+                                "commit": commit, "workforce_spec": sha,
+                                "patch_base": base if patch is not None else None}
+            rec["caveats"].append("SELF-REPO: installed this repository's own workforce/ at the "
+                                  "task commit %s%s, not %s" % (
+                                      commit[:10], ", with the proposal's diff %s..%s applied" % (
+                                          base[:10], sha[:10]) if patch is not None else "",
+                                      sha[:10]))
+            sha = commit
+        try:
+            installed = install_workforce(sha, work, config, os.path.join(tdir, "install.log"),
+                                          sandbox_argv(claude, work, (), config), patch)
+        except Unpatchable as e:
+            rec["self_repo"] = dict(rec["self_repo"], mode="unpatchable", why=str(e))
+            rec["exit"] = "unpatchable"
+            rec["caveats"].append("SELF-REPO-UNPATCHABLE: %s; not replayed, and no verdict "
+                                  "counts it" % e)
+            return rec
         left = sorted(set(os.listdir(work)) - {"config", "src", "home"})
         if left or os.path.lexists(wt):  # e.g. work/repo as a link the clone would follow out
             raise ReplayUnsafe("the install left %s in %s" % (", ".join(left) or "repo", work))
         rec["workforce"] = {"spec": args.workforce or "task", "commit": None if sha == "installed"
-                            else sha, "version": installed_version(config)}
+                            else sha, "version": installed_version(config),
+                            "patched": patch is not None}
+        rec["hooks_registered"] = [  # what `reached` credits a hook by when it prints nothing
+            {"event": ev, "matcher": m.get("matcher"), "command": h.get("command")}
+            for ev, ms in ((installed or {}).get("hooks") or {}).items() if isinstance(ms, list)
+            for m in ms if isinstance(m, dict) for h in m.get("hooks") or [] if isinstance(h, dict)]
         user = read_json(os.path.join(USER_CONFIG, "settings.json"), {})
         deny = replay_deny(config, args.state, top)
         rec["deny_rules"] = deny  # what `bin/loop denials` classifies this replay's denials by
@@ -3605,7 +3809,7 @@ def replay_turns(args, claude, prompts, rec, tdir, cwd, env, meta, sandbox, flag
             if changed:
                 raise ReplayUnsafe("the replay's guard files changed: %s" % ", ".join(changed))
             result, init = c["result"], c["init"]
-            t = {"n": n, "kind": kind, "resume": sid, "exit": c["exit"],
+            t = {"n": n, "kind": kind, "resume": sid, "exit": c["exit"], "raw_exit": c["raw_exit"],
                  "timed_out": c["timed_out"], "ended_turn": c["ended_turn"],
                  "background_pending": c["background_pending"], "stopped_idle": c["stopped_idle"],
                  "agent_pending": c["agent_pending"],
@@ -3713,7 +3917,8 @@ def cost_text(known, unreported):
 def replay_line(i, n, key, task, hidx):
     """The progress line for one task; a held-out task is only `held-out k`."""
     if hidx:
-        return "  [%d/%d] held-out task %d" % (i, n, hidx)
+        return "  [%d/%d] held-out task %d%s" % (i, n, hidx, ", repeat " + key.rsplit("@", 1)[1]
+                                                  if "@" in key else "")
     p = task["project"]
     return "  [%d/%d] %s  %s @%s  workforce %s" % (
         i, n, key, one_line(os.path.basename(p["git_toplevel"] or ""), 24), (p["commit"] or "-")[:8],
@@ -3780,6 +3985,8 @@ def resume_args(args):
         args.workforce = ran.pop()
     args.max_turns, args.timeout = caps["turns"], caps["timeout"]
     args.max_resumes = caps.get("resumes", 0)  # a run from before resumes existed had none
+    args.repeats = meta.get("repeats") or 1
+    args.patch_base = meta.get("patch_base")
     return meta
 
 
@@ -3795,8 +4002,9 @@ def cmd_replay(args):
     why = None
     if not claude:
         why = "no `claude` on PATH; pass --claude"
-    elif args.max_turns < 1 or args.timeout < 1 or args.max_resumes < 0:
-        why = "--max-turns and --timeout must be at least 1, --max-resumes at least 0"
+    elif args.max_turns < 1 or args.timeout < 1 or args.max_resumes < 0 or \
+            getattr(args, "repeats", 1) < 1:
+        why = "--max-turns, --timeout and --repeats must be at least 1, --max-resumes at least 0"
     elif args.model and not MODEL_ID.match(args.model):
         why = "--model %r is not a model id" % args.model
     elif not shutil.which("bwrap"):
@@ -3812,6 +4020,9 @@ def cmd_replay(args):
         return 2
     empty = [p for p in picked if nothing_to_send(p[1])]
     picked = interleave([p for p in picked if not nothing_to_send(p[1])])
+    # REPEATS RUN AFTER A WHOLE FIRST PASS, so a run that stops early still has every task once.
+    reps = getattr(args, "repeats", 1) or 1
+    picked += [("%s@%d" % (k, r), t, h) for r in range(2, reps + 1) for k, t, h in picked]
     n_hidden = sum(1 for p in picked if p[2])
     if meta is not None:
         if len(picked) != meta["tasks"]:
@@ -3822,9 +4033,11 @@ def cmd_replay(args):
             args.state, "replay", args.resume, "tasks", p[0], "record.json"))]
         print("loop replay: resuming %s: %d of %d task(s) already have a record, %d left"
               % (args.resume, meta["tasks"] - len(picked), meta["tasks"], len(picked)))
-    print("loop replay: bank %s%s; %d task(s) (%d held out, not named), split %s, workforce %s"
+    print("loop replay: bank %s%s; %d task run(s) (%d held out, not named)%s, split %s, workforce %s"
           % (args.bank, "" if accepted else " (NOT ACCEPTED: scores are provisional)",
-             len(picked), sum(1 for p in picked if p[2]), args.split if not args.task else "--task",
+             len(picked), sum(1 for p in picked if p[2]),
+             ", each task %d times" % reps if reps > 1 else "",
+             args.split if not args.task else "--task",
              args.workforce or "as recorded on each task"))
     if empty:  # a bank defect: the session's only human turn was a /clear
         print("  not run, nothing to send (user words only /clear): %s" % ", ".join(
@@ -3876,9 +4089,11 @@ def cmd_replay(args):
                     "turns": args.max_turns, "timeout": args.timeout,
                     "resumes": args.max_resumes},
                 "tasks": len(picked), "heldout": n_hidden, "done": 0, "cost_usd": 0.0,
-                "status": "running", "format": REPLAY_FORMAT}
+                "status": "running", "format": REPLAY_FORMAT, "repeats": reps}
     args.run_stamp = stamp  # how `propose` finds the run it started
     write_private(os.path.join(out, "replay.json"), json.dumps(meta, indent=1) + "\n")
+
+    meta["patch_base"] = getattr(args, "patch_base", None)
 
     def on_signal(signum, frame):
         raise KeyboardInterrupt("signal %d" % signum)
@@ -4775,6 +4990,51 @@ def tally(rows):
     return out
 
 
+def read_jsonl(path):
+    """The rows of a JSONL file, [] when it does not exist."""
+    if not os.path.isfile(path):
+        return []
+    with open(path, encoding="utf-8") as fh:
+        return [json.loads(l) for l in fh if l.strip()]
+
+
+def judge_key(question, task, rec, tdir):
+    """sha256 of everything a judge's answer depends on but the replay's own evidence: the full
+    rendered prompt (question, reference outcome, user words, and the replay's reply, diff and
+    tool calls, which are the same replay on both sides) and the task fields `verify_env` reads
+    (task without its graders). Two scores agree on an answer only when this matches."""
+    rest = json.dumps({k: v for k, v in task.items() if k != "graders"}, sort_keys=True)
+    return hashlib.sha256((judge_prompt(question, task, rec, tdir) + "\0" + rest).encode(
+        "utf-8", "surrogatepass")).hexdigest()
+
+
+def prior_score(args, out, hidden):
+    """What re-scoring on ANOTHER bank (`--bank`) may reuse of the score at `out`, or None (a plain
+    `--force` judges again): only when that score used this
+    judge prompt and judge model, so a judge's answer to the same question about the same replay
+    is the answer it would give again, and only where `judge_key` says the judge saw the same
+    thing (`score_run` checks it per answer). {"judges": {(task, repeat): {question: grader
+    row}}, "held": {(line, repeat): row}, "old_shown"/"old_hidden": the old bank's tasks,
+    "rows": the old shown rows, for the preview}."""
+    summary = read_json(os.path.join(out, "summary.json"), None)
+    if not getattr(args, "bank", None) or not isinstance(summary, dict) or \
+            summary.get("bank") == args.bank or summary.get("scoring_sha256") != scoring_sha256() or \
+            summary.get("judge_model") != args.judge_model:
+        return None
+    try:
+        rows, held = (read_jsonl(os.path.join(out, n)) for n in ("scores.jsonl", "heldout.jsonl"))
+        _, old_shown, old_hidden, _ = load_bank(args.state, summary["bank"])
+    except (OSError, ValueError, KeyError) as e:
+        raise ReplayError("the score at %s is unreadable (%s)" % (out, e))
+    return {"old_shown": {t["id"]: t for t in old_shown}, "old_hidden": old_hidden,"judges": {(r["task"], r.get("repeat") or 1): {
+                g["question"]: g for g in r.get("graders") or []
+                if g.get("type") == "judge" and g.get("result") in ("pass", "fail", "unknown", "env")}
+                for r in rows},
+            "held": {(r["index"], r.get("repeat") or 1): r for r in held},
+            "rows": {(r["task"], r.get("repeat") or 1): r for r in rows},
+            "bank": summary["bank"]}
+
+
 def cmd_score(args):
     claude = judge_setup(args, "score")
     if not claude:
@@ -4787,14 +5047,21 @@ def cmd_score(args):
     if not meta:
         print("loop score: no readable replay at %s" % rdir, file=sys.stderr)
         return 2
+    bank = getattr(args, "bank", None) or meta["bank"]
     try:
-        _, shown, hidden, accepted = load_bank(args.state, meta["bank"])
+        _, shown, hidden, accepted = load_bank(args.state, bank)
     except ReplayError as e:
         print("loop score: %s" % e, file=sys.stderr)
         return 2
     by_id = {t["id"]: t for t in shown}
     out = os.path.join(args.state, "score", args.replay)
-    if os.path.exists(os.path.join(out, "summary.json")) and not args.force:
+    try:
+        prior = prior_score(args, out, hidden)
+    except ReplayError as e:
+        print("loop score: %s" % e, file=sys.stderr)
+        return 2
+    if os.path.exists(os.path.join(out, "summary.json")) and not args.force and \
+            not (args.dry_run and prior):
         print("loop score: %s is already scored (%s); pass --force to score it again"
               % (args.replay, out), file=sys.stderr)
         return 2
@@ -4805,7 +5072,7 @@ def cmd_score(args):
             continue
         task = hidden[rec["heldout_index"] - 1] if rec.get("heldout_index") else by_id.get(rec.get("task"))
         if task is None:
-            print("loop score: %s is not in bank %s; skipped" % (rec.get("key"), meta["bank"]),
+            print("loop score: %s is not in bank %s; skipped" % (rec.get("key"), bank),
                   file=sys.stderr)
             continue
         if rec.get("model") and model_base(rec["model"]) == model_base(args.judge_model) \
@@ -4816,25 +5083,75 @@ def cmd_score(args):
         recs.append((os.path.dirname(path), rec, task))
     argv = judge_argv(claude, args.judge_model, args.timeout)
     jcwd = os.path.join(out, "judge-cwd")
-    print("loop score: replay %s, bank %s%s, %d task(s) (%d held out, counted only); judge %s"
-          % (args.replay, meta["bank"], "" if accepted else " (NOT ACCEPTED: provisional)",
+    print("loop score: replay %s, bank %s%s%s, %d task(s) (%d held out, counted only); judge %s"
+          % (args.replay, bank, "" if accepted else " (NOT ACCEPTED: provisional)",
+             "" if bank == meta["bank"] else " (the replay ran bank %s)" % meta["bank"],
              len(recs), sum(1 for _, r, _ in recs if r.get("heldout_index")), args.judge_model))
+    if prior:
+        print("  the score it replaces used this judge prompt and model: an answer of it is reused "
+              "where the judge would see the same prompt (judge_key); %d shown answer(s) and %d "
+              "held-out row(s) are candidates" % (sum(map(len, prior["judges"].values())),
+                                                  len(prior["held"])))
+    if args.dry_run and prior:
+        return score_run(args, out, jcwd, argv, recs, dict(meta, bank=bank), accepted, prior, True)
     if args.dry_run:
         print("Judge command (prompt on stdin; cwd an empty directory):\n  " + shlex.join(argv))
         print("Dry run: no model was called and nothing was written.")
         return 0
     private_dir(os.path.join(private_dir(os.path.join(private_dir(args.state), "score")), args.replay))
-    return judged("score", jcwd, lambda: score_run(args, out, jcwd, argv, recs, meta, accepted))
+    if os.path.exists(os.path.join(out, "summary.json")):  # --force: the old score is kept, aside
+        old = private_dir(os.path.join(out, "superseded-" + utc_stamp(time.time())))
+        for name in ("summary.json", "scores.jsonl", "heldout.jsonl"):
+            if os.path.isfile(os.path.join(out, name)):
+                os.rename(os.path.join(out, name), os.path.join(old, name))
+        print("  the score it replaces is kept in %s" % old)
+    return judged("score", jcwd, lambda: score_run(args, out, jcwd, argv, recs,
+                                                   dict(meta, bank=bank), accepted, prior))
 
 
-def score_run(args, out, jcwd, argv, recs, meta, accepted):
-    shown_rows, hidden_rows, cost = [], [], 0.0
+def score_run(args, out, jcwd, argv, recs, meta, accepted, prior=None, preview=False):
+    """Grade every record; with `prior`, a judge question answered in the score being replaced is
+    not asked again. `preview`: call no judge (a question with no prior answer is `unknown`,
+    `not judged in a preview`), write nothing, and print each shown task's old and new verdict."""
+    shown_rows, hidden_rows, cost, reused, reused_held = [], [], 0.0, 0, 0
     for tdir, rec, task in recs:
         hid = bool(rec.get("heldout_index"))
+        rkey = (rec.get("heldout_index") if hid else task["id"], rec.get("repeat") or 1)
+        if rec.get("exit") == "unpatchable":  # never replayed: nothing to grade, no judge paid
+            row = {"split": task["split"], "verdict": "unknown",
+                   "unpatchable": (rec.get("self_repo") or {}).get("why")}
+            if hid:
+                hidden_rows.append(dict(row, index=rec["heldout_index"]))
+            else:
+                shown_rows.append(dict(row, task=task["id"], graders=[], replay={
+                    "exit": rec.get("exit"), "error": None, "cost_usd": 0.0, "model_turns": 0,
+                    "model": None, "workforce": rec.get("workforce")}))
+            continue
+        if hid and prior and rkey in prior["held"]:
+            old = prior["old_hidden"][rec["heldout_index"] - 1] \
+                if rec["heldout_index"] <= len(prior["old_hidden"]) else None
+            if old is not None and old.get("graders") == task.get("graders") and all(
+                    judge_key(g["question"], old, rec, tdir) == judge_key(g["question"], task, rec, tdir)
+                    for g in task.get("graders") or [] if g["type"] == "judge"):
+                hidden_rows.append(dict(prior["held"][rkey], reused_from=prior["bank"]))
+                reused_held += 1
+                continue
         graders = []
         for g in task.get("graders") or []:
+            before = (prior or {}).get("judges", {}).get(rkey, {}).get(g.get("question")) \
+                if g["type"] == "judge" and not hid else None
+            key = judge_key(g["question"], task, rec, tdir) if g["type"] == "judge" else None
+            old_task = (prior or {}).get("old_shown", {}).get(task["id"]) if before else None
+            if before is not None and (old_task is None or before.get("prompt_sha256", key) != key
+                                       or judge_key(g["question"], old_task, rec, tdir) != key):
+                before = None  # the judge would see something else now: ask it again
             if g["type"] == "script":
                 verdict, detail = script_grade(g, rec, tdir, task)
+            elif before is not None:
+                verdict, detail, reused = before["result"], before.get("detail"), reused + 1
+                g = dict(before, reused_from=prior["bank"], prompt_sha256=key)
+            elif preview:
+                verdict, detail = "unknown", "not judged in a preview"
             else:
                 print("  judging %s ..." % ("a held-out task" if hid else rec["key"]),
                       end="", file=sys.stderr, flush=True)
@@ -4842,13 +5159,15 @@ def score_run(args, out, jcwd, argv, recs, meta, accepted):
                                                         rec, tdir)
                 cost += c
                 print(" %s" % verdict, file=sys.stderr)
-                g = dict(g, **extra)
+                g = dict(g, prompt_sha256=key, **extra)
             graders.append(dict(g, result=verdict, detail=detail))
         finished = rec.get("exit") == "ok" and not rec.get("error")
         row = {"split": task["split"], "verdict": task_verdict(graders, finished,
                                                                task.get("reference_outcome"))}
         if row["verdict"] == "unknown" and any(g["result"] == "env" for g in graders):
             row["env"] = [g["detail"] for g in graders if g["result"] == "env"]
+        if rec.get("repeat"):
+            row["repeat"] = rec["repeat"]
         if hid:  # counted on screen; kept per line of heldout.jsonl only in a file never printed
             hidden_rows.append(dict(row, index=rec["heldout_index"]))
             continue
@@ -4857,8 +5176,22 @@ def score_run(args, out, jcwd, argv, recs, meta, accepted):
             "model_turns": rec.get("model_turns"), "model": rec.get("model"),
             "workforce": rec.get("workforce")})
         shown_rows.append(row)
+    if preview:
+        for r in shown_rows:
+            k = (r["task"], r.get("repeat") or 1)
+            old = (prior["rows"].get(k) or {}).get("verdict", "-")
+            print("  %-8s -> %-8s %s%s  %s" % (old.upper(), r["verdict"].upper(), r["task"],
+                                                "@%d" % k[1] if k[1] > 1 else "", "; ".join(
+                "%s %s" % (g.get("name") or "judge", g["result"]) for g in r["graders"])))
+        print("  held-out: %d of %d row(s) reused (same graders, same judge prompts), the rest "
+              "would be judged again; counted only" % (
+                  reused_held, sum(1 for _, r, _ in recs if r.get("heldout_index"))))
+        print("Preview against bank %s (the old score used %s): %d judge answer(s) reused, no model "
+              "was called, nothing was written." % (meta["bank"], prior["bank"], reused))
+        return 0
     replay_cost, unreported = run_cost(os.path.join(args.state, "replay", args.replay))
     summary = {"replay": args.replay, "bank": meta["bank"], "bank_accepted": accepted,
+               "judges_reused": reused, "heldout_rows_reused": reused_held,
                "judge_model": args.judge_model, "judge_cost_usd": round(cost, 4),
                "replay_cost_usd": replay_cost, "replay_cost_unreported_calls": unreported,
                "splits": tally(shown_rows),
@@ -4870,7 +5203,8 @@ def score_run(args, out, jcwd, argv, recs, meta, accepted):
                   "".join(json.dumps(r, sort_keys=True) + "\n" for r in shown_rows))
     write_private(os.path.join(out, "summary.json"), json.dumps(summary, indent=1) + "\n")
     for r in shown_rows:
-        print("  %-8s %s  %s" % (r["verdict"].upper(), r["task"], "; ".join(
+        print("  %-8s %s%s  %s" % (r["verdict"].upper(), r["task"], "@%d" % r["repeat"]
+                                   if (r.get("repeat") or 1) > 1 else "", "; ".join(
             "%s %s" % (g.get("name") or "judge", g["result"]) for g in r["graders"])))
     for label, block in (("", summary["splits"]), ("held-out ", summary["heldout"])):
         for split, c in block.items():
@@ -4920,6 +5254,47 @@ def usable(task):
     return task.get("replayable") and not nothing_to_send(task)
 
 
+def by_vote(rows, key, planned=1):
+    """{task: one row} from score rows, a task replayed N = `planned` times (`--repeats`) given
+    its MAJORITY verdict: the one more than N/2 of the PLANNED repeats reached, else `unknown`
+    with `vote_split` set, so a task its repeats split on is neither gained nor lost. A repeat
+    that has no score (not run, interrupted) is an `unknown` vote, and the task is flagged
+    `under_sampled`. `repeats` lists each repeat's verdict in order; a task planned and run
+    once keeps its row as it is."""
+    groups = {}
+    for r in rows:
+        groups.setdefault(r[key], []).append(r)
+    out = {}
+    for k, rs in groups.items():
+        if len(rs) == 1 and planned <= 1:
+            out[k] = rs[0]
+            continue
+        rs = sorted(rs, key=lambda r: r.get("repeat") or 1)
+        votes = [r["verdict"] for r in rs]
+        votes += ["unknown"] * max(0, planned - len(votes))
+        n_planned = max(planned, len(rs))
+        top, n = collections.Counter(votes).most_common(1)[0]
+        row = dict(rs[0], verdict=top if 2 * n > n_planned else "unknown", repeats=votes,
+                   vote_split=2 * n <= n_planned, under_sampled=len(rs) < planned)
+        row.pop("env", None)
+        envs = [w for r in rs if r["verdict"] == "unknown" for w in r.get("env") or []]
+        if row["verdict"] == "unknown" and envs:
+            row["env"] = envs
+        out[k] = row
+    return out
+
+
+def noise_text(summary):
+    """`noise 2 of 9 tasks' repeats disagree (22%)`, or that it was not measured."""
+    n = (summary or {}).get("noise") or {}
+    if not n.get("tasks"):
+        return "noise not measured (each task ran once; --repeats 3 measures it)"
+    return "noise: %d of %d tasks' repeats disagree (%.0f%%)%s" % (
+        n["disagree"], n["tasks"], 100.0 * n["disagree"] / n["tasks"],
+        "; %d task(s) UNDER-SAMPLED (a missing repeat counts as an unknown vote)"
+        % n["under_sampled"] if n.get("under_sampled") else "")
+
+
 def load_baseline(state, stamp):
     """(score summary, {task id: score row}, {held-out index: score row} or None when the score
     kept none, replay meta, {workforce commits its tasks ran}), or raise ReplayError. A
@@ -4933,15 +5308,25 @@ def load_baseline(state, stamp):
         raise ReplayError("no scored replay %s in %s" % (stamp, state))
     try:
         with open(os.path.join(sdir, "scores.jsonl"), encoding="utf-8") as fh:
-            rows = {r["task"]: r for r in (json.loads(l) for l in fh if l.strip())}
+            rows = by_vote([json.loads(l) for l in fh if l.strip()], "task",
+                           meta.get("repeats") or 1)
     except (OSError, ValueError, KeyError, TypeError) as e:
         raise ReplayError("unreadable scores.jsonl in %s (%s)" % (sdir, e))
     held = None
     if os.path.isfile(os.path.join(sdir, "heldout.jsonl")):
         with open(os.path.join(sdir, "heldout.jsonl"), encoding="utf-8") as fh:
-            held = {r["index"]: r for r in (json.loads(l) for l in fh if l.strip())}
-    commits = {(read_json(p, {}).get("workforce") or {}).get("commit") for p in
-               glob.glob(os.path.join(glob.escape(rdir), "tasks", "*", "record.json"))}
+            held = by_vote([json.loads(l) for l in fh if l.strip()], "index",
+                           meta.get("repeats") or 1)
+    voted = [r for r in list(rows.values()) + list((held or {}).values()) if r.get("repeats")]
+    summary = dict(summary, noise={"tasks": len(voted), "disagree": sum(
+        1 for r in voted if len(set(r["repeats"])) > 1), "under_sampled": sum(
+        1 for r in voted if r.get("under_sampled"))})
+    recs = [read_json(p, {}) for p in
+            glob.glob(os.path.join(glob.escape(rdir), "tasks", "*", "record.json"))]
+    # A self-repo task installs its own commit's workforce (format 4), so it is not a second
+    # workforce the run replayed.
+    commits = {(r.get("workforce") or {}).get("commit") for r in recs
+               if not isinstance(r.get("self_repo"), dict)}
     return summary, rows, held, meta, {c for c in commits if c}
 
 
@@ -5080,26 +5465,532 @@ def print_plan(plan):
                            plan["baseline"]))
     if plan["not_in_baseline"]:
         print("  not in the baseline, so not replayed: %s" % ", ".join(plan["not_in_baseline"]))
-    caps, n = plan["caps"], len(t["capability"]) + len(t["regression"]) + t["heldout"]
+    caps, n = plan["caps"], (len(t["capability"]) + len(t["regression"]) + t["heldout"]) * \
+        (plan.get("repeats") or 1)
     per = plan["baseline_cost_usd"] / plan["baseline_tasks"] if plan["baseline_tasks"] else 0
     print("  as the baseline ran: model %s, %s turns, %ss per call, judge %s; the baseline cost "
-          "$%.2f a task, so about $%.2f for these %d (a measurement, not a limit)%s" % (
+          "$%.2f a task, so about $%.2f for these %d run(s) (a measurement, not a limit)%s" % (
               plan["replay_model"] or "the user's default", caps.get("turns"), caps.get("timeout"),
               plan["judge_model"], per, per * n, n,
               "; at least: %d of its calls were killed before reporting all their cost"
               % plan["baseline_cost_unreported"] if plan.get("baseline_cost_unreported") else ""))
 
 
-def compare(plan, before, after, before_held, after_held):
+# ---------------------------------------------------------------- exercised: did a task reach the diff
+
+# A task that never reached a proposal's change says nothing about it: what it gained or lost
+# is the run's noise. How a path can be reached follows how manifest.txt (at the proposal's
+# commit, or the base's for a removed path) ships it: a script row (`hook`, `exec`,
+# `exec-sibling`) runs; an `agent` row registers a subagent by its directory's name; a skill's
+# SKILL.md loads when the skill is invoked; any other shipped file is reached by being read. A
+# path no manifest row ships (fixtures, this repo's own bin/, its docs) never reaches a replay.
+# A HOOK'S INPUT IS RECORDED NOWHERE (the stream and the transcripts carry what it printed, never
+# what it was given), so old and new code cannot be re-run on it. A hook that ran counts as
+# reached; it is SHOWN to differ when its recorded output carries a string only the new code has,
+# or the baseline's carried one only the old code had and this run's does not.
+SCRIPT_FLAGS = ("hook", "exec", "exec-sibling")
+LITERAL_MIN = 16
+_LITERAL = re.compile(r'"((?:[^"\\\n]|\\.)*)"|\'((?:[^\'\\\n]|\\.)*)\'')
+_PLACEHOLDER = re.compile(r"%[-#0 +]*\d*(?:\.\d+)?[sdrfx%]|\{[^{}]*\}|\$\{?\w+\}?|\\u[0-9a-fA-F]{4}|"
+                          r"\\x[0-9a-fA-F]{2}|\\.")
+READ_TOOLS = ("Read", "Grep", "Glob", "Bash", "Edit", "MultiEdit", "Write", "NotebookRead",
+              "NotebookEdit")
+
+
+def installed_suffix(path):
+    """Where a shipped `workforce/...` path lands under the config root: `workforce/skills/<s>/
+    <rest>` at `skills/<s>/<rest>`, any other `workforce/<rest>` at `skills/workforce/<rest>`."""
+    m = re.match(r"workforce/skills/([^/]+)/(.+)", path)
+    return "skills/%s/%s" % m.groups() if m else "skills/workforce/" + path[len("workforce/"):]
+
+
+def suffix_re(suffix):
+    """The installed path, never the clone's own copy (`.../repo/workforce/skills/<s>/...` holds
+    `skills/<s>/...` too, and a task in this repo reads it at the task's commit, not the diff's)."""
+    return re.compile(r"(?<!workforce/)(?<![\w.-])%s(?![\w.-])" % re.escape(suffix))
+
+
+def manifest_flags(*commits):
+    """{path: {flag, ...}} over manifest.txt at each commit ('' for an unflagged row); `retired`
+    rows ship nothing and are left out."""
+    out = {}
+    for commit in commits:
+        for line in (rgit("show", "--no-textconv", commit + ":manifest.txt") or "").splitlines():
+            parts = line.split("#", 1)[0].split()
+            if len(parts) == 1:
+                out.setdefault(parts[0], set()).add("")
+            elif len(parts) == 2 and parts[0] != "retired":
+                out.setdefault(parts[1], set()).add(parts[0])
+    return out
+
+
+def literals(lines):
+    """The prose fragments of the quoted strings on `lines`: each literal split at its format
+    placeholders and escapes, kept when at least LITERAL_MIN characters with a space in them."""
+    out = set()
+    for line in lines:
+        for m in _LITERAL.finditer(line):
+            for frag in _PLACEHOLDER.split(m.group(1) if m.group(1) is not None else m.group(2)):
+                frag = frag.strip(" .,:;()-")
+                if len(frag) >= LITERAL_MIN and " " in frag and re.search(r"[A-Za-z]{3}", frag):
+                    out.add(frag)
+    return out
+
+
+def in_tree(rev, text):
+    """True when any shipped file at `rev` holds `text`."""
+    return gitx(ROOT, "grep", "-F", "-q", "-e", text, rev, "--", "workforce", timeout=60)[0] == 0
+
+
+def diff_surfaces(base, commit):
+    """One entry per path base..commit changes: {path, kind, how it is reached}. `kind` is script,
+    agent, skill, reference or unshipped; a script carries `added` (strings only the new tree
+    has) and `removed` (strings only the old tree had), from the quoted literals on its changed
+    lines."""
+    flags = manifest_flags(commit, base)
+    names = (rgit("diff", "--name-only", "--no-renames", base, commit, "--") or "").split("\n")
+    out = []
+    for p in filter(None, names):
+        f = flags.get(p)
+        s = {"path": p, "kind": "unshipped"}
+        if f and p.startswith("workforce/"):
+            s["suffix"] = installed_suffix(p)
+            if f & set(SCRIPT_FLAGS):
+                d = rgit("diff", "-U0", "--no-textconv", "--no-ext-diff", base, commit, "--", p) or ""
+                lines = d.splitlines()
+                plus = [l[1:] for l in lines if l.startswith("+") and not l.startswith("+++")]
+                minus = [l[1:] for l in lines if l.startswith("-") and not l.startswith("---")]
+                s.update(kind="script", added=sorted(x for x in literals(plus) if not in_tree(base, x)),
+                         removed=sorted(x for x in literals(minus) if not in_tree(commit, x)))
+            elif "agent" in f:
+                s.update(kind="agent", name=os.path.basename(os.path.dirname(p)))
+            elif p.endswith("/SKILL.md"):
+                s.update(kind="skill", name="workforce" if p == "workforce/SKILL.md"
+                         else p.split("/")[2])
+            else:
+                s["kind"] = "reference"
+        out.append(s)
+    return out
+
+
+def _strings(x):
+    """Every string inside a decoded JSON value."""
+    if isinstance(x, str):
+        yield x
+    elif isinstance(x, dict):
+        for v in x.values():
+            yield from _strings(v)
+    elif isinstance(x, list):
+        for v in x:
+            yield from _strings(v)
+
+
+def _hook_text(raw):
+    """A hook's printed text, and the strings of it when it printed JSON."""
+    out = [raw] if isinstance(raw, str) and raw else []
+    if out and raw.lstrip()[:1] in "{[":
+        try:
+            out += list(_strings(json.loads(raw)))
+        except ValueError:
+            pass
+    return out
+
+
+def task_trace(tdir, rec=None):
+    """What one replayed task did that a diff can reach, from every stream and copied transcript
+    it left (subagents included): `tools` [(name, input)], `hooks` (the commands recorded as
+    run: hook attachments, Stop summaries), `hook_text` (what hooks printed, and the hook
+    feedback the agent was shown), `prompts` (what was sent, and the slash commands run)."""
+    tr = {"tools": [], "hooks": [], "hook_text": [], "session_text": [],
+          "prompts": list((rec or {}).get("sent") or [])}
+    seen = set()
+    paths = sorted(glob.glob(os.path.join(glob.escape(tdir), "turn-*.stream.jsonl"))) + sorted(
+        glob.glob(os.path.join(glob.escape(tdir), "transcripts", "**", "*.jsonl"), recursive=True))
+    for path in paths:
+        for e in read_stream(path):
+            msg = e.get("message") if isinstance(e.get("message"), dict) else {}
+            content = msg.get("content")
+            blocks = content if isinstance(content, list) else \
+                [{"type": "text", "text": content}] if isinstance(content, str) else []
+            for c in blocks:
+                if not isinstance(c, dict):
+                    continue
+                if c.get("type") == "tool_use" and e.get("type") == "assistant":
+                    if c.get("id") in seen:  # the stream and the transcript both carry it
+                        continue
+                    seen.add(c.get("id"))
+                    tr["tools"].append((str(c.get("name")), c.get("input")
+                                        if isinstance(c.get("input"), dict) else {}))
+                elif c.get("type") == "text" and e.get("type") == "user" and \
+                        isinstance(c.get("text"), str):
+                    t = c["text"]
+                    if "<command-name>" in t:
+                        tr["prompts"] += re.findall(r"<command-name>([^<]*)</command-name>", t)
+                    if re.search(r"hook", t, re.I):
+                        tr["hook_text"].append(t)
+            a = e.get("attachment")
+            if isinstance(a, dict) and str(a.get("type", "")).startswith("hook"):
+                be = a.get("blockingError")
+                for cmd in (a.get("command"), be.get("command") if isinstance(be, dict) else None):
+                    if isinstance(cmd, str):
+                        tr["hooks"].append(cmd)
+                for raw in (a.get("stdout"), a.get("stderr"), a.get("content"),
+                            be.get("blockingError") if isinstance(be, dict) else be):
+                    tr["hook_text"] += _hook_text(raw)
+                    if a.get("hookEvent") == "SessionStart":
+                        tr["session_text"] += _hook_text(raw)
+            if e.get("type") == "system":
+                if e.get("subtype") == "stop_hook_summary":
+                    tr["hooks"] += [h["command"] for h in e.get("hookInfos") or []
+                                    if isinstance(h, dict) and isinstance(h.get("command"), str)]
+                    tr["hook_text"] += [x for x in _strings(e.get("hookErrors") or [])]
+                elif e.get("subtype") == "hook_response":
+                    for raw in (e.get("output"), e.get("stdout"), e.get("stderr")):
+                        tr["hook_text"] += _hook_text(raw)
+                        if e.get("hook_event") == "SessionStart":
+                            tr["session_text"] += _hook_text(raw)
+    return tr
+
+
+def tool_paths(tr):
+    """Each path or command a tool call named: what a Read, Grep, Glob, edit or Bash call reached."""
+    return [str(v) for name, i in tr["tools"] if name in READ_TOOLS
+            for k, v in i.items() if k in ("file_path", "path", "notebook_path", "command") and v]
+
+
+_SIBLING_CALL = re.compile(r"""_(?:load_)?sibling\(\s*["']([\w.-]+)["']""")
+_REGISTERED = re.compile(r"^\s*\+\s+(\S+)\s+(\w+)(?:\s+matcher\s+(.+?))?\s+registered\s*$")
+_GRAPHS = {}
+INJECT_MIN = 40
+
+
+def script_sources(commit):
+    """{path: source} of every file under a `bin/` directory of workforce/ at `commit`: what a
+    hook can load (`_sibling`) or read (an injected file) is named in these."""
+    if commit not in _GRAPHS:
+        names = (rgit("ls-tree", "-r", "--name-only", commit, "--", "workforce") or "").split("\n")
+        _GRAPHS[commit] = {p: rgit("show", "--no-textconv", "%s:%s" % (commit, p)) or ""
+                           for p in names if re.search(r"(^|/)bin/[^/]+$", p)}
+    return _GRAPHS[commit]
+
+
+def sibling_closure(commit, ran):
+    """{script path: the script that ran and loaded it} for every script `ran` loads through
+    `_sibling` / `_load_sibling` (a module beside it in the same bin/), transitively; a script
+    that ran maps to itself."""
+    src, out, todo = script_sources(commit), {p: p for p in ran}, list(ran)
+    while todo:
+        p = todo.pop()
+        for name in _SIBLING_CALL.findall(src.get(p, "")):
+            q = os.path.join(os.path.dirname(p), name)
+            if q in src and q not in out:
+                out[q] = out[p]
+                todo.append(q)
+    return out
+
+
+def registrations(tdir, rec):
+    """[(script name, event, matcher)] the replay's install wired: the record's own copy of the
+    installed settings' hooks when it kept one, else the install log's `+ <name> <event>
+    [matcher <m>] registered` lines (every replay keeps install.log)."""
+    out = []
+    for h in rec.get("hooks_registered") or []:
+        m = re.search(r"/bin/([\w.-]+)\W*$", str(h.get("command") or ""))
+        if m:
+            out.append((m.group(1), h.get("event"), h.get("matcher")))
+    if out:
+        return out
+    try:
+        with open(os.path.join(tdir, "install.log"), encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                m = _REGISTERED.match(line.rstrip("\n"))
+                if m:
+                    out.append((m.group(1).split("@")[0], m.group(2), m.group(3)))
+    except OSError:
+        pass
+    return out
+
+
+def fired(tr, rec, event, matcher):
+    """How many times `event` (with `matcher`, a tool-name pattern) fired in the replay."""
+    tools = [n for n, _ in tr["tools"]]
+    if event == "SessionStart":
+        return len(rec.get("sessions") or []) + sum(1 for t in rec.get("turns") or []
+                                                    if t.get("resume") and t.get("kind") != "clear")
+    if event == "UserPromptSubmit":
+        return len(rec.get("sent") or [])
+    if event == "Stop":
+        return sum(1 for t in rec.get("turns") or [] if t.get("kind") != "clear"
+                   and not t.get("skipped"))
+    if event in ("SubagentStart", "SubagentStop"):
+        return sum(1 for n in tools if n in ("Agent", "Task"))
+    if event in ("PreToolUse", "PostToolUse"):
+        if not matcher or matcher.strip() == "*":
+            return len(tools)
+        try:
+            rx = re.compile(matcher)
+            return sum(1 for n in tools if rx.fullmatch(n))
+        except re.error:
+            return sum(1 for n in tools if n in matcher.split("|"))
+    return 0
+
+
+def frontmatter_skills(text):
+    """The `skills:` an agent definition preloads (inline list or YAML list)."""
+    m = re.match(r"---\n(.*?)\n---", text or "", re.S)
+    if not m:
+        return []
+    fm = m.group(1)
+    one = re.search(r"^skills:[ \t]*\[([^\]]*)\]", fm, re.M)
+    if one:
+        return [x.strip().strip("'\"") for x in one.group(1).split(",") if x.strip()]
+    block = re.search(r"^skills:[ \t]*\n((?:[ \t]+-[^\n]*\n?)+)", fm, re.M)
+    if block:
+        return [l.strip()[1:].strip().strip("'\"") for l in block.group(1).splitlines()]
+    one = re.search(r"^skills:[ \t]*(\S[^\n]*)$", fm, re.M)
+    return [x.strip() for x in one.group(1).split(",")] if one else []
+
+
+def agent_definition(name, commit, project):
+    """(text, where) of the definition a spawned `name` ran from: a shipped agent at `commit`,
+    else the project's `.claude/agents/<name>.md` at the task's commit, else as it is now."""
+    for p in ("workforce/agents/%s/AGENT.md" % name,):
+        t = rgit("show", "--no-textconv", "%s:%s" % (commit, p))
+        if t:
+            return t, p
+    for p, flags in manifest_flags(commit).items():
+        if "agent" in flags and os.path.basename(os.path.dirname(p)) == name:
+            return rgit("show", "--no-textconv", "%s:%s" % (commit, p)) or "", p
+    top, c = (project or {}).get("git_toplevel"), (project or {}).get("commit")
+    rel = ".claude/agents/%s.md" % name
+    if top and c:
+        rc, out, _ = gitx(top, "show", "--no-textconv", "%s:%s" % (c, rel), timeout=60)
+        if rc == 0:
+            return out.decode("utf-8", "replace"), "%s at the task's commit" % rel
+    try:
+        with open(os.path.join(top or "/nonexistent", rel), encoding="utf-8") as fh:
+            return fh.read(), "%s as it is now" % rel
+    except OSError:
+        return "", None
+
+
+def reached(surfaces, tr, base_tr=None, rec=None, tdir=None, commit=None):
+    """[(path, how)] for each surface this task reached, `how` naming the method; [] when none.
+    A script is reached when it ran: a hook row or Stop summary names it, a Bash command names
+    it, or the install registered it on an event that fired; and so is every module a script
+    that ran loads through `_sibling`. An agent's `skills:` preloads are reached when it is
+    spawned; a shipped file is reached when a line of it (INJECT_MIN characters or more) is in
+    what a SessionStart hook added to the context: the hook injected it. (Matching a file by
+    its name in a hook's source was tried and is wrong: wf-census names `AGENT.md`,
+    `version.md` and `procedures/hooks.md` in comments and paths it only lists, and credited
+    P1 and P3 tasks that never saw those files.)"""
+    rec = rec or {}
+    hits, named = [], tool_paths(tr)
+    agents = [str(i.get("subagent_type") or "") for n, i in tr["tools"] if n in ("Agent", "Task")]
+    skills = [str(i.get("skill") or "") for n, i in tr["tools"] if n == "Skill"]
+    text_new = "\n".join(tr["hook_text"])
+    text_old = "\n".join(base_tr["hook_text"]) if base_tr else None
+    src = script_sources(commit) if commit else {}
+    by_name = {}
+    for p in src:
+        by_name.setdefault(os.path.basename(p), p)
+    ran, why = {}, {}
+    for p in src:  # what each shipped script did, by every record of it
+        rx = suffix_re(installed_suffix(p))
+        runs = sum(1 for c in tr["hooks"] if rx.search(c))
+        bash = sum(1 for n, i in tr["tools"] if n == "Bash" and rx.search(str(i.get("command"))))
+        if runs or bash:
+            ran[p] = runs
+            why[p] = "ran as a hook %d time(s)" % runs if runs else \
+                "named in %d Bash command(s)" % bash
+    for name, event, matcher in registrations(tdir, rec) if tdir else []:
+        p, n = by_name.get(name), fired(tr, rec, event, matcher)
+        if p and n:
+            ran.setdefault(p, 0)
+            why.setdefault(p, "registered on %s%s, which fired %d time(s)" % (
+                event, " (matcher %s)" % matcher if matcher else "", n))
+    loaded = sibling_closure(commit, list(ran)) if commit else {p: p for p in ran}
+    session = "\n".join(tr.get("session_text") or [])
+    preloads = {}
+    for a in sorted(set(agents)):
+        text, where = agent_definition(a.split(":")[-1], commit, rec.get("project")) \
+            if commit else ("", None)
+        for sk in frontmatter_skills(text):
+            preloads.setdefault(sk, "preloaded by agent %s (`skills:` in %s), spawned" % (a, where))
+    for s in surfaces:
+        if s["kind"] == "unshipped":
+            continue
+        rx = suffix_re(s["suffix"])
+        if s["kind"] == "script":
+            p = s["path"]
+            if p not in loaded:
+                continue
+            how = why[p] if loaded[p] == p else "loaded through _sibling by %s, which %s" % (
+                os.path.basename(loaded[p]), why.get(loaded[p], "ran"))
+            new = [x for x in s["added"] if x in text_new]
+            gone = [x for x in s["removed"] if text_old is not None and x in text_old
+                    and x not in text_new]
+            if new:
+                how += "; its output DIFFERS: it printed text only the new code has (%r)" % new[0][:80]
+            elif gone:
+                how += "; its output DIFFERS: the baseline's printed %r, which the new code " \
+                       "removed, and this run's does not" % gone[0][:80]
+            else:
+                how += "; whether its output differs is not shown: its input is not recorded, " \
+                       "so old and new were not re-run on it, and no string unique to either " \
+                       "side appears in what it printed"
+            hits.append((p, how))
+            continue
+        name = s.get("name") or ""
+        spawned = [a for a in agents if name and (a == name or a.endswith(":" + name))]
+        agent_dir = re.search(r"/agents/([^/]+)/AGENT\.md$", s["path"])
+        if s["kind"] == "agent" and spawned:
+            hits.append((s["path"], "spawned as subagent_type %s %d time(s)" % (name, len(spawned))))
+        elif agent_dir and any(a.split(":")[-1] == agent_dir.group(1) for a in agents):
+            hits.append((s["path"], "its agent %s was spawned" % agent_dir.group(1)))
+        elif s["kind"] == "skill" and (
+                any(k == name or k.endswith(":" + name) for k in skills) or
+                any(re.match(r"\s*/%s(?![\w-])" % re.escape(name), p) for p in tr["prompts"])):
+            hits.append((s["path"], "skill %s invoked (Skill tool or /%s)" % (name, name)))
+        elif s["kind"] == "skill" and name in preloads:
+            hits.append((s["path"], preloads[name]))
+        elif any(rx.search(p) for p in named):
+            hits.append((s["path"], "read: %d tool call(s) name its installed path %s" % (
+                sum(1 for p in named if rx.search(p)), s["suffix"])))
+        else:
+            d, base = s["suffix"].rsplit("/", 1)
+            drx, brx = suffix_re(d), re.compile(r"(?<![\w.-])%s(?![\w.-])" % re.escape(base))
+            n = sum(1 for p in named if drx.search(p) and brx.search(p))
+            body = (rgit("show", "--no-textconv", "%s:%s" % (commit, s["path"])) or "") \
+                if commit and session else ""
+            inj = [l.strip() for l in body.splitlines() if len(l.strip()) >= INJECT_MIN
+                   and l.strip() in session]
+            if n:  # `P=<config>/skills/<s>/references; cat $P/<file>`: directory and name apart
+                hits.append((s["path"], "read: %d tool call(s) name its installed directory %s "
+                                        "and its file name %s" % (n, d, base)))
+            elif inj:  # its text is in what a SessionStart hook injected
+                hits.append((s["path"], "injected at SessionStart: %d of its lines are in what a "
+                                        "SessionStart hook added to the context (%r)"
+                             % (len(inj), inj[0][:60])))
+    return hits
+
+
+def is_self_repo(project):
+    """True when the task's project is THIS repository: its commit is one of ours."""
+    c = (project or {}).get("commit")
+    return bool(c) and gitx(ROOT, "cat-file", "-e", c + "^{commit}", timeout=60)[0] == 0
+
+
+def future_install(project, workforce_commit):
+    """Why a task of this repository replayed under a FUTURE install cannot measure anything,
+    or None: the workforce it ran is not in the task commit's history, so the agent works in a
+    clone of the code beside an install from that code's future and can read the answer off
+    the install (cap-97ab04ca found "wf-model-lanes ... arrives in 1.78.0" so). Replay format 4
+    never does this (`self_repo_source`); a format-3 record may have."""
+    if not is_self_repo(project):
+        return None
+    c = project["commit"]
+    if workforce_commit and gitx(ROOT, "merge-base", "--is-ancestor", workforce_commit, c,
+                                 timeout=60)[0] == 0:
+        return None
+    return ("its project is this repository at %s, and it ran workforce %s, which that commit's "
+            "history does not hold: the install is the code's future" % (
+                c[:10], (workforce_commit or "as installed")[:10]))
+
+
+def self_repo_patch(task_commit, base, commit):
+    """(patch bytes, None) when the proposal's diff (base..commit, workforce/ only) applies
+    cleanly to the task commit's own tree, else (None, why). Checked with `git apply --cached
+    --check` against a throwaway index of that tree: reads only, writes no object."""
+    rc, patch, err = gitx(ROOT, "diff", "--binary", "--no-textconv", "--no-ext-diff", "--no-renames",
+                          base, commit, "--", "workforce", timeout=120)
+    if rc != 0:
+        return None, "git diff failed: %s" % one_line(err.decode("utf-8", "replace"), 200)
+    if not patch.strip():
+        return patch, None
+    bad = patch_symlink_escapes(patch)
+    if bad:
+        return None, "symlink outside tree: the diff makes a link to %s" % ", ".join(bad[:3])
+    with tempfile.TemporaryDirectory() as d:
+        env = dict(os.environ, GIT_INDEX_FILE=os.path.join(d, "index"))
+        rc, _, err = gitx(ROOT, "read-tree", task_commit, env=env, timeout=120)
+        if rc == 0:
+            rc, _, err = gitx(ROOT, "apply", "--cached", "--check", "-", env=env,
+                              input_text=patch, timeout=120)
+    if rc != 0:
+        return None, "the proposal's workforce/ diff does not apply to %s: %s" % (
+            task_commit[:10], one_line(err.decode("utf-8", "replace"), 300))
+    return patch, None
+
+
+UNPATCHABLE = "self-repo, unpatchable"
+
+
+def self_repo_state(rec, plan_commit):
+    """(shown, excluded) for one record: what kind of self-repo replay it was, and why it cannot
+    count (None when it can). Format 4 records `self_repo` {mode: task-time | patched |
+    unpatchable}; an older record is judged by `future_install`."""
+    sr = rec.get("self_repo")
+    if isinstance(sr, dict):
+        if sr.get("mode") == "unpatchable":
+            return "SELF-REPO-UNPATCHABLE: %s" % sr.get("why"), UNPATCHABLE
+        return "SELF-REPO, %s install of the task commit's own workforce/ tree%s" % (
+            sr.get("mode"), " with the proposal's diff applied" if sr.get("mode") == "patched"
+            else ""), None
+    why = future_install(rec.get("project"), (rec.get("workforce") or {}).get("commit")
+                         or plan_commit)
+    return ("SELF-REPO, not counted: %s" % why, "self-repo, future install") if why else (None, None)
+
+
+def replay_records(state, stamp):
+    """{(task id, or ("held-out", line)), repeat): (task dir, record)} of a replay run."""
+    out = {}
+    for path in sorted(glob.glob(os.path.join(glob.escape(state), "replay", stamp, "tasks", "*",
+                                              "record.json"))):
+        rec = read_json(path, None)
+        if isinstance(rec, dict):
+            key = ("held-out", rec["heldout_index"]) if rec.get("heldout_index") else rec.get("task")
+            out[(key, rec.get("repeat") or 1)] = (os.path.dirname(path), rec)
+    return out
+
+
+def exercise_map(state, plan, after_stamp, before_stamp):
+    """{task id or ("held-out", line): {"hits": [(path, how)], "self_repo": what kind, or None,
+    "excluded": why it cannot count, or None}} for
+    every planned task the after replay ran (any repeat reaching the diff counts), and the
+    diff's surfaces."""
+    surfaces = diff_surfaces(plan["base"], plan["commit"])
+    after, before = replay_records(state, after_stamp), replay_records(state, before_stamp)
+    out = {}
+    for (key, r), (tdir, rec) in sorted(after.items(), key=lambda kv: (str(kv[0][0]), kv[0][1])):
+        b = before.get((key, r)) or before.get((key, 1))
+        hits = reached(surfaces, task_trace(tdir, rec), task_trace(b[0], b[1]) if b else None,
+                       rec, tdir, plan["commit"])
+        e = out.setdefault(key, {"hits": [], "self_repo": None, "excluded": None, "repeats": 0})
+        e["repeats"] += 1
+        e["hits"] += [h for h in hits if h not in e["hits"]]
+        shown, excluded = self_repo_state(rec, plan["commit"])
+        e["self_repo"], e["excluded"] = e["self_repo"] or shown, e["excluded"] or excluded
+    return out, surfaces
+
+
+def compare(plan, before, after, before_held, after_held, reach=None):
     """Before and after on the same tasks: shown tasks by id, held-out tasks by their line in
     heldout.jsonl (rows from score's private heldout.jsonl; only counts leave this function).
     `missing` counts planned tasks with no after-score (not run, interrupted, no record);
     `blinded` counts tasks decided before (pass or fail) and unknown or missing after;
-    `env_blinded`, those that passed before and are env-unknown after."""
-    groups = [(s, [(i, before[i]["verdict"], (after.get(i) or {}).get("verdict"),
+    `env_blinded`, those that passed before and are env-unknown after. With `reach`
+    (`exercise_map`): a pass that is fail OR unknown after is LOST on every task, reached or
+    not (detection can miss a real run, and a miss must never hide a loss); a gain counts only
+    on a task that reached the diff (`exercised`), one that did not (`unexercised`) is listed
+    in `moved_unexercised`; a self-repo task the replay could not test (`excluded`: a future
+    install, or a proposal diff that does not apply to its tree) is counted in `self_repo`
+    and nothing else."""
+    groups = [(s, [(i, i, before[i]["verdict"], (after.get(i) or {}).get("verdict"),
                     bool((after.get(i) or {}).get("env"))) for i in plan["tasks"][s]], True)
               for s in ("capability", "regression")]
-    groups += [("held-out " + s, [(n, (before_held.get(n) or {}).get("verdict", "unknown"),
+    groups += [("held-out " + s, [(n, ("held-out", n),
+                                   (before_held.get(n) or {}).get("verdict", "unknown"),
                                    (after_held.get(n) or {}).get("verdict"),
                                    bool((after_held.get(n) or {}).get("env"))) for n in idx], False)
                for s, idx in sorted(plan["heldout_index"].items())]
@@ -5108,11 +5999,45 @@ def compare(plan, before, after, before_held, after_held):
         row = {"tasks": len(items), "before": dict.fromkeys(VERDICTS, 0),
                "after": dict.fromkeys(VERDICTS, 0), "gained": 0, "lost": 0, "kept": 0,
                "undecided": 0, "missing": 0, "blinded": 0, "env_blinded": 0, "moved": []}
-        for key, b, a, env in items:
-            row["missing"] += a is None
+        if reach is not None:
+            row.update(exercised=0, unexercised=0, self_repo=0, moved_unexercised=[],
+                       untestable=0, untestable_tasks=[])
+        for key, rkey, b, a, env in items:
+            got = a is not None
+            row["missing"] += not got
             a = a or "unknown"
             row["before"][b] += 1
             row["after"][a] += 1
+            e = None if reach is None else reach.get(rkey)
+            if e is not None and e["excluded"] == UNPATCHABLE and b != "unknown":
+                # THE BASELINE DECIDED IT and the proposal could not be installed on its tree:
+                # what the proposal does there is unknown, like a missing after-score. Dropped,
+                # a pass lost there would let the verdict read NEUTRAL or IMPROVES.
+                row["untestable"] += 1
+                row["untestable_tasks"].append(key if shown else "held-out")
+                continue
+            if e is not None and e["excluded"]:  # self-repo it could not test: no evidence
+                row["self_repo"] += 1
+                if shown and a != b:
+                    row["moved_unexercised"].append({"task": key, "before": b, "after": a,
+                                                     "why": e["excluded"]})
+                continue
+            if e is not None:
+                # EXERCISED GATES GAINS ONLY. Detection can miss a real run, so a loss counts
+                # whether or not the task reached the diff, and with `reach` a pass that is
+                # unknown after counts as lost too: nothing may hide one.
+                row["exercised" if e["hits"] else "unexercised"] += 1
+                if got and b == "pass" and a in ("fail", "unknown"):
+                    row["lost"] += 1
+                    if shown:
+                        row["moved"].append({"task": key, "before": b, "after": a})
+                    continue
+                if not e["hits"]:
+                    if b != "pass" and a == "pass" and shown:
+                        row["moved_unexercised"].append({"task": key, "before": b, "after": a,
+                                                         "why": "not exercised, so not a gain"})
+                    row["kept" if a == b and a != "unknown" else "undecided"] += 1
+                    continue
             row["blinded"] += b != "unknown" and a == "unknown"
             row["env_blinded"] += b == "pass" and a == "unknown" and env  # a pass hidden as env
             move = "undecided" if "unknown" in (b, a) else "kept" if a == b else \
@@ -5125,15 +6050,25 @@ def compare(plan, before, after, before_held, after_held):
 
 
 def proposal_verdict(cmp, ablation, same_grader=True, same_format=True):
-    """(verdict, why). An unknown is never a gain or a loss. A loss is REGRESSES; otherwise a
-    planned task with no after-score, or a regression or held-out task (any task, for an
-    ablation) that was decided before and is unknown after, is INCONCLUSIVE: what it would
-    have shown is not known, so the run cannot say IMPROVES or REMOVABLE."""
+    """(verdict, why). Without what each task reached, an unknown is never a gain or a loss;
+    with it (`compare`'s `reach`), a pass unknown after is a loss. A loss on a regression or
+    held-out task (any task, for an ablation) is REGRESSES; otherwise a planned task with no
+    after-score is INCONCLUSIVE; then a run with NO loss anywhere and no task that reached the
+    diff is NOT EXERCISED (it says nothing about the change); then a regression or held-out
+    task that was decided before and is unknown after is INCONCLUSIVE: what it would have
+    shown is not known, so the run cannot say IMPROVES or REMOVABLE."""
     cap = cmp["capability"]
     guarded = [n for n in cmp if n != "capability" or ablation]
     lost = ["%s lost %d pass(es)" % (n, cmp[n]["lost"]) for n in guarded if cmp[n]["lost"]]
     undecided = sum(r["undecided"] for r in cmp.values())
     note = "; %d task(s) unknown on a side, not counted" % undecided if undecided else ""
+    reach = all("exercised" in r for r in cmp.values())
+    if reach:
+        un, sr = (sum(r[k] for r in cmp.values()) for k in ("unexercised", "self_repo"))
+        note += "; %d task(s) never reached the diff (no gain counted, losses still are)" % un \
+            if un else ""
+        note += "; SELF-REPO: %d task(s) of this repository not counted (untestable: see the " \
+                "exercised report)" % sr if sr else ""
     if not same_grader:
         return "INCONCLUSIVE", "before and after were graded with different %s" % TT_PATH
     if not same_format:
@@ -5141,10 +6076,23 @@ def proposal_verdict(cmp, ablation, same_grader=True, same_format=True):
                                "rig (replay format or judge prompt differs, or was not recorded)"
     if lost:
         return "REGRESSES", "; ".join(lost) + note
-    blind = ["%d planned task(s) have no after-score" % sum(r["missing"] for r in cmp.values())] \
-        if any(r["missing"] for r in cmp.values()) else []
-    blind += ["%s: %d decided before, unknown after" % (n, cmp[n]["blinded"])
-              for n in guarded if cmp[n]["blinded"]]
+    missing = sum(r["missing"] for r in cmp.values())
+    if missing:
+        return "INCONCLUSIVE", "%d planned task(s) have no after-score%s" % (missing, note)
+    untestable = [t for r in cmp.values() for t in r.get("untestable_tasks") or []]
+    if untestable:
+        named = [t for t in untestable if t != "held-out"]
+        return "INCONCLUSIVE", "%d task(s) could not be tested against this proposal (patch does " \
+            "not apply): %s%s" % (len(untestable), ", ".join(named + (
+                ["%d held-out" % (len(untestable) - len(named))] if len(named) < len(untestable)
+                else [])), note)
+    if reach and not sum(r["exercised"] for r in cmp.values()) and \
+            not sum(r["lost"] for r in cmp.values()):
+        return "NOT EXERCISED", "no replayed task reached the diff (no changed script ran, no " \
+                                "changed agent was spawned or skill invoked, no changed file " \
+                                "was read), so nothing it gained or lost was about it%s" % note
+    blind = ["%s: %d decided before, unknown after" % (n, cmp[n]["blinded"])
+             for n in guarded if cmp[n]["blinded"]]
     blind += ["%s: %d passed before and are env-unknown after" % (n, cmp[n]["env_blinded"])
               for n in cmp if n not in guarded and cmp[n].get("env_blinded")]
     if blind:
@@ -5162,10 +6110,135 @@ def proposal_verdict(cmp, ablation, same_grader=True, same_format=True):
         net, cap["gained"], cap["lost"], note)
 
 
+def exercise_summary(reach, surfaces):
+    """What proposal.json keeps of `exercise_map`: each changed path's kind, and per SHOWN task
+    what it reached; held-out tasks as counts only (what one reached says which task it is)."""
+    held = [e for k, e in reach.items() if isinstance(k, tuple)]
+    return {"surfaces": [{"path": x["path"], "kind": x["kind"]} for x in surfaces],
+            "tasks": {k: {"hits": e["hits"], "self_repo": e["self_repo"], "excluded": e["excluded"],
+                          "repeats": e["repeats"]}
+                      for k, e in sorted(reach.items(), key=lambda kv: str(kv[0]))
+                      if not isinstance(k, tuple)},
+            "heldout": {"tasks": len(held), "exercised": sum(
+                1 for e in held if e["hits"] and not e["excluded"]),
+                "self_repo": sum(1 for e in held if e["self_repo"]),
+                "excluded": sum(1 for e in held if e["excluded"])}}
+
+
+def exercised_lines(ex):
+    """The per-task EXERCISED report, as plain lines (`exercised` prints them; the .md quotes them)."""
+    shipped = [x for x in ex["surfaces"] if x["kind"] != "unshipped"]
+    out = ["changed paths: " + ("; ".join("%s (%s)" % (x["path"], x["kind"]) for x in shipped)
+                                or "none shipped") +
+           "; %d path(s) no manifest row ships, which reach no replay" % (
+               len(ex["surfaces"]) - len(shipped))]
+    for k, e in ex["tasks"].items():
+        if e["self_repo"]:
+            out.append("%s  %s" % (k, e["self_repo"]))
+        out.append("%s  %s" % (k, "EXERCISED" if e["hits"] else "NOT EXERCISED (a gain here is not "
+                                "counted; a loss is): no changed script ran or was loaded, no "
+                                "changed agent was spawned or skill invoked or preloaded, no "
+                                "changed file was read or injected by a SessionStart hook"))
+        out += ["    %s: %s" % (path, how) for path, how in e["hits"]]
+    h = ex["heldout"]
+    out.append("held-out: %d of %d exercised, %d self-repo of which %d not counted (counted only)"
+               % (h["exercised"], h["tasks"], h["self_repo"], h.get("excluded", h["self_repo"])))
+    return out
+
+
+def exercised_md(ex):
+    if not ex:
+        return []
+    return ["", "## Exercised: which tasks reached the diff", "",
+            "A gain counts only on a task that reached the change; a loss counts on every task. "
+            "A task of this repository the replay could not test (SELF-REPO under a future "
+            "install, or SELF-REPO-UNPATCHABLE) is counted in neither.", "", "```"] + \
+        [_CONTROL.sub("", l).replace("`", "'") for l in exercised_lines(ex)] + ["```"]
+
+
+def beside(cmp, noise):
+    """What is printed beside every verdict: the noise, and how many tasks were SELF-REPO."""
+    sr = sum(r.get("self_repo", 0) for r in cmp.values())
+    return "%s; self-repo: %d task(s) not counted" % (noise, sr)
+
+
+def rederive(state, prop):
+    """(comparison, verdict, reason, exercise summary, noise) for a finished proposal from what is
+    on disk now; reads, never writes."""
+    before_sum, before, before_held, _, _ = load_baseline(state, prop["baseline"])
+    after_sum, after, after_held, _, _ = load_baseline(state, prop["replay"])
+    reach, surfaces = exercise_map(state, prop, prop["replay"], prop["baseline"])
+    cmp = compare(prop, before, after, before_held, after_held or {}, reach)
+    verdict, reason = proposal_verdict(
+        cmp, prop["kind"] == "ablation",
+        (after_sum.get("grader") or {}).get("wf_task_tag_sha256") == prop["grader"],
+        before_sum.get("replay_format") == after_sum.get("replay_format") is not None and
+        before_sum.get("scoring_sha256") == after_sum.get("scoring_sha256") is not None)
+    if before_sum.get("bank") != after_sum.get("bank"):
+        verdict, reason = "INCONCLUSIVE", "the baseline was scored on bank %s and this replay " \
+            "on %s; re-score one of them with `score --bank`" % (before_sum.get("bank"),
+                                                                  after_sum.get("bank"))
+    return cmp, verdict, reason, exercise_summary(reach, surfaces), noise_text(before_sum)
+
+
+def cmd_exercised(args):
+    """Read-only: per replayed task, whether it reached the proposal's diff and how, and the
+    verdict the proposal would get from it now (no model called, nothing written)."""
+    pdir = os.path.join(args.state, "proposals", args.proposal)
+    prop = read_json(os.path.join(pdir, "proposal.json"), None) if STAMP.match(args.proposal) else None
+    if not isinstance(prop, dict) or not prop.get("replay"):
+        print("loop exercised: no proposal with a replay at %s" % pdir, file=sys.stderr)
+        return 2
+    try:
+        cmp, verdict, reason, ex, noise = rederive(args.state, prop)
+    except ReplayError as e:
+        print("loop exercised: %s" % e, file=sys.stderr)
+        return 2
+    print("Proposal %s (%s), replay %s against baseline %s" % (
+        args.proposal, one_line(prop["ref"], 60), prop["replay"], prop["baseline"]))
+    for line in exercised_lines(ex):
+        print("  " + line)
+    for name, r in cmp.items():
+        print("  %-22s gained %d lost %d kept %d unknown-on-a-side %d | not exercised %d, "
+              "self-repo %d" % (name, r["gained"], r["lost"], r["kept"], r["undecided"],
+                                r["unexercised"], r["self_repo"]))
+        for m in r["moved_unexercised"]:
+            print("      moved, not counted: %s %s -> %s (%s)" % (m["task"], m["before"],
+                                                                  m["after"], m["why"]))
+    try:
+        _, shown, hidden, _ = load_bank(args.state, prop["bank"])
+    except ReplayError:
+        shown, hidden = [], []
+    planned = set(prop["tasks"]["capability"] + prop["tasks"]["regression"])
+    lines = sorted(n for idx in prop.get("heldout_index", {}).values() for n in idx)
+    held_ok = held_no = 0
+    for t in [t for t in shown if t["id"] in planned] + [hidden[n - 1] for n in lines
+                                                         if n <= len(hidden)]:
+        if not is_self_repo(t.get("project")):
+            continue
+        _, why = self_repo_patch(t["project"]["commit"], prop["base"], prop["commit"])
+        if t in hidden:
+            held_ok, held_no = held_ok + (why is None), held_no + (why is not None)
+            continue
+        print("  self-repo patch check %s @%s: %s" % (t["id"], t["project"]["commit"][:10],
+                                                       "APPLIES cleanly" if why is None else
+                                                       "SELF-REPO-UNPATCHABLE: " + why))
+    if held_ok or held_no:
+        print("  self-repo patch check, held-out: %d apply, %d unpatchable (counted only)"
+              % (held_ok, held_no))
+    print("Recorded verdict: %s. Now: %s (%s); %s." % (prop.get("verdict"), verdict,
+                                                        one_line(reason, 400), beside(cmp, noise)))
+    print("Read only: nothing was written.")
+    return 0
+
+
 def proposal_md(prop, shown):
     fmt = lambda c: "%d / %d / %d" % (c["pass"], c["fail"], c["unknown"])
     cmp, cost = prop["comparison"], prop["cost"]
-    out = ["# Proposal %s: %s" % (prop["stamp"], prop["verdict"]), "", md_safe(prop["reason"]), "",
+    out = ["# Proposal %s: %s" % (prop["stamp"], prop["verdict"]), "", md_safe(prop["reason"]), ""]
+    if prop.get("noise"):
+        out += ["Beside the verdict: %s." % md_safe(beside(prop["comparison"], prop["noise"]), 300), ""]
+    out += [
            "- Kind: %s" % ("ablation: it removes something; REMOVABLE means no split lost a "
                            "pass without it" if prop["kind"] == "ablation" else "fix"),
            "- Commit: `%s` (`%s`), built on the baseline's workforce `%s`"
@@ -5191,17 +6264,25 @@ def proposal_md(prop, shown):
                                                  md_safe(src.get("title") or "", 80),
                                                  md_safe(f.get("note") or "", 300)),
                     "    > %s" % md_safe(f.get("evidence") or "", 300)]
+    out += exercised_md(prop.get("exercised"))
+    reach = all("exercised" in r for r in cmp.values())
     out += ["", "## Before and after, the same tasks (pass / fail / unknown)", "",
-            "| split | tasks | before | after | gained | lost | unknown on a side | no after-score |",
-            "|---|---|---|---|---|---|---|---|"]
+            "| split | tasks | before | after | gained | lost | unknown on a side | no after-score |"
+            + (" not exercised | self-repo |" if reach else ""),
+            "|---|---|---|---|---|---|---|---|" + ("---|---|" if reach else "")]
     for split, r in cmp.items():
         out.append("| %s | %d | %s | %s | %d | %d | %d | %d |" % (
             split, r["tasks"], fmt(r["before"]), fmt(r["after"]), r["gained"], r["lost"],
-            r["undecided"], r["missing"]))
+            r["undecided"], r["missing"]) + (" %d | %d |" % (r["unexercised"], r["self_repo"])
+                                             if reach else ""))
     moved = [m for r in cmp.values() for m in r["moved"]]
     if moved:
         out += ["", "Moved: " + ", ".join("`%s` %s to %s" % (m["task"], m["before"], m["after"])
                                           for m in moved)]
+    noise = [m for r in cmp.values() for m in r.get("moved_unexercised") or []]
+    if noise:
+        out += ["", "Moved but not counted (the run's noise): " + ", ".join(
+            "`%s` %s to %s (%s)" % (m["task"], m["before"], m["after"], m["why"]) for m in noise)]
     out += ["", "## Cost", "", "Replay $%.2f + judge $%.2f = $%.2f." % (
         cost["replay_usd"], cost["judge_usd"], cost["replay_usd"] + cost["judge_usd"]), "",
             "## Your decision", "",
@@ -5221,6 +6302,7 @@ def gated(args):
         print("loop %s: REFUSED: %s" % (args.cmd, line), file=sys.stderr)
     if no:
         return None
+    plan["repeats"] = getattr(args, "repeats", 1) or 1
     print_plan(plan)
     return plan
 
@@ -5253,7 +6335,8 @@ def cmd_propose(args):
         task=(t["capability"] + t["regression"]) or None, with_heldout=bool(t["heldout"]),
         workforce=plan["commit"], model=plan["replay_model"],
         max_turns=caps.get("turns") or 100, timeout=caps.get("timeout") or 1800,
-        max_resumes=caps.get("resumes", 0), dry_run=False, run_stamp=None, resume=None)
+        max_resumes=caps.get("resumes", 0), dry_run=False, run_stamp=None, resume=None,
+        repeats=args.repeats, patch_base=plan["base"])
     rc = cmd_replay(ns)
     prop["replay"] = ns.run_stamp
     if rc == 0:
@@ -5269,7 +6352,10 @@ def cmd_propose(args):
     before_sum, before, before_held, _, _ = load_baseline(args.state, args.baseline)
     after_sum, after, after_held, _, _ = load_baseline(args.state, ns.run_stamp)
     shown = load_bank(args.state, args.bank)[1]
-    prop["comparison"] = compare(plan, before, after, before_held, after_held or {})
+    reach, surfaces = exercise_map(args.state, plan, ns.run_stamp, args.baseline)
+    prop["exercised"] = exercise_summary(reach, surfaces)
+    prop["noise"] = noise_text(before_sum)
+    prop["comparison"] = compare(plan, before, after, before_held, after_held or {}, reach)
     prop["verdict"], prop["reason"] = proposal_verdict(
         prop["comparison"], plan["kind"] == "ablation",
         (after_sum.get("grader") or {}).get("wf_task_tag_sha256") == plan["grader"],
@@ -5411,6 +6497,13 @@ def add_propose(p):
                    help="a category it fixes (adds to its %s trailers)" % CATEGORY_TRAILER)
     p.add_argument("--claude", metavar="PATH", help="the claude binary (default: on PATH)")
     p.add_argument("--judge-timeout", type=int, default=300, help="seconds per judge call")
+    p.add_argument("--repeats", type=int, default=1, metavar="N",
+                   help="replay each task N times; a task counts by its majority verdict, and "
+                        "one its repeats split on counts as unknown (default 1)")
+
+
+def add_exercised(p):
+    p.add_argument("proposal", metavar="PROPOSAL_STAMP", help="a proposal that has a replay")
 
 
 def add_decide(p):
@@ -5461,6 +6554,10 @@ def add_bank(p):
     p.add_argument("--retire", action="append", metavar="ID",
                    help="with --recommit: mark this task of tasks.jsonl not replayable")
     p.add_argument("--reason", help="with --retire: why, recorded as its not_replayable")
+    p.add_argument("--revise", metavar="STAMP",
+                   help="write a new bank from that one with script graders corrected as "
+                        "--revisions FILE says; calls no model")
+    p.add_argument("--revisions", metavar="FILE", help="with --revise: the JSON of revisions")
 
 
 def add_replay(p):
@@ -5486,6 +6583,9 @@ def add_replay(p):
     p.add_argument("--max-resumes", type=int, default=3,
                    help="times per task a call the timeout stopped mid-work is resumed "
                         "(default 3: with --timeout 1800, about 2 h a task)")
+    p.add_argument("--repeats", type=int, default=1, metavar="N",
+                   help="run each task N times (keys <key>@2 ... <key>@N); scores count a "
+                        "task by its majority verdict (default 1)")
     p.add_argument("--dry-run", action="store_true",
                    help="list what would run, the caps and the command; call no model")
 
@@ -5513,7 +6613,12 @@ def add_deny_check(p):
 def add_score(p):
     p.add_argument("replay", metavar="REPLAY_STAMP", help="the replay run to score")
     add_judge_args(p)
-    p.add_argument("--force", action="store_true", help="score a replay that was scored before")
+    p.add_argument("--force", action="store_true", help="score a replay that was scored before "
+                   "(the old score is moved to superseded-<stamp>/)")
+    p.add_argument("--bank", metavar="STAMP",
+                   help="grade against this bank (a revision of the replay's own; same task "
+                        "ids and held-out lines); a judge answer the old score holds for the "
+                        "same question is reused. With --dry-run: show what changes")
     p.add_argument("--dry-run", action="store_true",
                    help="list the tasks and the judge command; call no model, write nothing")
 
@@ -5551,6 +6656,8 @@ COMMANDS = {
              add_propose, cmd_gate),
     "propose": ("gate a proposal commit, replay and score it, compare with a baseline, verdict",
                 add_propose, cmd_propose),
+    "exercised": ("per replayed task of a proposal, whether it reached the diff, and the "
+                  "verdict it would get now; reads only", add_exercised, cmd_exercised),
     "decide": ("record the user's approval or rejection of a proposal, with its lineage",
                add_decide, cmd_decide),
     "status": ("one screen: last mine, accepted taxonomy and bank, baseline, proposals, due",
