@@ -278,11 +278,13 @@ import importlib.util
 import io
 import selectors
 import json
+import math
 import os
 import re
 import shlex
 import shutil
 import signal
+import stat
 import subprocess
 import sys
 import tarfile
@@ -2400,7 +2402,7 @@ class ReplayUnsafe(Exception):
     """A replay loaded something it must not have; the whole run stops."""
 
 
-def gitx(cwd, *argv, timeout=300, sandbox=(), env=None):
+def gitx(cwd, *argv, timeout=300, sandbox=(), env=None, input_text=None):
     """(returncode, stdout, stderr) of one git command, raw. Hooks and fsmonitor off and
     `GIT_SAFE_ENV`, so a clone, checkout or archive runs nothing a tree or the user's config
     names. `sandbox` (a bwrap prefix) and `env` run it inside a replay's sandbox: for a clone
@@ -2409,8 +2411,10 @@ def gitx(cwd, *argv, timeout=300, sandbox=(), env=None):
     try:
         r = subprocess.run(list(sandbox) + [
             shutil.which("git") or "git", "-c", "core.hooksPath=/dev/null", "-c",
-            "core.fsmonitor=false", "-C", cwd] + list(argv), stdin=subprocess.DEVNULL,
-            capture_output=True, timeout=timeout, env=env)
+            "core.fsmonitor=false", "-C", cwd] + list(argv),
+            capture_output=True, timeout=timeout, env=env,
+            **({"input": input_text.encode("utf-8")} if input_text is not None
+               else {"stdin": subprocess.DEVNULL}))
     except (OSError, subprocess.TimeoutExpired) as e:
         return 1, b"", str(e).encode()
     return r.returncode, r.stdout, r.stderr
@@ -2682,10 +2686,11 @@ def sandbox_argv(claude, work, objects, config, ro=()):
     read-only); HOME as an empty tmpfs holding only the toolchains above read-only, `.claude`
     as a link to the throwaway config, and a .gitconfig with the user's name and email; `work/`
     (the clone, throwaway config with the copied token, throwaway home, install source)
-    read-write; the source repository's object store(s) the clone borrows from READ-ONLY.
+    read-write; any `objects` dirs read-only (a replay clone passes none: `clone_at` repacks it
+    to own its objects); `ro` files and dirs read-only (the release guard at /run/loop).
     NOT VISIBLE: everything else in HOME (~/.ssh, ~/.gnupg, ~/.config, the real ~/.claude,
-    other projects, the loop's bank and scores), the source repository's config, refs, hooks
-    and working tree, and /run/user (session sockets). NOT ISOLATED: the network (the API needs
+    other projects, the loop's bank and scores), the source repository itself (its objects,
+    config, refs, hooks and working tree), and /run/user (session sockets). NOT ISOLATED: the network (the API needs
     it), and the copied access token, readable by the replay's own tools. Own PID, IPC and UTS
     namespaces; killed with its parent."""
     home = os.path.realpath(os.path.expanduser("~"))
@@ -2814,12 +2819,14 @@ def replay_argv(claude, seconds, turns, model, resume, sandbox=(), settings=None
 
 
 # THE RIG'S VERSION, recorded in replay.json and summary.json: a proposal is compared with a
-# baseline only when both ran the same replay format and the same judge prompt. 2: each peer
+# baseline only when both ran the same replay format and the same judge prompt. 3: the commit
+# from the HEAD reflog, the project's .claude/ state copied in (`copy_session_state`), refs
+# newer than the commit removed (`prune_future_refs`). 2: each peer
 # message its own turn at the session's first idle point, timeouts resumed (a background
 # subagent is work in progress), the release guard hook in read-only flag settings with the
 # glob deny list, /tmp and work/ allowed, the judge shown the patch and tool calls, and the
 # env outcome.
-REPLAY_FORMAT = 2
+REPLAY_FORMAT = 3
 CONTEXT_BLOCK = ("[Delivered by the replay, not a new request] Earlier in this conversation the "
                  "user said:\n%s\n[End of the earlier turns.]")
 
@@ -3048,14 +3055,17 @@ def git_refs(top):
     return dict(l.split(" ", 1) for l in out.decode().splitlines() if " " in l) if rc == 0 else None
 
 
-def capture_diff(wt, sub, commit, tdir, sandbox, env):
+def capture_diff(wt, sub, commit, tdir, sandbox, env, base=None):
     """The replay's change from the starting commit, as the project sees it: committed, staged,
     modified and untracked-not-ignored (`git add -A` in the throwaway clone first). Paths are
     relative to the project directory; one outside it is dropped from `paths`. Every git call
     runs in the replay's own sandbox, without network: the replay could write the clone's
     .git (a clean filter, a textconv, a `gitdir:` pointing at a real repository), and what
-    that config names must run where the replay did, never out here."""
+    that config names must run where the replay did, never out here. `base`: the tree the
+    replay started from when session state was copied in (`copy_session_state`), so what was
+    copied is not counted as the replay's change."""
     box = list(sandbox) + ["--unshare-net"]
+    commit = base or commit
     gitx_ok(wt, "add", "-A", "--", ".", sandbox=box, env=env)
     names = gitx_ok(wt, "diff", "--cached", "--name-only", "-z", "--no-renames", commit, "--",
                     sandbox=box, env=env)
@@ -3091,11 +3101,14 @@ def file_checks(task, cwd, wt):
 
 
 def clone_at(top, commit, repo):
-    """The project at `commit` in `repo`: `git clone --shared --no-checkout` (it borrows the
-    source's objects through `objects/info/alternates`, writes nothing to the source), no
-    remote left, hooks off, then a detached checkout. Returns the object dirs it borrows, which
-    the sandbox binds read-only. The source repository's config, refs and hooks are never
-    shared with the clone, so nothing a replay does to its git can reach them."""
+    """The project at `commit` in `repo`, holding ONLY what the session could have seen: a
+    `git clone --shared --no-checkout` of `top` (it writes nothing to the source), no remote,
+    hooks off, checked out at `commit` on one branch with a fixed name, `replay` (the source's
+    branch names say nothing to it), every other branch and every tag deleted
+    (`prune_future_refs`), the reflog expired, then `git repack -a -d` and the alternates file
+    removed, so the clone owns a copy of exactly the objects reachable from `commit` and its
+    kept refs, and no later commit, tree or blob can be read from it, not even through
+    `cat-file --batch-all-objects`. Returns [] (no object store to bind into the sandbox)."""
     rc, _, err = gitx(os.path.dirname(repo), "clone", "--quiet", "--shared", "--no-checkout",
                       "--", top, repo)
     if rc != 0:
@@ -3103,8 +3116,252 @@ def clone_at(top, commit, repo):
     gitx_ok(repo, "remote", "remove", "origin")
     gitx_ok(repo, "config", "core.hooksPath", "/dev/null")
     gitx_ok(repo, "-c", "advice.detachedHead=false", "checkout", "--quiet", "--detach", commit)
-    with open(os.path.join(repo, ".git", "objects", "info", "alternates"), encoding="utf-8") as fh:
-        return [os.path.realpath(l.strip()) for l in fh if l.strip()]
+    REFS_PRUNED[repo] = prune_future_refs(repo, commit, "replay")
+    gitx_ok(repo, "repack", "-a", "-d", "-q", timeout=1800)
+    alternates = os.path.join(repo, ".git", "objects", "info", "alternates")
+    os.unlink(alternates)
+    gitx_ok(repo, "fsck", "--connectivity-only", "--no-dangling", "--no-progress", timeout=1800)
+    return []
+
+
+REFS_PRUNED = {}  # clone path -> what `prune_future_refs` did, for the task's record
+
+
+def prune_future_refs(repo, commit, branch=None):
+    """The clone keeps ONE ref: `branch` (`replay`), set to `commit` and checked out; every tag
+    and every other branch is deleted, whatever it points at. Returns {branch, deleted}."""
+    refs = gitx_ok(repo, "for-each-ref", "--format=%(refname)", "refs/heads", "refs/tags")
+    out = {"branch": branch, "deleted": []}
+    if branch:
+        gitx_ok(repo, "update-ref", "refs/heads/" + branch, commit)
+        gitx_ok(repo, "symbolic-ref", "HEAD", "refs/heads/" + branch)
+    for ref in [r for r in refs.splitlines() if r]:
+        if branch and ref == "refs/heads/" + branch:
+            continue
+        gitx_ok(repo, "update-ref", "-d", ref)
+        out["deleted"].append(ref)
+    gitx_ok(repo, "reflog", "expire", "--expire=all", "--all")
+    return out
+
+
+# SESSION STATE a git checkout lacks: the project's own .claude/ files that are not in the commit,
+# copied only when they were last changed BEFORE the session's opening turn (so they cannot hold
+# its work) and pass an ALLOWLIST: a text file with one of these extensions, under one of these
+# org dirs, not a ledger (they carry other sessions' prompts), and no name or content that looks
+# like a credential. Everything else is skipped and listed on the task record.
+STATE_DIRS = ("agents", "skills", "commands", "workforce", "plans")
+STATE_EXTS = (".md", ".txt", ".yaml", ".yml", ".json", ".sh", ".py", ".js", ".mjs", ".ts",
+              ".toml", ".csv")
+LEDGER = re.compile(r"(^|/)workforce/(issues|records)/|(^|/)(commitments|index)\.json$|\.jsonl$")
+CRED_NAME = re.compile(
+    r"(^|/)(\.env[^/]*|\.envrc|\.npmrc|\.pypirc|\.pgpass|\.netrc|\.git-credentials|"
+    r"\.dockercfg|kubeconfig|id_(rsa|dsa|ecdsa|ed25519)[^/]*)$|"
+    r"(token|secret|credential|passw|apikey|api[-_]key|private|oauth|cookie|session|auth|cache)|"
+    r"\.(key|pem|p12|pfx|der|crt|asc|gpg|kdbx|jks)$|(^|/)settings[^/]*\.json|__pycache__|"
+    r"\.wf-bak$|crash-log|(^|/)data/", re.I)
+# FAILS CLOSED, by shape rather than by known formats: a key-like name with any value, URL
+# userinfo, an auth header value, a JWT, a webhook URL, a PEM marker, a credential sentence.
+CRED_TEXT = re.compile(
+    # a key-like name with any value: pass*, pwd, secret, api key, credential, private key
+    r"(?i:\w*(pass(word|wd|phrase|code)?|pwd|secret|api.?key|credential|private.?key)\w*"
+    r"[\"']?\s*[:=]\s*[\"']?\S)|"
+    # auth only as auth, auth_*, *_auth, authorization, authtoken (never author)
+    r"(?i:\b(\w+_)?(auth|authorization|authtoken)(_\w+)?[\"']?\s*[:=]\s*[\"']?\S)|"
+    # token with a value that is not a short number (`tokens: 600` is a budget)
+    # (a number of up to 6 digits, or one with thousands commas, is a count, not a secret)
+    r"(?i:\w*token\w*[\"']?\s*[:=]\s*[\"']?(?!(\d{1,6}|\d{1,3}(,\d{3})+)[\"']?\s*($|[,;}\]\s]))\S)|"
+    r"(?i:\bpin[\"']?\s*[:=]\s*[\"']?\S)|"
+    # a password on a command line
+    r"\b(mysql|mysqldump|mariadb|sshpass|psql|redis-cli)\b[^\n]*\s-p\s?\S|--password[= ]\S|"
+    r"://[^/\s:@]+:[^/\s@]+@|:\\/\\/[^/\s:@\\]+:[^/\s@\\]+@|(?i:\b(bearer|basic)\s+[A-Za-z0-9+/=._~-]{8,})|"
+    r"\beyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}|"
+    r"hooks\.slack\.com/|discord(app)?\.com/api/webhooks/|-----BEGIN|"
+    r"(?i:\b(password|passphrase|secret|token|api ?key)\s+(is|was|=|:))|"
+    # known prefixes too, for keys shorter or plainer than the entropy test catches
+    r"\b(AKIA|ASIA)[0-9A-Z]{16}\b|\bAIza[0-9A-Za-z_-]{20,}|\bSG\.[A-Za-z0-9_-]{10,}|"
+    r"\b(sk|rk|pk)_(live|test)_[A-Za-z0-9]{8,}|\b(sk-ant-|sk-proj-|github_pat_|glpat-|GOCSPX-|"
+    r"hf_|npm_|xox[abprs]-)[A-Za-z0-9_-]{8,}|\bgh[pousr]_[A-Za-z0-9]{16,}")
+HIGH_ENTROPY = re.compile(r"[A-Za-z0-9+/=_-]{24,}")
+# Timestamps and dates inside a run (`org-20261003T020911Z-fingrowth`), taken out before the
+# entropy and uppercase-digit tests. MEASURED 2026-10-16: without this, work-order run ids
+# made most of a project's workforce/work/ look like credentials.
+STAMP_PART = re.compile(r"\d{8}T\d{6}Z|\d{4}-\d{2}-\d{2}(T\d{2}[:-]?\d{2}([:-]?\d{2})?Z?)?")
+HEX_RUN = re.compile(r"(?<![0-9A-Za-z])[0-9a-f]{32,}(?![0-9A-Za-z])")
+UUID = re.compile(r"(?i)(?<![0-9a-z])[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?![0-9a-z])")
+UPPER_DIGIT_RUN = re.compile(r"(?<![0-9A-Za-z])[A-Z0-9]{24,}(?![0-9A-Za-z])")
+KEY_WORD = re.compile(r"(?i)(key|token|secret|api|auth|passw|password|credential)\w*[\"'\s:=]*$")
+STATE_MAX_FILE, STATE_MAX_TOTAL = 1 << 20, 50 << 20
+
+
+def credential_like(text):
+    """True when text holds anything shaped like a credential (`CRED_TEXT`), or a high-entropy
+    run: 24+ characters of [A-Za-z0-9+/=_-] holding a lowercase letter, an uppercase letter and
+    a digit, with Shannon entropy above 3.5 bits per character (a key, a token, a base64 blob,
+    a PEM body); a lowercase hex run of 32+ characters that is not 40 or 64 long (a hex secret;
+    a 40/64 one, a git sha's length, only right after a key word); a UUID right after a key
+    word; an uppercase-and-digit run of 24+ characters. MEASURED: a git sha and a dated path
+    like plan/review-loop-2026-10-14 are not caught. NOT CAUGHT, an accepted limit: a plain
+    lowercase password with no key name near it. Over-skipping is accepted: the sandbox having
+    no credentials is the floor."""
+    if CRED_TEXT.search(text):
+        return True
+    for m in HEX_RUN.finditer(text):  # a hex secret; a 40/64-hex git sha only beside a key word
+        if len(m.group(0)) not in (40, 64) or KEY_WORD.search(text[max(0, m.start() - 40):m.start()]):
+            return True
+    for m in UUID.finditer(text):
+        if KEY_WORD.search(text[max(0, m.start() - 40):m.start()]):
+            return True
+    for m in UPPER_DIGIT_RUN.finditer(text):
+        run = STAMP_PART.sub("", m.group(0))
+        if len(run) >= 24 and re.search(r"[A-Z]", run) and re.search(r"[0-9]", run):
+            return True
+    for m in HIGH_ENTROPY.finditer(text):
+        run = STAMP_PART.sub("", m.group(0))  # a run id's timestamp is not a secret
+        if len(run) < 24:
+            continue
+        if not (re.search(r"[a-z]", run) and re.search(r"[A-Z]", run) and re.search(r"[0-9]", run)):
+            continue
+        counts = collections.Counter(run)
+        entropy = -sum(n / len(run) * math.log2(n / len(run)) for n in counts.values())
+        if entropy > 3.5:
+            return True
+    return False
+
+
+def credential_name(rel):
+    """True when one component of a path is shaped like a credential (`skills/x/ghp_....md`):
+    `credential_like` per component, so a long path is not mistaken for a high-entropy run."""
+    return any(credential_like(part) for part in re.split(r"[/\\]", rel) if part)
+
+
+def read_state_file(path, src_real, st):
+    """(the bytes of one source file, None), or (None, why): opened without following a link,
+    and only when the open descriptor is the same regular, singly-linked file that was listed,
+    lies under the source .claude/, and holds at most STATE_MAX_FILE bytes (read from the
+    descriptor: one byte more means too big)."""
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    except OSError as e:
+        return None, "could not be opened safely (%s)" % e.__class__.__name__
+    try:
+        fst = os.fstat(fd)
+        if not stat.S_ISREG(fst.st_mode) or fst.st_nlink != 1 or \
+                (fst.st_dev, fst.st_ino) != (st.st_dev, st.st_ino):
+            return None, "a hard link, or changed while being read"
+        real = os.path.realpath("/proc/self/fd/%d" % fd)
+        if not real.startswith(src_real + os.sep):
+            return None, "resolves outside the project's .claude/"
+        chunks, size = [], 0
+        while size <= STATE_MAX_FILE:
+            chunk = os.read(fd, min(1 << 16, STATE_MAX_FILE + 1 - size))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            size += len(chunk)
+        if size > STATE_MAX_FILE:
+            return None, "over 1 MiB"
+        return b"".join(chunks), None
+    finally:
+        os.close(fd)
+
+
+def safe_dirs(wt, rel_dir):
+    """Create rel_dir under the clone one component at a time, refusing a component that is a
+    link or resolves outside the clone; True when every component is a real directory inside."""
+    wt_real, cur = os.path.realpath(wt), wt
+    for part in [p for p in rel_dir.split(os.sep) if p]:
+        if part in (".", ".."):
+            return False
+        cur = os.path.join(cur, part)
+        if os.path.islink(cur):
+            return False
+        if not os.path.lexists(cur):
+            os.mkdir(cur, 0o755)
+        if not os.path.isdir(cur) or os.path.islink(cur) or \
+                not os.path.realpath(cur).startswith(wt_real + os.sep):
+            return False
+    return True
+
+
+def copy_session_state(top, sub, commit, wt, when):
+    """Copy into the clone the project's .claude/ files its commit does not hold that were last
+    changed (the later of mtime and ctime) before the session began (`when`, the opening turn)
+    and pass the allowlist (`STATE_DIRS`, `STATE_EXTS`, not a `LEDGER`, no `CRED_NAME`, nothing
+    `credential_like`). Returns {copied, skipped: {reason: [paths]}}."""
+    out = {"copied": [], "skipped": collections.defaultdict(list)}
+    src = os.path.join(top, sub if sub not in ("", ".") else "", ".claude")
+    if not os.path.isdir(src) or os.path.islink(src):
+        return out
+    src_real = os.path.realpath(src)
+    rel_base = os.path.normpath(os.path.join(sub, ".claude")) if sub not in ("", ".") else ".claude"
+    tracked = set(gitx_ok(top, "ls-tree", "-r", "--name-only", commit, "--", rel_base).splitlines())
+    started = datetime.datetime.strptime(when[:19], "%Y-%m-%dT%H:%M:%S").replace(
+        tzinfo=datetime.timezone.utc).timestamp()
+    for root, dirs, files in os.walk(src):
+        dirs[:] = sorted(d for d in dirs if not os.path.islink(os.path.join(root, d)))
+        for name in sorted(files):
+            path = os.path.join(root, name)
+            inner = os.path.relpath(path, src)
+            rel = os.path.normpath(os.path.join(rel_base, inner))
+            if rel in tracked:
+                continue
+            st = os.lstat(path)
+            why, raw = None, None
+            if inner.split(os.sep)[0] not in STATE_DIRS:
+                why = "outside the org dirs"
+            elif not stat.S_ISREG(st.st_mode):
+                why = "not a regular file"
+            elif os.path.splitext(name)[1].lower() not in STATE_EXTS:
+                why = "not an allowed text extension"
+            elif max(st.st_mtime, st.st_ctime) >= started:
+                why = "changed after the session began"
+            elif LEDGER.search(inner):
+                why = "a ledger (issues, records, commitments, index, jsonl)"
+            elif CRED_NAME.search(inner) or credential_name(inner):
+                why = "a credential-like, settings, cache or data name"
+            if why is None:
+                raw, why = read_state_file(path, src_real, st)
+            if why is None:
+                try:
+                    if credential_like(raw.decode("utf-8")):
+                        why = "content that looks like a credential"
+                except UnicodeDecodeError:
+                    why = "binary (its content cannot be checked)"
+            if why is None and sum(len(x) for x in [raw]) + out.get("bytes", 0) > STATE_MAX_TOTAL:
+                why = "over the 50 MiB copy limit"
+            if why is None and not safe_dirs(wt, os.path.dirname(rel)):
+                why = "its destination is not a fresh path in the clone"
+            dest = os.path.join(wt, rel)
+            if why is None and os.path.lexists(dest):
+                why = "its destination is not a fresh path in the clone"
+            if why:
+                out["skipped"][why].append(rel)
+                continue
+            fd = os.open(dest, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o644)
+            with os.fdopen(fd, "wb") as fh:
+                fh.write(raw)
+            out["copied"].append(rel)
+            out["bytes"] = out.get("bytes", 0) + len(raw)
+    out["skipped"] = dict(out["skipped"])
+    return out
+
+
+def state_base(wt, commit, paths):
+    """The tree the replay starts from: `commit` plus the copied files git would track (not
+    ignored), so `capture_diff` counts only what the replay itself changed."""
+    if not paths:
+        return None
+    rc, ign, _ = gitx(wt, "check-ignore", "--stdin", "-z", input_text="\0".join(paths))
+    ignored = set(ign.decode("utf-8", "replace").split("\0")) if rc in (0, 1) else set(paths)
+    keep = [p for p in paths if p not in ignored]
+    index = os.path.join(wt, ".git", "replay-base-index")
+    env = dict(os.environ, GIT_INDEX_FILE=index)
+    gitx_ok(wt, "read-tree", commit, env=env)
+    for k in range(0, len(keep), 200):
+        gitx_ok(wt, "add", "--", *keep[k:k + 200], env=env)
+    tree = gitx_ok(wt, "write-tree", env=env).strip()
+    os.unlink(index)
+    return tree
 
 
 def replay_task(args, claude, key, task, hidx, tdir, meta):
@@ -3165,11 +3422,23 @@ def replay_task(args, claude, key, task, hidx, tdir, meta):
         cwd = os.path.join(wt, sub)
         if not os.path.isdir(cwd):
             raise ReplayError("the project directory %s does not exist at %s" % (sub, commit[:10]))
-        rc, ign, _ = gitx(top, "ls-files", "--others", "--ignored", "--exclude-standard",
-                          "--directory", "--", os.path.join(sub, ".claude"))
-        if rc == 0 and ign.strip():
-            rec["caveats"].append("the project's .claude/ holds untracked or ignored files (a "
-                                  "local org, settings.local.json); the clone has none of them")
+        rec["refs"] = prune_result = REFS_PRUNED.pop(wt, None)
+        state = copy_session_state(top, sub, commit, wt, task["user_words"]["turns"][0]["ts"])
+        rec["session_state"] = state
+        base = state_base(wt, commit, state["copied"])
+        rec["base_tree"] = base
+        later = state["skipped"].get("changed after the session began", [])
+        rec["caveats"].append(
+            "%d of the project's .claude/ files not in git were copied in, unchanged since before "
+            "the session began; %d changed since were left out, so the replay lacks them (org "
+            "definitions included); %d others were left out (see session_state)" % (
+                len(state["copied"]), len(later),
+                sum(len(v) for k, v in state["skipped"].items()) - len(later)))
+        if prune_result:
+            rec["caveats"].append("the clone has one branch, %s, at the commit; %d other refs "
+                                  "(branches and tags) were removed" % (
+                                      prune_result["branch"] or "none (detached)",
+                                      len(prune_result["deleted"])))
         rec["caveats"] += pinned_env_caveats(cwd)
         rec["caveats"].append("the clone is not under the project's parent directories, so no "
                               "CLAUDE.md above the project loads, and no auto-memory exists for it")
@@ -3190,7 +3459,7 @@ def replay_task(args, claude, key, task, hidx, tdir, meta):
         # settings outrank whatever a replay puts there.
         replay_turns(args, claude, prompts, rec, tdir, cwd, env, meta, sandbox, flag_settings,
                      guard_paths)
-        rec["diff"] = capture_diff(wt, sub, commit, tdir, sandbox, env)
+        rec["diff"] = capture_diff(wt, sub, commit, tdir, sandbox, env, base)
         rec["exists"] = file_checks(task, cwd, wt)
     except (ReplayError, OSError, ValueError, subprocess.SubprocessError) as e:
         rec["error"], rec["exit"] = "%s" % e, "error"  # never left "ok" by the turns before it
@@ -3392,7 +3661,7 @@ def replay_turns(args, claude, prompts, rec, tdir, cwd, env, meta, sandbox, flag
 
 
 def scoring_sha256():
-    return hashlib.sha256(SCORING.encode("utf-8")).hexdigest()
+    return hashlib.sha256((SCORING + SCORING_RULES).encode("utf-8")).hexdigest()
 
 
 def same_rig(summary):
@@ -3417,13 +3686,17 @@ def keep_attempt(tdir):
         os.rename(old, os.path.join(tdir, "record.%d.json" % n))
 
 
-def run_cost(rdir):
+def run_cost(rdir, attempts=True):
     """(the cost every task record of a replay run reports, the calls that were killed before
     reporting all of theirs), summed over the records on disk, earlier attempts' included
     (`record.<n>.json`, kept by `keep_attempt`), so a run that was killed and finished with
-    `--resume` counts every task and every attempt, not just what the last run ran."""
+    `--resume` counts every task and every attempt, not just what the last run ran.
+    `attempts=False`: the last attempt of each task only (`record.json`), for a per-task rate."""
     known, unreported = 0.0, 0
-    for path in glob.glob(os.path.join(glob.escape(rdir), "tasks", "*", "record*.json")):
+    paths = glob.glob(os.path.join(glob.escape(rdir), "tasks", "*", "record.json"))
+    if attempts:
+        paths += glob.glob(os.path.join(glob.escape(rdir), "tasks", "*", "record.[0-9]*.json"))
+    for path in paths:
         rec = read_json(path, {})
         known += rec.get("cost_usd") or 0
         unreported += rec.get("cost_unreported_turns") or 0
@@ -3926,9 +4199,38 @@ def cmd_deny_check(args):
         print("  WRONG  should %s: %s%s  (%s)" % (want, "monitor: " if t == "Monitor" else "",
                                                   c.replace("\n", "\u23ce"),
                                                   guard[(t, c)] or "no rule"))
+    cred_wrong = cred_check()
     if not args.live:
-        return 1 if wrong else 0
-    return deny_check_live(args, cases) or (1 if wrong else 0)
+        return 1 if wrong or cred_wrong else 0
+    return deny_check_live(args, cases) or (1 if wrong or cred_wrong else 0)
+
+
+CRED_FIXTURE = os.path.join(ROOT, "fixtures", "loop", "credential-strings.txt")
+
+
+def cred_check():
+    """The session-state copy's credential checks against fixtures/loop/credential-strings.txt:
+    every `secret` line must be `credential_like` (or match CRED_NAME for `name` lines), every
+    `clean` line must not. Returns how many are wrong, after printing them."""
+    wrong, n = [], 0
+    with open(CRED_FIXTURE, encoding="utf-8") as fh:
+        for line in (raw.replace("<>", "") for raw in fh):
+            if not line.strip() or line.startswith("#"):
+                continue
+            parts = line.rstrip("\n").split(" ", 2)
+            if parts[0] == "name":
+                want, text = parts[1], parts[2]
+                hit = bool(CRED_NAME.search(text)) or credential_name(text)
+            else:
+                want, text = parts[0], line.rstrip("\n").split(" ", 1)[1]
+                hit = credential_like(text)
+            n += 1
+            if hit != (want == "secret"):
+                wrong.append((want, text))
+    print("cred-check (fixtures/loop/credential-strings.txt): %d case(s), %d wrong" % (n, len(wrong)))
+    for want, text in wrong:
+        print("  WRONG  should be %s: %s" % (want, text))
+    return len(wrong)
 
 
 def hook_verdicts(cases, cwd, globs):
@@ -4175,7 +4477,17 @@ def script_grade(g, rec, tdir, task):
     return "unknown", "no such script grader %r" % name
 
 
-PATCH_FILE_CAP, PATCH_TOTAL_CAP = 20000, 120000  # characters of the diff a judge is shown
+# Characters of the diff a judge is shown: all of it when it fits PATCH_TOTAL_CAP (about 100k
+# tokens, inside the judge's context with the rest of the prompt); otherwise every file the
+# question or reference names in full first, then the others at most PATCH_FILE_CAP each.
+# MEASURED 2026-10-16 (UTC): the largest diff in replay 20261016T005640Z is 3,751,540 bytes
+# (cap-1ac89f90), the next 546,847; cap-09c4270d's is 196,526, all of which now fits.
+PATCH_FILE_CAP, PATCH_TOTAL_CAP = 20000, 400000
+# How scoring reads a replay beyond the prompt text; part of the judge-prompt sha, so a change
+# here makes old scores not like-for-like. 3: when all judges rule env, an outcome script on a
+# path a question or the reference names is excused; the judge sees the whole diff up to
+# PATCH_TOTAL_CAP.
+SCORING_RULES = "3:env-all-judges-named-path;patch:%d/%d" % (PATCH_FILE_CAP, PATCH_TOTAL_CAP)
 TOOLS_CAP_LINES, TOOLS_CAP_CHARS = 300, 24000  # of the tool-call list
 
 
@@ -4186,10 +4498,10 @@ def as_data(text):
 
 
 def bounded_patch(tdir, rec, about=""):
-    """The replay's diff.patch for the judge: each file's diff at most `PATCH_FILE_CAP`
-    characters, all of it at most `PATCH_TOTAL_CAP`, a binary file named only; every cut says
-    what it cut. Files whose path or name the text `about` (the question and the reference)
-    mentions come first, so the limit cuts what the question is not about."""
+    """The replay's diff.patch for the judge, a binary file named only: all of it when it fits
+    `PATCH_TOTAL_CAP`; otherwise the files whose path or name `about` (the question and the
+    reference) mentions, in full, then the rest at most `PATCH_FILE_CAP` each, until the total
+    is reached. Every cut says what it cut."""
     diff = rec.get("diff") or {}
     if not diff:
         return "(the replay recorded no diff)"
@@ -4207,14 +4519,16 @@ def bounded_patch(tdir, rec, about=""):
         path = f.split("\n", 1)[0].rsplit(" b/", 1)[-1]
         name = os.path.splitext(os.path.basename(path))[0]
         return path in about or (len(name) > 3 and name in about)
+    files = [f.split("\n", 1)[0] + "\n[binary file: its contents are not shown]\n"
+             if "\nGIT binary patch\n" in f else f for f in files]
+    whole = sum(map(len, files)) <= PATCH_TOTAL_CAP
     for f in sorted(files, key=lambda f: not mentioned(f)):  # stable: patch order otherwise
         head = f.split("\n", 1)[0]
         if total >= PATCH_TOTAL_CAP:
             unshown.append(head[len("diff --git "):])
             continue
-        if "\nGIT binary patch\n" in f:
-            f = head + "\n[binary file: its contents are not shown]\n"
-        room = min(PATCH_FILE_CAP, PATCH_TOTAL_CAP - total)
+        room = PATCH_TOTAL_CAP - total if whole or mentioned(f) else \
+            min(PATCH_FILE_CAP, PATCH_TOTAL_CAP - total)
         if len(f) > room:
             f = f[:room] + "\n[... this file's diff is cut: %d of %d characters shown]\n" % (room, len(f))
         out.append(f)
@@ -4414,21 +4728,35 @@ def model_base(model):
 ENV_EXCUSES = ("diff_touches", "file_exists")  # outcome checks a verified env blocker explains
 
 
-def task_verdict(graders, finished):
+def task_verdict(graders, finished, reference=""):
     """fail if any grader failed; pass only if every grader passed AND the replay finished
     (exit `ok`), since graders read a partial replay as readily as a whole one; else unknown.
-    A verified `env` judge answer makes the task unknown (counted as env), and excuses only an
-    outcome script's fail (`ENV_EXCUSES`) about the missing path itself (its argument is that
-    path, under it, or a glob matching it), never a judge's no or a behaviour check's fail."""
+    A verified `env` judge answer makes the task unknown (counted as env). It excuses an outcome
+    script's fail (`ENV_EXCUSES`: the work did not happen, so a path was not touched or made)
+    about the missing path itself (its argument is that path, under it, or a glob matching it),
+    or, when EVERY judge grader ruled env (the judges agree the work could not happen at all),
+    an outcome script's fail whose path a judge's question or the reference outcome names (the
+    literal part of its glob, `agenda` for `agenda/**`). Never a judge's no, a judge's yes or
+    unknown beside it, an outcome check on a path nobody named, or a behaviour check's fail
+    (no_kickback_at_end, transcript_absent, ...): those stay FAIL."""
     results = [g["result"] for g in graders]
     env = "env" in results
     missing = [g["missing"].strip("/") for g in graders
                if g["result"] == "env" and g.get("missing_kind") == "path" and g.get("missing")]
+    judges = [g for g in graders if g.get("type") == "judge"]
+    all_env = bool(judges) and all(g["result"] == "env" for g in judges)
+    named_in = "\n".join([str(g.get("question") or "") for g in judges] + [reference or ""])
+
+    def named(arg):  # the glob's literal part, as whole path segments (`bin` is not `combine`)
+        literal = re.split(r"[*?\[]", arg)[0].strip("/")
+        return bool(literal) and re.search(r"(?<![\w.-])%s(?![\w-])" % re.escape(literal),
+                                           named_in) is not None
 
     def excused(g):
         arg = (g.get("arg") or "").strip("/")
-        return g.get("name") in ENV_EXCUSES and any(
-            arg == m or arg.startswith(m + "/") or glob_hit(m, arg) for m in missing)
+        return g.get("name") in ENV_EXCUSES and (
+            any(arg == m or arg.startswith(m + "/") or glob_hit(m, arg) for m in missing) or
+            (all_env and named(arg)))
     if any(g["result"] == "fail" and not excused(g) for g in graders):
         return "fail"
     if env:
@@ -4516,8 +4844,9 @@ def score_run(args, out, jcwd, argv, recs, meta, accepted):
                 print(" %s" % verdict, file=sys.stderr)
                 g = dict(g, **extra)
             graders.append(dict(g, result=verdict, detail=detail))
-        row = {"split": task["split"], "verdict": task_verdict(graders, rec.get("exit") == "ok"
-                                                               and not rec.get("error"))}
+        finished = rec.get("exit") == "ok" and not rec.get("error")
+        row = {"split": task["split"], "verdict": task_verdict(graders, finished,
+                                                               task.get("reference_outcome"))}
         if row["verdict"] == "unknown" and any(g["result"] == "env" for g in graders):
             row["env"] = [g["detail"] for g in graders if g["result"] == "env"]
         if hid:  # counted on screen; kept per line of heldout.jsonl only in a file never printed
@@ -4645,7 +4974,9 @@ def proposal_gate(args):
         no.append("the baseline %s was scored on bank %s, not --bank %s"
                   % (args.baseline, summary.get("bank"), args.bank))
     ran = ran_count(os.path.join(args.state, "replay", args.baseline))
-    bcost, bunreported = run_cost(os.path.join(args.state, "replay", args.baseline))
+    # The rate per task is from each task's last attempt; the unreported count is the run's.
+    bcost = run_cost(os.path.join(args.state, "replay", args.baseline), attempts=False)[0]
+    bunreported = run_cost(os.path.join(args.state, "replay", args.baseline))[1]
     if bmeta.get("status") != "done" or ran != bmeta.get("tasks"):
         no.append("the baseline replay is %s, %d of %s task(s) run; finish it with `bin/loop "
                   "replay --resume %s`, then score it" % (bmeta.get("status"), ran,

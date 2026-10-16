@@ -204,7 +204,35 @@ Run the steps in this order. Costs are what was measured on 2026-10-14 and 2026-
 7. `bin/loop replay --bank <stamp> --split all --workforce main`, then `bin/loop score <replay stamp>`.
    This is the baseline. `main` is resolved to one commit when the run starts. The run includes the
    held-out split. If the run is interrupted, `bin/loop replay --resume <stamp>` runs only what is
-   left; then score it. A run's cost is the sum of every task record, an earlier attempt's
+   left; then score it. A replay starts from the commit the project's HEAD reflog shows at the
+   task's opening turn, on one branch named `replay` (every other branch and every tag
+   removed), repacked so the clone owns only the objects reachable from that commit
+   (no borrowed object store, nothing later readable), and with the project's own `.claude/`
+   files that are not in that commit copied in only when they were last changed (the later of
+   mtime and ctime) before the opening turn: an allowlist of text files (`.md .txt .yaml .yml
+   .json .sh .py .js .mjs .ts .toml .csv`) under `agents/ skills/ commands/ workforce/ plans/`,
+   never a ledger (`workforce/issues/`, `workforce/records/`, `commitments.json`, `index.json`,
+   `*.jsonl`), read without following links or hard links, at most 1 MiB each. Anything changed
+   since is left out, org definitions included: the replay then lacks it, a fidelity loss
+   accepted so the session's own work can't leak in. Never a credential, by name (each path
+   component) or by content: a key-like name with any value (pass*, pwd, secret, api key,
+   credential, private key, pin; `auth` only as auth, `auth_*`, `*_auth`, authorization or
+   authtoken, never author; `token` unless its value is a number of up to 6 digits or one with thousands commas), a password
+   on a mysql/psql/sshpass/redis-cli command line or after `--password`, URL userinfo (also
+   JSON-escaped), a Bearer/Basic value, a JWT, a Slack or Discord webhook, a PEM marker, a
+   known key prefix, and three run tests: a run of 24+ characters of [A-Za-z0-9+/=_-] holding a
+   lowercase letter, an uppercase letter and a digit with Shannon entropy above 3.5 bits per
+   character; a lowercase hex run of 32+ characters that is not 40 or 64 long (40 or 64, a git
+   sha's length, only right after a key word), or a UUID right after one; an uppercase-and-digit
+   run of 24+ characters. Timestamps and dates are taken out of a run first, so a work order's
+   run id is not a secret. Checked against `fixtures/loop/credential-strings.txt` by
+   `bin/loop deny-check`. This over-skips on purpose. ACCEPTED LIMITS: a plain lowercase password
+   with no key name near it, and a short low-entropy secret with none, are not caught; the
+   sandbox having no credentials stays the floor. The task record lists what was copied and
+   skipped. When every judge grader rules `env`, a failed `diff_touches` or `file_exists` on a
+   path a judge's question or the reference names (as whole path segments) is excused; any other
+   outcome check, a judge's no and a behaviour check's fail stay FAIL. The judge sees the whole diff up to 400,000 characters, the files its question
+   names first. A run's cost is the sum of every task record, an earlier attempt's
    included (a task `--resume` runs again keeps its first record as `record.<n>.json`). There is no
    spend limit. Measured so far: $0.01 to $10.94 per replayed task,
    and about $0.03 per task to judge.
