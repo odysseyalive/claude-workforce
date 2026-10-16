@@ -233,6 +233,51 @@ deny git -c alias.p='!npm publish' p
 deny ls *(e:'npm publish':)
 deny ls *(+npmpublish)
 deny ls x(N)$(npm publish)
+# A program that runs a release for us, siblings, expansions, leftovers (final review, 2026-10-15).
+deny ltrace npm publish
+deny op run -- npm publish
+deny nodemon --exec 'npm publish'
+deny concurrently 'npm run build' 'npm publish'
+deny dotenv -- npm publish
+deny direnv exec . npm publish
+deny volta run npm publish
+deny su -c 'npm publish'
+deny gdb --args npm publish
+deny hyperfine 'npm publish'
+deny entr npm publish
+deny parallel ::: 'npm publish'
+deny x=npm; $x publish
+deny set -- npm publish; "$@"
+deny a=(npm publish); "${a[@]}"
+deny read -r x <<< 'npm'; $x publish
+deny eval npm pu$()blish
+deny echo publish | xargs -I{} npm {}
+deny npm (publish|x)(N)
+deny npm publ(i|x)sh
+deny npm publish(.)
+deny npm publ#ish
+deny g(){ gh api repos/x; }; g
+deny builtin eval 'npm publish'
+deny command eval 'npm publish'
+deny dash -c 'npm publish'
+deny ksh -lc 'npm publish'
+deny zsh -ic 'npm publish'
+deny source /proc/self/fd/0 <<< 'npm publish'
+deny tee >(npm publish) </dev/null
+deny pnpm dlx vercel --prod
+deny yarn dlx netlify deploy
+deny setsid npm publish
+deny stdbuf -oL npm publish
+deny ionice -c 3 npm publish
+deny nohup npm publish
+allow mk id1 callee "pnpm --dir agenda run publish, then check the page"
+allow f() { "$@"; }; f ls
+allow $SHELL -c 'ls'
+allow for p in /usr/bin/python3; do $p -V; done
+allow time (ls)
+allow ls agenda | xargs -I{} sh -c 'echo {}'
+allow git commit --dry-run -m "notes: run npm publish later"
+allow git log -1 --format=%x1e%H
 # The guard fails closed: a crash of the hook and a hook past its deadline both deny.
 deny echo LOOP_GUARD_SELFTEST_CRASH
 deny echo LOOP_GUARD_SELFTEST_HANG

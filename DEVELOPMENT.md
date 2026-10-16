@@ -239,11 +239,20 @@ Run the steps in this order. Costs are what was measured on 2026-10-14 and 2026-
      every substitution in an unquoted heredoc body, a `${...}` operand, an arithmetic
      expansion or a zsh glob group is read as a command. Denied as unreadable: a brace-list
      command word, any `$IFS` expansion, a variable command word after a standalone `IFS=`, a
-     zsh `e`/`+` glob qualifier, and a release tool's verb that expands (`npm $v`,
-     `npm "$@"`, `npm {publish,}`, `npm publ*`). NOT READ, a documented limit (operator,
+     zsh `e`/`+` glob qualifier, and a release tool's verb that expands
+     through a substitution, brace list or glob (`npm pu$()blish`, `npm {publish,}`,
+     `npm publ*`, `npm publ(i|x)sh`). A command word or verb that is only a variable is read
+     through literal assignments on the same command line (`x=npm; $x publish`,
+     `set -- npm publish; "$@"`, `a=(...)`, `read x <<< '...'`). Any program not known to be
+     safe is read for a release tool and its verb among its arguments (`ltrace npm publish`,
+     `op run -- npm publish`), and for a command line given to an option or to a known
+     command runner (`nodemon --exec '...'`, `concurrently '...'`, `su -c '...'`). NOT READ, a documented limit (operator,
      2026-10-15), since none of it releases in the transcripts and the sandbox has no
      credentials: code an interpreter runs (`python -c`, `node -e`, `perl -e`, awk's
-     `system()`, `sed .../e`, `make -f /dev/stdin`), code read from a file or a command's
+     `system()`, `sed .../e`, `make -f /dev/stdin`), a variable assigned elsewhere used as the
+     command word or verb (a function's `"$@"`, `$(which ...)`), a quoted command passed as
+     a plain argument to an unknown program (data, like a work order's check string), code
+     read from a file or a command's
      output (`eval "$(sed ...)"`, `bash -c "$(sed ...)"`, `source <(sed ...)`,
      `sed ... | bash`, `bash < file`), and a script file run by name (`bash x.sh` is judged
      by its name only). The hook and the deny list reach the replay through a

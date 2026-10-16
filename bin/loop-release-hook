@@ -399,7 +399,7 @@ def lex(text, substs):
         nonlocal cur, literal
         cur = (cur or "") + chars
         bare.append("_" * len(chars) if quoted else chars)
-        literal = literal and lit
+        literal = literal and lit and "\x00" not in chars  # an outer substitution's placeholder
 
     def flush():
         nonlocal cur, bare, vars_, literal
@@ -491,10 +491,20 @@ def lex(text, substs):
             k = closing(text, i + 2)
             subst("cmd", text[i + 2:k - 1])
             i = k
-        elif c == "(" and cur is not None:  # mid-word: a zsh glob group or qualifier, `(N)`
+        elif c == "(" and (cur is not None or (
+                toks and isinstance(toks[-1], Word) and toks[-1] not in KEYWORDS and
+                toks[-1] not in WRAPPERS and toks[-1] not in ("time", "!", "then", "do", "else",
+                                                             "elif", "if", "while", "until"))):
+            # mid-word, or a word of its own after the command word: a zsh glob group or
+            # qualifier, `(N)`, `(publish|x)(N)`; bash would reject it
             k = closing(text, i + 1)
             body = text[i + 1:k - 1]
-            array = re.fullmatch(r"[A-Za-z_]\w*\+?=", cur)  # `ids=(a b c)`: an array, not a glob
+            if cur is not None and not body.strip() and re.fullmatch(r"[\w.:-]+", cur):
+                flush()  # `name() {`: a function definition, not a glob
+                toks += [Op("("), Op(")")]
+                i = k
+                continue
+            array = cur is not None and re.fullmatch(r"[A-Za-z_]\w*\+?=", cur)  # `ids=(a b c)`: an array, not a glob
             if not array and re.search(r"(?:^|[^A-Za-z])e[^A-Za-z0-9\s]|(?:^|[^\w])\+\w", body):
                 raise Unreadable("a zsh glob qualifier that runs code (e or +)")
             substs.extend(("cmd", b) for b in inner_substs(body, in_dq=False))
@@ -632,11 +642,26 @@ def classify(command, cwd=None, depth=0):
         raise Unreadable("a word expands $IFS")
     # IFS set for the shell itself (an assignment alone), not for one command (`IFS= read`).
     ifs_set = any(a.startswith("IFS=") for s in segs if not s.argv for a in s.assigns)
+    if depth == 0:
+        KNOWN.clear()
+    learn(segs)
     for seg in segs:
         if not seg.argv:
             continue
         if ifs_set and seg.argv[0].bare.startswith("$"):
             raise Unreadable("IFS is set and the command word is a variable")
+        only = re.fullmatch(r"\$(\{[^}]*\}|[A-Za-z_]\w*|[@*#?$!0-9-])", seg.argv[0])
+        if only and not seg.argv[0].literal:
+            words = resolve(only.group(1).strip("{}"))
+            if words is None:  # assigned elsewhere (a function's "$@", `$(which ...)`): a limit
+                seg.argv = []
+                continue
+            why = classify(" ".join(shlex_quote(w) for w in words + list(seg.argv[1:])),
+                           cwd, depth + 1)
+            if why:
+                return why
+            seg.argv = []
+            continue
         m = PLACEHOLDER.fullmatch(seg.argv[0])
         if m:  # `$(cmd) args`: read when cmd's output is literal (`$(echo npm) publish`)
             out = producer(SUBSTS[int(m.group(1))][1])
@@ -663,6 +688,38 @@ def classify(command, cwd=None, depth=0):
         if why:
             return why
     return None
+
+
+KNOWN = {}  # name -> [words]: literal assignments seen on this command line
+
+
+def learn(segs):
+    """Record the literal assignments a command line makes: `x=...`, `a=(...)`, `set -- ...`,
+    `read a b <<< 'literal'`, so a command word that only expands one of them can be read."""
+    for seg in segs:
+        for a in seg.assigns if not seg.argv else []:
+            name, _, val = a.partition("=")
+            if a.literal or re.fullmatch(r"\(.*\)", val, re.S):
+                KNOWN[name] = val[1:-1].split() if val.startswith("(") and val.endswith(")") \
+                    else [val]
+        if seg.argv and seg.argv[0] == "set" and seg.argv[1:2] == ["--"] and \
+                all(w.literal for w in seg.argv):
+            KNOWN["@"] = KNOWN["*"] = [str(w) for w in seg.argv[2:]]
+            for k, w in enumerate(seg.argv[2:], 1):
+                KNOWN[str(k)] = [str(w)]
+        if seg.argv and seg.argv[0] == "read":
+            names = [w for w in seg.argv[1:] if not w.startswith("-")]
+            here = next((t for op, t in seg.redirs if op == "<<<"), None)
+            if names and here is not None and here.literal:
+                parts = str(here).split()
+                for k, nm in enumerate(names):
+                    KNOWN[nm] = [" ".join(parts[k:])] if k == len(names) - 1 else parts[k:k + 1]
+
+
+def resolve(name):
+    """[words] a parameter expands to from KNOWN, or None when it was not assigned literally."""
+    base = re.sub(r"\[[@*]\]$", "", name)
+    return KNOWN.get(base) if base in KNOWN else None
 
 
 def shlex_quote(word):
@@ -797,8 +854,14 @@ def classify_argv(argv, cwd, depth, stdin=None, substs=()):
         return nested(payload + " " + " ".join(argv[3:]), cwd, depth, "env -S")
     if prog in WRAPPERS:
         rest = unwrap(argv, WRAPPERS[prog])
-        if prog == "xargs" and rest and not positionals(rest[1:]) and releaser(rest[0]):
-            return "xargs gives %s arguments the guard cannot see" % rest[0]
+        if prog == "xargs" and rest and releaser(rest[0]) and \
+                os.path.basename(rest[0]) not in SHELLS:
+            repl = next((a[2:] or (argv[k + 1] if k + 1 < len(argv) else "") for k, a in
+                         enumerate(argv) if a.startswith("-I")), None) or \
+                ("{}" if any(a.startswith(("-i", "--replace")) for a in argv) else None)
+            first = positionals(rest[1:])[:1]
+            if not first or (repl and repl in first[0]):
+                return "xargs gives %s arguments the guard cannot see" % rest[0]
         if prog == "timeout" and rest and re.match(r"^[\d.]+[smhd]?$", rest[0]):
             rest = rest[1:]
         if prog == "watch":
@@ -823,6 +886,12 @@ def classify_argv(argv, cwd, depth, stdin=None, substs=()):
         return None
     if prog == "parallel":
         cmd = [t for t in argv[1:] if not t.startswith("-")]
+        if cmd[:1] == [":::"]:  # no command: each argument is one (`parallel ::: 'npm publish'`)
+            for a in cmd[1:]:
+                why = nested(a, cwd, depth, "parallel")
+                if why:
+                    return why
+            return None
         cmd = cmd[:cmd.index(":::")] if ":::" in cmd else cmd
         return nested(" ".join(cmd), cwd, depth, "parallel") if cmd else None
     if prog == "script":
@@ -870,7 +939,41 @@ def classify_argv(argv, cwd, depth, stdin=None, substs=()):
     pos = positionals(argv[1:])
     if pos and pos[0] in WORDS + ("push", "upload") and not a_path(pos[0], cwd):
         return "%s %s" % (prog, pos[0])  # an unknown tool told to release
+    return carried(argv, cwd, depth)
+
+
+def carried(argv, cwd, depth):
+    """A release an unknown program would run for us: a release-capable tool among its
+    arguments with that tool's release verb (`ltrace npm publish`, `op run -- npm publish`),
+    or one in an argument that is itself a command line: one given to an option (`nodemon
+    --exec 'npm publish'`, `su -c '...'`), or any argument of a known command runner
+    (`concurrently 'npm publish'`, `hyperfine '...'`). Elsewhere a quoted command is data: a
+    work-order function's check string, a commit message."""
+    runner = os.path.basename(argv[0]) in CODE_RUNNERS
+    for k, a in enumerate(argv[1:], 1):
+        if releaser(a) and not os.path.basename(a) in SHELLS:
+            why = classify_argv(argv[k:], cwd, depth + 1)
+            if why:
+                return "%s runs %s" % (os.path.basename(argv[0]), why)
+        elif (runner or argv[k - 1].startswith("-")) and \
+                re.match(r"\s*([A-Za-z_]\w*=\S*\s+)*(%s)\s" % "|".join(
+                re.escape(t) for t in sorted(RELEASE_TOOLS)), a):  # an argument that IS a command
+            try:
+                why = classify(a, cwd, depth + 1)
+            except Unreadable:
+                why = None  # an argument that is not shell code
+            if why:
+                return "%s runs %s" % (os.path.basename(argv[0]), why)
     return None
+
+
+RELEASE_TOOLS = set()  # filled below: every tool the guard knows can release
+# Programs whose plain arguments are command lines they run.
+CODE_RUNNERS = {"concurrently", "hyperfine", "npm-run-all", "run-p", "run-s", "watchexec",
+                "nodemon", "entr", "parallel", "tmux", "screen", "xterm", "kitty", "alacritty",
+                "foot", "wezterm", "ghostty", "gnome-terminal", "konsole", "dtach", "abduco",
+                "faketime", "firejail", "proot", "chroot", "systemd-run", "runuser", "su",
+                "pkexec", "machinectl"}
 
 
 def releaser(cmd):
@@ -899,12 +1002,30 @@ def interpreter(prog, rest, cwd, depth):
 
 def opaque_verb(word):
     """True when a word in a release-capable tool's verb position could expand into a verb the
-    guard cannot see: a variable or substitution, a brace list, a glob."""
+    guard cannot see: a substitution, a brace list, a glob, or a variable mixed with text. A
+    word that is only one variable is resolved by `verb_words` instead."""
+    if VAR_ONLY.fullmatch(str(word)):
+        return False
     return not getattr(word, "literal", True) or \
-        bool(re.search(r"[*?\[]|\{[^{}]*,", getattr(word, "bare", str(word))))
+        bool(re.search(r"[*?\[(|#~^]|\{[^{}]*,", getattr(word, "bare", str(word))))
+
+
+VAR_ONLY = re.compile(r"\$(\{[^}]*\}|[A-Za-z_]\w*|[@*#?$!0-9-])")
+
+
+def verb_words(argv):
+    """argv with a verb-position word that is only a literally-assigned variable replaced by
+    its value (`v=publish; npm $v`); an unassigned one (a function's "$@") stays: a limit."""
+    out = []
+    for w in argv:
+        m = VAR_ONLY.fullmatch(str(w))
+        words = resolve(m.group(1).strip("{}")) if m else None
+        out += [Word(x) for x in words] if words is not None else [w]
+    return out
 
 
 def subcommand(prog, argv):
+    argv = verb_words(argv)
     verbs, depth_n, value_opts = SUBCOMMANDS[prog]
     if verbs is None:
         return "%s releases" % prog
@@ -953,6 +1074,7 @@ def pm(argv, cwd=None, depth=0):
     """npm, pnpm, yarn, bun: their publish subcommands (and npm's abbreviations of them), a `run`
     of a release script, a script run by name (yarn/pnpm/bun) named so, and what their own
     runners (`exec`, `dlx`, `x`, `workspaces foreach`) run."""
+    argv = verb_words(argv)
     pos = positionals(argv[1:], PM_VALUE_OPTS, past_dashdash=True)
     if not pos:
         return None
@@ -1013,6 +1135,9 @@ def glob_hit(cmd, patterns):
                         or form == pat or form.startswith(pat + " "):
                     return pat
     return None
+
+
+RELEASE_TOOLS.update(PMS, SUBCOMMANDS, TASK_RUNNERS, {r[0] for r in RUNNERS}, TOOL_ALIASES)
 
 
 def selftest(command):
