@@ -247,10 +247,11 @@ Run the steps in this order. Costs are what was measured on 2026-10-14 and 2026-
      push); a `for` list's words become possible values where the loop is reached. A `( )`
      subshell's assignments end at its `)` (a case pattern's `)` closes none), and every
      substitution (a `$(...)`, backtick or `<(...)` body, and one inside a `${...}` operand, an
-     arithmetic expansion or an unquoted heredoc body) is read when its command runs, with the
-     values of that moment, its own assignments staying inside it. A verb the line assigns in a form
-     the guard cannot value (`a[1]=`, `${a[1]}`, `x=$(cmd)`) fails closed; a command word like that
-     is tried with each value the line may give it, and what follows a command word that may hold a
+     arithmetic expansion, a zsh glob group or an unquoted heredoc body) is read when its command
+     runs, with the values of that moment, its own assignments staying inside it; one no command
+     holds is read first, with the line's starting values. A verb the line assigns in a form the
+     guard cannot value (`a[1]=`, `${a[1]}`, `x=$(cmd)`) fails closed; a command word like that is
+     tried with each value the line may give it, and what follows a command word that may hold a
      value the guard cannot tell (one from outside the line, or `x=$(cmd)`) is read as a command of
      its own (`$X git push`). A name with more than 50 possible values, or one command with more
      than 50 combinations of them, cannot be read. Any program not known to be safe is read for a

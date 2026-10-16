@@ -609,6 +609,7 @@ def segments(toks, keep_data=False):
     assignments always happen, may not happen, or stay in a subshell."""
     out, cur, i = [], Seg(), 0
     block, paren, braces, cond_next, last_sep = 0, 0, [], False, None
+    fn_body = False  # the next `{` opens a function body: it runs only if the function is called
 
     def close(seg, op):
         nonlocal block
@@ -625,6 +626,11 @@ def segments(toks, keep_data=False):
 
     while i < len(toks):
         t = toks[i]
+        if t == "(" and isinstance(t, Op) and i + 1 < len(toks) and toks[i + 1] == ")" and \
+                isinstance(toks[i + 1], Op):  # `name()`: a function definition
+            close(cur, None)
+            cur, fn_body, i = Seg(), True, i + 2
+            continue
         if isinstance(t, Op) and (t in SEPARATORS or t in ("|", "|&")):
             close(cur, t)
             nxt = Seg()
@@ -648,16 +654,26 @@ def segments(toks, keep_data=False):
             i += 1
         elif not cur.argv and ASSIGNMENT.match(t):
             cur.assigns.append(t)
+            if fn_body:  # `f() v=x`: an assignment-only body
+                cur.ctx, fn_body = "cond", False
         elif not cur.argv and t in KEYWORDS:
             if t in OPENERS:
                 block = max(0, block + OPENERS[t])
             elif t == "{":
-                braces.append(cond_next or cur.ctx == "cond")
+                braces.append(fn_body or cond_next or cur.ctx == "cond")
                 block += braces[-1]
+                fn_body = False
             elif t == "}" and braces:
                 block = max(0, block - braces.pop())
+        elif t == "{" and len(cur.argv) == 2 and cur.argv[0] == "function":
+            close(cur, None)  # `function f {`: the body is conditional, like `f() {`
+            cur = Seg()
+            braces.append(True)
+            block += 1
         else:
             cur.argv.append(t)
+            if fn_body:  # `f() cmd`: a one-command body, run only if f is called
+                cur.ctx, fn_body = "cond", False
         i += 1
     close(cur, None)
     for seg in out:  # `function f {` / `function f() {`: the body's first command follows
@@ -735,7 +751,11 @@ def classify(command, cwd=None, depth=0):
             why = isolated(classify, entry[1], cwd, depth + 1)
             if why:
                 return why
-        why = classify_seg(seg, cwd, depth, substs, ifs_set)
+        CONTEXT.append(seg.ctx)  # where an `eval` in this command runs
+        try:
+            why = classify_seg(seg, cwd, depth, substs, ifs_set)
+        finally:
+            CONTEXT.pop()
         if why:
             return why
         learn(seg)
@@ -790,13 +810,20 @@ def classify_seg(seg, cwd, depth, substs, ifs_set):
 
 
 def isolated(fn, *a):
-    """fn(*a) with VALUES restored afterwards: code that runs in a subshell or a child shell."""
+    """fn(*a) with VALUES restored afterwards: code that runs in a subshell or a child shell.
+    What it left in VALUES is kept in LAST_VALUES, for an eval that may not run."""
     saved = {k: list(v) for k, v in VALUES.items()}
     try:
         return fn(*a)
     finally:
+        LAST_VALUES.clear()
+        LAST_VALUES.update({k: list(v) for k, v in VALUES.items()})
         VALUES.clear()
         VALUES.update(saved)
+
+
+CONTEXT = []  # the context ("plain", "cond", "sub") of each command being read, innermost last
+LAST_VALUES = {}
 
 
 VALUES = {}  # name -> the values it may hold at this point of the line: each one [words], or
@@ -1020,8 +1047,16 @@ def nested(text, cwd, depth, what):
     only a substitution's output (`eval "$(sed ...)"`), a documented limit."""
     if PLACEHOLDER.fullmatch(str(text).strip()):
         return None
-    if what == "eval":  # eval runs in this shell: what it assigns stays
+    ctx = CONTEXT[-1] if CONTEXT else "plain"
+    if what == "eval" and ctx == "plain":  # eval runs in this shell: what it assigns stays
         why = classify(str(text), cwd, depth + 1)
+    elif what == "eval" and ctx == "cond":  # it may not run: what it assigns is possible only
+        before = {k: list(v) for k, v in VALUES.items()}
+        why = isolated(classify, str(text), cwd, depth + 1)
+        for name, alts in LAST_VALUES.items():
+            for alt in alts:
+                if alt not in before.get(name, [OUTSIDE]):
+                    possible(name, alt)
     else:  # a child shell, a trap, an alias: its assignments do not reach this line
         why = isolated(classify, str(text), cwd, depth + 1)
     return "%s runs %s" % (what, why) if why else None

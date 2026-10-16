@@ -354,6 +354,21 @@ allow v=status; echo $(( $(git $v | wc -l) ))
 deny v=push; echo $(( $(git $v | wc -l) ))
 allow v=status; cat <<EOF⏎$(git $v)⏎EOF
 deny v=push; cat <<EOF⏎$(git $v)⏎EOF
+# A function body, an eval that may not run, and a backgrounded eval do not replace a value
+# (review of df246f7, 2026-10-16).
+deny v=push; f() { v=status; }; git $v
+allow v=status; f() { v=log; }; git $v
+deny v=status; f() { v=push; }; git $v
+deny v=push; function f { v=status; }; git $v
+allow v=status; function f { v=log; }; git $v
+deny v=push; f() v=status; git $v
+deny v=push; false && eval 'v=status'; git $v
+allow v=status; false && eval 'v=log'; git $v
+deny v=status; false && eval 'v=push'; git $v
+deny v=push; eval 'v=status' & git $v
+allow v=status; eval 'v=log' & git $v
+allow v=status; eval 'v=push' & git $v
+deny v=status; eval 'v=push'; git $v
 # The guard fails closed: a crash of the hook and a hook past its deadline both deny.
 deny echo LOOP_GUARD_SELFTEST_CRASH
 deny echo LOOP_GUARD_SELFTEST_HANG
