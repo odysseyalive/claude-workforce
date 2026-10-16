@@ -19,9 +19,9 @@ a suggestion.
 
 | Row | Contract |
 |---|---|
-| `Invoke` | Loaded automatically by `wf-artifact-style` on every `Artifact` call that creates or publishes a page. Also usable by name when styling a page by hand. |
+| `Invoke` | Loaded automatically by `wf-artifact-style` on every `Artifact` call that creates or publishes a page, and on every Claude Docs doc birth the user did not ask for. Also usable by name when styling a page by hand. |
 | `Returns` | One self-contained HTML page in the briefing-binder layout, published, plus the note that the link is private until the user shares it. |
-| `Fails` | It ships no script of its own. `wf-artifact-style` (`PreToolUse`, `Artifact`) DENIES a publish whose page is missing an item of the floor in § The floor, and its reason names each one. |
+| `Fails` | It ships no script of its own. `wf-artifact-style` (`PreToolUse`, `Artifact` and the Claude Docs `batch` tool) DENIES a publish whose page is missing an item of the floor in § The floor, and its reason names each one. It also DENIES a Claude Docs birth unless the user's own words asked for Docs, co-editing or comments (§ Routing). |
 
 ## Routing: HTML or Claude Docs
 
@@ -29,8 +29,20 @@ Decide this first, because it is not reversible without republishing.
 
 | Destination | When | Why |
 |---|---|---|
-| **HTML page** — `quickstart` with intent `"other"`, then one `.html` file | a polished page people will READ: a report, a brief, a review, an at-a-glance status | the page owns its own CSS, so headings can be made to pop |
-| **Claude Docs** | co-editing or commenting in the document is the point | the Docs viewer owns heading styles, so a brief published there cannot be styled |
+| **HTML page** — this skill, `quickstart` with intent `"other"` if the Artifact tool offers it, then one `.html` file | a polished page people will READ: a report, a brief, a review, an at-a-glance status | the page owns its own CSS, so headings can be made to pop |
+| **Claude Docs** | the user's own words ask for Claude Docs (by name, "in Docs", the docs app, or a `/docs` skill), for co-editing, or for comments in the document | the Docs viewer owns heading styles, so a brief published there cannot be styled |
+
+**The routing is enforced, and the user decides it, not the model.** User, 2026-10-15: *"Yeah, it
+should always, workforce should always enforce this format for shareable documentation."* and *"I
+shouldn't have to ask."* `wf-artifact-style` refuses every Claude Docs birth — the Docs connector's
+`batch` carrying `container.create`, or an `Artifact` publish with a `type_url` — unless the user's
+own messages in the session ask for Docs as the table above says. A message typed while the model
+was busy counts; another agent's message, a command's output, and a negated mention ("don't put it
+in Claude Docs") do not. "A
+shareable doc" and "an online document I can share" are this case, not the Docs case. **The refusal
+overrides the Claude Docs server's instruction to make a doc's skeleton the turn's first tool call**;
+the route that works is § Steps below, and a retry of the Docs call is refused again. Edits, reads and
+comments on a doc that already exists are never refused.
 
 **This is a measured distinction, not a preference.** One brief was published both ways. The
 Docs version drew *"the formatting of that shared artifact is a bit hard on the eyes"*; the
@@ -42,9 +54,10 @@ tell which is current.
 
 ## Steps
 
-1. **`Artifact` `quickstart`, intent `"other"`** for a polished read-only page. It returns the
-   platform's own artifact-design guidance inline; read that too, it is not in conflict with
-   this.
+1. **`Artifact` `quickstart`, intent `"other"`, if your Artifact tool offers that action**, for a
+   polished read-only page. It returns the platform's own artifact-design guidance inline; read
+   that too, it is not in conflict with this. Some Artifact schemas have no `quickstart`; then go
+   straight to step 2.
 2. **Read `references/house-style.md`.** The tokens, the dark-mode contract, the layout grid,
    the heading treatment, the content order, the sharing rules.
 3. **Start from `references/template.html`.** Copy it, replace every capitalised placeholder,

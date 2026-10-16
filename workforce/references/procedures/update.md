@@ -211,12 +211,14 @@ because the install count is what a reader checks against, and a skill missing f
 as a failed install.
 
 **`shared-artifact` rides them too, and is the one sibling with a hook.** It carries the house style
-for any artifact published as a shareable link, and `wf-artifact-style` (`PreToolUse` on `Artifact`)
-is what applies it without anyone typing a command. The skill ships a `references/` directory and is
+for any artifact published as a shareable link, and `wf-artifact-style` (`PreToolUse` on `Artifact`
+and on the Claude Docs `batch` tool that creates a doc) is what applies it without anyone typing a command. The skill ships a `references/` directory and is
 still not a catalog: `house-style.md` is a recipe, not a graded corpus, so it is registered in neither
 `wf-catalog` nor `wf-conform` (`manifest.txt` § shared-artifact). The hook arrives by the same
 `--wire-defaults` producer every other shipped hook uses, so an install made before 2026-10-02 picks
-it up on the next `update` or `audit` with nothing to run by hand.
+it up on the next `update` or `audit` with nothing to run by hand. An install wired before 2026-10-15
+holds it on `Artifact` alone; the same pass moves that row to the shipped matcher in whichever
+settings file holds it, user scope included (`hooks.md` § Healing, `PRIOR_MATCHERS`).
 
 **A skill this installer did not write is never overwritten.** Ownership is decided once per skill,
 on its `SKILL.md`, against `.installed-external` as that record stood BEFORE the run — a project's

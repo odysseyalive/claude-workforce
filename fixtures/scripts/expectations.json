@@ -6105,6 +6105,180 @@
       "Traceback"
     ]
   },
+  "sa-hook-matcher-duplicate-same-file": {
+    "_why": "SECOND REVIEW FINDING 2. The file already holds our hook on the shipped matcher AND a leftover row on the retired `Artifact` one, for example from a hand wire or an interrupted run. Moving the old row would leave two registrations on the new matcher, and every Docs birth would be refused twice. The old row is deleted instead, and its reversal record is dropped.",
+    "script": "wf-settings-apply",
+    "args": [
+      "--wire-hook",
+      "wf-artifact-style",
+      "--execute"
+    ],
+    "env": {
+      "CLAUDE_CONFIG_DIR": "${TREE}/cfg"
+    },
+    "exit": 0,
+    "want": [
+      "row on retired matcher Artifact removed"
+    ],
+    "not": [
+      "HOOK UNVERIFIED",
+      "NOT WRITTEN"
+    ],
+    "after": {
+      ".claude/settings.local.json": {
+        "once": [
+          "skills/workforce/bin/wf-artifact-style",
+          "\"matcher\": \"^(?:Artifact|mcp__.+[Dd]ocs__batch)$\""
+        ],
+        "not": [
+          "\"matcher\": \"Artifact\""
+        ]
+      },
+      ".claude/workforce/.settings-owned.json": {
+        "once": [
+          "\"matcher\": \"^(?:Artifact|mcp__.+[Dd]ocs__batch)$\""
+        ],
+        "not": [
+          "\"matcher\": \"Artifact\""
+        ]
+      }
+    }
+  },
+  "sa-hook-matcher-both-scopes": {
+    "_why": "SECOND REVIEW FINDING 2, ACROSS SCOPES. Both the user file and the project file hold the hook on `Artifact`, so it double-fired already. Moving both would carry the double-fire onto the new matcher. The user-scope row is moved first, because it covers every project on the machine. The project row is then deleted, since the user scope already covers this project. A user-scope row is never deleted because a project holds the hook: that would unguard every other project on the machine.",
+    "script": "wf-settings-apply",
+    "args": [
+      "--wire-hook",
+      "wf-artifact-style",
+      "--execute"
+    ],
+    "env": {
+      "CLAUDE_CONFIG_DIR": "${TREE}/cfg"
+    },
+    "subst": [
+      "cfg/settings.json",
+      "cfg/workforce/.settings-owned.json"
+    ],
+    "exit": 0,
+    "want": [
+      "matcher moved from Artifact to",
+      "row on retired matcher Artifact removed"
+    ],
+    "not": [
+      "HOOK UNVERIFIED",
+      "NOT WRITTEN"
+    ],
+    "after": {
+      "cfg/settings.json": {
+        "once": [
+          "skills/workforce/bin/wf-artifact-style",
+          "\"matcher\": \"^(?:Artifact|mcp__.+[Dd]ocs__batch)$\""
+        ]
+      },
+      ".claude/settings.local.json": {
+        "not": [
+          "wf-artifact-style"
+        ]
+      },
+      ".claude/workforce/.settings-owned.json": {
+        "not": [
+          "wf-artifact-style"
+        ]
+      }
+    }
+  },
+  "sa-hook-matcher-moved-user-scope": {
+    "_why": "REVIEW FINDING 3. The installer wires USER scope, so most machines hold wf-artifact-style in `$CLAUDE_CONFIG_DIR/settings.json` on `Artifact`. A project-scope wire sees that row through the union of settings files and reports it already registered, so without this the user row never moved and Docs births stayed unguarded on every such machine. The move happens in the file that holds the row. Nothing is added to the project file, because a second copy would double-fire. The user-scope reversal record follows the move.",
+    "script": "wf-settings-apply",
+    "args": [
+      "--wire-hook",
+      "wf-artifact-style",
+      "--execute"
+    ],
+    "env": {
+      "CLAUDE_CONFIG_DIR": "${TREE}/cfg"
+    },
+    "subst": [
+      "cfg/settings.json",
+      "cfg/workforce/.settings-owned.json"
+    ],
+    "exit": 0,
+    "want": [
+      "matcher moved from Artifact to",
+      "already registered on PreToolUse in"
+    ],
+    "not": [
+      "HOOK UNVERIFIED",
+      "NOT WRITTEN"
+    ],
+    "after": {
+      "cfg/settings.json": {
+        "want": [
+          "\"matcher\": \"^(?:Artifact|mcp__.+[Dd]ocs__batch)$\""
+        ],
+        "not": [
+          "\"matcher\": \"Artifact\""
+        ],
+        "once": [
+          "skills/workforce/bin/wf-artifact-style"
+        ]
+      },
+      "cfg/workforce/.settings-owned.json": {
+        "want": [
+          "\"matcher\": \"^(?:Artifact|mcp__.+[Dd]ocs__batch)$\""
+        ],
+        "not": [
+          "\"matcher\": \"Artifact\""
+        ]
+      },
+      ".claude/settings.local.json": {
+        "not": [
+          "wf-artifact-style"
+        ]
+      }
+    }
+  },
+  "sa-hook-matcher-moved": {
+    "_why": "A WIDENED MATCHER HAS TO REACH EXISTING INSTALLS. Presence is decided by script and event, so a project wired before 2026-10-15 holds wf-artifact-style on `Artifact` and, without PRIOR_MATCHERS, `--wire-hook` reports NOOP and the Claude Docs births stay unguarded on every such machine. The row is moved to the shipped matcher, the user's own hook that shared the old entry keeps its `Artifact` matcher, and the reversal record follows the move so `--unwire-defaults` can still find what it wrote.",
+    "script": "wf-settings-apply",
+    "args": [
+      "--wire-hook",
+      "wf-artifact-style",
+      "--execute"
+    ],
+    "env": {
+      "CLAUDE_CONFIG_DIR": "${TREE}/cfg"
+    },
+    "exit": 0,
+    "want": [
+      "matcher moved from Artifact to",
+      "verified on disk: wf-artifact-style on matcher"
+    ],
+    "not": [
+      "already registered",
+      "HOOK UNVERIFIED"
+    ],
+    "after": {
+      ".claude/settings.local.json": {
+        "want": [
+          "\"matcher\": \"^(?:Artifact|mcp__.+[Dd]ocs__batch)$\"",
+          "\"matcher\": \"Artifact\"",
+          "echo user-own-artifact-hook"
+        ],
+        "once": [
+          "skills/workforce/bin/wf-artifact-style"
+        ]
+      },
+      ".claude/workforce/.settings-owned.json": {
+        "want": [
+          "\"matcher\": \"^(?:Artifact|mcp__.+[Dd]ocs__batch)$\""
+        ],
+        "not": [
+          "\"matcher\": \"Artifact\""
+        ]
+      }
+    }
+  },
   "sa-wire-no-claude-dir": {
     "_why": "The same tree under --wire-defaults, which runs the heal first: no NOT HEALED, exit 0.",
     "script": "wf-settings-apply",
@@ -7461,16 +7635,323 @@
       ]
     },
     "artifact-style-docs-create": {
-      "_why": "A Claude Docs create carries type_url and no local file. There is nothing to read and the Docs viewer owns its heading styles, so the only useful output is the routing rule. Denying here would block a destination that is correct whenever co-editing is the point.",
+      "_why": "The Artifact tool's other door into Claude Docs: `publish` with a type_url and no local file. This is how the efwnow orientation brief the user called 'hard on the eyes' was born (2026-10-02). User directive 2026-10-15: 'workforce should always enforce this format for shareable documentation'. With no transcript there are no user words naming Docs, so it is refused, and the refusal names the HTML route.",
       "exit": 0,
       "not": [
-        "permissionDecision",
         "Traceback"
       ],
       "script": "wf-artifact-style",
       "stdin_raw": "{\"tool_name\": \"Artifact\", \"tool_input\": {\"action\": \"publish\", \"type_url\": \"https://claude.ai/artifact/AAAA\", \"title\": \"Status Brief\"}}",
       "want": [
-        "Keep one source of truth"
+        "\"permissionDecision\": \"deny\"",
+        "quickstart"
+      ]
+    },
+    "artifact-style-docs-birth-brief": {
+      "_why": "THE REPORTED CASE (odyssey-alive 0a159bc6, 2026-10-15). The Docs server says the doc skeleton is the turn's first tool call, so the Artifact quickstart never ran and an orientation brief was born in the Docs viewer. The user asked for 'an online shareable doc', which is shareable documentation, not co-editing. The refusal must say it overrides the server's first-call instruction and name the HTML route, or the model holds two orders and picks the louder one.",
+      "exit": 0,
+      "not": [
+        "Traceback"
+      ],
+      "script": "wf-artifact-style",
+      "stdin_raw": "{\"tool_name\": \"mcp__claude_ai_Claude_Docs__batch\", \"transcript_path\": \"t.jsonl\", \"hook_event_name\": \"PreToolUse\", \"tool_input\": {\"container\": {\"kind\": \"project\", \"create\": {\"name\": \"SBDC Orientation Brief\", \"doc\": {\"markdown\": \"# SBDC Orientation Brief\"}}}, \"batch\": []}}",
+      "want": [
+        "\"permissionDecision\": \"deny\"",
+        "OVERRIDES the Claude Docs server's instruction",
+        "if your Artifact tool offers it",
+        "Instead, load the `shared-artifact` skill first; it is the required step.",
+        "shared-artifact"
+      ]
+    },
+    "artifact-style-docs-retry-denied": {
+      "_why": "A RETRY IS REFUSED LIKE THE FIRST ATTEMPT. The user's directive (2026-10-15, 'I shouldn't have to ask') takes the choice away from the model, so nothing the model writes opens the gate: not its own text claiming co-editing is the point, not the shared-artifact skill body (a meta row) that names Claude Docs and co-editing, not a tool result echoing the refusal, and not a task notification saying the user wants Docs. Only the user's words count, and these ask for 'an online document I can share'.",
+      "exit": 0,
+      "not": [
+        "Traceback"
+      ],
+      "script": "wf-artifact-style",
+      "stdin_raw": "{\"tool_name\": \"mcp__claude_ai_Claude_Docs__batch\", \"transcript_path\": \"t.jsonl\", \"hook_event_name\": \"PreToolUse\", \"tool_input\": {\"container\": {\"kind\": \"project\", \"create\": {\"name\": \"Orientation Brief\", \"doc\": {\"markdown\": \"# Orientation Brief\"}}}, \"batch\": []}}",
+      "want": [
+        "\"permissionDecision\": \"deny\"",
+        "Do not retry the Docs call"
+      ]
+    },
+    "artifact-style-docs-user-asked": {
+      "_why": "THE ONE WAY THROUGH. The user's own words, in a later message of the session, ask for a Claude Doc they can edit together and comment in. That is the case Docs exists for, and refusing it would be a wrong fire on an explicit request.",
+      "exit": 0,
+      "not": [
+        "hookSpecificOutput",
+        "Traceback"
+      ],
+      "script": "wf-artifact-style",
+      "stdin_raw": "{\"tool_name\": \"mcp__claude_ai_Claude_Docs__batch\", \"transcript_path\": \"t.jsonl\", \"hook_event_name\": \"PreToolUse\", \"tool_input\": {\"container\": {\"kind\": \"project\", \"create\": {\"name\": \"Volunteer Schedule\", \"doc\": {\"markdown\": \"# Volunteer Schedule\"}}}, \"batch\": []}}"
+    },
+    "artifact-style-docs-other-prefix": {
+      "_why": "The birth is matched by tool-name pattern, not by this machine's `mcp__claude_ai_Claude_Docs__` prefix, so a host that names the connector differently is covered. No transcript_path at all: a session whose user words cannot be read opens nothing, so the birth is refused.",
+      "exit": 0,
+      "not": [
+        "Traceback"
+      ],
+      "script": "wf-artifact-style",
+      "stdin_raw": "{\"tool_name\": \"mcp__Claude_Docs__batch\", \"tool_input\": {\"container\": {\"kind\": \"project\", \"create\": {\"name\": \"Quarterly Report\"}}, \"batch\": []}}",
+      "want": [
+        "\"permissionDecision\": \"deny\""
+      ]
+    },
+    "artifact-style-docs-update-silent": {
+      "_why": "An edit to a doc that already exists: `batch` with a container id and no `create`. Every write after a birth goes this way (34 updates and 4 batch edits in the two Docs sessions on the measuring machine), and refusing them would strand a doc the user asked for.",
+      "exit": 0,
+      "not": [
+        "hookSpecificOutput",
+        "Traceback"
+      ],
+      "script": "wf-artifact-style",
+      "stdin_raw": "{\"tool_name\": \"mcp__claude_ai_Claude_Docs__batch\", \"tool_input\": {\"container\": {\"kind\": \"project\", \"id\": \"7f705cb8-51b2-41d0-8634-788816c3cdde\"}, \"batch\": [{\"verb\": \"update\", \"ref\": {\"object\": \"node\", \"id\": \"21bf1d30-b9f1\"}, \"engine\": \"prose\", \"payload\": {\"ops\": []}}]}}"
+    },
+    "artifact-style-docs-read-silent": {
+      "_why": "A read writes nothing. The registered matcher never routes `read` here, and the hook's own name check stays silent too when a broader registration does.",
+      "exit": 0,
+      "not": [
+        "hookSpecificOutput",
+        "Traceback"
+      ],
+      "script": "wf-artifact-style",
+      "stdin_raw": "{\"tool_name\": \"mcp__claude_ai_Claude_Docs__read\", \"tool_input\": {\"ref\": {\"object\": \"node\", \"id\": \"21bf1d30-b9f1\"}, \"container\": {\"kind\": \"project\", \"id\": \"7f705cb8-51b2-41d0-8634-788816c3cdde\"}}}"
+    },
+    "artifact-style-docs-comment-silent": {
+      "_why": "`create` is also how a comment is made: object `utterance` into an existing container, with no `container.create`. MEASURED: the one `create` call on the measuring machine is exactly this. A comment on a doc is not a doc birth.",
+      "exit": 0,
+      "not": [
+        "hookSpecificOutput",
+        "Traceback"
+      ],
+      "script": "wf-artifact-style",
+      "stdin_raw": "{\"tool_name\": \"mcp__claude_ai_Claude_Docs__create\", \"tool_input\": {\"object\": \"utterance\", \"container\": {\"kind\": \"project\", \"id\": \"93706884-5609-418f-ab54-00b38c0a7c72\"}, \"payload\": {\"value\": {\"body\": \"Is the PDF form current?\"}}}}"
+    },
+    "artifact-style-open-silent": {
+      "_why": "`open` shows an existing artifact in the viewer and writes nothing. The reported session's only Artifact call was this, on the doc the Docs birth had just made.",
+      "exit": 0,
+      "not": [
+        "hookSpecificOutput",
+        "Traceback"
+      ],
+      "script": "wf-artifact-style",
+      "stdin_raw": "{\"tool_name\": \"Artifact\", \"tool_input\": {\"action\": \"open\", \"url\": \"https://claude.ai/code/artifact/93706884-5609-418f-ab54-00b38c0a7c72\"}}"
+    },
+    "artifact-style-docs-queued-ask": {
+      "_why": "REVIEW FINDING 1. A message the user types while the model is busy is stored only as an `attachment` row of type `queued_command`, never as a user row. 115 of them on the measuring machine carry origin kind `human`. Here the user's ask for a Claude Doc to edit together arrived that way, and ignoring it would refuse an explicit request.",
+      "exit": 0,
+      "not": [
+        "hookSpecificOutput",
+        "Traceback"
+      ],
+      "script": "wf-artifact-style",
+      "stdin_raw": "{\"tool_name\": \"mcp__claude_ai_Claude_Docs__batch\", \"transcript_path\": \"t.jsonl\", \"hook_event_name\": \"PreToolUse\", \"tool_input\": {\"container\": {\"kind\": \"project\", \"create\": {\"name\": \"November Rota\"}}, \"batch\": []}}"
+    },
+    "artifact-style-docs-queued-not-user": {
+      "_why": "THE OTHER HALF OF FINDING 1. Task notifications and peer-session messages also arrive as `queued_command` attachments: commandMode `task-notification`, origin kind `peer` with isMeta, or text `INJECTED` recognises. None is the user, so each names Claude Docs and co-editing here and the birth is still refused.",
+      "exit": 0,
+      "not": [
+        "Traceback"
+      ],
+      "script": "wf-artifact-style",
+      "stdin_raw": "{\"tool_name\": \"mcp__claude_ai_Claude_Docs__batch\", \"transcript_path\": \"t.jsonl\", \"hook_event_name\": \"PreToolUse\", \"tool_input\": {\"container\": {\"kind\": \"project\", \"create\": {\"name\": \"Grant Brief\"}}, \"batch\": []}}",
+      "want": [
+        "\"permissionDecision\": \"deny\""
+      ]
+    },
+    "artifact-style-docs-skill-asked": {
+      "_why": "REVIEW FINDING 2. Typing a Docs skill (`/docs`, `/anthropic-skills:docs`) is asking for Docs by name, but the skill's name is in `<command-name>` and its args need not say 'Claude Docs'. Refusing it would block the user's own command.",
+      "exit": 0,
+      "not": [
+        "hookSpecificOutput",
+        "Traceback"
+      ],
+      "script": "wf-artifact-style",
+      "stdin_raw": "{\"tool_name\": \"mcp__claude_ai_Claude_Docs__batch\", \"transcript_path\": \"t.jsonl\", \"hook_event_name\": \"PreToolUse\", \"tool_input\": {\"container\": {\"kind\": \"project\", \"create\": {\"name\": \"Board Call Notes\"}}, \"batch\": []}}"
+    },
+    "artifact-style-docs-negated-denied": {
+      "_why": "REVIEW FINDING 5, NARROWED BY THE SECOND REVIEW. 'Don’t use Claude Docs' and 'do not put it in Claude Docs' name Docs to refuse it. Decided by verb scope in the mention's clause: both carry a verb after the negation, and the verb is itself negated. The curly apostrophe is how this user types.",
+      "exit": 0,
+      "not": [
+        "Traceback"
+      ],
+      "script": "wf-artifact-style",
+      "stdin_raw": "{\"tool_name\": \"mcp__claude_ai_Claude_Docs__batch\", \"transcript_path\": \"t.jsonl\", \"hook_event_name\": \"PreToolUse\", \"tool_input\": {\"container\": {\"kind\": \"project\", \"create\": {\"name\": \"Contractor Onboarding\"}}, \"batch\": []}}",
+      "want": [
+        "\"permissionDecision\": \"deny\""
+      ]
+    },
+    "artifact-style-docs-plain-ask": {
+      "_why": "REVIEW FINDING 6. A plain ask for Docs need not say 'Claude Docs' or 'co-edit': 'set it up in Docs so the whole team can collaborate on the rota' is the case Docs exists for. Since the second review, 'in Docs' needs the capital D and 'collaborate on' needs a document noun after it.",
+      "exit": 0,
+      "not": [
+        "hookSpecificOutput",
+        "Traceback"
+      ],
+      "script": "wf-artifact-style",
+      "stdin_raw": "{\"tool_name\": \"mcp__claude_ai_Claude_Docs__batch\", \"transcript_path\": \"t.jsonl\", \"hook_event_name\": \"PreToolUse\", \"tool_input\": {\"container\": {\"kind\": \"project\", \"create\": {\"name\": \"Shift Rota\"}}, \"batch\": []}}"
+    },
+    "artifact-style-docs-instead-of-asked": {
+      "_why": "SECOND REVIEW FINDING 1. 'Instead of HTML use Claude Docs' asks for Docs. Treating 'instead of' as a negation refused it, because the window reached back over 'HTML use'.",
+      "exit": 0,
+      "not": [
+        "hookSpecificOutput",
+        "Traceback"
+      ],
+      "script": "wf-artifact-style",
+      "stdin_raw": "{\"tool_name\": \"mcp__claude_ai_Claude_Docs__batch\", \"transcript_path\": \"t.jsonl\", \"hook_event_name\": \"PreToolUse\", \"tool_input\": {\"container\": {\"kind\": \"project\", \"create\": {\"name\": \"Volunteer Handbook\"}}, \"batch\": []}}"
+    },
+    "artifact-style-docs-why-not-asked": {
+      "_why": "SECOND REVIEW FINDING 1. 'Why not use Claude Docs' is a suggestion to use it. 'not use' is a negation on the verb, so `why` directly before it has to cancel the negation.",
+      "exit": 0,
+      "not": [
+        "hookSpecificOutput",
+        "Traceback"
+      ],
+      "script": "wf-artifact-style",
+      "stdin_raw": "{\"tool_name\": \"mcp__claude_ai_Claude_Docs__batch\", \"transcript_path\": \"t.jsonl\", \"hook_event_name\": \"PreToolUse\", \"tool_input\": {\"container\": {\"kind\": \"project\", \"create\": {\"name\": \"Volunteer Handbook\"}}, \"batch\": []}}"
+    },
+    "artifact-style-docs-no-put-asked": {
+      "_why": "SECOND REVIEW FINDING 1. 'No put it in Claude docs' answers a question with no, then asks for Docs. A bare 'no' in the window refused it. Under the verb-scope rule the verb 'put' follows the 'no' and is not itself negated.",
+      "exit": 0,
+      "not": [
+        "hookSpecificOutput",
+        "Traceback"
+      ],
+      "script": "wf-artifact-style",
+      "stdin_raw": "{\"tool_name\": \"mcp__claude_ai_Claude_Docs__batch\", \"transcript_path\": \"t.jsonl\", \"hook_event_name\": \"PreToolUse\", \"tool_input\": {\"container\": {\"kind\": \"project\", \"create\": {\"name\": \"Volunteer Handbook\"}}, \"batch\": []}}"
+    },
+    "artifact-style-docs-repo-talk-denied": {
+      "_why": "SECOND REVIEW FINDING 3. Talk about a repository's docs is not an ask for Claude Docs. None of these opens the gate: 'update the readme in docs' (lowercase, a directory), 'we should collaborate on this' (no document noun), 'check both edited files', and 'the changelog file was co-edited'. The user's actual ask is a release summary to share, so the birth is refused.",
+      "exit": 0,
+      "not": [
+        "Traceback"
+      ],
+      "script": "wf-artifact-style",
+      "stdin_raw": "{\"tool_name\": \"mcp__claude_ai_Claude_Docs__batch\", \"transcript_path\": \"t.jsonl\", \"hook_event_name\": \"PreToolUse\", \"tool_input\": {\"container\": {\"kind\": \"project\", \"create\": {\"name\": \"Release Summary\"}}, \"batch\": []}}",
+      "want": [
+        "\"permissionDecision\": \"deny\""
+      ]
+    },
+    "artifact-style-docs-refusals-denied": {
+      "_why": "THIRD REVIEW. Each of these refuses Docs, and the second review's verb-only negation let all five through: 'Not Claude Docs, HTML', 'No Claude Docs please', 'never Claude Docs', 'not in Claude Docs', and 'Don’t put the orientation brief in Claude Docs', where the noun phrase pushed the negation out of a four-word window. Under the verb-scope rule, a mention with no verb between it and the last negation word in its clause is negated. When a verb is there, the mention is negated only if that verb is.",
+      "exit": 0,
+      "not": [
+        "Traceback"
+      ],
+      "script": "wf-artifact-style",
+      "stdin_raw": "{\"tool_name\": \"mcp__claude_ai_Claude_Docs__batch\", \"transcript_path\": \"t.jsonl\", \"hook_event_name\": \"PreToolUse\", \"tool_input\": {\"container\": {\"kind\": \"project\", \"create\": {\"name\": \"Orientation Brief\"}}, \"batch\": []}}",
+      "want": [
+        "\"permissionDecision\": \"deny\""
+      ]
+    },
+    "artifact-style-docs-not-just-asked": {
+      "_why": "THIRD REVIEW, THE ALLOW SIDE. 'not just a page put it in Claude Docs': the verb 'put' sits between the negation and the mention and is not itself negated, so this is an ask.",
+      "exit": 0,
+      "not": [
+        "hookSpecificOutput",
+        "Traceback"
+      ],
+      "script": "wf-artifact-style",
+      "stdin_raw": "{\"tool_name\": \"mcp__claude_ai_Claude_Docs__batch\", \"transcript_path\": \"t.jsonl\", \"hook_event_name\": \"PreToolUse\", \"tool_input\": {\"container\": {\"kind\": \"project\", \"create\": {\"name\": \"Volunteer Handbook\"}}, \"batch\": []}}"
+    },
+    "artifact-style-docs-without-asked": {
+      "_why": "THIRD REVIEW, THE ALLOW SIDE. 'without the HTML put it in Claude Docs': 'without' scopes over 'the HTML', and the un-negated verb 'put' takes Claude Docs.",
+      "exit": 0,
+      "not": [
+        "hookSpecificOutput",
+        "Traceback"
+      ],
+      "script": "wf-artifact-style",
+      "stdin_raw": "{\"tool_name\": \"mcp__claude_ai_Claude_Docs__batch\", \"transcript_path\": \"t.jsonl\", \"hook_event_name\": \"PreToolUse\", \"tool_input\": {\"container\": {\"kind\": \"project\", \"create\": {\"name\": \"Volunteer Handbook\"}}, \"batch\": []}}"
+    },
+    "artifact-style-docs-why-dont-asked": {
+      "_why": "THIRD REVIEW, THE ALLOW SIDE. 'Why don’t we use Claude Docs' is a suggestion, like 'why not use'.",
+      "exit": 0,
+      "not": [
+        "hookSpecificOutput",
+        "Traceback"
+      ],
+      "script": "wf-artifact-style",
+      "stdin_raw": "{\"tool_name\": \"mcp__claude_ai_Claude_Docs__batch\", \"transcript_path\": \"t.jsonl\", \"hook_event_name\": \"PreToolUse\", \"tool_input\": {\"container\": {\"kind\": \"project\", \"create\": {\"name\": \"Volunteer Handbook\"}}, \"batch\": []}}"
+    },
+    "artifact-style-docs-unlisted-verb-denied": {
+      "_why": "ALWAYS ENFORCE: A REFUSAL MUST NEVER READ AS AN ASK. don't, dont, do not and never negate whatever word comes next, listed verb or not ('don't send it to Claude Docs', 'never save it in Claude Docs'). A later listed verb does not lift that negation unless it starts a new coordinated verb ('and put it in Claude Docs'). Under the nearest-verb rule, 'Don’t send the brief you make to Claude Docs' read as an ask, because 'make' sat after the negated 'send'.",
+      "exit": 0,
+      "not": [
+        "Traceback"
+      ],
+      "script": "wf-artifact-style",
+      "stdin_raw": "{\"tool_name\": \"mcp__claude_ai_Claude_Docs__batch\", \"transcript_path\": \"t.jsonl\", \"hook_event_name\": \"PreToolUse\", \"tool_input\": {\"container\": {\"kind\": \"project\", \"create\": {\"name\": \"Board Brief\"}}, \"batch\": []}}",
+      "want": [
+        "\"permissionDecision\": \"deny\""
+      ]
+    },
+    "artifact-style-docs-coordinated-verb-asked": {
+      "_why": "THE ONE WAY A STRONG NEGATION IS LIFTED. 'Don't worry about formatting and put it in Claude Docs': 'and' starts a new verb, 'put', which takes Claude Docs and is not negated. Without the coordinator exception every 'don't …' earlier in the clause would refuse the ask.",
+      "exit": 0,
+      "not": [
+        "hookSpecificOutput",
+        "Traceback"
+      ],
+      "script": "wf-artifact-style",
+      "stdin_raw": "{\"tool_name\": \"mcp__claude_ai_Claude_Docs__batch\", \"transcript_path\": \"t.jsonl\", \"hook_event_name\": \"PreToolUse\", \"tool_input\": {\"container\": {\"kind\": \"project\", \"create\": {\"name\": \"Board Brief\"}}, \"batch\": []}}"
+    },
+    "artifact-style-docs-unlisted-verb-asked": {
+      "_why": "THE OTHER HALF OF THE VERB LIST. 'Instead of HTML share it in Claude Docs' is an ask. Before 'share' was a listed verb, the clause had no verb after 'instead of', so the mention read as refused. The verbs added are send, save, keep, upload, share, write and draft.",
+      "exit": 0,
+      "not": [
+        "hookSpecificOutput",
+        "Traceback"
+      ],
+      "script": "wf-artifact-style",
+      "stdin_raw": "{\"tool_name\": \"mcp__claude_ai_Claude_Docs__batch\", \"transcript_path\": \"t.jsonl\", \"hook_event_name\": \"PreToolUse\", \"tool_input\": {\"container\": {\"kind\": \"project\", \"create\": {\"name\": \"Board Brief\"}}, \"batch\": []}}"
+    },
+    "artifact-style-docs-command-output-denied": {
+      "_why": "REVIEW FINDING 7. Output of a `!` command (`<bash-stdout>`, `<bash-stderr>`) and of a local slash command (`<local-command-stdout>`) is stored as a user row, but the user did not write it. A `Co-Authored-By:` trailer pasted into a message is not a request to co-author a doc. None of these opens the gate.",
+      "exit": 0,
+      "not": [
+        "Traceback"
+      ],
+      "script": "wf-artifact-style",
+      "stdin_raw": "{\"tool_name\": \"mcp__claude_ai_Claude_Docs__batch\", \"transcript_path\": \"t.jsonl\", \"hook_event_name\": \"PreToolUse\", \"tool_input\": {\"container\": {\"kind\": \"project\", \"create\": {\"name\": \"Release Summary\"}}, \"batch\": []}}",
+      "want": [
+        "\"permissionDecision\": \"deny\""
+      ]
+    },
+    "artifact-style-docs-sdk-app-denied": {
+      "_why": "A PROGRAM'S PROMPT IS NOT A PERSON'S. Found by the finding-6 re-measure: the only two messages on the measuring machine that opened the gate were Agent SDK (`sdk-py`) security-review prompts quoting a diff of this hook, which names Claude Docs and co-editing. Their entrypoint is `sdk-py`; a person's `claude -p` is `sdk-cli` and still counts.",
+      "exit": 0,
+      "not": [
+        "Traceback"
+      ],
+      "script": "wf-artifact-style",
+      "stdin_raw": "{\"tool_name\": \"mcp__claude_ai_Claude_Docs__batch\", \"transcript_path\": \"t.jsonl\", \"hook_event_name\": \"PreToolUse\", \"tool_input\": {\"container\": {\"kind\": \"project\", \"create\": {\"name\": \"Security Review\"}}, \"batch\": []}}",
+      "want": [
+        "\"permissionDecision\": \"deny\""
+      ]
+    },
+    "artifact-style-typeurl-pin-silent": {
+      "_why": "REVIEW FINDING 8. Only a `publish`, or the implicit publish with no action, can create a doc through the Artifact tool. A `pin` that happens to carry a type_url and a url acts on an artifact that already exists.",
+      "exit": 0,
+      "not": [
+        "hookSpecificOutput",
+        "Traceback"
+      ],
+      "script": "wf-artifact-style",
+      "stdin_raw": "{\"tool_name\": \"Artifact\", \"tool_input\": {\"action\": \"pin\", \"url\": \"https://claude.ai/artifact/AAAA\", \"type_url\": \"https://claude.ai/artifact/AAAA\"}}"
+    },
+    "artifact-style-docs-teammate-denied": {
+      "_why": "REVIEW FINDING 10. Another agent's words are not the user's, even when they say the user wants Docs. A teammate's message arrives as a user row or a queued prompt wrapped in `<teammate-message>`, and here both name Claude Docs and co-editing. A spawned agent's own transcript is no way round it either: its spawn prompt is a sidechain row, here claiming the user wants Docs, and sidechain rows never count. The user's own message asks for a brief to send around, so the birth is refused. Canary blocked in this environment (a nested `claude -p` is refused by the worktree guard); platform.md fact 22a (c) measured that a subagent's PreToolUse carries the PARENT transcript, and teammate transcripts on this machine sit under the parent session's `subagents/` directory.",
+      "exit": 0,
+      "not": [
+        "Traceback"
+      ],
+      "script": "wf-artifact-style",
+      "stdin_raw": "{\"tool_name\": \"mcp__claude_ai_Claude_Docs__batch\", \"agent_id\": \"a0000fx\", \"agent_type\": \"writer\", \"transcript_path\": \"t.jsonl\", \"hook_event_name\": \"PreToolUse\", \"tool_input\": {\"container\": {\"kind\": \"project\", \"create\": {\"name\": \"Vendor Migration Brief\"}}, \"batch\": []}}",
+      "want": [
+        "\"permissionDecision\": \"deny\""
       ]
     },
     "artifact-style-read-action": {

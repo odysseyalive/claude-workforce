@@ -164,7 +164,19 @@ SHIPPED_HOOKS = {
     # It emits the style instruction on `quickstart` and denies a publish whose page is
     # missing the dark-mode floor, which is the defect the author provably cannot see:
     # they publish from one theme and the broken state is the other.
-    "wf-artifact-style": ("PreToolUse", "Artifact"),
+    #
+    # AND ON THE CLAUDE DOCS TOOL THAT BEARS A DOC, `batch`, matched by name pattern so a host
+    # that prefixes the connector differently is covered. Added 2026-10-15: the Docs server
+    # tells the model to make a doc's skeleton the turn's first tool call, so on `Artifact`
+    # alone the house style never arrived and a brief was born in the Docs viewer. The user:
+    # "workforce should always enforce this format for shareable documentation". The hook
+    # refuses a Docs birth the user's own words did not ask for (its header has the measure).
+    # A regex, so the host tests it against the tool name instead of splitting on `|`; the
+    # anchors are needed because the host's test is unanchored. Existing rows on the old
+    # matcher are moved by PRIOR_MATCHERS below on the next `--wire-defaults`, in whichever
+    # settings file holds them. `create` is not in it: under the Docs schema its container
+    # is kind and id only, so no doc is born through it (review finding 9).
+    "wf-artifact-style": ("PreToolUse", "^(?:Artifact|mcp__.+[Dd]ocs__batch)$"),
     # THE ONLY HOOK HERE THAT ACTS. Everything else in this table reports or decides;
     # this one spawns a reader and opens the channel the turn left shut. Config shape is
     # in AGENT_HOOKS below — it is registered as `type: "agent"`, not `command`.
@@ -225,6 +237,16 @@ SHIPPED_HOOKS = {
     # all for any other tool, and on an `Agent` call in a project with no issue ledger it
     # exits on one failed read.
     "wf-turn-budget@agentspawn": ("PreToolUse", "Agent"),
+}
+
+# MATCHERS A SHIPPED HOOK USED TO BE REGISTERED ON, by SHIPPED_HOOKS name. Presence is decided
+# by script and event, never by matcher, so without this a release that widens a matcher
+# reports "already registered — NOOP" on every machine that has the old row, and the new
+# matcher reaches nobody — the shape the stale-agent-prompt heal in `do_wire_hook` fixed for
+# prompts. A row of ours on a matcher named here is moved to the shipped one; a row on any
+# OTHER matcher is the user's own choice and is left alone.
+PRIOR_MATCHERS = {
+    "wf-artifact-style": ("Artifact",),
 }
 
 # AGENT-HOOK CONFIG, keyed by the same names SHIPPED_HOOKS uses.
@@ -788,13 +810,136 @@ def _scan_hook(data, event, agent_cfg, command, root):
                         present = True
                     else:
                         stale_agent.append((e, h))
-            elif _same_command(h, command, root):
+            elif _is_this_hook(h, command, want, root):
                 present = True
-            elif want is not None:
-                have = _wf_identity(h, root)
-                if have is not None and have[0] == want[0] and have[1] is not False:
-                    present = True
     return present, stale_agent
+
+
+def _is_this_hook(h, command, want, root):
+    """Is registered entry `h` this command hook — by spelling, or by script from any live
+    install? `want` is `_wf_identity({"command": command}, root)`, computed once by the caller.
+    Shared by the presence scan and the prior-matcher move, so the two cannot disagree about
+    which rows are ours."""
+    if _same_command(h, command, root):
+        return True
+    have = _wf_identity(h, root) if want is not None else None
+    return have is not None and have[0] == want[0] and have[1] is not False
+
+
+def _holds_on(data, event, matcher, command, root):
+    """Does `data` register this hook on exactly `matcher`?"""
+    hooks = data.get("hooks") if isinstance(data, dict) else None
+    entries = hooks.get(event) if isinstance(hooks, dict) else None
+    want = _wf_identity({"command": command}, root)
+    return any(isinstance(e, dict) and e.get("matcher") == matcher
+               and any(_is_this_hook(h, command, want, root) for h in e.get("hooks") or [])
+               for e in (entries if isinstance(entries, list) else []))
+
+
+def _move_prior_matcher(data, name, event, matcher, command, root, live_elsewhere=False):
+    """Take this hook's rows off every matcher PRIOR_MATCHERS retires; return
+    `(old matchers, the inner hook dicts taken, deleted)`. Edits `data`.
+
+    MOVED onto `matcher` AS IT IS WRITTEN — its command spelling is the one its own scope
+    chose, and a user-scope absolute path must not become a project's per-session form.
+    DELETED instead when the hook is already live on `matcher` in this file, or when the
+    caller says it is live there in a file that covers this one (`live_elsewhere`): moving
+    it would leave two registrations on the new matcher, and every Docs birth refused twice
+    (second review, finding 2). Only OUR hook leaves an entry: a hook of the user's beside it
+    keeps the old matcher, and only an entry left empty goes.
+    """
+    prior = PRIOR_MATCHERS.get(name) or ()
+    hooks = data.get("hooks") if isinstance(data, dict) else None
+    entries = hooks.get(event) if isinstance(hooks, dict) else None
+    if not prior or not isinstance(entries, list):
+        return [], [], False
+    deleted = live_elsewhere or _holds_on(data, event, matcher, command, root)
+    want = _wf_identity({"command": command}, root)
+    moved, carried, keep = [], [], []
+    for e in entries:
+        inner = e.get("hooks") if isinstance(e, dict) else None
+        ours = [h for h in inner if _is_this_hook(h, command, want, root)] \
+            if isinstance(inner, list) and e.get("matcher") in prior else []
+        if not ours:
+            keep.append(e)
+            continue
+        moved.append(e.get("matcher"))
+        carried.extend(ours)
+        rest = [h for h in inner if h not in ours]
+        if rest:
+            keep.append(dict(e, hooks=rest))
+    if moved:
+        if not deleted:
+            keep.append({"matcher": matcher, "hooks": carried})
+        hooks[event] = keep
+    return moved, carried, deleted
+
+
+def _retarget_records(owned, name, event, matcher, carried, deleted, root):
+    """Point the reversal records of moved rows at the new matcher, or drop the records of
+    deleted ones. True when any changed.
+
+    `--unwire-defaults` removes a row only when event, matcher AND command match its record,
+    so a record left on the old matcher would leave a moved row wired forever, and a record
+    of a deleted row would report it absent on every unwire."""
+    prior = PRIOR_MATCHERS.get(name) or ()
+    added = owned.get("hooks_added")
+    if not isinstance(added, list):
+        return False
+    keep, changed = [], False
+    for r in added:
+        if isinstance(r, dict) and r.get("event") == event and r.get("matcher") in prior \
+                and any(_same_command(h, r.get("command"), root) for h in carried):
+            changed = True
+            if deleted:
+                continue
+            r["matcher"] = matcher
+        keep.append(r)
+    owned["hooks_added"] = keep
+    return changed
+
+
+def _move_in(spath, data, owned_scope, name, event, matcher, command, root, execute,
+             live_elsewhere=False):
+    """Run the prior-matcher move on one settings file. None when it held nothing to move,
+    else the exit code. Record first, then the file, then a re-read — the order and the proof
+    every other write in this file uses."""
+    moved, carried, deleted = _move_prior_matcher(data, name, event, matcher, command, root,
+                                                  live_elsewhere)
+    if not moved:
+        return None
+    done = (f"row on retired matcher {moved[0]} removed from {spath} — already live on "
+            f"{matcher}" if deleted else
+            f"matcher moved from {moved[0]} to {matcher} in {spath}")
+    if not execute:
+        print(f"  ~ {name}  {event}  {done}  (would)")
+        return 0
+    try:
+        owned_path, owned = load_owned(root, owned_scope)
+        if _retarget_records(owned, name, event, matcher, carried, deleted, root):
+            dump(owned_path, owned)
+        dump(spath, data)
+    except OSError as exc:
+        print(f"  ! {name}  {event}  matcher NOT MOVED in {spath} — "
+              f"{exc.__class__.__name__}: {exc}")
+        return 1
+    back, _ = load(spath)
+    entries = back.get("hooks", {}).get(event, []) if isinstance(back, dict) else []
+    prior = PRIOR_MATCHERS.get(name) or ()
+    left = any(isinstance(e, dict) and e.get("matcher") in prior
+               and any(h in carried for h in e.get("hooks") or []) for e in entries)
+    ok = not left and (deleted or any(
+        isinstance(e, dict) and e.get("matcher") == matcher
+        and any(h in carried for h in e.get("hooks") or []) for e in entries))
+    print(f"  * {name}  {event}  {done}")
+    if not ok:
+        print(f"wf-settings-apply: HOOK UNVERIFIED — {name} in {spath} is not where the move "
+              f"put it.", file=sys.stderr)
+        return 1
+    print(f"  verified on disk: {name} on matcher {matcher}"
+          f"{' elsewhere' if deleted and live_elsewhere else ''}, nothing on {moved[0]}, "
+          f"in {spath}")
+    return 0
 
 
 def settings_for_scope(root, scope):
@@ -2616,6 +2761,39 @@ def do_wire_hook(root, name, execute, scope="project", quiet=False):
         return 1
     if not isinstance(data, dict):
         data = {}
+    # A ROW ON A MATCHER THIS RELEASE RETIRED IS MOVED FIRST, IN EVERY FILE IN FORCE — not
+    # only the one this scope writes. The installer wires USER scope, and a project-scope run
+    # sees that row below, reports it already registered and writes nothing, so a move made
+    # only here would never reach the file most machines hold it in (review finding 3).
+    # PRIOR_MATCHERS says why this cannot be left to presence.
+    #
+    # THE USER FILE GOES FIRST, and a project row is DELETED rather than moved when the user
+    # file then holds the hook on the shipped matcher: user scope covers every project, this
+    # one included, so a moved copy would double-fire (second review, finding 2). Never the
+    # other way round. A project holding the hook covers only itself, and deleting the user
+    # row on its account would unguard every other project on the machine.
+    moves = {}
+    if agent_cfg is None:
+        user_real = os.path.realpath(user_settings_path())
+        files = []
+        for path in union_settings_paths(root):
+            if os.path.realpath(path) == os.path.realpath(spath):
+                files.append((path, data))
+            else:
+                fdata, _ferr = load(path)
+                if isinstance(fdata, dict):
+                    files.append((path, fdata))
+        files.sort(key=lambda f: os.path.realpath(f[0]) != user_real)
+        user_data = next((d for p, d in files if os.path.realpath(p) == user_real), None)
+        for path, fdata in files:
+            is_user = os.path.realpath(path) == user_real
+            covered = (not is_user and user_data is not None
+                       and _holds_on(user_data, event, matcher, command, root))
+            moves[path] = _move_in(path, fdata, "user" if is_user else "project", name,
+                                   event, matcher, command, root, execute, covered)
+    rcs = [rc for rc in moves.values() if rc is not None]
+    if any(rcs) or moves.get(spath) is not None:
+        return max(rcs)
     present, stale_agent = _scan_hook(data, event, agent_cfg, command, root)
 
     # THE OFFER IS MADE AGAINST EVERY FILE IN FORCE, NOT ONLY THE ONE THIS SCOPE WRITES.

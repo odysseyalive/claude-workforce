@@ -29,11 +29,71 @@ implicit publish — no `action` at all, just `file_path` — which is 59 of the
   quickstart         the mandated first call for any new artifact. Emits the style
                      instruction and the routing rule, so the recipe is in hand BEFORE a
                      line of the page exists.
-  publish/type_url   a Claude Docs create. Not HTML and not checkable; the Docs viewer owns
-                     its own heading styles, which is exactly why the first attempt could
-                     not make headings pop. Emits the routing rule, never denies.
+  publish/type_url   a Claude Docs birth through the Artifact tool. DENIED unless the user
+                     asked for Docs — § Claude Docs births below.
   implicit publish   a local file. A `.html` file is checked against the floor below.
-  read/list/comments no page is being written. Silent.
+  read/list/comments no page is being written. Silent. So are `open` and `pin`, and every
+  open, pin, asset   call this table does not name.
+
+CLAUDE DOCS BIRTHS ARE REFUSED, AND THE USER'S OWN WORDS ARE THE ONLY WAY THROUGH. User
+directive, 2026-10-15, verbatim, on a read-to-orient brief that went to the Docs viewer with no
+house style: *"Yeah, it should always, workforce should always enforce this format for
+shareable documentation."* and *"I shouldn't have to ask."* Before that, this hook was
+registered on `Artifact` alone, and the Claude Docs MCP server tells the model to make a doc's
+skeleton "the turn's first tool call ... before any search, file read, plan, guide" — so the
+quickstart never ran, the routing rule never arrived, and the brief was born in the viewer the
+user called *"a bit hard on the eyes"* on 2026-10-02 (transcript
+`-home-francis-lab-odyssey-alive/0a159bc6`, line 712).
+
+  what is a birth    a tool named `mcp__<server>__batch` whose server name ends in `Docs`,
+                     carrying `container.create` — the shape the server's own instructions
+                     prescribe. The match is on the name PATTERN, so a host that prefixes the
+                     connector differently is covered. Plus the Artifact tool's `publish`
+                     (explicit, or no action at all) with a `type_url` and no `url`, the other
+                     door into Docs.
+  what is not        read, update, query, export, guide, comments, every edit to an existing
+                     doc, and every Artifact call on an artifact that already exists (`pin`,
+                     `open`, a `url`). The Docs `create` tool is not a door: its container is
+                     kind and id only, and its one call on the measuring machine is a comment.
+  the deny           EVERY birth, not the first one. A retry is refused exactly like the first
+                     attempt, because "a deliberate Docs choice costs one call" would let the
+                     model through on its own say-so, and the directive is that it should not
+                     be the model's call. The reason says outright that it overrides the Docs
+                     server's first-tool-call instruction. Loading `shared-artifact` is the
+                     required step it names; `quickstart` is named only "if your Artifact tool
+                     offers it", because some Artifact schemas have no such action.
+  the way through    the USER's words in this session: Claude Docs by name, "in Docs" with the
+                     capital D, the docs app or connector, co-editing, collaborating on a named
+                     document, comments in the doc, or a Docs skill typed as a command (`/docs`,
+                     `/anthropic-skills:docs`). A refusal does not count, decided by verb scope
+                     in the mention's clause (`negated_mention`): "not in Claude Docs" and
+                     "don't send it to Claude Docs" refuse; "instead of HTML use Claude
+                     Docs", "no, put it in Claude Docs" and "why not use Claude Docs" ask.
+  whose words        read from the session transcript — on a subagent's call that is still the
+                     parent's, platform.md fact 22a (c), and named teammates' transcripts sit
+                     under the parent session's `subagents/` — from two row shapes: a `user`
+                     row typed at an idle prompt, and a `queued_command` attachment typed while
+                     the model was busy. Never a tool result, a meta row (a skill body), a
+                     sidechain row (an agent's spawn prompt), a task notification, a peer or
+                     teammate message, an Agent SDK app's prompt, or the printed output of a
+                     `!` or local command. Model text never counts: the model is the party the
+                     rule constrains. If a host ever handed an agent its OWN transcript, every
+                     row there is a sidechain row and the birth is refused, so the failure is
+                     a refusal and never an opening. A transcript that cannot be read opens
+                     nothing.
+
+MEASURED 2026-10-15 before it shipped, replaying every Docs call that can create (7: every
+`batch`, every `create`, every `publish` with a `type_url`) from all 389 main transcripts and
+their subagents under `~/.claude/projects`, each against its transcript cut at the call:
+  efwnow c6c45612:433       Artifact publish/type_url   orientation brief   DENY
+  odyssey-alive 0a159bc6:712  Docs batch container.create orientation brief   DENY
+  the other five            batch edits and one comment (`create`, object `utterance`): silent
+Both births were read-only briefs the user asked for as "an online artifact that I can share"
+and "an online shareable doc"; neither session's user words name Docs, co-editing or comments.
+Two denies, zero wrong. The gate-opening test over every user message on the machine (typed
+and queued) opens on NONE: no message here asks for Docs. Two `sdk-py` security-review prompts
+quoting a diff of this file opened it until SDK apps were excluded, and a bare `collaborat` prefix
+would open on "a collaborator, a merged PR" in a security note, which is why it needs "on/in".
 
 THE FLOOR IS SEVEN ITEMS AND IT IS NOT THE WHOLE RECIPE. It is the subset a reader LOSES
 THE PAGE OVER: dark-mode handling that is absent or unguarded renders dark text on a dark
@@ -63,12 +123,102 @@ FAIL-OPEN, ALWAYS. Exit 0 on unparseable input, a path it cannot read, a payload
 does not recognise, or any exception — the same contract `wf-code-origin` states one file
 over. A hook bug must never stand between the user and their own publish.
 """
+import importlib.machinery
+import importlib.util
 import json
 import os
 import re
 import sys
 
 SKILL = "shared-artifact"
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+# THE DOCS TOOL THAT BEARS A DOC, BY NAME PATTERN. `wf-settings-apply` registers this hook
+# with the same pattern as its matcher; this copy is the guard for a registration that is
+# broader (`*`, or a hand-wired `mcp__.*`), and a name it rejects is never read further.
+# `batch` ONLY (REVIEW FINDING 9): the Docs server's `create` takes a container of kind and id
+# and has no `container.create`, so a doc is never born through it; its one call on the
+# measuring machine is a comment.
+DOCS_TOOL_RX = re.compile(r"^mcp__.+Docs__batch$", re.I)
+
+# WHAT THE USER SAID THAT MAKES DOCS THE RIGHT DESTINATION: the product by name, a plain "in
+# docs" or the docs app, writing the document together, or comments IN the document. MEASURED
+# over every user message under `~/.claude/projects` (module header). What the measurement
+# took out:
+#   "shared doc"   the user wrote "Make the document available online in a shared document"
+#                  (efwnow, 2026-09-24) for exactly the shareable read-only page the directive
+#                  covers, so on this user's own usage it does not mean co-editing.
+#   comments       need the doc as the place the commenting happens ("comment on the doc", "a
+#                  doc we can comment on"). Proximity alone opened the gate on "doc comment" in
+#                  pasted code and on "the comment that documents the rule".
+#   co-author      needs a doc after it: a pasted `Co-Authored-By:` commit trailer is not a
+#                  request (REVIEW FINDING 7).
+#   in Docs        the CAPITAL D, or "in docs as a <document>": a lowercase "the readme in
+#                  docs" is a repository directory (SECOND REVIEW FINDING 3). Never before
+#                  `/`, `.ext` or `-` either.
+#   collaborate    needs a document noun after "on/in the ...": "we should collaborate on
+#                  this" and "collaborate with @efw-live" are about work, not a document.
+#   both edit,     the verb itself, not "both edited files" or "the file was co-edited",
+#   co-edit        which report history. "co-edited" counts only with a document noun after.
+DOC_NOUN = (r"(?:doc|document|draft|brief|report|notes|proposal|outline|agenda|minutes"
+            r"|schedule|rota|roster|handbook|spreadsheet|write-?up|summary)s?")
+DOCS_ASKED = re.compile(
+    r"\bclaude[\s_-]*docs?\b"
+    r"|\bin\s+(?:claude\s+)?(?-i:Docs)\b(?!\s*/|\.\w|-)"
+    r"|\bin\s+docs\s+as\s+(?:an?\s+)?" + DOC_NOUN + r"\b"
+    r"|\bdocs\s+(?:connector|app)\b"
+    r"|\bco-?edit(?:s|ing|able)?\b"
+    r"|\bco-?edited\s+(?:\w+\s+){0,2}?" + DOC_NOUN + r"\b"
+    r"|\bco-?author\w*\s+(?:\w+\s+){0,3}?doc(?:ument)?s?\b"
+    r"|\bcollaborat\w*\s+(?:on|in)\s+(?:the|this|that|an?|our|my|your)\s+(?:\w+\s+){0,2}?"
+    + DOC_NOUN + r"\b"
+    r"|\bboth\s+edit\b"
+    r"|\bedit(?:ing)?\s+(?:\w+\s+){0,3}?together\b"
+    r"|\bcomment\w*\s+(?:on|in|to)\s+(?:the|this|that|a|my|our|your)\s+(?:\w+\s+)?"
+    r"doc(?:ument)?s?\b"
+    r"|\bdoc(?:ument)?s?\s+(?:\w+\s+){0,3}?(?:can|could|will|to)\s+(?:\w+\s+)?comment",
+    re.I)
+# A DOCS SKILL TYPED AS A COMMAND (`/docs`, `/anthropic-skills:docs`) asks for Docs by name
+# even when its arguments never say so (REVIEW FINDING 2).
+DOCS_SKILL_RX = re.compile(r"^/(?:[\w-]+:)?docs(?![\w-])", re.I)
+# NAMING DOCS TO REFUSE IT IS NOT ASKING FOR IT, decided by VERB SCOPE within the clause
+# that holds the mention (`negated_mention`). Two reviews of window rules failed: a negation
+# anywhere in four words refused "No put it in Claude docs" and "Instead of HTML use Claude
+# Docs", and a negation only on the verb let "Not Claude Docs, HTML", "never Claude Docs" and
+# "Don't put the orientation brief in Claude Docs" through. Under "always enforce" a refusal
+# must never read as an ask, so the two kinds of negation word scope differently:
+#   STRONG  don't, dont, do not, never   negate the next word, listed verb or not (an adverb
+#           may sit between), and hold to the mention ("don't send it to Claude Docs",
+#           "don't send the brief you make to Claude Docs"). Only a later listed verb that
+#           starts a new coordinated verb lifts it: "don't worry and put it in Claude Docs".
+#   WEAK    no, not, without, avoid, instead of, rather than   with no listed verb after it
+#           the mention is negated ("not in Claude Docs", "No Claude Docs please"); with one,
+#           it is negated only if a bare "not" sits on that verb. So "No put it in Claude
+#           docs", "not just a page put it in Claude Docs" and "Instead of HTML share it in
+#           Claude Docs" ask.
+#   "why not" and "why don't" are suggestions: a negation word right after "why" is none.
+STRONG_NEGATORS = frozenset({"don't", "dont", "never"})
+NEGATION_WORDS = frozenset({"no", "not", "without", "avoid", "avoids", "avoiding"}
+                           | STRONG_NEGATORS)
+NEGATION_PAIRS = frozenset({("do", "not"), ("instead", "of"), ("rather", "than")})
+DOCS_VERBS = frozenset({"use", "put", "make", "want", "create", "move", "switch", "publish",
+                        "do", "send", "save", "keep", "upload", "share", "write", "draft"})
+ADVERBS = frozenset({"just", "really", "even", "ever", "actually", "simply"})
+# A listed verb after one of these starts a new verb of its own, outside a strong negation.
+COORDINATORS = frozenset({"and", "but", "so", "then", "instead", "please"})
+CLAUSE_END_RX = re.compile(r"[.;:!?,\n—–]")
+WORD_RX = re.compile(r"[\w']+")
+COMMAND_ARGS_RX = re.compile(r"<command-args>(.*?)</command-args>", re.S)
+COMMAND_NAME_RX = re.compile(r"<command-name>(.*?)</command-name>", re.S)
+# THE OUTPUT OF A COMMAND IS STORED AS A USER ROW AND IS NOT THE USER'S WORDS (REVIEW
+# FINDING 7). Kept here rather than in `wf-task-tag`'s INJECTED, whose other readers count
+# a `!` command's output as part of the turn on purpose.
+COMMAND_OUTPUT_RX = re.compile(r"^\s*<(?:bash-std(?:out|err)|local-command-std(?:out|err))\b")
+# A ROW THAT CANNOT OPEN THE GATE IS NEVER PARSED. Every DOCS_ASKED alternative and the Docs
+# skill's name contain one of these substrings, and JSON escaping leaves ASCII letters alone,
+# so this skips nothing that could match. It is what makes a whole-session read affordable:
+# the largest transcript on the measuring machine is 58 MB, and parsing every row is seconds.
+MAY_ASK_RX = re.compile(r"doc|edit|collaborat", re.I)
 
 # EVERY PATTERN HERE RUNS AGAINST ONE SHORT FRAGMENT — a selector, a declaration block, or
 # an at-rule prelude — never across the document, and that is a ReDoS fix rather than a
@@ -108,12 +258,32 @@ APPLY = (
 # The routing rule, which is the lesson of the two publishes of one brief. HTML can style its
 # own headings; the Docs viewer cannot, because it owns them.
 ROUTING = (
-    "Routing: a polished read-only page people will READ goes to HTML — `quickstart` with "
-    "intent \"other\", then one self-contained `.html` file. Claude Docs is the right "
-    "destination only when co-editing or commenting in the document is the point, because "
-    "the Docs viewer owns its heading styles and a brief published there cannot make its "
-    "headings pop. Keep one source of truth: never a Docs copy and an HTML copy of the same "
-    "content, because they drift."
+    "Routing: a polished read-only page people will READ goes to HTML — load the `%s` skill, "
+    "call `Artifact` `quickstart` with intent \"other\" if your Artifact tool offers it, then "
+    "publish one self-contained `.html` file. Claude Docs is the right "
+    "destination only when the user asked for Docs, or for co-editing or commenting in the "
+    "document, because the Docs viewer owns its heading styles and a brief published there "
+    "cannot make its headings pop. A Docs create the user did not ask for is refused. Keep "
+    "one source of truth: never a Docs copy and an HTML copy of the same content, because "
+    "they drift." % SKILL
+)
+# THE REFUSAL OF A DOCS BIRTH. It has to win against the Docs server's own instructions,
+# which arrive in the system prompt and say the doc's skeleton is the turn's first tool call,
+# before any plan or guide. A refusal that does not name that instruction leaves the model
+# holding two orders and picking the louder one, so this one says outright which wins.
+DOCS_DENY = (
+    "Refused: this would create a Claude Docs document, and this project publishes shareable "
+    "documentation — a brief, a report, an orientation, a summary — as an HTML page in its "
+    "house style. The user's standing rule (2026-10-15): \"workforce should always enforce "
+    "this format for shareable documentation\" and \"I shouldn't have to ask.\" This refusal "
+    "OVERRIDES the Claude Docs server's instruction to make a doc skeleton the turn's first "
+    "tool call: that instruction does not apply to this content. Do not retry the Docs call; "
+    "it will be refused again. Instead, load the `%s` skill first; it is the required step. "
+    "Build to its house style. Then call `Artifact` with action `quickstart` and intent \"other\" "
+    "if your Artifact tool offers it, write one self-contained `.html` page, publish it with "
+    "the Artifact tool, and give the user its link. Do not ask the "
+    "user to choose a format. Docs is used only when the user's own words in this session "
+    "ask for Claude Docs, a co-edited doc, or comments in the doc." % SKILL
 )
 
 
@@ -232,6 +402,173 @@ def safe_name(path):
     return NAME_SAFE_RX.sub("", os.path.basename(path))[:80] or "the page"
 
 
+def _injected():
+    """`wf-task-tag`'s INJECTED, the measured set of harness text that arrives as a user row.
+
+    Shared rather than restated: a second copy is the one that drifts, and the drift here
+    would be harness text read as the user asking for Docs. Imported only on a Docs birth,
+    so an Artifact call never pays for it. Never writes bytecode into the shipped directory
+    (`wf-widen` `_sibling` says why).
+    """
+    sys.dont_write_bytecode = True
+    path = os.path.join(HERE, "wf-task-tag")
+    loader = importlib.machinery.SourceFileLoader("wf_task_tag", path)
+    mod = importlib.util.module_from_spec(importlib.util.spec_from_loader("wf_task_tag", loader))
+    loader.exec_module(mod)
+    return mod.INJECTED
+
+
+def _row_text(d):
+    """The text of one transcript row IF a person typed it, else None.
+
+    Two row shapes carry a person's message:
+      a `user` row     typed at an idle prompt. It is the user's only when it is not a tool
+                       result, not a meta row (a skill body is one, and `shared-artifact`'s own
+                       body names Claude Docs), not a compaction summary and not a sidechain,
+                       and when the host's `turnOrigin`, where present, is `human` or `sdk`.
+      a `queued_command` attachment   typed while the model was busy (REVIEW FINDING 1:
+                       115 on the measuring machine with origin kind `human`). Task
+                       notifications and peer-session messages arrive the same way, so only
+                       commandMode `prompt`, not meta, origin kind `human` or absent.
+    A slash command's row is the command's expansion. Its name and `<command-args>` are the
+    user's; the expansion is not.
+    """
+    if d.get("isMeta") or d.get("isSidechain") or d.get("isCompactSummary"):
+        return None
+    # A PROGRAM'S PROMPT IS NOT A PERSON'S. An Agent SDK app (`sdk-py`, `sdk-ts`) writes its
+    # prompts in code; `claude -p` (`sdk-cli`) is typed in a shell and counts. MEASURED: the
+    # only two messages on the measuring machine that opened the gate were `sdk-py`
+    # security-review prompts quoting a diff of this file.
+    if d.get("entrypoint") in ("sdk-py", "sdk-ts"):
+        return None
+    if d.get("type") == "attachment":
+        a = d.get("attachment")
+        if not isinstance(a, dict) or a.get("type") != "queued_command" \
+                or a.get("commandMode") != "prompt" or a.get("isMeta"):
+            return None
+        origin = a.get("origin")
+        if isinstance(origin, dict) and origin.get("kind") not in (None, "human"):
+            return None
+        c = a.get("prompt")
+    elif d.get("type") == "user" and "toolUseResult" not in d:
+        # THE HOST SAYS WHO STARTED THE TURN, where it is new enough to record it: `human`
+        # and `sdk` are a person's prompt, and anything else (`task_notification`) is not.
+        # An older row carries neither key and falls through to INJECTED in the caller.
+        origin = d.get("turnOrigin")
+        if (origin is not None and origin not in ("human", "sdk")) \
+                or d.get("promptSource") == "system":
+            return None
+        msg = d.get("message")
+        c = msg.get("content") if isinstance(msg, dict) else None
+    else:
+        return None
+    if isinstance(c, list):
+        if any(isinstance(b, dict) and b.get("type") == "tool_result" for b in c):
+            return None
+        c = "\n".join(b.get("text") or "" for b in c
+                      if isinstance(b, dict) and b.get("type") == "text")
+    if not isinstance(c, str) or not c.strip():
+        return None
+    if "<command-name>" in c:
+        name = COMMAND_NAME_RX.search(c)
+        return "\n".join([name.group(1).strip() if name else ""]
+                         + [m.group(1) for m in COMMAND_ARGS_RX.finditer(c)])
+    return c
+
+
+def user_words(lines):
+    """The messages the USER typed in this transcript that could name Docs, oldest first.
+
+    `_row_text` decides which rows are a person's. Harness text that still arrives in one of
+    those shapes is dropped by `INJECTED`, and the output of a `!` or local command by
+    COMMAND_OUTPUT_RX: the user ran the command, but did not write what it printed.
+    """
+    injected = _injected()
+    out = []
+    for line in lines:
+        if ('"user"' not in line and "queued_command" not in line) \
+                or not MAY_ASK_RX.search(line):
+            continue
+        try:
+            d = json.loads(line)
+        except ValueError:
+            continue
+        c = _row_text(d) if isinstance(d, dict) else None
+        if c and not injected.match(c) and not COMMAND_OUTPUT_RX.match(c):
+            out.append(c)
+    return out
+
+
+def negated_mention(words):
+    """True when the words of a clause, ending just before a Docs mention, refuse it.
+
+    The rule is in the comment above STRONG_NEGATORS.
+    """
+    words = [w.lower() for w in words]
+    last, strong = -1, False
+    for i, w in enumerate(words):
+        pair = i >= 1 and (words[i - 1], w) in NEGATION_PAIRS
+        if (w in NEGATION_WORDS or pair) and not (i >= 1 and words[i - 1] == "why") \
+                and not (pair and i >= 2 and words[i - 2] == "why"):
+            last, strong = i, w in STRONG_NEGATORS or (pair and words[i - 1] == "do")
+    if last < 0:
+        return False
+    verbs = [i for i in range(last + 1, len(words)) if words[i] in DOCS_VERBS
+             and not (words[i] == "do" and i + 1 < len(words) and words[i + 1] == "not")]
+    if strong:
+        scoped = last + 2 if last + 1 < len(words) and words[last + 1] in ADVERBS else last + 1
+        return not any(v > scoped and words[v - 1] in COORDINATORS for v in verbs)
+    if not verbs:
+        return True
+    j = verbs[-1] - 1
+    if j >= 0 and words[j] in ADVERBS:
+        j -= 1
+    return j >= 0 and words[j] == "not"
+
+
+def asks_for_docs(text):
+    """True when this one message asks for Docs: the Docs skill typed as a command, or a
+    DOCS_ASKED match whose clause does not refuse it (`negated_mention`)."""
+    if DOCS_SKILL_RX.match(text):
+        return True
+    text = text.replace("’", "'")
+    for m in DOCS_ASKED.finditer(text):
+        clause = CLAUSE_END_RX.split(text[max(0, m.start() - 300):m.start()])[-1]
+        if not negated_mention(WORD_RX.findall(clause)):
+            return True
+    return False
+
+
+def user_asked_for_docs(payload):
+    """True when the user's own words in this session make Docs the destination."""
+    path = payload.get("transcript_path")
+    if not isinstance(path, str) or not path:
+        return False
+    if not os.path.isabs(path):
+        path = os.path.join(payload.get("cwd") or os.getcwd(), path)
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            return any(asks_for_docs(w) for w in user_words(fh))
+    except OSError:
+        return False
+
+
+def docs_birth(tool, ti):
+    """True when this call creates a new Claude Docs document.
+
+    Through the Artifact tool only a publish can, explicit or implicit (no action), and only
+    one that names a type rather than an existing artifact's `url` (REVIEW FINDING 8).
+    """
+    if tool == "Artifact":
+        action = (ti.get("action") or "").strip().lower()
+        return action in ("", "publish") and bool(ti.get("type_url")) \
+            and not ti.get("url") and not ti.get("file_path")
+    if not DOCS_TOOL_RX.match(tool):
+        return False
+    container = ti.get("container")
+    return isinstance(container, dict) and "create" in container
+
+
 def emit(payload):
     print(json.dumps(payload))
 
@@ -257,6 +594,19 @@ def main():
     ti = payload.get("tool_input")
     if not isinstance(ti, dict):
         return 0
+    tool = payload.get("tool_name")
+    tool = tool if isinstance(tool, str) and tool else "Artifact"
+
+    # A DOCS BIRTH, from either door. Refused unless the user's own words asked for Docs;
+    # see the module header for the directive and the measurement.
+    if docs_birth(tool, ti):
+        if not user_asked_for_docs(payload):
+            deny(DOCS_DENY)
+        return 0
+    # Every other Docs call edits, reads or comments on a doc that already exists.
+    if tool != "Artifact":
+        return 0
+
     action = (ti.get("action") or "").strip().lower()
 
     # No page is being written by any of these.
@@ -265,12 +615,6 @@ def main():
 
     if action == "quickstart":
         context(APPLY + " " + ROUTING)
-        return 0
-
-    # A connector-typed create. There is no local file to read and the viewer owns the
-    # heading styles, so the only useful thing to say is where this belongs.
-    if ti.get("type_url") and not ti.get("file_path"):
-        context(ROUTING)
         return 0
 
     # An uploaded asset is a file being carried, not a page being styled.
