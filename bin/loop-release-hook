@@ -23,7 +23,6 @@ runs this file, as the replay does, over fixtures/loop/deny-commands.txt.
 import json
 import os
 import re
-import shlex
 import signal
 import sys
 
@@ -35,19 +34,25 @@ NOT_A_RELEASE = {"check", "checks", "test", "tests", "spec", "lint", "notes", "d
 SAFE_FLAGS = {"--dry-run", "--dryrun", "--help", "--version", "--check", "--syntax-check",
               "--list-tasks", "--list-hosts", "--plan", "--noop", "--what-if"}
 FLAGS = {"--prod", "--production", "--push"}
-OPERATORS = {";", "&&", "||", "|", "&", "(", ")", "|&", ";;", "{", "}"}
-REDIRECTS = re.compile(r"^\d*(>|>>|<|<<<|>&|<&|&>|&>>|>\|)$")
 ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
-KEYWORDS = {"if", "then", "else", "elif", "fi", "do", "done", "while", "until", "!", "time",
-            "builtin", "command", "exec", "{", "}", "coproc"}
+KEYWORDS = {"if", "then", "else", "elif", "fi", "do", "done", "while", "until", "!", "builtin",
+            "{", "}", "coproc"}
 DATA_KEYWORDS = {"for", "select", "case", "function", "esac", "in"}
 # Wrappers that run the rest of their arguments as a command, and their options with a value.
 WRAPPERS = {
     "env": {"-u", "--unset", "-C", "--chdir"}, "nice": {"-n", "--adjustment"},
     "nohup": set(), "stdbuf": {"-i", "-o", "-e"}, "ionice": {"-c", "-n", "-p", "--class"},
     "timeout": {"-s", "--signal", "-k", "--kill-after"}, "caffeinate": set(), "doas": {"-u"},
-    "sudo": {"-u", "-g", "-C", "-D", "-h", "-p", "-U"}, "chrt": set(), "taskset": set(),
-    "setsid": set(), "unbuffer": set(), "flock": {"-w", "-E"}, "watch": {"-n", "--interval", "-d"},
+    "sudo": {"-u", "-g", "-C", "-D", "-h", "-p", "-U"}, "chrt": {"-p"}, "taskset": {"-c", "--cpu-list"},
+    "setsid": set(), "unbuffer": set(),
+    "flock": {"-w", "--wait", "--timeout", "-E", "--conflict-exit-code"}, "watch": {"-n", "--interval", "-d"},
+    "exec": {"-a"}, "time": {"-f", "--format", "-o", "--output"}, "command": set(),
+    "unshare": {"--propagation", "-S", "--setuid", "-G", "--setgid", "-R", "--root", "-w",
+                "--wd"}, "fakeroot": {"-s", "-i", "-l", "--lib", "--faked"},
+    "strace": {"-o", "-e", "-p", "-s", "-u", "-E", "-a", "-P", "-I", "-b", "-O", "-S", "-X"},
+    "dbus-run-session": {"--config-file", "--dbus-daemon"},
+    "xvfb-run": {"-n", "--server-num", "-s", "--server-args", "-f", "--auth-file", "-e",
+                 "--error-file", "-w", "--wait", "-p", "--xauth-protocol"},
     "xargs": {"-I", "-i", "-n", "-P", "-L", "-l", "-d", "-E", "-s", "-a", "--max-args",
               "--max-procs", "--delimiter", "--arg-file", "--replace"},
 }
@@ -162,67 +167,447 @@ def scripted(path):
         not NOT_A_RELEASE.intersection(words[1:])
 
 
-def strip_heredocs(command):
-    """The command with each heredoc's body removed, unless the heredoc feeds a shell (`bash
-    <<EOF`, `cat <<EOF | sh`): a body is data, not commands, and an apostrophe in it is not a
-    quote. A body that feeds a shell stays, as lines of commands."""
-    lines, out, i = command.split("\n"), [], 0
-    while i < len(lines):
-        line = lines[i]
-        marks = re.findall(r"(?<!<)<<(-?)\s*(['\"]?)([A-Za-z_][\w-]*)\2", line)
-        out.append(re.sub(r"(?<!<)<<-?\s*(['\"]?)[A-Za-z_][\w-]*\1", " ", line) if marks else line)
-        i += 1
-        feeds = bool(re.search(r"(^|[;&|(]\s*)(\w+=\S*\s+)*(bash|sh|zsh|dash|ksh)\b[^|]*<<", line)
-                     or re.search(r"\|\s*(bash|sh|zsh|dash|ksh)\b", line))
-        for dash, _, delim in marks:
-            while i < len(lines) and (lines[i].lstrip("\t") if dash else lines[i]) != delim:
-                if feeds:
-                    out.append(lines[i])
-                i += 1
-            i += 1
-    return "\n".join(out)
+class Word(str):
+    """A shell word after quote removal. `bare`: its unquoted characters (quoted ones become
+    "_"), for brace expansion and a leading `$`; `vars`: the parameters it expands (outside
+    single quotes); `literal`: no expansion or substitution at all."""
+    def __new__(cls, text, bare="", vars=(), literal=True):
+        w = str.__new__(cls, text)
+        w.bare, w.vars, w.literal = bare, tuple(vars), literal
+        return w
 
 
-def segments(command):
-    """The simple commands of a command line, each a token list. Raises Unreadable."""
-    command = strip_heredocs(command)
-    if re.search(r"(^|[;&|(\n{]|\b(then|do|else)\b)\s*([A-Za-z_]\w*=\S*\s+)*(\$\(|`)", command):
-        raise Unreadable("its command word is computed by a substitution")
-    text = command.replace("`", " ; ").replace("$(", " ( ").replace("\n", " ; ")
-    try:
-        lex = shlex.shlex(text, posix=True, punctuation_chars=True)
-        lex.whitespace_split = True
-        toks = list(lex)
-    except ValueError as e:
-        raise Unreadable("unbalanced quoting (%s)" % e)
-    out, cur, skip = [], [], False
-    for tok in toks:
-        if skip:
-            skip = False
-        elif tok in OPERATORS or set(tok) <= set(";&|(){}"):
-            if cur:
-                out.append(cur)
-            cur = []
-        elif tok == "<<<" and cur and os.path.basename(cur[0]) in SHELLS:
-            cur.append("-c")  # `bash <<< "cmd"`: the here-string is the shell's command
-        elif REDIRECTS.match(tok) or set(tok) <= set("<>&"):
-            skip = True  # its target
-        elif not cur and tok in KEYWORDS:
-            continue
+class Op(str):
+    """An operator or redirect; a heredoc's `<<` carries its `body`."""
+    body = None
+
+
+PLACEHOLDER = re.compile(r"\x00(\d+)\x00")
+SUBSTS = {}  # placeholder number -> (kind, body), for every substitution read in this process
+REDIR_OPS = ("<<<", "<<-", "<<", "<>", "<&", ">&", ">>", ">|", "&>>", "&>", "<", ">")
+CTRL_OPS = (";;", "&&", "||", "|&", ";", "|", "&", "(", ")")
+ANSI_C = {"a": "\a", "b": "\b", "e": "\x1b", "E": "\x1b", "f": "\f", "n": "\n", "r": "\r",
+          "t": "\t", "v": "\v", "\\": "\\", "'": "'", '"': '"', "?": "?"}
+
+
+HEREDOC_OP = re.compile(r"<<(-?)[ \t]*((?:[^\s;&|<>()'\"]|'[^']*'|\"[^\"]*\")+)")
+
+
+def closing(text, i):
+    """Index just past the `)` that closes the `(` at text[i-1], reading the way the shell
+    does: quotes, nested substitutions, `${...}`, comments, and heredoc bodies (skipped, so an
+    apostrophe or a parenthesis in a commit message is data); raises Unreadable when there is
+    no closing parenthesis."""
+    depth, j, pending = 1, i, []
+    while j < len(text):
+        c = text[j]
+        if c == "\\":
+            j += 2
+        elif c == "'":
+            k = text.find("'", j + 1)
+            if k < 0:
+                raise Unreadable("an unterminated quote")
+            j = k + 1
+        elif c == '"':
+            j = dquote_end(text, j + 1)
+        elif c == "`":
+            k = text.find("`", j + 1)
+            if k < 0:
+                raise Unreadable("an unterminated backtick")
+            j = k + 1
+        elif text.startswith("${", j):
+            j = param_end(text, j + 2)[0]
+        elif c == "#" and (j == i or text[j - 1] in " \t\n;&|("):
+            k = text.find("\n", j)
+            j = len(text) if k < 0 else k
+        elif text.startswith("<<", j) and not text.startswith("<<<", j) and HEREDOC_OP.match(text, j):
+            m = HEREDOC_OP.match(text, j)
+            pending.append((re.sub(r"['\"]", "", m.group(2)), m.group(1) == "-"))
+            j = m.end()
+        elif c == "\n" and pending:
+            j = skip_bodies(text, j + 1, pending)
+            pending = []
+        elif c == "(":
+            depth, j = depth + 1, j + 1
+        elif c == ")":
+            depth, j = depth - 1, j + 1
+            if depth == 0:
+                return j
         else:
-            cur.append(tok)
-    if cur:
+            j += 1
+    raise Unreadable("an unterminated substitution")
+
+
+def skip_bodies(text, j, pending):
+    """The index past the heredoc bodies that start at text[j]."""
+    for delim, strip_tabs in pending:
+        while j < len(text):
+            k = text.find("\n", j)
+            line = text[j:len(text) if k < 0 else k]
+            j = len(text) if k < 0 else k + 1
+            if (line.lstrip("\t") if strip_tabs else line) == delim:
+                break
+    return j
+
+
+def dquote_end(text, j):
+    """The index past a double-quoted string's closing quote, its body starting at text[j]."""
+    while j < len(text):
+        c = text[j]
+        if c == "\\":
+            j += 2
+        elif c == '"':
+            return j + 1
+        elif text.startswith("$(", j):
+            j = closing(text, j + 2)
+        elif text.startswith("${", j):
+            j = param_end(text, j + 2, in_dq=True)[0]
+        elif c == "`":
+            k = text.find("`", j + 1)
+            if k < 0:
+                raise Unreadable("an unterminated backtick")
+            j = k + 1
+        else:
+            j += 1
+    raise Unreadable("an unterminated quote")
+
+
+def param_end(text, j, in_dq=False):
+    """(index past the `}` closing a `${` whose body starts at text[j], [the bodies of every
+    $(...), `...` and $((...)) substitution inside it]). The operand is read the way bash reads
+    it: quotes (a single quote is literal inside double quotes), nested `${...}`, substitutions.
+    Unreadable only when it does not end."""
+    start = j
+    while j < len(text):
+        c = text[j]
+        if c == "\\":
+            j += 2
+        elif c == "'" and not in_dq:
+            k = text.find("'", j + 1)
+            if k < 0:
+                raise Unreadable("an unterminated quote in ${...}")
+            j = k + 1
+        elif c == '"':
+            j = dquote_end(text, j + 1)
+        elif text.startswith("$(", j):
+            j = closing(text, j + 2)
+        elif text.startswith("${", j):
+            j = param_end(text, j + 2, in_dq)[0]
+        elif c == "`":
+            k = text.find("`", j + 1)
+            if k < 0:
+                raise Unreadable("an unterminated backtick")
+            j = k + 1
+        elif c == "}":
+            return j + 1, inner_substs(text[start:j], in_dq)
+        else:
+            j += 1
+    raise Unreadable("an unterminated ${...}")
+
+
+def inner_substs(text, in_dq=True):
+    """The command bodies of every $(...), `...` and $((...))/${...}-nested substitution in a
+    piece of text that the shell expands (an operand, an arithmetic expression, an unquoted
+    heredoc body)."""
+    out, j = [], 0
+    while j < len(text):
+        c = text[j]
+        if c == "\\":
+            j += 2
+        elif c == "'" and not in_dq:
+            k = text.find("'", j + 1)
+            j = len(text) if k < 0 else k + 1
+        elif text.startswith("$((", j):
+            k = closing(text, j + 2)
+            out += inner_substs(text[j + 3:k - 2])
+            j = k
+        elif text.startswith("$(", j):
+            k = closing(text, j + 2)
+            out.append(text[j + 2:k - 1])
+            j = k
+        elif text.startswith("${", j):
+            k, bodies = param_end(text, j + 2, in_dq)
+            out += bodies
+            j = k
+        elif c == "`":
+            k = text.find("`", j + 1)
+            if k < 0:
+                raise Unreadable("an unterminated backtick")
+            out.append(text[j + 1:k])
+            j = k + 1
+        else:
+            j += 1
+    return out
+
+
+def ansi_c(text, j):
+    """(decoded text, index past the closing quote) of a $'...' body starting at text[j]."""
+    out = []
+    while j < len(text):
+        c = text[j]
+        if c == "'":
+            return "".join(out), j + 1
+        if c == "\\" and j + 1 < len(text):
+            d = text[j + 1]
+            if d in ANSI_C:
+                out.append(ANSI_C[d])
+                j += 2
+            elif d == "x":
+                m = re.match(r"[0-9a-fA-F]{1,2}", text[j + 2:])
+                out.append(chr(int(m.group(0), 16)) if m else "\\x")
+                j += 2 + (len(m.group(0)) if m else 0)
+            elif d in "uU":
+                m = re.match(r"[0-9a-fA-F]{1,%d}" % (4 if d == "u" else 8), text[j + 2:])
+                out.append(chr(int(m.group(0), 16)) if m else "\\" + d)
+                j += 2 + (len(m.group(0)) if m else 0)
+            elif d in "01234567":
+                m = re.match(r"[0-7]{1,3}", text[j + 1:])
+                out.append(chr(int(m.group(0), 8)))
+                j += 1 + len(m.group(0))
+            elif d == "c" and j + 2 < len(text):
+                out.append(chr(ord(text[j + 2]) & 0x1f))
+                j += 3
+            else:
+                out.append("\\" + d)
+                j += 2
+            continue
+        out.append(c)
+        j += 1
+    raise Unreadable("an unterminated $'...' quote")
+
+
+def arithmetic(text, j):
+    """True when the `$((` at text[j] is arithmetic: its matching parens close as `))`."""
+    try:
+        k = closing(text, j + 2)
+    except Unreadable:
+        return False
+    return text[k - 2:k] == "))"
+
+
+def lex(text, substs):
+    """The tokens of a command line as bash reads it: Words and Ops. Comments start only where
+    `#` begins a word outside quotes and end at the newline; a backslash-newline is removed;
+    an unquoted newline is a separator (`\\n`); $'...' is decoded; $(...), `...`, <(...) and
+    >(...) become a placeholder (their bodies go to `substs`, as (kind, body)); a heredoc's
+    body is read from the lines after its line, ending at its delimiter (quotes removed)."""
+    toks, i, n = [], 0, len(text)
+    cur, bare, vars_, literal = None, [], [], True
+    pending = []
+
+    def add(chars, quoted, lit=True):
+        nonlocal cur, literal
+        cur = (cur or "") + chars
+        bare.append("_" * len(chars) if quoted else chars)
+        literal = literal and lit
+
+    def flush():
+        nonlocal cur, bare, vars_, literal
+        if cur is not None:
+            toks.append(Word(cur, "".join(bare), vars_, literal))
+        cur, bare, vars_, literal = None, [], [], True
+
+    def subst(kind, body):
+        substs.append((kind, body))
+        key = len(SUBSTS)  # unique across nested reads: a payload carries its outer placeholders
+        SUBSTS[key] = (kind, body)
+        add("\x00%d\x00" % key, True, False)
+
+    def arith(j, quoted):
+        """$((expr)): a number; every substitution inside it is a command."""
+        k = closing(text, j + 2)
+        substs.extend(("cmd", body) for body in inner_substs(text[j + 3:k - 2]))
+        add(text[j:k], quoted, False)
+        return k
+
+    def var(j, quoted):
+        if text.startswith("${", j):  # a parameter expansion, read to its matching brace
+            end, bodies = param_end(text, j + 2, in_dq=quoted)
+            substs.extend(("cmd", body) for body in bodies)
+            vars_.append(re.match(r"[#!]?([A-Za-z_][A-Za-z0-9_]*|[0-9#?@*$!-]?)",
+                                  text[j + 2:]).group(1))
+            add(text[j:end], quoted, False)
+            return end
+        m = re.match(r"\$([A-Za-z_][A-Za-z0-9_]*|[0-9#?@*$!-])", text[j:])
+        if not m:
+            add("$", quoted)
+            return j + 1
+        vars_.append(m.group(1).strip("{}").split(":")[0].split("[")[0])
+        add(m.group(0), quoted, False)
+        return j + len(m.group(0))
+
+    while i < n:
+        c = text[i]
+        if c == "\\" and text.startswith("\n", i + 1):
+            i += 2
+        elif c == "\\":
+            add(text[i + 1:i + 2], True)
+            i += 2
+        elif c == "'":
+            k = text.find("'", i + 1)
+            if k < 0:
+                raise Unreadable("an unterminated quote")
+            add(text[i + 1:k], True)
+            i = k + 1
+        elif text.startswith("$'", i):
+            s, i = ansi_c(text, i + 2)
+            add(s, True)
+        elif c == '"':
+            j = i + 1
+            if cur is None:
+                cur = ""
+            while True:
+                if j >= n:
+                    raise Unreadable("an unterminated quote")
+                d = text[j]
+                if d == '"':
+                    j += 1
+                    break
+                if d == "\\" and j + 1 < n and text[j + 1] in '$`"\\\n':
+                    if text[j + 1] != "\n":
+                        add(text[j + 1], True)
+                    j += 2
+                elif text.startswith("$((", j) and arithmetic(text, j):
+                    j = arith(j, True)
+                elif text.startswith("$(", j):
+                    k = closing(text, j + 2)
+                    subst("cmd", text[j + 2:k - 1])
+                    j = k
+                elif d == "`":
+                    k = text.find("`", j + 1)
+                    if k < 0:
+                        raise Unreadable("an unterminated backtick")
+                    subst("cmd", text[j + 1:k])
+                    j = k + 1
+                elif d == "$":
+                    j = var(j, True)
+                else:
+                    add(d, True)
+                    j += 1
+            i = j
+        elif text.startswith("$((", i) and arithmetic(text, i):
+            i = arith(i, False)
+        elif text.startswith("$(", i):
+            k = closing(text, i + 2)
+            subst("cmd", text[i + 2:k - 1])
+            i = k
+        elif c == "(" and cur is not None:  # mid-word: a zsh glob group or qualifier, `(N)`
+            k = closing(text, i + 1)
+            body = text[i + 1:k - 1]
+            array = re.fullmatch(r"[A-Za-z_]\w*\+?=", cur)  # `ids=(a b c)`: an array, not a glob
+            if not array and re.search(r"(?:^|[^A-Za-z])e[^A-Za-z0-9\s]|(?:^|[^\w])\+\w", body):
+                raise Unreadable("a zsh glob qualifier that runs code (e or +)")
+            substs.extend(("cmd", b) for b in inner_substs(body, in_dq=False))
+            add(text[i:k], False)
+            i = k
+        elif c == "`":
+            k = text.find("`", i + 1)
+            if k < 0:
+                raise Unreadable("an unterminated backtick")
+            subst("cmd", text[i + 1:k])
+            i = k + 1
+        elif c in "<>" and text.startswith("(", i + 1) and cur is None:
+            k = closing(text, i + 2)
+            subst("in" if c == "<" else "out", text[i + 2:k - 1])
+            i = k
+        elif c == "$":
+            i = var(i, False)
+        elif c == "#" and cur is None:
+            k = text.find("\n", i)
+            i = n if k < 0 else k
+        elif c == "\n":
+            flush()
+            toks.append(Op("\n"))
+            i += 1
+            for op, strip_tabs in pending:  # heredoc bodies follow the line that opened them
+                at = next(k for k, t in enumerate(toks) if t is op)
+                delim = toks[at + 1] if at + 1 < len(toks) and isinstance(toks[at + 1], Word) else ""
+                lines = []
+                while i < n:
+                    k = text.find("\n", i)
+                    line = text[i:n if k < 0 else k]
+                    i = n if k < 0 else k + 1
+                    if (line.lstrip("\t") if strip_tabs else line) == delim:
+                        break
+                    lines.append(line)
+                op.body = "\n".join(lines)
+                if isinstance(delim, Word) and delim.bare == str(delim):  # unquoted: it expands
+                    substs.extend(("cmd", body) for body in inner_substs(op.body))
+            pending = []
+        elif c in " \t":
+            flush()
+            i += 1
+        else:
+            redir = next((o for o in REDIR_OPS if text.startswith(o, i)), None)
+            if redir:
+                if cur is not None and re.fullmatch(r"\d+|\{\w+\}", cur):
+                    cur, bare, vars_, literal = None, [], [], True  # `2>`: the fd is the op's
+                flush()
+                op = Op(redir)
+                toks.append(op)
+                if redir in ("<<", "<<-"):
+                    pending.append((op, redir == "<<-"))
+                i += len(redir)
+                continue
+            ctrl = next((o for o in CTRL_OPS if text.startswith(o, i)), None)
+            if ctrl:
+                flush()
+                toks.append(Op(ctrl))
+                i += len(ctrl)
+                continue
+            add(c, False)
+            i += 1
+    flush()
+    return toks
+
+
+class Seg:
+    """One simple command: its assignments, argv, redirects [(op, target)], and the command
+    piped into it."""
+    def __init__(self):
+        self.assigns, self.argv, self.redirs, self.pipe_from = [], [], [], None
+
+
+SEPARATORS = {";", "&", "&&", "||", "\n", "(", ")", ";;"}
+
+
+def segments(toks):
+    out, cur, prev_pipe = [], Seg(), False
+    i = 0
+    while i < len(toks):
+        t = toks[i]
+        if isinstance(t, Op) and (t in SEPARATORS or t in ("|", "|&")):
+            if cur.argv or cur.assigns or cur.redirs:
+                out.append(cur)
+            nxt = Seg()
+            if t in ("|", "|&") and out and out[-1] is cur:
+                nxt.pipe_from = cur
+            cur = nxt
+        elif isinstance(t, Op):  # a redirect: its target is the next word
+            target = toks[i + 1] if i + 1 < len(toks) and isinstance(toks[i + 1], Word) else Word("")
+            cur.redirs.append((t, target))
+            i += 1
+        elif not cur.argv and ASSIGNMENT.match(t):
+            cur.assigns.append(t)
+        elif not cur.argv and t in KEYWORDS:
+            pass
+        else:
+            cur.argv.append(t)
+        i += 1
+    if cur.argv or cur.assigns or cur.redirs:
         out.append(cur)
-    return [s for s in out if s[0] not in DATA_KEYWORDS and not re.match(r"^\w+\(\)$", s[0])]
+    return [s for s in out if not (s.argv and s.argv[0] in DATA_KEYWORDS)]
 
 
-def positionals(argv, value_opts=frozenset()):
+def positionals(argv, value_opts=frozenset(), past_dashdash=False):
+    """The arguments that are not options or option values; `--` ends them, or with
+    `past_dashdash` ends the options, so what follows is positional (`npm -- publish`)."""
     out, skip = [], False
-    for tok in argv:
+    for at, tok in enumerate(argv):
         if skip:
             skip = False
         elif tok == "--":
-            break
+            return out + list(argv[at + 1:]) if past_dashdash else out
         elif tok.startswith("-") and len(tok) > 1:
             skip = tok in value_opts
         else:
@@ -235,14 +620,127 @@ def a_path(tok, cwd):
 
 
 def classify(command, cwd=None, depth=0):
-    """Why `command` is a release, or None."""
+    """Why `command` is a release, or None. It is read as bash reads it (`lex`); every
+    substitution's body is read as a command; a word bash would expand into a command the
+    guard cannot see (a brace list as the command word, $IFS splitting) is unreadable."""
     if depth > 6:
         raise Unreadable("nested too deeply to read")
-    for argv in segments(command):
-        why = classify_argv(argv, cwd, depth)
+    substs = []
+    toks = lex(command, substs)
+    segs = segments(toks)
+    if any("IFS" in t.vars for t in toks if isinstance(t, Word)):
+        raise Unreadable("a word expands $IFS")
+    # IFS set for the shell itself (an assignment alone), not for one command (`IFS= read`).
+    ifs_set = any(a.startswith("IFS=") for s in segs if not s.argv for a in s.assigns)
+    for seg in segs:
+        if not seg.argv:
+            continue
+        if ifs_set and seg.argv[0].bare.startswith("$"):
+            raise Unreadable("IFS is set and the command word is a variable")
+        m = PLACEHOLDER.fullmatch(seg.argv[0])
+        if m:  # `$(cmd) args`: read when cmd's output is literal (`$(echo npm) publish`)
+            out = producer(SUBSTS[int(m.group(1))][1])
+            if out[0] == "literal":
+                why = classify(" ".join([out[1]] + [shlex_quote(w) for w in seg.argv[1:]]),
+                               cwd, depth + 1)
+                if why:
+                    return why
+            seg.argv = []  # otherwise code from a substitution: a documented limit
+            continue
+        if re.search(r"\{[^{}]*,[^{}]*\}", seg.argv[0].bare):
+            raise Unreadable("its command word is a brace expansion")
+    for kind, body in substs:
+        why = classify(body, cwd, depth + 1)
+        if why:
+            return why
+    for seg in segs:
+        for a in seg.assigns:  # code the shell runs later
+            if a.startswith("PROMPT_COMMAND="):
+                why = nested(a.split("=", 1)[1], cwd, depth, "PROMPT_COMMAND")
+                if why:
+                    return why
+        why = classify_argv(list(seg.argv), cwd, depth, stdin_of(seg, substs), substs)
         if why:
             return why
     return None
+
+
+def shlex_quote(word):
+    return "'" + str(word).replace("'", "'\\''") + "'"
+
+
+def literal_output(seg, substs):
+    """What a command writes to stdout when the guard can tell without running it: `echo` or
+    `printf` of literal words, `cat` of a heredoc or here-string; else None."""
+    if not seg.argv or not all(w.literal for w in seg.argv):
+        return None
+    prog, args = os.path.basename(seg.argv[0]), list(seg.argv[1:])
+    if prog == "echo":
+        escapes = False
+        while args and re.fullmatch(r"-[neE]+", args[0]):
+            escapes = escapes or "e" in args[0]
+            args = args[1:]
+        text = " ".join(args)
+        return text.encode().decode("unicode_escape", "replace") if escapes else text
+    if prog == "printf" and args:
+        fmt = args[0].encode().decode("unicode_escape", "replace")
+        try:
+            return fmt % tuple(args[1:]) if "%" in fmt and args[1:] else fmt
+        except (TypeError, ValueError):
+            return fmt + " " + " ".join(args[1:])
+    if prog == "cat" and not args:
+        source = stdin_of(seg, substs)
+        return source[1] if source and source[0] == "literal" else None
+    return None
+
+
+def stdin_of(seg, substs):
+    """Where a command's stdin comes from: ("literal", text), ("opaque", what), or None."""
+    for op, target in seg.redirs:
+        if op in ("<<", "<<-"):
+            return ("literal", op.body or "")
+        if op == "<<<":
+            return ("literal", str(target)) if target.literal else \
+                ("opaque", "a here-string that expands")
+        if op == "<":
+            m = PLACEHOLDER.fullmatch(target)
+            if m and SUBSTS[int(m.group(1))][0] == "in":
+                return producer(SUBSTS[int(m.group(1))][1])
+            return ("opaque", "the file %s" % target)
+    if seg.pipe_from is not None:
+        text = literal_output(seg.pipe_from, substs)
+        return ("literal", text) if text is not None else ("opaque", "the output of %s" % (
+            seg.pipe_from.argv[0] if seg.pipe_from.argv else "a pipe"))
+    return None
+
+
+def producer(body, substs=None):
+    """The stdin a process substitution `<(body)` gives: literal when body is one echo,
+    printf or cat of a literal."""
+    inner = []
+    segs = segments(lex(body, inner))
+    text = literal_output(segs[0], inner) if len(segs) == 1 else None
+    return ("literal", text) if text is not None else \
+        ("opaque", "the output of <(%s)" % body.strip())
+
+
+def code_from(source, cwd, depth, what):
+    """A shell is handed code: read it when it is literal. Code that is not (`sed ... | bash`,
+    `source <(sed ...)`, `bash < file`) is a documented limit, like an interpreter's code: it
+    runs, and the sandbox having no credentials is the floor."""
+    if source is None or source[0] != "literal":
+        return None
+    why = classify(source[1], cwd, depth + 1)
+    return "%s runs %s" % (what, why) if why else None
+
+
+def nested(text, cwd, depth, what):
+    """Code given as a string (to eval, trap, `bash -c`, alias, ...): read it, unless it is
+    only a substitution's output (`eval "$(sed ...)"`), a documented limit."""
+    if PLACEHOLDER.fullmatch(str(text).strip()):
+        return None
+    why = classify(str(text), cwd, depth + 1)
+    return "%s runs %s" % (what, why) if why else None
 
 
 def unwrap(argv, value_opts):
@@ -263,7 +761,7 @@ def unwrap(argv, value_opts):
     return rest
 
 
-def classify_argv(argv, cwd, depth):
+def classify_argv(argv, cwd, depth, stdin=None, substs=()):
     while argv and ASSIGNMENT.match(argv[0]):
         argv = argv[1:]
     if not argv:
@@ -276,17 +774,27 @@ def classify_argv(argv, cwd, depth):
         return None  # a dry run, a check, or help
     if prog == "alias":  # `alias p='npm publish'`: the alias is read where it is defined
         for a in argv[1:]:
-            why = classify(a.split("=", 1)[1], cwd, depth + 1) if "=" in a else None
+            why = nested(a.split("=", 1)[1], cwd, depth, "alias") if "=" in a else None
             if why:
-                return "alias for %s" % why
+                return why
         return None
     if prog == "eval":
-        return classify(" ".join(argv[1:]), cwd, depth + 1)
+        if any(PLACEHOLDER.fullmatch(a) for a in argv[1:]):
+            return None  # `eval "$(sed ...)"`: code from a substitution, a documented limit
+        return nested(" ".join(argv[1:]), cwd, depth, "eval")
+    if prog == "trap" and len(argv) > 1 and not argv[1].startswith("-"):
+        return nested(argv[1], cwd, depth, "trap")  # the trap's action is code the shell runs
     if argv[0] in (".", "source"):
-        return "sources %s" % argv[1] if len(argv) > 1 and scripted(argv[1]) else None
+        src = argv[1] if len(argv) > 1 else ""
+        m = PLACEHOLDER.fullmatch(src)
+        if m and SUBSTS[int(m.group(1))][0] == "in":
+            return code_from(producer(SUBSTS[int(m.group(1))][1], substs), cwd, depth, argv[0])
+        if src in ("/dev/stdin", "/proc/self/fd/0", "-"):
+            return code_from(stdin or ("opaque", "stdin"), cwd, depth, argv[0])
+        return "sources %s" % src if scripted(src) else None
     if prog == "env" and any(a in ("-S", "--split-string") or a.startswith("-S") for a in argv[1:2]):
         payload = argv[2] if argv[1] in ("-S", "--split-string") and len(argv) > 2 else argv[1][2:]
-        return classify(payload + " " + " ".join(argv[3:]), cwd, depth + 1)
+        return nested(payload + " " + " ".join(argv[3:]), cwd, depth, "env -S")
     if prog in WRAPPERS:
         rest = unwrap(argv, WRAPPERS[prog])
         if prog == "xargs" and rest and not positionals(rest[1:]) and releaser(rest[0]):
@@ -294,8 +802,17 @@ def classify_argv(argv, cwd, depth):
         if prog == "timeout" and rest and re.match(r"^[\d.]+[smhd]?$", rest[0]):
             rest = rest[1:]
         if prog == "watch":
-            return classify(" ".join(rest), cwd, depth + 1)
-        return classify_argv(rest, cwd, depth)
+            return nested(" ".join(rest), cwd, depth, "watch")
+        if prog == "flock":
+            if "-c" in argv or "--command" in argv:
+                at = argv.index("-c") if "-c" in argv else argv.index("--command")
+                return nested(argv[at + 1], cwd, depth, "flock") if at + 1 < len(argv) else None
+            rest = rest[1:]  # the lock file
+        if prog == "taskset" and not any(a in ("-c", "--cpu-list") for a in argv[1:]):
+            rest = rest[1:]  # the CPU mask
+        if prog == "chrt" and rest and re.fullmatch(r"\d+", rest[0]):
+            rest = rest[1:]  # the priority
+        return classify_argv(rest, cwd, depth, stdin, substs)
     if prog == "find":
         for i, tok in enumerate(argv):
             if tok in ("-exec", "-execdir", "-ok", "-okdir"):
@@ -307,28 +824,33 @@ def classify_argv(argv, cwd, depth):
     if prog == "parallel":
         cmd = [t for t in argv[1:] if not t.startswith("-")]
         cmd = cmd[:cmd.index(":::")] if ":::" in cmd else cmd
-        return classify(" ".join(cmd), cwd, depth + 1) if cmd else None
+        return nested(" ".join(cmd), cwd, depth, "parallel") if cmd else None
     if prog == "script":
         for i, tok in enumerate(argv[1:], 1):
-            if tok in ("-c", "--command") and i + 1 < len(argv):
-                return classify(argv[i + 1], cwd, depth + 1)
+            if (tok == "--command" or re.fullmatch(r"-[a-zA-Z]*c[a-zA-Z]*", tok)) and i + 1 < len(argv):
+                return nested(argv[i + 1], cwd, depth, "script")
         return None
     for n in (3, 2, 1):
         if tuple(argv[:n]) in RUNNERS:
             rest = argv[n:]
             while rest and rest[0].startswith("-"):
                 rest = rest[1:]
-            return classify_argv(rest, cwd, depth)
+            return classify_argv(rest, cwd, depth, stdin, substs)
     if prog in SHELLS:
         for i, tok in enumerate(argv[1:], 1):
             if re.match(r"^-[a-z]*c[a-z]*$", tok):
                 rest = argv[i + 1:]
                 rest = rest[1:] if rest[:1] == ["--"] else rest
-                return classify(rest[0], cwd, depth + 1) if rest else None
+                return nested(rest[0], cwd, depth, prog) if rest else None
         if any(re.match(r"^-[a-z]*n[a-z]*$", t) for t in argv[1:]):
             return None  # `bash -n`: a syntax check
         script = next((t for t in argv[1:] if not t.startswith("-")), None)
-        return "runs %s" % script if script and scripted(script) else None
+        m = PLACEHOLDER.fullmatch(script or "")
+        if m and SUBSTS[int(m.group(1))][0] == "in":  # `bash <(...)`
+            return code_from(producer(SUBSTS[int(m.group(1))][1], substs), cwd, depth, prog)
+        if script is None or "-s" in argv[1:]:  # the shell reads its code from stdin
+            return code_from(stdin, cwd, depth, prog)
+        return "runs %s" % script if scripted(script) else None
     if INTERPRETERS.match(prog):
         return interpreter(prog, argv[1:], cwd, depth)
     if "/" in argv[0] and scripted(argv[0]):
@@ -375,14 +897,29 @@ def interpreter(prog, rest, cwd, depth):
     return None
 
 
+def opaque_verb(word):
+    """True when a word in a release-capable tool's verb position could expand into a verb the
+    guard cannot see: a variable or substitution, a brace list, a glob."""
+    return not getattr(word, "literal", True) or \
+        bool(re.search(r"[*?\[]|\{[^{}]*,", getattr(word, "bare", str(word))))
+
+
 def subcommand(prog, argv):
     verbs, depth_n, value_opts = SUBCOMMANDS[prog]
     if verbs is None:
         return "%s releases" % prog
+    first = positionals(argv[1:], value_opts)[:1]
+    if first and opaque_verb(first[0]):
+        raise Unreadable("%s's subcommand %r expands" % (prog, str(first[0])))
     if prog == "git":
         for i, tok in enumerate(argv[1:-1], 1):
             if tok == "-c" and argv[i + 1].lower().startswith("protocol."):
                 return "git -c %s overrides the replay's transport block" % argv[i + 1]
+            m = re.match(r"(?i)alias\.[^=]+=\s*!(.*)", argv[i + 1], re.S) if tok == "-c" else None
+            if m:  # a shell alias: `git -c alias.p='!npm publish' p`
+                why = nested(m.group(1), None, 0, "a git alias")
+                if why:
+                    return why
     pos = positionals(argv[1:], value_opts)
     found = [t for t in pos[:depth_n] if t in verbs]
     if prog == "cargo" and pos[:1] == ["workspaces"] and pos[1:2] and pos[1] in ("publish", "release"):
@@ -416,9 +953,11 @@ def pm(argv, cwd=None, depth=0):
     """npm, pnpm, yarn, bun: their publish subcommands (and npm's abbreviations of them), a `run`
     of a release script, a script run by name (yarn/pnpm/bun) named so, and what their own
     runners (`exec`, `dlx`, `x`, `workspaces foreach`) run."""
-    pos = positionals(argv[1:], PM_VALUE_OPTS)
+    pos = positionals(argv[1:], PM_VALUE_OPTS, past_dashdash=True)
     if not pos:
         return None
+    if opaque_verb(pos[0]):
+        raise Unreadable("%s's command %r expands" % (argv[0], str(pos[0])))
     for p in pos[:3]:  # an unknown option's value may come first: `npm --foo bar publish`
         if PM_RELEASE.match(p):
             return "%s %s" % (argv[0], p)

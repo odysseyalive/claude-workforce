@@ -131,6 +131,108 @@ deny bash <<< "npm publish"
 deny uv tool run twine upload dist/x.tar.gz
 deny echo publish | xargs npm
 deny alias p='npm publish'; p
+# Read as bash and zsh read it (security review of 56747aa, 2026-10-15). `⏎` is a line break.
+deny # Publish⏎npm publish
+allow # Publish⏎npm test
+deny cd agenda # go⏎npm publish
+allow cd agenda # go⏎ls
+deny npm run build && # then⏎npm publish
+allow npm run build && # then⏎npm test
+deny echo a# ; npm publish
+allow echo a# ; ls
+deny pnpm \⏎ publish -r
+allow pnpm \⏎ test
+deny npm \⏎publish
+allow npm \⏎test
+deny npm $'publish'
+deny npm $'\x70ublish'
+allow npm $'test'
+deny bash <<E"OF"⏎npm publish⏎EOF
+allow cat <<E"OF"⏎npm publish⏎EOF
+deny cat <(npm publish)
+allow diff <(ls) <(ls agenda)
+deny echo >(npm publish)
+deny 2>/dev/null npm publish
+allow 2>/dev/null npm test
+deny exec -a x npm publish
+deny time -p npm publish
+allow time -p ls
+deny npm -- publish
+allow npm -- test
+deny {npm,publish}
+allow echo {a,b}
+deny cmd=npm${IFS}publish; eval $cmd
+deny IFS=,; c=npm,publish; $c
+allow IFS=, read -r a b <<< "x,y"
+deny echo ${u:-$(npm publish)}
+deny echo "${u:=`npm publish`}"
+allow echo ${HOME:-/tmp}
+allow f=a.txt; echo ${f%.txt}
+deny echo ${u:-"$(npm publish)"}
+deny echo ${u:-"}"$(npm publish)}
+deny echo ${u:-$'x'$(npm publish)}
+deny trap 'npm publish' EXIT
+allow trap 'cleanup' EXIT
+allow trap 'rm -f $tmp' EXIT
+deny PROMPT_COMMAND='npm publish'
+allow PROMPT_COMMAND='date'
+deny source <(echo npm publish)
+allow source <(echo ls)
+deny bash <(echo npm publish)
+allow bash <(echo ls)
+deny . /dev/stdin <<< 'npm publish'
+allow . /dev/stdin <<< 'ls'
+deny printf 'npm publish\n' | bash
+allow printf 'ls\n' | bash
+deny echo npm publish | sh -s
+allow echo ls | sh -s
+deny echo npm publish | sh
+# Code read from a file or a command's output, handed to a shell: a documented limit
+# (operator, 2026-10-15), like an interpreter's code. It runs.
+allow bash <(cat scripts/x.sh)
+allow cat scripts/x.sh | bash
+allow cat scripts/x.sh | source /dev/stdin
+allow eval "$(sed -n 1,3p scripts/x.sh)"
+allow bash -c "$(sed -n 1,3p scripts/x.sh)"
+allow source <(sed -n 1,3p scripts/x.sh)
+# Real commands from this machine's transcripts the guard must read, not deny (guard-corpus).
+allow echo $(( $(date +%s) - 5 ))
+allow S=$(date +%s); echo $(( $(date +%s) - S ))
+allow echo ${HOME:-$(pwd)}
+allow a=(x y z); i=2; echo ${a[$((i-1))]}
+allow echo "${EST:-$(ls | head -1)}"
+allow echo ${x:-"it's here"}
+allow echo "${x:-it's here}"
+allow echo ${outer:-${inner:-default}}
+allow git commit --dry-run -m "$(cat <<'EOF'⏎Fix the guard's reading (it's subtle).⏎EOF⏎)"
+allow printf '%s\n' a b | while IFS= read -r l; do $SHELL -c "echo $l"; done
+allow ls -d agenda/(*publish*)(N) agenda/{src,publish}(N)
+allow ls agenda/*(N.om[1])
+allow ls agenda/*(.)
+# Deliberate bypasses closed (fourth security review, 2026-10-15).
+deny cat <<EOF⏎$(npm publish)⏎EOF
+deny cat <<EOF⏎`npm publish`⏎EOF
+deny npm pu$()blish
+deny v=publish; npm $v
+deny set -- publish; npm "$@"
+deny npm {publish,}
+deny npm publ*
+deny flock /tmp/lock npm publish
+deny flock /tmp/lock -c 'npm publish'
+deny taskset 0x1 npm publish
+deny taskset -c 0 npm publish
+deny chrt -f 10 npm publish
+deny unshare -r npm publish
+deny fakeroot npm publish
+deny strace -o /dev/null npm publish
+deny script -qc 'npm publish' /dev/null
+deny dbus-run-session -- npm publish
+deny xvfb-run -a npm publish
+deny printf x | xargs -I{} npm publish
+deny git -c alias.p='!npm publish' p
+deny ls *(e:'npm publish':)
+deny ls *(+npmpublish)
+deny ls x(N)$(npm publish)
 # The guard fails closed: a crash of the hook and a hook past its deadline both deny.
 deny echo LOOP_GUARD_SELFTEST_CRASH
 deny echo LOOP_GUARD_SELFTEST_HANG

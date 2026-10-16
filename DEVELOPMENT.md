@@ -225,13 +225,28 @@ Run the steps in this order. Costs are what was measured on 2026-10-14 and 2026-
      ordinary work, because a wrong deny distorts what the loop measures.
      Publishing, deploying, releasing, pushing and uploading are refused by
      `bin/loop-release-hook`, a PreToolUse hook on Bash and Monitor that reads the command's tokens
-     the way a shell does (compound commands, wrappers, runners, heredocs): `pnpm -r publish`,
+     the way bash and zsh do (its own lexer: comments only where `#` starts a word, line
+     continuations, `$'...'`, heredoc delimiters with quotes removed, every `$(...)`, backtick,
+     `<(...)`, `>(...)` and substitution inside `${...}` read as a command; compound commands,
+     wrappers, runners): `pnpm -r publish`,
      `npm run release` and `scripts/deploy.sh` are denied; `pnpm test -- deploy.spec.ts`,
      `make -C deploy test` and anything with `--dry-run` run. It fails closed: a command it cannot
      read is denied, it denies by itself after 10 s (measured: a hook Claude Code times out lets
      the call through, even with `|| exit 2`), and it runs as `... || exit 2`, so a crash
-     blocks. Code an interpreter runs (`python -c`, `node -e`, `... | bash`, `bash < file`) is
-     not read: a documented limit. The hook and the deny list reach the replay through a
+     blocks. Code handed to a shell is read
+     when it is literal (`trap '...'`, `PROMPT_COMMAND=...`, `bash <<EOF`, `bash <<< '...'`,
+     `printf/echo/cat <literal> | bash`, `source <(echo ...)`, `$(echo npm) publish`), and
+     every substitution in an unquoted heredoc body, a `${...}` operand, an arithmetic
+     expansion or a zsh glob group is read as a command. Denied as unreadable: a brace-list
+     command word, any `$IFS` expansion, a variable command word after a standalone `IFS=`, a
+     zsh `e`/`+` glob qualifier, and a release tool's verb that expands (`npm $v`,
+     `npm "$@"`, `npm {publish,}`, `npm publ*`). NOT READ, a documented limit (operator,
+     2026-10-15), since none of it releases in the transcripts and the sandbox has no
+     credentials: code an interpreter runs (`python -c`, `node -e`, `perl -e`, awk's
+     `system()`, `sed .../e`, `make -f /dev/stdin`), code read from a file or a command's
+     output (`eval "$(sed ...)"`, `bash -c "$(sed ...)"`, `source <(sed ...)`,
+     `sed ... | bash`, `bash < file`), and a script file run by name (`bash x.sh` is judged
+     by its name only). The hook and the deny list reach the replay through a
      flag settings file in one read-only mount at `/run/loop` (it cannot be moved or written
      in the sandbox), run by the system python's absolute path, with PATH, LD_PRELOAD,
      LD_LIBRARY_PATH, BASH_ENV and ENV pinned there to the rig's own values (PATH is the one
@@ -243,7 +258,12 @@ Run the steps in this order. Costs are what was measured on 2026-10-14 and 2026-
      Check both with `bin/loop deny-check` (free: the glob list and the hook itself, run in a
      scratch project) or `bin/loop deny-check --live` (a real `claude -p` in a replay's sandbox
      and settings, about 25 minutes), against `fixtures/loop/deny-commands.txt`, where a
-     `monitor: ` prefix sends a case to Monitor. `bin/loop denials <replay stamp>` classifies every denial
+     `monitor: ` prefix sends a case to Monitor. **Before shipping a guard change, run `bin/loop guard-corpus`:** it runs the guard over every
+     real Bash and Monitor command in `~/.claude/projects` (subagents included; nothing is
+     written to disk) and prints the denies by reason. The known-intended ones (a real
+     release, a push, `gh`, a command zsh cannot parse either) are listed in
+     `fixtures/loop/guard-corpus-expected.txt`; the target is "0 unexpected", since a wrong
+     deny distorts what the loop measures. `bin/loop denials <replay stamp>` classifies every denial
      of a run by cause.
    - **The judge** sees the user words, the final reply, the diff stat, the diff itself (bounded,
      with every cut stated) and the session's tool calls with their exit status. It may answer `env`
