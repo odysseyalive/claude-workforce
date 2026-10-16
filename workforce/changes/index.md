@@ -8,7 +8,8 @@
 
 | Version | Date | Surface | Org | Change |
 |---|---|---|---|---|
-| 1.78.1 | 2026-10-14 | docs | no | (pending — message lands on the next regeneration) |
+| 1.79.0 | 2026-10-16 | update, changes, hooks, scripts, installer | no | Release 1.79.0: shareable docs always get the house style; the review loop is removed |
+| 1.78.1 | 2026-10-14 | changes, scripts, installer | no | Release 1.78.1: simpler ISSUES lines, closed issues not listed |
 | 1.78.0 | 2026-10-14 | handbook, chart, principles, audit, verify, update, changes, hooks, scripts, installer, platform | **yes** | Release 1.78.0: changes are proven by demonstration, and ISSUES says what is happening |
 | 1.77.5 | 2026-10-13 | changes, hooks, scripts, installer | no | Release 1.77.5: the turn a dispatched item finishes on can close its issue |
 | 1.77.4 | 2026-10-13 | changes, hooks, scripts, installer | no | Release 1.77.4: a cut agent is resumed, never respawned, and an issue's items can close |

@@ -3,7 +3,7 @@ name: workforce
 description: "Staff a project with a company of agent employees — CEO, department leads, and ICs, each with a handbook, a pinned model, and a check that proves its work. Existing skills convert in. Commands: audit, hire, retire, handbook, org, principles, review, amend, defect, ledger, roster, model-map, checksums, hooks, preflight, discharge, sweep, backup, restore, rollback, disband, verify, update, version, wrap"
 when_to_use: "When building, staffing, auditing, or maintaining a project's agent org chart, employee handbooks (.claude/agents/*.md), or personnel records"
 argument-hint: "[command] [employee] [--execute]"
-version: "1.78.1"
+version: "1.79.0"
 minimum-effort-level: high
 strictness: standard
 allowed-tools: Read, Bash, Glob, Grep, Write, Edit, Agent, TaskCreate, TaskUpdate, TaskList, TaskGet
@@ -873,9 +873,6 @@ closes when that project re-runs its own reproduction and watches it pass (`refe
 defects, three carried through three or more audits — and the queue's own closing mechanism was "a
 person noticing the paragraph and opening a session by hand", which `deferred.md` names as a rule with a
 reader and no producer. This is the reader.*
-
-**A `dev` session also runs `bin/loop due`** right after the inbox. When it prints DUE, start a review
-cycle with `bin/loop mine --cycle` (`plan/review-loop-2026-10-14.md`).
 
 **No install is created in this repo, and no test runs against the live one.** `bin/sync` refreshes
 `.claude/skills/workforce` only if it is already there and never materializes it; `--personal`
