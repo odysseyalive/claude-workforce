@@ -23,41 +23,48 @@ its own work, which is the one configuration the measurement says returns a pass
 | Row | Contract |
 |---|---|
 | `Invoke` | `/text-eval [<path or passage>]`, or as a Task agent with `context: none` |
-| `Returns` | Flags keyed to catalog rows, each `{row, severity, evidence, fix}`. MUST FIX is reported with no cap; SHOULD FIX and CONSIDER are held to 3–5 combined. |
-| `Fails` | No exit codes — this skill ships no script. Its one mechanical check is the catalog drift anchor: `grep -c creative-scrub-ref-version references/*.md` returns 2. |
+| `Returns` | The passage's point restated in one plain sentence, then the claim inventory, then flags keyed to catalog rows (plus step 2's `Restate the point`), each `{row, severity, evidence, fix}`. MUST FIX is reported with no cap; SHOULD FIX and CONSIDER are held to 3–5 combined. The restatement and the inventory are not flags and do not count toward the cap. |
+| `Fails` | No exit codes. This skill ships no script. Its one mechanical check is the catalog drift anchor: `grep -l creative-scrub-ref-version references/*.md \| wc -l` prints 2. |
 
 ## Workflow
 
 1. **Character checks first, mechanically.** Literal searches before any subjective reading —
    em-dashes, smart quotes, ellipsis characters, non-breaking spaces. Do not assume the text
-   is clean and do not skip this because the prose reads well.
-2. **Read the catalog.** [references/text-tells.md](references/text-tells.md) is the corpus:
+   is clean and do not skip this because the prose reads well. In the same pass, build the
+   **claim inventory**: every statistic, date, direct quote, named study and named case, each
+   marked `sourced` or `unsourced`. It feeds the *Unsourced specific* row in `additions.md`.
+2. **Restate the point.** Before reading the catalog, write the passage's point in one plain
+   sentence, as if explaining it to someone outside the field. If you cannot, report it as
+   `Restate the point`, a workflow signal rather than a catalog row: one CONSIDER signal, counted toward the passage's cluster like any
+   other. Then take each sentence whose meaning a reader would have to guess, and check it against
+   the rows for unclear meaning: Vague pronoun referents, Topic collisions and Orphaned statements.
+3. **Read the catalog.** [references/text-tells.md](references/text-tells.md) is the corpus:
    pattern → tell → falsifiable test. [references/additions.md](references/additions.md)
    carries the rows authored by this distribution, including citation integrity and
    conversational register. `text-tells.md` is imported byte-for-byte from claude-enforcer,
    and its header points to a `creative-integrity.md` that exists only in that source project
    (skill-builder) and never shipped here. The severity and cluster rules it points to are the
-   ones step 4 states; read those, not the dead link. *Recorded 2026-09-14 instead of editing
+   ones step 5 states; read those, not the dead link. *Recorded 2026-09-14 instead of editing
    the corpus, which would fork a file with a single origin.*
-3. **Score the positive signals too**, from
+4. **Score the positive signals too**, from
    [references/human-markers.md](references/human-markers.md), BEFORE requiring any change.
    A passage with strong human markers and a few rhetorical devices is human writing. An
    evaluator that can only count tells over-flags prose that is plainly a person thinking,
    and the goal is "sounds like a person," never "contains no listed pattern." This does
    not touch a **[hard]** row: a mechanical defect is not offset by good writing around it.
-4. **Count clusters, not signals.** 1 signal in a passage → CONSIDER; 2 → SHOULD FIX; 3+ →
+5. **Count clusters, not signals.** 1 signal in a passage → CONSIDER; 2 → SHOULD FIX; 3+ →
    MUST FIX. Rows marked **[hard]** are outside clustering entirely. Dedupe by mechanism:
    two rows describing one underlying defect count once.
-5. **Apply the house rules, if the project has any.** A project may carry
+6. **Apply the house rules, if the project has any.** A project may carry
    `.claude/skills/text-eval/CATALOG-ANCHOR.md` with a supersession register and a precedence
    clause. **That register is the sole authority that demotes a finding**, and it is the
    project's, not this catalog's. Absent the file, nothing is demoted.
-6. **One pass, then stop.** Present the evaluation once. MUST FIX items are blocking and are
+7. **One pass, then stop.** Present the evaluation once. MUST FIX items are blocking and are
    resolved before the text reaches a reader. The rest is the author's call.
 
 ## Probe
 
-Evaluate this passage and return the flag list: *"Moreover, organizations everywhere are
+Evaluate this passage and return the evaluation: *"Moreover, organizations everywhere are
 utilizing these tools to delve into a tapestry of opportunities — truly transformative."* A
 correct result names the em-dash as a **[hard]** mechanical flag, plus a MUST FIX cluster
 citing connector overuse, hyperbolic scope, Latinate bias, AI vocabulary and superlative
@@ -66,5 +73,5 @@ stacking, and reports no cap on the hard row.
 ## Verification
 
 ```
-grep -c 'creative-scrub-ref-version' references/*.md   # 2 — the corpus and its version anchor
+grep -l 'creative-scrub-ref-version' references/*.md | wc -l   # 2: the corpus and its version anchor
 ```
