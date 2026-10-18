@@ -526,21 +526,46 @@ def _filter_tokens(tokens):
     return out
 
 
-def resolve_token(token, root):
+# The workforce skill this script ships in. A handbook cites workforce's own references
+# by the path the doctrine uses for them — `references/verification.md` § The rule — and
+# that file is in the install, never in the project.
+SKILL_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# A `<placeholder with spaces>` the whitespace split cut in half: `<the --model file>`
+# arrives as `…/<the`, which PLACEHOLDER_RX cannot see without its `>`.
+OPEN_PLACEHOLDER_RX = re.compile(r"<[A-Za-z][^>]*$")
+
+
+def stand_ins(body):
+    """Names a handbook writes alone in backticks, in capitals: `S`, `OUT`, `ROOT`.
+
+    A handbook that says "Write `S` below for your scratch directory" then writes
+    `"S/kroma.json"` in an example command, a variable spelled without its `$`.
+    MEASURED 2026-10-18 on mutze-studio: `S/kroma.json` read as a dead reference.
+    """
+    return set(re.findall(r"`([A-Z][A-Z0-9_]*)`", body))
+
+
+def resolve_token(token, root, names=()):
     """(abspath, exists) for a path-like token, or (None, None) when undecidable.
 
     Mirrors `wf-census.resolve_hook_command`'s expansion rules for the same reason
     it has them, and keeps its third state: a token this cannot decide is counted
-    apart and left alone.
+    apart and left alone. `names` are the handbook's own `stand_ins`.
     """
     path = token
     for var in ("${CLAUDE_PROJECT_DIR}", "$CLAUDE_PROJECT_DIR"):
         path = path.replace(var, root)
     path = os.path.expandvars(os.path.expanduser(path))
-    if "$" in path or PLACEHOLDER_RX.search(path):
+    if ("$" in path or PLACEHOLDER_RX.search(path) or OPEN_PLACEHOLDER_RX.search(path)
+            or path.split("/")[0] in names):
         return None, None
     if not os.path.isabs(path):
-        path = os.path.join(root, path)
+        # The project first, then the install: a relative path the project lacks and
+        # workforce ships is a citation of workforce's own file, not a dead one.
+        rel = path
+        path = os.path.normpath(os.path.join(root, rel))
+        if not os.path.exists(path) and os.path.exists(os.path.join(SKILL_DIR, rel)):
+            return os.path.normpath(os.path.join(SKILL_DIR, rel)), True
     path = os.path.normpath(path)
     return path, os.path.exists(path)
 
@@ -752,8 +777,9 @@ def check_handbook(path, body, root, rep, resolver):
     # real check takes. The command's own script is resolved by the census resolver
     # below, which is the mechanical half; this pass is for prose and fenced blocks.
     resolvable = NEGATIVE_LINE_RX.sub("", CHECK_LINE_RX.sub("", resolvable))
+    names = stand_ins(body)
     for token in candidate_tokens(resolvable):
-        resolved, exists = resolve_token(token, root)
+        resolved, exists = resolve_token(token, root, names)
         if resolved is None:
             rep.add(name, "undecidable", token,
                     "unexpanded variable or unbound placeholder — never reported as dead")

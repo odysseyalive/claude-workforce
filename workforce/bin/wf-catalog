@@ -1343,6 +1343,14 @@ def house_state(root, kind):
       refresh        the region is absent, or stale
     """
     dirs = house_dirs(root, kind)
+    # AN EVALUATOR THE INSTALL ANSWERS FOR HAS A HOUSE-RULES FILE TO WRITE. Its anchor goes
+    # where `--migrate` leaves one, `.claude/skills/<name>/CATALOG-ANCHOR.md` beside no
+    # corpus, and `house_write` already creates it. Until 2026-10-18 a kind with no
+    # project directory was `no-evaluator` whatever resolved it, so mutze-studio — all five
+    # answering from the install — read UNREFRESHED five times, each telling the user to
+    # install evaluators already installed.
+    if not dirs and install_dir(root, kind):
+        dirs = [os.path.join(root, ".claude", "skills", CATALOGS[kind]["skills"][0])]
     if not dirs:
         tried = ", ".join(".claude/skills/%s" % n for n in CATALOGS[kind]["skills"])
         return {"kind": kind, "verdict": "no-evaluator", "why":

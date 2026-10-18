@@ -237,6 +237,14 @@ FS_ROOTS = {
 SHELL_ARG_RX = re.compile(r"(?:^|\s)(?:--?[A-Za-z][\w-]*|\S*[\w.]/\S+|\S+\.[A-Za-z]{1,5})(?:\s|$)")
 
 
+# A SKILL IN INVOCATION POSITION. The slash follows a space, a quote or a bracket, never
+# a word, a `/` or a placeholder's closing `>`: `studio/production/<film>/scene-plan-<scene>.md`
+# read as `/scene-plan` (MEASURED 2026-10-18, mutze-studio). And the name ends the token:
+# `\b` let the match stop at the hyphen inside `scene-plan-`, so the trailing-hyphen
+# filter below never saw the hyphen it exists to catch.
+SKILL_CALL_RX = re.compile(r"(?<![\w/>])/([a-z][a-z0-9-]{2,})(?![\w-])")
+
+
 def _is_path_argument(tok, text):
     """True when `/tok` reads as an absolute path in a shell example, not a command."""
     if tok not in FS_ROOTS:
@@ -1195,6 +1203,10 @@ def check_handbook(path, body, res, ceiling, floors=None):
     for _sec in ("## Procedure", "## Verification"):
         _acts_raw += (section(body, _sec) or "") + "\n"
     _acts = "\n".join(l for l in _acts_raw.splitlines() if not PROHIBITION_RX.search(l))
+    # HTML comments say nothing an employee does, and the sidecar's own closing marker
+    # `<!-- /origin -->` matched the command grammar in every handbook carrying a user
+    # block. MEASURED 2026-10-18 on mutze-studio: 8 handbooks advised `/origin`.
+    _acts = re.sub(r"<!--.*?-->", " ", _acts, flags=re.S)
     # ROUTED SKILLS — collected from the RAW text, per numbered step, before the
     # prohibition filter runs. Two orderings had to be got right and neither is obvious:
     #
@@ -1218,7 +1230,7 @@ def check_handbook(path, body, res, ceiling, floors=None):
     def _harvest(lines):
         blob = "\n".join(lines)
         if ROUTING_RX.search(blob) or PROHIBITION_RX.search(blob):
-            _routed.update(re.findall(r"(?<![\w/])/([a-z][a-z0-9-]{2,})\b", blob))
+            _routed.update(SKILL_CALL_RX.findall(blob))
     for _l in _acts_raw.splitlines():
         if re.match(r"\s*\d+[a-z]?\.\s", _l) and _step:
             _harvest(_step)
@@ -1226,7 +1238,7 @@ def check_handbook(path, body, res, ceiling, floors=None):
         _step.append(_l)
     _harvest(_step)
     if tier == 3:
-        for sk in sorted(set(re.findall(r"(?<![\w/])/([a-z][a-z0-9-]{2,})\b", _acts))):
+        for sk in sorted(set(SKILL_CALL_RX.findall(_acts))):
             if sk in _routed:
                 continue
             sp = os.path.join(_root, ".claude", "skills", sk, "SKILL.md")
@@ -2804,10 +2816,20 @@ def check_catalog_read(n, body, res, tally):
 # separator is not in the pattern at all — `[^`\n]+` against a literal closer has one way to
 # match, and the whitespace comes off with `.strip()`, where it costs nothing.
 PROBE_CITE_RX = re.compile(r"`##([^`\n]+)`")
-# `1`, `1-2`, `1–2` (en dash, which is what a writer's editor produces). The spans a real
-# table uses are `1-2`, `rows 1, 4, 5`, `steps 6 and 7` — so the connector is never parsed,
-# only the numbers between the citation and the next citation in the same cell.
-PROBE_SPAN_RX = re.compile(r"(\d+)\s*(?:[-–]\s*(\d+))?")
+# `1`, `1-2`, `1–2` (en dash, which is what a writer's editor produces), `1 to 22`. The
+# spans a real table uses are `1-2`, `rows 1, 4, 5`, `steps 6 and 7`, `steps 1 to 22` — so
+# a list connector is never parsed, only the numbers between the citation and the next
+# citation in the same cell, and the one connector read is the one that makes a RANGE.
+# `to` was missing until 2026-10-18: "steps 1 to 22" covered 1 and 22 and nothing between,
+# which reported art-director, director-of-photography and sound-mixer on mutze-studio with
+# 20, 16 and 18 gaps their tables did not have. A number inside a word (`A1`) is no step.
+PROBE_SPAN_RX = re.compile(r"(?<!\w)(\d+)\b(?:\s*(?:[-–]|\bto\b)\s*(\d+)\b)?")
+# A STEP NAMED WITHOUT ITS SECTION. "Steps 1, 2" and "The consult order paragraph and step
+# 19" are rows a real table writes once `## Procedure` has been cited a row above, and
+# `step` is the Procedure's unit — Verification counts rows. Read only before the cell's
+# first citation, so "`## Verification` row 3" stays Verification's.
+PROBE_STEP_RX = re.compile(
+    r"\bsteps?\s+(\d+(?:\s*(?:[-–,&]|\bto\b|\band\b)\s*\d+\b)*)", re.I)
 # A section the table need not carry a row for: `## Procedure` and `## Verification` are
 # covered PER STEP and PER ROW below, which is strictly stronger than one row naming the
 # section, and `## Probe` is the section doing the substituting.
@@ -2869,17 +2891,23 @@ def _substitution_coverage(probe):
         if not left or set(left) <= set("-: "):      # the header's alignment rule
             continue
         cites = list(PROBE_CITE_RX.finditer(left))
+        head = left[:cites[0].start()] if cites else left
+        for st in PROBE_STEP_RX.finditer(head):
+            _add_spans(covered.setdefault("Procedure", set()), st.group(1))
         for i, m in enumerate(cites):
             end = cites[i + 1].start() if i + 1 < len(cites) else len(left)
-            nums = covered.setdefault(m.group(1).strip(), set())
-            for sm in PROBE_SPAN_RX.finditer(left[m.end():end]):
-                a = int(sm.group(1))
-                b = int(sm.group(2) or sm.group(1))
-                # A span is a step range, and no handbook has 50 of them. An unbounded
-                # `range()` off a typo (`1-9999`) would cover every step by accident,
-                # which is the one failure a coverage check must never have.
-                nums.update(range(a, b + 1) if 0 <= b - a <= 50 else (a, b))
+            _add_spans(covered.setdefault(m.group(1).strip(), set()), left[m.end():end])
     return covered
+
+
+def _add_spans(nums, text):
+    for sm in PROBE_SPAN_RX.finditer(text):
+        a = int(sm.group(1))
+        b = int(sm.group(2) or sm.group(1))
+        # A span is a step range, and no handbook has 50 of them. An unbounded
+        # `range()` off a typo (`1-9999`) would cover every step by accident,
+        # which is the one failure a coverage check must never have.
+        nums.update(range(a, b + 1) if 0 <= b - a <= 50 else (a, b))
 
 
 def _covered_nums(covered, label):

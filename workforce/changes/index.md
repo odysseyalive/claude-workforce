@@ -8,7 +8,8 @@
 
 | Version | Date | Surface | Org | Change |
 |---|---|---|---|---|
-| 1.80.0 | 2026-10-16 | docs | no | Release 1.80.0: text-eval catches empty maxims, buried points, bare statistics and US defaults |
+| 1.80.1 | 2026-10-18 | handbook, changes, scripts, installer | **yes** | Release 1.80.1: four audit scripts stop misreading real handbooks, and the template says what an injection is |
+| 1.80.0 | 2026-10-16 | changes, installer | no | Release 1.80.0: text-eval catches empty maxims, buried points, bare statistics and US defaults |
 | 1.79.1 | 2026-10-16 | verify, update, changes, scripts, installer | no | Release 1.79.1: update and verify say whether THIS project needs an audit |
 | 1.79.0 | 2026-10-16 | update, changes, hooks, scripts, installer | no | Release 1.79.0: shareable docs always get the house style; the review loop is removed |
 | 1.78.1 | 2026-10-14 | changes, scripts, installer | no | Release 1.78.1: simpler ISSUES lines, closed issues not listed |
