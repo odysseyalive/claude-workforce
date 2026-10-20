@@ -40,7 +40,7 @@ in its message and asked in that order, advisor last** (`audit-setup.md` § Rend
   session advisor (`org-config.template.md` § Model statics), marked `(recommended)` in place in the cost
   order like any lane's. Its **blank field is where the user types `none` to remove the `advisorModel` key
   entirely**. It rides its own call because `model-map` has no backup/consent call for it to sit on (in a
-  full `audit` it is the second object of the backup call, `audit-setup.md` § Step 0.2), and because
+  full `audit` it is the second of the backup call's three objects, `audit-setup.md` § Step 0.2), and because
   every budget call is already at its object cap.
 
 Lane membership is derived from the work **per employee**, never asked (`audit-setup.md` § Which

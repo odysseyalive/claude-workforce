@@ -16,7 +16,8 @@ evaluators are reached from the user install rather than written into the projec
 proceed, whether to archive first, and which model and effort each lane runs at
 (`references/audit-setup.md` § The question budget). The lanes the budgets manage separately are
 **analytical, creative-text, creative-visual, code**, plus the advisor; the advisor is an object on the
-backup call, not a lane and not a call of its own. Everything else is resolved by agent panels. Failures
+backup call, not a lane and not a call of its own, and so is the user's time zone
+(`audit-setup.md` § Step 0.2, applied there by `wf-timezone`). Everything else is resolved by agent panels. Failures
 land as ✗ in the Execution Summary with the step they failed at, never as "run this command yourself."
 
 ---
@@ -2017,6 +2018,7 @@ Budget Receipt
 | creative-visual      | <id>   | medium | asked this run           |
 | code                 | <id>   | medium | blank -> analytical      |
 | advisor              | <id>   | --     | unchanged, pre-selected  |
+| time zone            | <zone> | --     | verified on disk · restart Claude Code to see it |
 
 Lane assignment (per employee)
 | Employee           | Dept        | Lane       | Why                                    |

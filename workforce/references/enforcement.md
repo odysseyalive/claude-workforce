@@ -281,9 +281,15 @@ step; that is the entire reason it survived.*
 }
 ```
 
+The USER-scope record, `${CLAUDE_CONFIG_DIR:-~/.claude}/workforce/.settings-owned.json`, holds the
+same `hooks_added` for user-scope wiring and, written by `wf-timezone` only,
+`"env_added": {"TZ": "America/New_York"}` plus `"env_object_added": true` when that write created the
+`env` object. `wf-timezone clear` is its reversal.
+
 These are the keys the writers write, and no others: `wf-settings-apply` writes `permissions_allow_added`
 and `hooks_added`, `wf-permissions` rewrites `permissions_allow_added` when it repairs a rule, and
-`wf-apply` writes `hooks_removed` and `files_removed`. `bin/check` derives this set from those three
+`wf-apply` writes `hooks_removed` and `files_removed`; `wf-timezone` writes `env_added` and
+`env_object_added`, in the user-scope record only. `bin/check` derives this set from those three
 scripts and fails when the example drifts from it.
 
 **The `_removed` sections are the ones `disband` RESTORES rather than removes, and the asymmetry is

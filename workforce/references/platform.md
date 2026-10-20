@@ -554,6 +554,26 @@ write such a name (`handbook-templates.md` § Reporting, `staging.md` § Phase B
 shipped file against the harness's own pattern. The one shipped name that matches, the audit's
 closing report file, is written by the orchestrating session and never delegated (`procedures/audit.md` § Step 7).
 
+### Fact 27 — `env.TZ` in a settings file sets the zone Claude Code shows its own times in ✅ MEASURED
+
+**Measured 2026-10-20 on Claude Code 2.1.302**, Linux, system zone US/Pacific. Evidence:
+`measurements/2026-10-20-settings-env-tz.md`.
+
+- The turn-end line (`✻ Worked for 2h 43m · done 7:55 PM`) is rendered by
+  `new Date(t).toLocaleTimeString(void 0,{hour:"numeric",minute:"2-digit"})` — the process's own zone.
+- Every settings file's `env` block is copied onto Claude Code's own process environment
+  (`Object.assign(process.env, this.filterSettingsEnv(…env…))`), so `env.TZ` sets that zone. With
+  `{"env":{"TZ":"Asia/Tokyo"}}` the line read `done 6:26 AM` while the host read 2:26 PM PDT.
+- **A mid-session edit does not move Claude Code's own clock.** Editing a project settings file during
+  a session changed `date` in the next Bash call to JST at once, but the turn-end line stayed in PDT
+  until Claude Code was restarted. So the change shows **after a restart**.
+- **TZ reaches every tool subprocess too**: `date`, Python `localtime` and anything else reading local
+  time in a Bash call follows it.
+
+**Conditions:** one Linux host, `--settings` at startup and a project-local settings file, main session
+only. The user settings file is assumed to take the same path, not measured. Windows not measured.
+Written by `wf-timezone` (`timezone` skill), which is the only shipped writer of `env.TZ`.
+
 ---
 
 ## DOCUMENTED — not yet measured. Do not build blocking checks on these.

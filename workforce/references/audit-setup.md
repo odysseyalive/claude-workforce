@@ -24,7 +24,7 @@ budget each render as **two calls** (five lanes overflow one call), so the surfa
 | # | Step | What happens | Calls | Objects |
 |---|---|---|---|---|
 | 1 | 0 | Consent — proceed with this audit, or stop | **1** | 1 |
-| 2 | 0.2 | Backup — copy the project first · **and the session advisor** | **1** | 2 |
+| 2 | 0.2 | Backup — copy the project first · **and the session advisor** · **and your time zone** | **1** | 3 |
 | — | 0.3 | Absent companions materialized from doctrine automatically | 0 | — |
 | 3 | 0.4a | Model budget — Call A: analytical Lead/IC, code | **1** | 3 |
 | 4 | 0.4b | Model budget — Call B: creative-text, creative-visual | **1** | 2 |
@@ -76,7 +76,7 @@ instead.
 
 **BLOCKING — when more than one `AskUserQuestion` call is owed, each call is the ONLY tool call in its
 message, and the next is issued only after the previous one is answered.** The table above is the
-order: consent, then the backup and advisor, then model A, model B, effort A, effort B. This deliberately
+order: consent, then the backup, advisor and time zone, then model A, model B, effort A, effort B. This deliberately
 overrides the general habit of batching independent tool calls into one message, because these calls are
 **not** independent:
 
@@ -370,6 +370,38 @@ entirely (§ Step 0.4a; `org-config.template.md` § Session advisor) — it is n
 sentinel value. It sits here rather than with the lanes because it is not a lane: it reaches no
 employee, it has no effort setting, and putting it among the four made the two budgets offer different
 categories — which is the mismatch this arrangement exists to remove.
+
+**Third object on this call — your time zone.** It sets the zone Claude Code shows times in, such as
+the `done 7:55 PM` at the end of a turn (`platform.md` § Fact 27). Like the advisor it is not a lane and
+reaches no employee, so it rides this call rather than taking a seventh question. User request,
+2026-10-20: *"could we add a timezone picker in the audit questions?"*
+
+Before rendering, run the shipped script for its candidates:
+
+```bash
+TZB="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/timezone/bin/wf-timezone"; [ -x "$TZB" ] || TZB="${CLAUDE_PROJECT_DIR:-$PWD}/.claude/skills/timezone/bin/wf-timezone"
+"$TZB" --root "${CLAUDE_PROJECT_DIR:-$PWD}" show --json
+```
+
+> **Which time zone should Claude Code show times in?**
+> This sets the time Claude Code prints when it finishes a job, for every project on this machine.
+> Type any zone name in the blank field, like `America/New_York`, or **none** to use this machine's
+> clock.
+
+One option per entry in `candidates`, in the order the script gives, at most four. The label is the
+zone; a candidate with `current: true` is the `(current)` option and one with `recommended: true` is
+`(recommended)` (§ What "pre-selected" means on screen). The description is `Now <now>` and the
+candidate's `note`, which says when a zone is only a guess from the user's commit times. The script
+decides the order and the labels, so no part of this list is assembled by hand.
+
+**The answer is applied right after the backup is taken**, by the same script: a zone runs
+`"$TZB" set <zone>`, **none** runs `"$TZB" clear`, and keeping the `(current)` option runs nothing. It
+writes `env.TZ` into the USER settings file, outside the tree the backup archives, so `INV-BACKUP`'s
+count of writes before it is unchanged. Under `--review` nothing is written and the receipt says
+`would set`. If the classifier refuses the write, hand the user the one-line `! <set_command> <zone>`
+built from the script's own output (`timezone` skill § When the write is refused). The Budget Receipt
+reports the value the script printed after `verified on disk`, and says that Claude Code's own clock
+follows it after a restart.
 
 **Declining is answered, not refused.** `declined` is a fourth state beside the three below, and it
 costs exactly what a `failed` backup costs: conversions downgrade to

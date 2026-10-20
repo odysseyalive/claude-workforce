@@ -10357,5 +10357,136 @@
               ]
           }
       }
+  },
+  "timezone-set": {
+      "_why": "THE ONE KEY, AND NOTHING ELSE. `wf-timezone set` writes env.TZ into USER settings by inserting characters, never by load-and-dump: the user's own formatting around it must survive, and the reversal record must name what was written before the edit lands. User request 2026-10-20 (a time zone picker, also as its own tool).",
+      "script": "../skills/timezone/bin/wf-timezone",
+      "env": {
+          "CLAUDE_CONFIG_DIR": "${TREE}/cfg"
+      },
+      "args": [
+          "set",
+          "America/New_York"
+      ],
+      "exit": 0,
+      "want": [
+          "+ env.TZ = \"America/New_York\"   (was not set)",
+          "verified on disk: env.TZ = \"America/New_York\""
+      ],
+      "not": [
+          "Traceback"
+      ],
+      "after": {
+          "cfg/settings.json": {
+              "want": [
+                  "{\n  \"model\": \"opus\",\n  \"hooks\": {\n    \"Stop\": []\n  },\n  \"env\": {\n    \"TZ\": \"America/New_York\"\n  }\n}\n"
+              ]
+          },
+          "cfg/workforce/.settings-owned.json": {
+              "want": [
+                  "\"TZ\": \"America/New_York\"",
+                  "\"env_object_added\": true"
+              ]
+          }
+      }
+  },
+  "timezone-clear-byte-identical": {
+      "_why": "CLEAR GIVES THE FILE BACK. The tree is the state `set` leaves on a one-line file, with the record saying workforce created the env object. `clear` must cut exactly those characters, so the whole file reads as it did before `set`, compact style included; a load-and-dump would expand it to indented JSON and this row would fail. The record's env entries are removed with it.",
+      "script": "../skills/timezone/bin/wf-timezone",
+      "env": {
+          "CLAUDE_CONFIG_DIR": "${TREE}/cfg"
+      },
+      "args": [
+          "clear"
+      ],
+      "exit": 0,
+      "want": [
+          "- env.TZ removed   (was \"America/New_York\", set by workforce)",
+          "verified on disk: env.TZ absent"
+      ],
+      "not": [
+          "Traceback"
+      ],
+      "after": {
+          "cfg/settings.json": {
+              "want": [
+                  "{\"model\":\"opus\",\"permissions\":{\"allow\":[\"Bash(ls)\"]}}\n"
+              ],
+              "not": [
+                  "\"env\"",
+                  "TZ",
+                  "  "
+              ]
+          },
+          "cfg/workforce/.settings-owned.json": {
+              "not": [
+                  "env_added",
+                  "env_object_added"
+              ]
+          }
+      }
+  },
+  "timezone-invalid-refused": {
+      "_why": "AN UNKNOWN NAME IS REFUSED IN PLAIN WORDS AND WRITES NOTHING. A misspelt zone in env.TZ is not an error anywhere: the clock silently falls back to UTC, which is the very defect this skill exists to remove. So the name is checked against the zone database first, and a path-shaped name never reaches a filesystem join.",
+      "script": "../skills/timezone/bin/wf-timezone",
+      "env": {
+          "CLAUDE_CONFIG_DIR": "${TREE}/cfg"
+      },
+      "args": [
+          "set",
+          "America/Neu_York"
+      ],
+      "exit": 2,
+      "want": [
+          "\"America/Neu_York\" is not a time zone this machine knows",
+          "Nothing was written"
+      ],
+      "not": [
+          "Traceback",
+          "verified on disk"
+      ],
+      "after": {
+          "cfg/settings.json": {
+              "want": [
+                  "{\n  \"model\": \"opus\"\n}\n"
+              ],
+              "not": [
+                  "TZ"
+              ]
+          },
+          "cfg/workforce/.settings-owned.json": {
+              "absent": true
+          }
+      }
+  },
+  "timezone-existing-env": {
+      "_why": "AN env BLOCK THE USER ALREADY HAS IS JOINED, NOT REPLACED. TZ is appended after the user's own last env member with the same separator, and the record says workforce did NOT create the env object, so a later `clear` removes TZ and leaves the user's block in place.",
+      "script": "../skills/timezone/bin/wf-timezone",
+      "env": {
+          "CLAUDE_CONFIG_DIR": "${TREE}/cfg"
+      },
+      "args": [
+          "set",
+          "America/New_York"
+      ],
+      "exit": 0,
+      "want": [
+          "verified on disk: env.TZ = \"America/New_York\""
+      ],
+      "not": [
+          "Traceback"
+      ],
+      "after": {
+          "cfg/settings.json": {
+              "want": [
+                  "{\n  \"env\": {\n    \"FOO\": \"1\",\n    \"TZ\": \"America/New_York\"\n  },\n  \"model\": \"x\"\n}\n"
+              ]
+          },
+          "cfg/workforce/.settings-owned.json": {
+              "want": [
+                  "\"env_object_added\": false"
+              ]
+          }
+      }
   }
 }

@@ -348,6 +348,21 @@ sibling workforce/skills/shared-artifact/references/template.html
 # tools look half-wired when they are correctly wired.
 sibling workforce/skills/records-code-map/SKILL.md
 
+# ── timezone — the SIBLING that sets the zone Claude Code shows times in ──────
+#
+# User request, 2026-10-20: a time zone picker in the audit questions, *"a spearate tool,
+# too, so that we don't have to run a full audit for this feature. it needs to be part of
+# the native skills shipped with workforce."* Same install mechanism as the siblings above,
+# and for the same reason: shipping it is what lets `update` alone reach every machine, with
+# no audit. Not an evaluator and not a catalog: no `references/`, no drift anchor, registered
+# in neither `wf-catalog` nor `wf-conform`.
+#
+# It is the first `exec-sibling` row. Its script writes ONE key, `env.TZ`, into USER
+# settings, through `wf-settings-apply`'s span parser, which it loads from the workforce skill
+# installed beside it (`<skills-root>/workforce/bin/`). The mechanism is `platform.md` § Fact 27.
+sibling workforce/skills/timezone/SKILL.md
+exec-sibling workforce/skills/timezone/bin/wf-timezone
+
 # ── Procedures ────────────────────────────────────────────────────────────────
 workforce/references/procedures/audit.md
 workforce/references/procedures/org.md

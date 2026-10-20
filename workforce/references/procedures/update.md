@@ -201,9 +201,9 @@ makes the working directory the project is step 4's rule — run it from the roo
 with a bootstrap prompt. Both installers dropped that check with the evacuation directive; the prose
 outlived it by six weeks.*
 
-### The five evaluators come with it, and so do `blueprint` and `shared-artifact`
+### The five evaluators come with it, and so do `blueprint`, `shared-artifact`, `records-code-map` and `timezone`
 
-**`update` installs eight skills, not one.** `text-eval`, `code-evaluator`, `security-evaluator`,
+**`update` installs ten skills, not one.** `text-eval`, `code-evaluator`, `security-evaluator`,
 `image-eval` and `ui-design` ship as SIBLINGS of `skills/workforce/` — each complete, carrying the
 corpus it grades against and the agents it runs — and the same rows register those agents where the
 host reads them. That is the whole of the 2026-09-10 directive: *"All I have to do is update
@@ -225,6 +225,12 @@ still not a catalog: `house-style.md` is a recipe, not a graded corpus, so it is
 it up on the next `update` or `audit` with nothing to run by hand. An install wired before 2026-10-15
 holds it on `Artifact` alone; the same pass moves that row to the shipped matcher in whichever
 settings file holds it, user scope included (`hooks.md` § Healing, `PRIOR_MATCHERS`).
+
+**`records-code-map` and `timezone` ride them too.** `records-code-map` fronts the generated code map
+(`manifest.txt` § records-code-map). `timezone` is `/timezone`: it sets `env.TZ` in the user's own
+settings so Claude Code shows its times in the user's zone, and it ships the first `exec-sibling`
+script, `wf-timezone`, which `audit` Step 0.2 calls for its time zone question
+(`manifest.txt` § timezone). Neither is an evaluator or a catalog.
 
 **A skill this installer did not write is never overwritten.** Ownership is decided once per skill,
 on its `SKILL.md`, against `.installed-external` as that record stood BEFORE the run — a project's

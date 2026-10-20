@@ -159,6 +159,16 @@ WRITERS = {
                  "fixtures/scripts/orgsync-new-agent"],
         "watch": "fixtures/scripts/orgsync-new-agent",
     },
+    # wf-timezone set writes TWO files: the user settings file and the user-scope
+    # .settings-owned.json record. A second identical `set` must find env.TZ already at
+    # that value and write neither — a re-recorded `env_object_added`, or a TZ member
+    # inserted a second time, is the shape this row catches. CLAUDE_CONFIG_DIR points the
+    # user scope at a fixture tree inside the copy, never at the account running this.
+    "timezone-set": {
+        "argv": ["workforce/skills/timezone/bin/wf-timezone", "set", "America/New_York"],
+        "env": {"CLAUDE_CONFIG_DIR": "${WORK}/fixtures/scripts/timezone-set/cfg"},
+        "watch": "fixtures/scripts/timezone-set",
+    },
     "settings-heal": {
         "argv": ["workforce/bin/wf-settings-apply", "--root",
                  "fixtures/scripts/sa-heal-execute", "--heal", "--execute"],

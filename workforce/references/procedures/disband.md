@@ -140,3 +140,6 @@ proceeds believing the tree is clean.*
 - **Touch a hand-edited handbook or a changed skill.** Reported, left alone.
 - **Uninstall the skill itself.** The tooling stays; only this project's org is dismantled. Remove the
   install separately if you want it gone.
+- **Clear your time zone.** `env.TZ` lives in the USER settings file and serves every project on the
+  machine, so dismantling one project's org leaves it. `/timezone` with **none**, or `wf-timezone
+  clear`, removes it and reads the user-scope record that says workforce wrote it.
