@@ -1280,17 +1280,34 @@ def project_only_rows(root, kind, proj, rels):
     *"Consistent edge quality"* from `image-eval`'s `watercolor.md`; neither row is in any
     shipped catalog, and after the migration `wf-catalog --grep` for either answered `no
     match` because the only copy was in an archive directory the resolver never reads. They
-    are PROJECT rows and they do not belong in the shipped corpus — so they are lifted into
-    the house-rules layer, which the resolver does read and which survives every migration.
+    are lifted into the house-rules layer, which the resolver does read and which survives
+    every migration. (`Productive tangent` is a personal-voice rule and stays the project's;
+    `Consistent edge quality` turned out to be a shipped watercolor row the install had
+    dropped, restored in `image-eval-ref-version: 2`. The lift is right for either.)
+
+    THE SHIPPED FILE AT THE SAME PATH COUNTS AS SHIPPED. `install_keys` reads the corpus,
+    `references/`, and an in-skill agent is not corpus. `classify` retires an agent only
+    when the shipped agent of that name carries every section the copy does
+    (`capability_gap`), so all of its headings ARE shipped — and they were lifted anyway,
+    announced as rows "no shipped catalog carries". MEASURED 2026-10-22 on a live host:
+    `code-design-advisor` and `deadcode-gardener`, each a subset of the shipped agent, each
+    printed `LIFT … 4 project-only row(s)`, and a byte-identical twin in
+    `catalog-migrate-keeps-divergent-agent` printed the same. An agent's headings lifted
+    into the anchor are text about a capability the install already provides, and every
+    `--grep` would return them as project rules.
     """
     shipped = install_keys(root, kind)
+    inst = install_dir(root, kind)
     out = {}
     for rel in sorted(rels):
         f = os.path.join(proj, rel)
         if os.path.islink(f) or not rel.endswith(".md"):
             continue
+        twin = os.path.join(os.path.dirname(inst), rel) if inst else None
+        have = shipped | (set(file_keys(slurp(twin))) if twin and os.path.isfile(twin)
+                          else set())
         rows = [v for k, v in file_keys(HOUSE_RX.sub("", slurp(f))).items()
-                if k not in shipped]
+                if k not in have]
         if rows:
             out[rel] = sorted(rows)
     return out
@@ -1354,9 +1371,10 @@ def house_state(root, kind):
     if not dirs:
         tried = ", ".join(".claude/skills/%s" % n for n in CATALOGS[kind]["skills"])
         return {"kind": kind, "verdict": "no-evaluator", "why":
-                "no %s evaluator directory at project scope (tried %s), so there is no "
-                "house-rules file to refresh. Run `workforce update` to install the "
-                "evaluators, then re-run." % (kind, tried)}
+                "no %s evaluator directory at project scope (tried %s) and no installed %s "
+                "evaluator answers for this project (`wf-catalog --kind %s --path`), so "
+                "there is no house-rules file to refresh. Run `workforce update` to "
+                "install the evaluators, then re-run." % (kind, tried, kind, kind)}
     anchors = [os.path.join(d, ANCHOR) for d in dirs]
     dest = next((a for a in anchors if os.path.isfile(a)), anchors[0])
     rows, cites = register_rows(root, kind)

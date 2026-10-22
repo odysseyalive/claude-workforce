@@ -7172,7 +7172,7 @@
     ]
   },
   "catalog-migrate-keeps-divergent-agent": {
-    "_why": "A NAME MATCH IS NOT A CAPABILITY MATCH, and `--migrate` was reading it as one. MEASURED 2026-10-02 on a live host: the project's `agents/character-scanner/AGENT.md` was classed residue because the install ships an agent of that name, and only the project copy emits the *Verification Preamble* that `text-eval/SKILL.md` and `agents/tells-evaluator/AGENT.md` both require — the install's copy does not mention it once. Retiring it would have left that requirement unsatisfiable, which is the one thing a retirement may never do. Lifting is no substitute: nothing spawns an agent out of CATALOG-ANCHOR.md. `stale-twin` is the falsifying half INSIDE this fixture — byte-identical to its shipped twin, no gap, and it must still retire — so a rule degraded to 'keep every bundled agent' fails here too.",
+    "_why": "A NAME MATCH IS NOT A CAPABILITY MATCH, and `--migrate` was reading it as one. MEASURED 2026-10-02 on a live host: the project's `agents/character-scanner/AGENT.md` was classed residue because the install ships an agent of that name, and only the project copy emits the *Verification Preamble* that `text-eval/SKILL.md` and `agents/tells-evaluator/AGENT.md` both require — the install's copy does not mention it once. Retiring it would have left that requirement unsatisfiable, which is the one thing a retirement may never do. Lifting is no substitute: nothing spawns an agent out of CATALOG-ANCHOR.md. `stale-twin` is the falsifying half INSIDE this fixture — byte-identical to its shipped twin, no gap, and it must still retire — so a rule degraded to 'keep every bundled agent' fails here too. The twin also prints NO `LIFT`: its headings are the shipped agent's own, and until 2026-10-22 `project_only_rows` compared an agent against the corpus alone and announced them as project-only rows bound for CATALOG-ANCHOR.md.",
     "script": "wf-catalog",
     "args": [
       "--migrate"
@@ -7188,7 +7188,8 @@
     ],
     "not": [
       "retire     agents/character-scanner/AGENT.md",
-      "LIFT       agents/character-scanner/AGENT.md"
+      "LIFT       agents/character-scanner/AGENT.md",
+      "LIFT       agents/stale-twin/AGENT.md"
     ]
   },
   "catalog-migrate-kind-scopes": {
@@ -7342,6 +7343,19 @@
       "no code evaluator directory at project scope"
     ],
     "not": ["\"body\":"]
+  },
+  "catalog-house-rules-install-answers": {
+    "_why": "MEASURED 2026-10-16 on ComfyUI (upstream DEF-Q-003) and 2026-10-18 on mutze-studio: `--house-rules` looked for evaluator directories at PROJECT scope only, so a project whose evaluators all resolve from the install (`INV-CATALOG 5 kind(s) · 5 from install`) read `UNREFRESHED … Run workforce update to install the evaluators` five times, a remedy for a state that was not true. The house rules stay in the project even when the corpus does not, so an install-answered kind gets its anchor at `.claude/skills/<name>/CATALOG-ANCHOR.md`, the same place `--migrate` leaves one. This tree has NO `.claude/skills/` at all and a text corpus the maintainer tree answers: text must read `would refresh`, and the four kinds nothing answers stay UNREFRESHED, naming both places that were tried.",
+    "script": "wf-catalog",
+    "args": ["--house-rules"],
+    "env": {"CLAUDE_CONFIG_DIR": "/nonexistent-config"},
+    "exit": 0,
+    "want": [
+      "~ text-eval            register 0 row(s) · precedence clause written — would refresh into .claude/skills/text-eval/CATALOG-ANCHOR.md",
+      "UNREFRESHED no code evaluator directory at project scope (tried .claude/skills/code-evaluator) and no installed code evaluator answers",
+      "INV-HOUSERULES  5 evaluator(s) · 0 current · 1 would refresh · 4 unrefreshed"
+    ],
+    "not": ["no text evaluator directory", "Traceback"]
   },
   "catalog-house-rules-relocates-region": {
     "_why": "The region's home is CATALOG-ANCHOR.md and two real projects carry it in a corpus file instead, because that is where the 2026-08-20 propagation put it: code-evaluator's went into references/guards.md and was DELETED by the 2026-09-11 migration (recovered from retired/ by hand), and text-eval's sits in references/ai-patterns.md with the same fate pending. The producer moves it and clears the old copy, verified by readback. This tree also carries a `supersedes:` marker, so the register derives one row FROM STRUCTURE, and a hand-written row already in the region is carried rather than dropped — retention, not a machine-owned overwrite.",

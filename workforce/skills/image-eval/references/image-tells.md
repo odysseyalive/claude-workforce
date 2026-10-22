@@ -1,4 +1,4 @@
-<!-- image-eval-ref-version: 1 -->
+<!-- image-eval-ref-version: 2 -->
 <!-- origin: workforce | modifiable: true -->
 # Image Tells — the authenticity classes an image evaluator looks for
 
@@ -14,7 +14,7 @@
      entries from here that the project's copy does not already carry, into the
      machine-owned region at the bottom.
 
-     Version anchor: 1
+     Version anchor: 2
 -->
 
 ## Required verification checks
@@ -117,7 +117,10 @@ practitioner actually produce this?"
 | **No paper texture visible** | Pigment settles into paper grain, especially in washes. |
 | **Crisp fine details** | Pigment bleeds on wet paper. Fine lines feather. |
 | **Absent cauliflowering** | Wet-on-drying creates blooms. It's unavoidable. |
+| **Impossible bloom placement** | Blooms happen at wet/drying boundaries. |
+| **Consistent edge quality** | Real paintings have varied edges (wet vs. dry application). |
 | **Symmetric organic effects** | Water doesn't create bilateral symmetry. |
+| **Colors mixing impossibly** | Some pigments granulate, separate, or don't mix cleanly. |
 
 ### Oil and acrylic
 
