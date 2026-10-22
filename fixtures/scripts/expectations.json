@@ -692,6 +692,23 @@
       "UNDECIDABLE  PreToolUse     .claude/settings.json — `$WF_UNSET_HOOK_HOME/hooks/guard.sh` carries a variable this process cannot expand"
     ]
   },
+  "census-inline-interpreter": {
+    "_why": "AN INLINE SCRIPT IS DECIDED BY ANY LEADING OPTION, not by an exact `-c` in first position (found 2026-10-22 fixing university--11). Before the fix `node -e \"require('./lib/x.js')\"` and `bash -ec 'test -f references/a.md'` named their CODE as the script, found a slash in it and counted DEAD (`2 dead`), and `python3 -W ignore hooks/live.py` named the option argument `ignore` as the script and read UNDECIDABLE. After it the two inline rows are undecidable with their reason and the python row resolves to its live script.",
+    "env": {
+      "CLAUDE_CONFIG_DIR": ".nocfg"
+    },
+    "exit": 0,
+    "not": [
+      "DEAD  ",
+      "`ignore` is a bare name"
+    ],
+    "script": "wf-census",
+    "want": [
+      "3 wired · 0 inside a skill dir · 0 dead · 2 undecidable",
+      "UNDECIDABLE  PreToolUse     .claude/settings.json — inline script (`node -e`)",
+      "UNDECIDABLE  PreToolUse     .claude/settings.json — inline script (`bash -ec`)"
+    ]
+  },
   "census-duplicate": {
     "exit": 0,
     "not": [
@@ -960,6 +977,20 @@
     "script": "wf-checkrun",
     "want": [
       "~ undeclared"
+    ]
+  },
+  "checkrun-inline-interpreter": {
+    "_why": "A Check: line that runs inline code must not block as a dead check (found 2026-10-22 fixing university--11). Before the fix `node -e \"require('./lib/x.js')\"` reported `! dead runs require('./lib/x.js')` and `bash -ec 'test -f references/a.md'` reported `! dead runs test -f references/a.md`, both blocking (exit 1), and `python3 -W ignore scripts/check.py` took `ignore` for its script and resolved nothing. The resolver now reads every leading option, so the inline lines are undecidable and the python line resolves to its script.",
+    "exit": 0,
+    "not": [
+      "! dead",
+      "runs require("
+    ],
+    "script": "wf-checkrun",
+    "want": [
+      "+ resolved",
+      "1 resolved · 0 dead · 0 undecidable",
+      "0 blocking finding(s)"
     ]
   },
   "checkrun-nested-decorated": {

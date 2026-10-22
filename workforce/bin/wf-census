@@ -279,6 +279,89 @@ NAME_RX = re.compile(r"^name:\s*['\"]?([^'\"\n]+?)['\"]?\s*$", re.M)
 # assignment mistakable for the path being run. See Census._resolve_segment.
 ENV_ASSIGN_RX = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 
+# ONE LEADING INTERPRETER OPTION, per interpreter family. Each grammar returns
+# (consumed, why): `why` set means the call runs no file; `consumed` 0 means `t` is
+# the operand; _END means `t` ends the options and the next token is the operand;
+# otherwise it is how many tokens the option takes, its argument included. Skipping
+# the argument is what keeps `python3 -W ignore x.py` from naming `ignore`.
+_END = -1
+_SH_ARG_LONG = ("--rcfile", "--init-file")
+_NODE_INLINE = ("-e", "--eval", "-p", "--print", "-pe", "-ep")
+_NODE_ARG = ("-r", "--require", "--import", "--loader", "--experimental-loader",
+             "-C", "--conditions")
+_PWSH_INLINE = ("-c", "-command", "-e", "-ec", "-encodedcommand", "-cwa",
+                "-commandwithargs")
+_PWSH_FILE = ("-f", "-file")
+_PWSH_ARG = ("-ex", "-ep", "-executionpolicy", "-wd", "-workingdirectory", "-config",
+             "-configurationname", "-o", "-of", "-outputformat", "-if", "-inputformat",
+             "-w", "-windowstyle", "-settingsfile", "-custompipename")
+
+
+def _sh_option(interp, t):
+    """sh/bash/zsh: a short cluster holding `c` is inline (`-ec`, `-xc`)."""
+    if t == "-":  # a lone `-` ends the options, as `--` does
+        return _END, None
+    if t.startswith("--"):
+        return (2 if t in _SH_ARG_LONG else 1), None
+    if len(t) < 2 or t[0] not in "-+":
+        return 0, None
+    flags = t[1:]
+    if t[0] == "-" and "c" in flags:
+        return 0, f"inline script (`{interp} {t}`)"
+    if t[0] == "-" and "s" in flags:
+        return 0, f"script read from stdin (`{interp} {t}`)"
+    return 1 + flags.count("o") + flags.count("O"), None  # each takes the next token
+
+
+def _python_option(interp, t):
+    """python: `c` in a cluster is inline (`-c`, `-Bc`); `-W`/`-X` take an argument."""
+    if t == "-":
+        return 0, f"script read from stdin (`{interp} -`)"
+    if t.startswith("--"):
+        return (2 if t == "--check-hash-based-pycs" else 1), None
+    if not t.startswith("-"):
+        return 0, None
+    for j, ch in enumerate(t[1:], 1):
+        if ch == "c":
+            return 0, f"inline script (`{interp} {t[:j + 1]}`)"
+        if ch == "m":
+            return 0, f"module run (`{interp} {t[:j + 1]}`), not a file"
+        if ch in "WX":
+            # The rest of the cluster is the argument, or else the next token is.
+            return (2 if j == len(t) - 1 else 1), None
+    return 1, None
+
+
+def _node_option(interp, t):
+    """node: `-e`, `--eval`, `-p`, `--print` are inline."""
+    if t == "-":
+        return 0, f"script read from stdin (`{interp} -`)"
+    if t in _NODE_INLINE or t.startswith(("--eval=", "--print=")):
+        return 0, f"inline script (`{interp} {t.split('=', 1)[0]}`)"
+    if not t.startswith("-"):
+        return 0, None
+    return (2 if t in _NODE_ARG else 1), None
+
+
+def _pwsh_option(interp, t):
+    """pwsh: `-Command`/`-c` are inline; `-File` names the script. Case-insensitive."""
+    low = t.lower()
+    if low in _PWSH_INLINE:
+        return 0, f"inline script (`{interp} {t}`)"
+    if low in _PWSH_FILE:
+        return _END, None
+    if not t.startswith("-"):
+        return 0, None
+    return (2 if low in _PWSH_ARG else 1), None
+
+
+# Interpreters whose script operand is the file a command runs. perl and ruby are
+# deliberately absent: their `-e` and option grammar are not modelled, so they stay
+# bare names resolved on PATH, which is undecidable and never dead.
+_OPTION_GRAMMAR = {"sh": _sh_option, "bash": _sh_option, "zsh": _sh_option,
+                   "python": _python_option, "python3": _python_option,
+                   "node": _node_option, "pwsh": _pwsh_option}
+
 # Marker families are open-ended by design: a foreign generator invents its own.
 # Report unknown families rather than dropping them — four unknown families on the
 # first real target is what taught this project that an allowlist here silently
@@ -857,14 +940,10 @@ class Census:
             return None, "only environment assignments, no command"
         first = tokens[0]
         # An interpreter invocation runs its script argument, not itself.
-        if os.path.basename(first) in ("sh", "bash", "zsh", "python", "python3", "node", "pwsh"):
-            args = [t for t in tokens[1:] if not t.startswith("-")]
-            if len(tokens) > 1 and tokens[1] in ("-c", "-Command"):
-                # inline script: nothing to stat
-                return None, f"inline script (`{os.path.basename(first)} {tokens[1]}`)"
-            if not args:
-                return None, f"`{os.path.basename(first)}` with no script argument"
-            first = args[0]
+        if os.path.basename(first) in _OPTION_GRAMMAR:
+            first, why = self._interpreter_operand(os.path.basename(first), tokens[1:])
+            if first is None:
+                return None, why
 
         if "/" not in first:
             # resolved via PATH; not ours to judge
@@ -886,6 +965,37 @@ class Census:
         # a `..` row is decided like any other — HEAD's behaviour for foreign rows, which
         # refusing `..` outright had lost (review 3, L5).
         return path, None
+
+    @staticmethod
+    def _interpreter_operand(interp, args):
+        """(script_token, None) for the file an interpreter runs, or (None, why).
+
+        THE OPTIONS BEFORE THE FIRST OPERAND DECIDE IT, not `args[0]` alone. Only an
+        exact `-c` or `-Command` in first position used to count as inline, so a
+        handbook Check `node -e "require('./lib/x.js')"` or `bash -ec 'test -f a.md'`
+        named its CODE as the script, found a slash in it, and reported a dead check
+        that blocked (found 2026-10-22 while fixing university--11). Walking the
+        leading options also skips their arguments, so `python3 -W ignore x.py` names
+        `x.py` and not `ignore`. Everything after the operand belongs to the script.
+        """
+        grammar = _OPTION_GRAMMAR[interp]
+        i, n = 0, len(args)
+        while i < n:
+            if args[i] == "--":
+                i += 1
+                break
+            consumed, why = grammar(interp, args[i])
+            if why:
+                return None, why
+            if consumed == 0:
+                break
+            if consumed == _END:
+                i += 1
+                break
+            i += consumed
+        if i >= n:
+            return None, f"`{interp}` with no script argument"
+        return args[i], None
 
     def owning_skill(self, resolved):
         """Which skill directory this hook's script lives in, exactly.
