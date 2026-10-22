@@ -669,15 +669,21 @@ def record_floor(root, name, evidence, execute):
               f"report that measured the floor, by project-relative path", file=sys.stderr)
         return 2
     ev = ev.replace(os.sep, "/")
-    lines, size = len(body.splitlines()), len(body.encode("utf-8"))
+    # THE AUTHORED BODY, ON BOTH SIDES OF THE TEST (`wf-conform.length_measure`). Whether a
+    # split is owed is the length row's own measure; what is RECORDED is the authored body,
+    # so a restamp, a re-pin or a Step 5d insertion never moves the floor (odyssey-alive
+    # row 28). The row's sixth cell names that basis, so a reader can tell it from an
+    # older whole-file row.
+    lm = conform.length_measure(body)
+    lines, size = lm["floor_lines"], lm["floor_bytes"]
     ceiling = conform.DEFAULT_LENGTH_CEILING
     budget = ceiling * conform.MEASURED_BYTES_PER_LINE
-    if lines <= ceiling and size <= budget:
-        print(f"  . nothing to record  {base}.md  {lines} lines, {size:,} B — within {ceiling} "
+    if lm["lines"] <= ceiling and lm["bytes"] <= budget:
+        print(f"  . nothing to record  {base}.md  {lm['lines']} lines, {lm['bytes']:,} B — within {ceiling} "
               f"lines and {budget:,} B, so no split is ordered and no floor is needed")
         return 0
     today = time.strftime("%Y-%m-%d", time.gmtime())
-    row = f"| `{base}.md` | {lines} | {size} | `{ev}` | {today} |"
+    row = f"| `{base}.md` | {lines} | {size} | `{ev}` | {today} | {conform.FLOOR_BASIS} |"
     path = os.path.join(root, conform.LENGTH_FLOORS_REL)
     if not execute:
         print(f"  ~ would record  {row}\n  Re-run with --execute to write {rel_file}.")
@@ -711,7 +717,8 @@ def record_floor(root, name, evidence, execute):
     # READ BACK WITH THE READER THAT WILL USE IT (`checksums.md` rule 2).
     floors, _bad = conform.read_length_floors(root)
     got = floors.get(base + ".md")
-    if not got or (got["lines"], got["bytes"], got["evidence"]) != (lines, size, ev):
+    if not got or (got["lines"], got["bytes"], got["evidence"], got.get("basis")) != (
+            lines, size, ev, conform.FLOOR_BASIS):
         print(f"  ! wrote {rel_file} and wf-conform read back {got!r} — not counted", file=sys.stderr)
         return 2
     print(f"  + recorded  {row}  ({rel_file}, read back by wf-conform)")
