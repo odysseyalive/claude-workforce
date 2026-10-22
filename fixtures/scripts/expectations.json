@@ -10577,5 +10577,70 @@
           "front-end: catalog pin",
           "ref-version: 99` is not"
       ]
+  },
+  "conform-write-list-order": {
+      "_why": "odyssey-alive BB-U1/BB-U4: CARVE_OUT_RX skips every carve-out sentence, so `NEVER edit files outside <list>` was never read and verify printed `0 ordering an act the same file forbids` while three orders required edits to `.claude/skills/ynab/scripts/*.py`. The list is now read as the permitted region: a Procedure step editing a script outside it FAILS, the `.spawn` order that said `build scripts/ynab_pull.py` is ADVISED (history), and the covered `workflows.md` update and the Reporting write into the reporting directory are not reported. The parenthetical with a colon inside the list must not cut it short.",
+      "script": "wf-conform",
+      "exit": 1,
+      "want": [
+          "books: ## Procedure orders a write outside its own Guardrails write list (`.claude/skills/ynab/scripts/ynab_pull.py`)",
+          "books: 1 work order clause(s) require a write outside its Guardrails write list (`.claude/skills/ynab/scripts/ynab_pull.py`)",
+          "write lists: 1 handbook(s) name one · 1 ordering a write outside it · 1 with a work order that did"
+      ],
+      "not": [
+          "workflows.md`)",
+          "OUTPUT.md`)",
+          "Traceback"
+      ]
+  },
+  "conform-grounding-write-list": {
+      "_why": "odyssey-alive BB-U3/U4/U5: the handbook's write list was widened to `.claude/skills/ynab/scripts/*` while the grounding still restates `scripts/*.py`, still says `scripts/ynab-env.sh` and `.sh` are left out, and still names `fund_month.py`, which does not exist. Each disagreement FAILS. `ynab_pull.py` and `reconcile_pulse.py` exist and are not reported; `old_pull.py` is named as removed history; the zoho catalog glob shares no directory with the write list.",
+      "script": "wf-conform",
+      "exit": 1,
+      "want": [
+          "books: grounding restates `scripts/*.py`; its Guardrails write list says `.claude/skills/ynab/scripts/*`",
+          "books: grounding says `scripts/ynab-env.sh` is outside the write list; `.claude/skills/ynab/scripts/*` covers it",
+          "books: grounding says `.sh` is outside the write list",
+          "books: grounding names `fund_month.py` among `scripts/*.py`, and no such file exists"
+      ],
+      "not": [
+          "`ynab_pull.py` among",
+          "`reconcile_pulse.py` among",
+          "old_pull.py",
+          "zoho/references",
+          "Traceback"
+      ]
+  },
+  "conform-skill-scope-nested": {
+      "_why": "pythom-space row 1, 2026-10-04: a handbook registered in two orgs by symlink named `Skill(pythom-space:triage-playbook)`, the form only the parent root lists, and both cold probes from the project's own root failed on it. The skill is local here and no `pythom-space/` directory holds it, so the row FAILS and names the symlink. `Skill(product-management:brainstorm)` is a plugin skill this root does not carry and is not reported.",
+      "script": "wf-conform",
+      "exit": 1,
+      "want": [
+          "comms-drafter: names `Skill(pythom-space:triage-playbook)`, which this root lists as `Skill(triage-playbook)`",
+          "so it is read from more than one root"
+      ],
+      "not": [
+          "product-management:brainstorm",
+          "Traceback"
+      ]
+  },
+  "orgsync-comment-closer": {
+      "_why": "Latent, found 2026-10-22: `placement()` matched `/origin` inside a `<!-- /origin -->` closer, so a project skill named `origin` was reported as placed in `## Orchestrators` when the chart never names it. Comments are stripped before the slash grammar runs, as wf-conform does since 1.80.1. The real `/release-runner` row keeps its placement.",
+      "script": "wf-org-sync",
+      "exit": 0,
+      "after": {
+          ".claude/workforce/org-chart.md": {
+              "want": [
+                  "| `origin` | Records where a file came from. | not yet classified |",
+                  "| `release-runner` | Runs the release. | Orchestrators |"
+              ],
+              "not": [
+                  "| `origin` | Records where a file came from. | Orchestrators |"
+              ]
+          }
+      },
+      "not": [
+          "Traceback"
+      ]
   }
 }

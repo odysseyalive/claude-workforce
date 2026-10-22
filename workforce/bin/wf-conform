@@ -24,6 +24,8 @@ Usage
 """
 
 import argparse
+import fnmatch
+import glob
 import hashlib
 import json
 import os
@@ -476,7 +478,8 @@ def _template_clause_caps():
         path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                             "references", "handbook-templates.md")
         try:
-            text = open(path, encoding="utf-8").read()
+            with open(path, encoding="utf-8") as fh:
+                text = fh.read()
         except (OSError, UnicodeDecodeError):
             text = ""
         m = re.search(r"^## IC\n.*?^```markdown\n(.*?)^```\n", text, re.S | re.M)
@@ -3630,6 +3633,395 @@ def check_self_contradiction(n, body, res, tally):
             "author can say which line is right; amend that one.")
 
 
+# THE WRITE LIST A CARVE-OUT NAMES. Guard 3 above skips a carve-out sentence because its
+# tokens are the PERMITTED region — and then nothing read that region at all. odyssey-alive
+# BB-U1/U4, 2026-10-03: `business-books` § Guardrails reads "NEVER edit files outside
+# `/home/francis/org/`, … `.claude/skills/ynab/data/*.jsonl` and your reporting directory",
+# three work orders in one session required edits to `.claude/skills/ynab/scripts/*.py`,
+# and `verify` reported "0 ordering an act the same file forbids" throughout, because the one
+# sentence that decided the question was the one sentence it never parsed. The grounding
+# file's "`.sh` is deliberately left out of the write glob" rested on the same unread line.
+#
+# Edit-family verbs only. "NEVER edit files outside X" fences writes, not runs: the verb
+# list above includes `run` and `invok`, and a handbook that runs `bin/check` is not
+# writing to it.
+# `(?!-)`: "derived write-off windows" is a noun — measured on a real work order.
+EDIT_VERB_RX = re.compile(
+    r"\b(writ|edit|creat|modif|overwrit|append|delet|remov|touch|renam|rewrit|updat)\w*\b(?!-)",
+    re.I)
+# A WORK ORDER IS TERSER THAN A HANDBOOK. "build scripts/ynab_pull.py", "Add advice.hours
+# to advisor_feed.py" — the two measured orders that wrote a fenced script said build and add.
+ORDER_VERB_RX = re.compile(
+    r"\b(writ|edit|creat|modif|overwrit|append|delet|remov|touch|renam|rewrit|updat"
+    r"|build|add|replac|fix|chang)\w*\b(?!-)", re.I)
+# The carve-out word, NEAR the verb: "edit files outside", "write anything other than".
+ALLOW_CUT_RX = re.compile(
+    r"\boutside(?: of)?\b|\bother than\b|\bapart from\b|\bbeyond\b|\bexcept(?: for| in)?\b",
+    re.I)
+# A GLOB COMPONENT. `_split_glob` cuts a token at the first one, so `scripts/*.py` pairs with
+# `.claude/skills/ynab/scripts/*.py` by its directory and differs from `scripts/*` by pattern.
+GLOB_CHARS_RX = re.compile(r"[*?\[]")
+# A claim that a path is NOT in the write list: "sourced at runtime, not edited", "`.sh` is
+# deliberately left out of the write glob".
+EXCLUDED_RX = re.compile(NEGATION_RX.pattern + r"|\bleft out\b|\bexclud\w*", re.I)
+# A sentence that names a file as GONE, or as history, is not restating the current set.
+HISTORY_RX = re.compile(r"\b(?:removed|deleted|renamed|retired|formerly|was|were|used to)\b",
+                        re.I)
+# WHAT FOLLOWS THE OBJECT IS NOT ANOTHER OBJECT. "Write the report to the path in
+# `## Reporting`, in the shape of `references/output-format.md`" names a template it
+# writes nothing to — measured on odyssey-alive's `content-evaluator`.
+REFERENCE_CUT_RX = re.compile(
+    r"\b(?:in the (?:shape|format|form) of|shaped like|per|according to|from|using|"
+    r"following|against|like|via|by|as|the same way|mirroring|matching|read|consult|see)\b",
+    re.I)
+# A LIST THAT POINTS ELSEWHERE IS NOT READ. "NEVER edit files outside the paths above"
+# names its list by position, and a list read without it reports every path above as
+# forbidden — measured on a peer checkout's `runtime-lead`.
+LIST_BY_REFERENCE_RX = re.compile(r"\b(?:above|below|listed|those|these)\b", re.I)
+# Every handbook's `## Reporting` writes here; the template's carve-out names it in words
+# ("your own reporting directory") as often as by path.
+REPORTING_DIR = ".claude/workforce/work"
+# A bare file name in a work order, backticked or not: `ynab_pull.py:900-990` -> ynab_pull.py.
+ORDER_FILE_RX = re.compile(r"(?<![\w/.~-])((?:[\w.~-]+/)*[\w-]+\.[A-Za-z][A-Za-z0-9]{0,4})(?![\w/])")
+# Directories that hold copies, history or other checkouts — a file name resolved there is
+# not the file the order meant.
+_INDEX_SKIP = {"work", "worktrees", "retired", "staging", "backups", ".git", "node_modules",
+               ".claude-backups", "__pycache__"}
+
+
+def _permitted_objects(sentence):
+    """For "NEVER edit files outside A, B and C": {A, B, C} — where writing IS allowed.
+    None when the sentence is not a write carve-out at all."""
+    m = PROHIBITION_STRICT_RX.search(sentence)
+    if not m:
+        return None
+    tail = sentence[m.end():]
+    verb = EDIT_VERB_RX.search(tail)
+    if not verb:
+        return None
+    cut = ALLOW_CUT_RX.search(tail, verb.end())
+    if not cut or len(tail[verb.end():cut.start()].split()) > 4:
+        return None
+    return _path_tokens(tail[cut.end():])
+
+
+def write_allow_list(body):
+    """(tokens, sentence) — the write list a § Guardrails carve-out names, or (set(), None).
+
+    A PARENTHETICAL IS STRIPPED BEFORE THE SENTENCE IS CUT. The measured line carries
+    "(what it holds: grounding § Guardrails — the ynab playbook)" mid-list, and the colon
+    inside it split the sentence there, which dropped the reporting directory named after
+    it. "outside your `## Scope` IN list" brings that list in by reference.
+    """
+    allow, said = set(), None
+    for bullet in _bullets(section(body, "## Guardrails")):
+        flat = re.sub(r"\([^()]*\)", " ", bullet)
+        for sentence in SENTENCE_SPLIT_RX.split(flat):
+            toks = _permitted_objects(sentence)
+            if toks is None:
+                continue
+            if LIST_BY_REFERENCE_RX.search(sentence):
+                return set(), None
+            # "your `## Scope` IN list", "the Scope IN paths", "your scope paths" — every
+            # path an IN bullet names, qualified or not, since the list is the bullets.
+            # A Scope relocated out of the file, or one with no IN bullet this can read,
+            # leaves the list unknown — and an unknown list is not read as an empty one.
+            if re.search(r"\bscope\b", sentence, re.I):
+                scoped = set()
+                for b in _bullets(section(body, "## Scope")):
+                    if re.match(r"^\*{0,2}IN\b", b):
+                        scoped |= _path_tokens(b)
+                if not scoped:
+                    return set(), None
+                toks |= scoped
+            allow |= toks | {REPORTING_DIR}
+            said = said or bullet
+    return allow, said
+
+
+def _split_glob(tok):
+    """(directory, pattern) — pattern None for a token with no glob component."""
+    parts = tok.split("/")
+    for i, p in enumerate(parts):
+        if GLOB_CHARS_RX.search(p):
+            return "/".join(parts[:i]), "/".join(parts[i:])
+    return tok, None
+
+
+def _same_dir(a_dir, b_dir):
+    """`.claude/skills/ynab/scripts` and `scripts` name one directory; a relative token in a
+    grounding file is written from the playbook it describes."""
+    return bool(a_dir and b_dir) and (a_dir == b_dir or a_dir.endswith("/" + b_dir)
+                                      or b_dir.endswith("/" + a_dir))
+
+
+def _covers(a, t):
+    """True when write-list token `a` covers target `t` — glob, directory, or the tail of a
+    longer path that a relative target is written against."""
+    # `<workflow>` in the list and `<name>` in the order are the same slot.
+    a, t = (re.sub(r"<[^<>/]+>", "*", x) for x in (a, t))
+
+    def one(a, t):
+        if _forbids(a, t) or fnmatch.fnmatchcase(t, a):
+            return True
+        return not GLOB_CHARS_RX.search(a) and t.startswith(a.rstrip("/") + "/")
+    if one(a, t):
+        return True
+    if t.startswith((".", "/", "~", "$")):
+        return False
+    k = len(t.split("/"))
+    return k < len(a.split("/")) and one("/".join(a.split("/")[-k:]), t)
+
+
+def _file_index(root):
+    """basename -> [root-relative paths] for every file under `.claude/`, copies excluded."""
+    idx = {}
+    base = os.path.join(root, ".claude")
+    for dp, dn, fns in os.walk(base):
+        dn[:] = [d for d in dn if d not in _INDEX_SKIP]
+        for f in fns:
+            idx.setdefault(f, []).append(os.path.relpath(os.path.join(dp, f), root))
+    return idx
+
+
+def _resolve(root, tok, index):
+    """The project files a work order's file name can mean — [] when it names none."""
+    if "/" in tok and os.path.exists(os.path.join(root, tok)):
+        return [tok]
+    return [p for p in index.get(os.path.basename(tok), [])
+            if p == tok or p.endswith("/" + tok)]
+
+
+def _order_lines(text):
+    """`task:` and `exit-criteria:` of a `.spawn` edge — the two fields that say what to do."""
+    out, cur = [], None
+    for line in text.splitlines():
+        m = re.match(r"^(task|exit-criteria):\s?(.*)$", line)
+        if m:
+            cur = m.group(1)
+            if m.group(2).strip() not in ("|", ">", ""):
+                out.append(m.group(2))
+        elif cur and line.startswith((" ", "\t")):
+            out.append(line.strip())
+        else:
+            cur = None
+    return out
+
+
+def check_write_list(root, n, body, res, tally, index):
+    """The § Guardrails write list, held against what orders this employee to write.
+
+    THREE READERS OF ONE LIST (odyssey-alive BB-U1, BB-U3, BB-U4, BB-U5):
+
+      Procedure and Reporting — an edit ordered on a path the list does not cover is the
+        same contradiction `check_self_contradiction` reports, from the side guard 3 skips.
+      the `.spawn` edges — `task:` and `exit-criteria:` of every order dispatched to this
+        employee. A past order cannot be re-asked, so this half ADVISES, the rule
+        `check_defects` follows for history. Only a file name that resolves to a project
+        file is judged; a name that resolves to nothing is unplaceable, never a finding.
+      the grounding file — its § Guardrails sections restate the list. A restated glob
+        whose directory the list also names must carry the list's pattern; a file the
+        grounding says is left out must not be covered by the list; and a file name
+        restated beside a glob must still exist where the glob points.
+    """
+    allow, said = write_allow_list(body)
+    if not allow:
+        return
+    tally["lists"] += 1
+    found = []
+    for label in ("## Procedure", "## Reporting"):
+        for sentence in _unfenced_sentences(section(body, label)):
+            for clause in re.split(r",\s*(?:and\s+)?then\b|\bthen\b|;\s", sentence):
+                verb = EDIT_VERB_RX.search(clause)
+                if not verb or NEGATION_RX.search(clause):
+                    continue
+                obj = clause[verb.end():]
+                ref = REFERENCE_CUT_RX.search(obj)
+                # `\`delete\` / \`stdlib\`` hands `_path_tokens` the ` / ` BETWEEN two
+                # backticked words as a token of its own — a path with no name in it.
+                for t in sorted(_path_tokens(obj[:ref.start()] if ref else obj)):
+                    # `/tile-index` is a command, not a path.
+                    if ("/" in t and re.search(r"\w", t) and "://" not in t
+                            and not t.startswith("$")
+                            and not re.fullmatch(r"/[\w:-]+", t)
+                            and not any(_covers(a, t) for a in allow)):
+                        found.append((label, t, clause))
+    if found:
+        tally["flagged"] += 1
+        label, tok, clause = found[0]
+        res.add(False, f"{n}: {label} orders a write outside its own Guardrails write list "
+                       f"(`{tok}`)",
+                f"{label} says \"{_quote(clause)}\"; § Guardrails says \"{_quote(said)}\", "
+                f"and no path in that list covers `{tok}`"
+                + (f", plus {len(found) - 1} more" if len(found) > 1 else "")
+                + ". Either the order or the list is wrong; widen the list or drop the order.")
+
+    edges = []
+    work = os.path.join(root, ".claude", "workforce", "work")
+    if os.path.isdir(work):
+        for run in sorted(os.listdir(work)):
+            rdir = os.path.join(work, run)
+            if not os.path.isdir(rdir):
+                continue
+            edges += [os.path.join(rdir, f) for f in sorted(os.listdir(rdir))
+                      if f.endswith(f"-to-{n}.spawn")]
+    outside = []
+    for e in edges:
+        try:
+            with open(e, encoding="utf-8") as fh:
+                lines = _order_lines(fh.read())
+        except (OSError, UnicodeDecodeError):
+            continue
+        for line in lines:
+            for clause in re.split(r";\s|(?<=[.!?])\s+", line):
+                verb = ORDER_VERB_RX.search(clause)
+                if (not verb or EXCLUDED_RX.search(clause)
+                        or ALLOW_CUT_RX.search(clause)):
+                    continue
+                # THE OBJECT ONLY, and an order's object ends at the first comma or `+`:
+                # "(7) pnpm build + typecheck pass, verify-agenda-page.sh exit 0" builds
+                # nothing it names, and "build per `<plan>.md`" writes no plan.
+                obj = re.split(r"[,+]", clause[verb.end():], maxsplit=1)[0]
+                ref = REFERENCE_CUT_RX.search(obj)
+                for tok in ORDER_FILE_RX.findall(obj[:ref.start()] if ref else obj):
+                    hits = _resolve(root, tok, index)
+                    if hits and not any(_covers(a, h) for h in hits for a in allow):
+                        outside.append((os.path.relpath(e, root), hits[0], clause))
+    if outside:
+        tally["orders"] += 1
+        edge, path, clause = outside[0]
+        res.advise(f"{n}: {len(outside)} work order clause(s) require a write outside its "
+                   f"Guardrails write list (`{path}`)",
+                   f"`{edge}` orders \"{_quote(clause)}\", and \"{_quote(said)}\" covers no "
+                   f"`{path}`. An employee told to do a thing its handbook forbids stops or "
+                   f"picks a side. Widen the list if the order was right, or fix how orders to "
+                   f"this employee are written. ADVISORY: an order is history and this row "
+                   f"blocks nothing")
+
+    gpath = os.path.join(root, ".claude", "workforce", "grounding", f"{n}.md")
+    if not os.path.isfile(gpath):
+        return
+    gtext = read(gpath, res) or ""
+    grel = os.path.relpath(gpath, root)
+    globs = [(a,) + _split_glob(a) for a in sorted(allow)]
+    globs = [g for g in globs if g[2]]
+    guard = "\n".join(m.group(1) for m in re.finditer(
+        r"^## Guardrails[^\n]*$(.*?)(?=^## |\Z)", "\n".join(_unfenced_lines(gtext)),
+        re.S | re.M))
+    gtoks = _path_tokens(guard)
+    for g in sorted(gtoks):
+        g_dir, g_pat = _split_glob(g)
+        paired = [a for a, a_dir, a_pat in globs if _same_dir(a_dir, g_dir)]
+        if g_pat and paired and not any(_split_glob(a)[1] == g_pat for a in paired):
+            res.add(False, f"{n}: grounding restates `{g}`; its Guardrails write list says "
+                           f"`{paired[0]}`",
+                    f"`{grel}` § Guardrails and the handbook's write list disagree on what "
+                    f"`{g_dir}` holds. One of them was edited without the other; make them "
+                    f"say the same glob.")
+    for a, a_dir, a_pat in globs:
+        named = [g for g in gtoks if _same_dir(_split_glob(g)[0], a_dir)
+                 or _same_dir(os.path.dirname(g), a_dir)]
+        if named and not any(_split_glob(g)[1] for g in named):
+            res.add(False, f"{n}: grounding names `{named[0]}` and no longer restates "
+                           f"the write glob `{a}`",
+                    f"`{grel}` § Guardrails describes files in `{a_dir}` without the glob the "
+                    f"handbook's write list carries for it, so what it says is in or out of "
+                    f"that list rests on nothing it states.")
+    for sentence in _unfenced_sentences(guard):
+        if not EXCLUDED_RX.search(sentence):
+            continue
+        toks = _path_tokens(sentence)
+        dirs = {os.path.dirname(t) for t in toks if "/" in t}
+        for t in sorted(toks):
+            for a, a_dir, a_pat in globs:
+                if "/" in t and not GLOB_CHARS_RX.search(t):
+                    probe = a_dir + "/" + os.path.basename(t)
+                    hit = _same_dir(a_dir, os.path.dirname(t)) and _covers(a, probe)
+                elif re.fullmatch(r"\.[A-Za-z0-9]{1,5}", t):
+                    probe = a_dir + "/x" + t
+                    hit = any(_same_dir(a_dir, d) for d in dirs) and _covers(a, probe)
+                else:
+                    hit = False
+                if hit:
+                    res.add(False, f"{n}: grounding says `{t}` is outside the write list; "
+                                   f"`{a}` covers it",
+                            f"`{grel}` § Guardrails: \"{_quote(sentence)}\" — and the "
+                            f"handbook's write list carries `{a}`, which covers `{probe}`. "
+                            f"Narrow the list or correct the claim.")
+                    break
+    # A FILE NAME RESTATED BESIDE A GLOB, anywhere in the grounding file (BB-U5): the
+    # inventory is a copy of the directory, and a copy nobody re-reads goes stale silently.
+    for para in re.split(r"\n\s*\n", "\n".join(_unfenced_lines(gtext))):
+        ptoks = _path_tokens(para)
+        pglobs = [(g,) + _split_glob(g) for g in ptoks if _split_glob(g)[1]]
+        if not pglobs:
+            continue
+        # "e.g." AND A COLON DO NOT END A CLAIM. `_unfenced_sentences` cuts at both, which
+        # parts "run it: `scripts/*.py`, e.g. `ynab_pull.py`" into three pieces and leaves
+        # the glob and the names it introduces in different sentences.
+        flat = re.sub(r"\b(?:e\.g|i\.e|etc)\.", "eg", " ".join(para.split()))
+        for sentence in re.split(r"(?<=[.!?])[*_)]*\s+(?=[A-Z`*(])", flat):
+            if HISTORY_RX.search(sentence) or EXCLUDED_RX.search(sentence):
+                continue
+            for g, g_dir, g_pat in pglobs:
+                # A FILE-TYPE GLOB, and the names restated AFTER it in the same sentence:
+                # "`scripts/*.py`, e.g. `ynab_pull.py`, `fund_month.py`". A tree glob such
+                # as `agenda/**` beside a list of names is a description of the tree, and
+                # pairing names across a paragraph read 90 false findings on one real org.
+                if not re.fullmatch(r"\*\.[A-Za-z0-9]{1,5}", g_pat):
+                    continue
+                at = sentence.find(f"`{g}`")
+                if at < 0:
+                    continue
+                dirs = [d for d in {g_dir} | {a_dir for _a, a_dir, _p in globs
+                                              if _same_dir(a_dir, g_dir)}
+                        if os.path.isdir(os.path.join(root, d))]
+                if not dirs:
+                    continue
+                for name in sorted(t for t in _path_tokens(sentence[at + len(g) + 2:])
+                                   if "/" not in t and fnmatch.fnmatchcase(t, g_pat)):
+                    if not any(os.path.isfile(os.path.join(root, d, name)) for d in dirs):
+                        res.add(False, f"{n}: grounding names `{name}` among `{g}`, and "
+                                       f"no such file exists",
+                                f"`{grel}`: \"{_quote(sentence)}\" — `{name}` is not under "
+                                f"`{dirs[0]}`. It was renamed or removed and the restated "
+                                f"inventory was not; name the directory's glob, not its "
+                                f"files, or update the list.")
+
+
+# `Skill(<scope>:<name>)` — the form a PARENT root lists a nested project's skill under.
+SCOPED_SKILL_RX = re.compile(r"\bSkill\(\s*([\w./-]+):([\w-]+)\s*\)")
+
+
+def check_skill_scope_names(root, path, n, body, res):
+    """A skill named in a form only another root resolves (pythom-space row 1, 2026-10-04).
+
+    A handbook registered in two orgs by symlink — a nested project adopted into its
+    parent — named every skill `Skill(pythom-space:triage-playbook)`. The parent lists the
+    nested skill under that directory scope; the project's own root lists it as
+    `triage-playbook`, so both cold probes run from the project failed on it. Fires when
+    the skill is local to THIS root, the scope is not a directory here that holds it, and
+    the handbook does not also name the bare `Skill(<name>)` this root resolves.
+    """
+    linked = os.path.islink(path)
+    text = "\n".join(_unfenced_lines(body))
+    for scope, name in sorted(set(SCOPED_SKILL_RX.findall(text))):
+        if not os.path.isfile(os.path.join(root, ".claude", "skills", name, "SKILL.md")):
+            continue
+        # Both forms named is the rule followed: each root finds the one it lists.
+        if re.search(r"\bSkill\(\s*" + re.escape(name) + r"\s*\)", text):
+            continue
+        if os.path.isfile(os.path.join(root, scope, ".claude", "skills", name, "SKILL.md")):
+            continue
+        res.add(False, f"{n}: names `Skill({scope}:{name})`, which this root lists as "
+                       f"`Skill({name})`",
+                (f"this handbook is a symlink to `{os.path.realpath(path)}`, so it is read "
+                 f"from more than one root. " if linked else "")
+                + f"`{name}` is this project's own skill; the `{scope}:` prefix is how a "
+                f"parent root lists a nested project's skill, and from here it resolves to "
+                f"nothing. handbook-templates.md § A handbook read from more than one root.")
+
+
 def check_companions(root, res, governed_n):
     """INV-COMPANIONS — after an audit, every core companion skill is on disk.
 
@@ -3796,6 +4188,8 @@ def main():
              "rx": re.compile(r"(?<![\w-])(" + "|".join(map(re.escape, sorted(_pin_keys)))
                               + r")\s*:\s*(\d+)\b")}
     _selfcon = {"checked": 0, "flagged": 0}
+    _wlist = {"lists": 0, "flagged": 0, "orders": 0}
+    _index = None
     org_edge_map = {}
     own_map = {}
     for p in sorted(handbooks):
@@ -3821,6 +4215,10 @@ def main():
             # claims that only mean anything next to every OTHER handbook's — collected
             # here, compared after the loop by `check_ownership_conflicts`.
             check_self_contradiction(_name, body, res, _selfcon)
+            if _index is None:
+                _index = _file_index(root)
+            check_write_list(root, _name, body, res, _wlist, _index)
+            check_skill_scope_names(root, p, _name, body, res)
             own_map[_name] = ownership_claims(body)
         elif args.strict_adopted:
             check_handbook(p, body, res, args.ceiling, floors)
@@ -3916,6 +4314,9 @@ def main():
         # prints on every run, zero included, and it exists for exactly this.
         res.count(f"write instructions: {_selfcon['checked']} handbook(s) · "
                   f"{_selfcon['flagged']} ordering an act the same file forbids")
+        res.count(f"write lists: {_wlist['lists']} handbook(s) name one · "
+                  f"{_wlist['flagged']} ordering a write outside it · "
+                  f"{_wlist['orders']} with a work order that did")
     # INV-CATREAD — PRINTED, including the zero. The first draft of this row named an
     # invariant in a docstring and emitted nothing, so `verify.md` and `audit` 2c both
     # instructed printing a count no tool produced. A named invariant that nothing emits is

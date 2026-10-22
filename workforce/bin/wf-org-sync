@@ -434,7 +434,10 @@ def placement(chart_without_block, skill):
            re.compile(r"(?<![\w/.-])/%s(?![\w-])" % re.escape(skill))]
     found = []
     for heading in ("Orchestrators", "Mechanicals"):
-        body = section_body(chart_without_block, heading)
+        # AN HTML COMMENT IS NOT A PLACEMENT. `<!-- /origin -->` closes a user block, and the
+        # slash form above reads it as the skill `origin` — the defect `wf-conform` fixed in
+        # 1.80.1 by stripping comments before its command grammar ran. Same strip, same reason.
+        body = re.sub(r"<!--.*?-->", " ", section_body(chart_without_block, heading), flags=re.S)
         if any(rx.search(body) for rx in rxs):
             found.append(heading)
     return " + ".join(found) if found else UNCLASSIFIED

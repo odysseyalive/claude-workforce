@@ -1327,7 +1327,12 @@ Per **governed** handbook (adopted agents stay exempt until their first amendmen
    handbook whose `## Sources` does not name the project ledger gains it here** —
    `Skill(personnel-ledger)`, `consult` mode scoped to that craft's subjects (`org-design.md` § The
    project ledger is a type-2 source on every producing craft) — so a handbook refreshed to the
-   installed contract is wired to the store that contract turned on. This is the same Sources heal
+   installed contract is wired to the store that contract turned on. **The `## Procedure` step this
+   adds is a command, never the words "consult mode".** Write it with the subjects filled in:
+   `python3 "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/workforce/bin/wf-ledger" consult --subjects
+   <this craft's subjects, comma-separated> --root .`, followed by "read every record it prints
+   before acting". *Measured 2026-10-04 on pythom-space: 5d wrote "consult the ledger in consult
+   mode" with no command, and a cold reader had nothing to run.* This is the same Sources heal
    Step 5e owns, applied on the `workforce-version:` stamp so an org authored before the ledger
    family existed reaches it in this run rather than at the next full sweep.
 
