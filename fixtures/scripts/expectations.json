@@ -1037,6 +1037,35 @@
       "never binds"
     ]
   },
+  "checkrun-quoted-pattern": {
+    "_why": "UPSTREAM ROW university #11, re-measured 2026-10-22 against 1.80.1: `wf-checkrun` can read a quoted grep pattern as a path. checkrun-grep-pattern's position rule held only while the pattern was one whitespace word with no `|` in it: `grep -c \"old guide/intro.md\" f` split into `\"old` and a FILE `guide/intro.md\"`, and `grep -E \"legacy|refs/gone-a.md\" f` split at the quoted `|` into a second command named `refs/gone-a.md\"`. The same class reached every other command whose argument is a program rather than a path: sed and awk scripts, a jq filter, a `find -path` pattern, a `python3 -c` body, a `bash -c` script, and `grep -m 1` (the count was taken as the pattern, so the pattern became a file). Against HEAD's wf-checkrun this handbook printed 12 dead rows, 11 of them invented. Words are now split by shlex and each command's arguments are read by its option grammar. `references/gone-real.md` is the falsification half: a QUOTED FILE argument is still a path and must still be reported dead. `references/gone-sub.md` guards the other direction: a quoted `\"$(grep ... file)\"` is one shell word, and the file inside it is read only because the substitution is re-read as a line of its own. The Guardrails rows are the same defect in the other pass: a quoted command word `\"./bin/gone tool.sh\"` was never examined at all, and the present `\"./bin/run check.sh\"` must not be reported.",
+    "script": "wf-checkrun",
+    "exit": 0,
+    "want": [
+      "+ resolved           references/a.md",
+      "+ resolved           references/data.json",
+      "names references/gone-real.md",
+      "names references/gone-sub.md",
+      "not on disk: bin/gone tool.sh",
+      "2 resolved · 3 dead"
+    ],
+    "not": [
+      "intro.md",
+      "gone-a.md",
+      "gone-b.md",
+      "gone-c.md",
+      "gone-d.md",
+      "refs/new.md",
+      "gone-e.md",
+      "gone-f.json",
+      "gone-g.md",
+      "gone-h.md",
+      "gone-i.md",
+      "gone-m.md",
+      "some/pattern.md",
+      "bin/run"
+    ]
+  },
   "checkrun-subshell": {
     "_why": "THE SILENT HALF of the same defect, found by writing the pair rather than by any report -- the audit that filed the false-dead row never saw this one. `cd \"$CLAUDE_PROJECT_DIR\" && bash bin/real.sh` put `cd` in first position: no slash, so UNDECIDABLE, so the real script behind `&&` was never examined and the tool exited 0 having checked nothing. Under-reporting is the direction wf-census.load_ignore is explicitly written against, and it is the direction that hurts. `0 resolved` is asserted absent because that -- not a wrong row -- is what the failure looked like.",
     "exit": 0,

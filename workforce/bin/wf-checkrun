@@ -66,6 +66,7 @@ import importlib.util
 import json
 import os
 import re
+import shlex
 import sys
 
 # `## Verification` is the section; the ORG-RECORD marker is what puts a handbook
@@ -407,97 +408,262 @@ def candidate_tokens(seg):
     return _filter_tokens(tokens)
 
 
-# A command whose first non-option argument is a PATTERN rather than a path. The pattern
-# is the one argument of a shell line that is guaranteed not to name a file, and it is
-# routinely written in the shape of one.
-PATTERN_CMDS = {"grep", "egrep", "fgrep", "zgrep", "rg", "ag", "ack", "pcregrep"}
-# Options that consume the NEXT token. `-e` consumes a pattern (dropped with it); `-f`
-# consumes a real path and is left alone, which is why the two are listed apart rather
-# than as one "takes a value" set.
+# WHICH ARGUMENTS OF A COMMAND ARE NOT PATHS. A grep pattern, a sed or awk program, a jq
+# filter, a `find -name` pattern and an inline `-c`/`-e` script are the arguments of a
+# shell line that are guaranteed not to name a file, and they are routinely written in
+# the shape of one. Each table is that command's option grammar, as far as it decides
+# which argument is which. The letters are the values an option takes, in order:
 #
-# SPELLED WITH THEIR OWNER. These are GREP's options, not this script's, and
-# `bin/check`'s flag-lie scan reads every string constant here as a flag this script
-# claims to accept unless the string names the command it belongs to. Writing them as
-# `grep --regexp` is not a workaround: it is the same fact the scan is asking for, said
-# out loud.
-PATTERN_OPTS = {s.split()[-1] for s in ("grep -e", "grep --regexp")}
-FILE_OPTS = {s.split()[-1] for s in ("grep -f", "grep --file")}
-# The `=`-joined spellings of the same two, derived so no second list can disagree.
-JOINED_PATTERN = tuple(o + "=" for o in sorted(PATTERN_OPTS) if o.startswith("--")) + ("-e",)
-JOINED_FILE = tuple(o + "=" for o in sorted(FILE_OPTS) if o.startswith("--"))
+#   c  the program or pattern: dropped, and it fills the program slot
+#   P  a real file that SUPPLIES the program (`grep -f`): kept, and fills the slot
+#   p  a real file: kept
+#   v  anything else (`-m 1`, `--arg name x`): dropped
+#   S  no value; the first operand is a SHELL script, read as a line of its own
+#
+# A `SLOT` command takes its program as its first operand unless an option supplied it.
+# A `FIRST` command stops reading options at its first operand, because everything after
+# it belongs to the script it runs (`python3 x.py -c y` hands `-c` to x.py).
+_GREP = {"-e": "c", "--regexp": "c", "-f": "P", "--file": "P", "-m": "v",
+         "--max-count": "v", "-A": "v", "-B": "v", "-C": "v", "--after-context": "v",
+         "--before-context": "v", "--context": "v", "--label": "v", "--include": "v",
+         "--exclude": "v", "--exclude-dir": "v", "-d": "v", "-D": "v"}
+_RG = {"-e": "c", "--regexp": "c", "-f": "P", "--file": "P", "-m": "v", "-A": "v",
+       "-B": "v", "-C": "v", "-g": "v", "--glob": "v", "--iglob": "v", "-t": "v",
+       "--type": "v", "-T": "v", "--type-not": "v", "--type-add": "v", "-E": "v",
+       "--encoding": "v", "-j": "v", "--threads": "v", "-M": "v", "--max-columns": "v",
+       "-r": "v", "--replace": "v", "-d": "v", "--max-depth": "v"}
+_AWK = {"-f": "P", "--file": "P", "-v": "v", "--assign": "v", "-F": "v",
+        "--field-separator": "v", "-e": "c", "--source": "c"}
+_FIND_PATTERN = ("-name", "-iname", "-path", "-ipath", "-wholename", "-iwholename",
+                 "-regex", "-iregex", "-lname", "-ilname")
+_GREPS = ("grep", "egrep", "fgrep", "zgrep", "pcregrep", "ag", "ack")
+_AWKS = ("awk", "gawk", "mawk", "nawk")
+_SHELLS = ("sh", "bash", "zsh", "dash", "ksh")
+ARG_GRAMMAR = {
+    **{c: _GREP for c in _GREPS},
+    "rg": _RG,
+    "sed": {"-e": "c", "--expression": "c", "-f": "P", "--file": "P", "-l": "v",
+            "--line-length": "v"},
+    **{c: _AWK for c in _AWKS},
+    "jq": {"-f": "P", "--from-file": "P", "--arg": "vv", "--argjson": "vv",
+           "--slurpfile": "vp", "--rawfile": "vp", "--indent": "v"},
+    "find": {**{o: "c" for o in _FIND_PATTERN}, "-newer": "p"},
+    **{c: {"-c": "c", "-m": "v", "-W": "v", "-X": "v"} for c in ("python", "python3")},
+    **{c: {"-e": "c", "-E": "c", "-I": "v", "-M": "v", "-m": "v"} for c in ("perl", "ruby")},
+    "node": {"-e": "c", "--eval": "c", "-p": "c", "--print": "c", "-r": "v",
+             "--require": "v"},
+    "php": {"-r": "c", "-d": "v"},
+    **{c: {"-c": "S", "-o": "v", "-O": "v"} for c in _SHELLS},
+}
+SLOT = {*_GREPS, "rg", "sed", *_AWKS, "jq"}
+FIRST = {"python", "python3", "perl", "ruby", "node", "php", *_SHELLS}
+# `find -exec CMD ... ;` runs a command of its own, read with that command's grammar.
+FIND_EXEC = ("-exec", "-execdir", "-ok", "-okdir")
+# Words that run the command after them, with their own options read by the same table.
+# `timeout` also takes one operand, its duration, before the command. `!` negates the
+# command after it, and is a wrapper rather than a separator because inside `find . !
+# -path x` it is an argument: splitting there made `-path`'s pattern a command word.
+WRAPPERS = {"sudo": {"-u": "v", "-g": "v"}, "env": {"-u": "v"}, "command": {},
+            "time": {}, "nohup": {}, "exec": {}, "builtin": {}, "nice": {"-n": "v"},
+            "timeout": {"-s": "v", "--signal": "v", "-k": "v", "--kill-after": "v"},
+            "xargs": {"-I": "v", "-n": "v", "-P": "v", "-d": "v", "-L": "v", "-s": "v",
+                      "-E": "v", "-a": "p", "--arg-file": "p"},
+            "!": {}}
 ASSIGN_RX = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+SEPARATORS = (";", "&", "&&", "|", "||", "(", ")", "{", "}")
+OUT_REDIRECT = (">", ">>", ">|", "&>", "&>>", ">&")
+IN_REDIRECT = ("<", "<<", "<<<", "<&")
+NEST_LIMIT = 4
 
 
-def _line_tokens(line):
-    """The whitespace tokens of one shell line, with any grep PATTERN argument dropped.
+def _shell_words(line):
+    """The words of one shell line, as its commands, or None when the line does not lex.
 
-    A QUOTED GREP PATTERN IS NOT A PATH, and this pass could not tell the difference:
-    tokens were split on whitespace with the quoting thrown away, so
-    `grep -c "security-ref-version/catalog.md" references/security-taxonomy.md` yielded
-    the pattern as a candidate, `is_file_reference` accepted it on its `.md` tail, and
-    the section was reported as naming a dead file. A check that greps for a path-shaped
-    string — a settings entry, a citation, a marker — is an ordinary shape, and the
-    report told its author to go fix a file that was never meant to exist.
+    QUOTING DECIDES WHERE A WORD ENDS. Splitting on whitespace cut
+    `grep -c "old guide/intro.md" f` into a pattern `"old` and a FILE `guide/intro.md"`,
+    and splitting on `|` anywhere cut `grep -E "legacy|refs/gone.md" f` into two commands,
+    the second one named `refs/gone.md"`. Both fragments were reported as dead files
+    (MEASURED 2026-10-22 against 1.80.1, upstream row university #11, with the earlier
+    position-only fix in place). `shlex` with `punctuation_chars` splits words the way
+    the shell does and sees an operator only outside quotes, the same grammar
+    `wf-census.shell_segments` applies to a `Check:` line. No comment character: shlex
+    would cut `sed 's#a#b#'` at its first `#`.
 
-    Dropped by POSITION rather than by quoting: the first non-option argument of a
-    pattern-taking command is its pattern whether or not the author quoted it, and no
-    real path is ever lost that way — the pattern slot cannot hold one.
+    An OUTPUT redirection's target is dropped with its operator: it is something the line
+    writes, never something it needs, and `2>/dev/null` would otherwise be the path most
+    often resolved out of a check.
     """
-    out = []
-    # Segment on the same separators the old single split used, so a pipeline is read as
-    # the several commands it is. `grep X | wc -l` must not hide `wc`'s arguments.
-    for seg in re.split(r"[|;()&]+", line):
-        toks = [t for t in re.split(r"\s+", seg.strip()) if t]
-        i = 0
-        while i < len(toks) and (ASSIGN_RX.match(toks[i]) or toks[i] in ("sudo", "env", "command", "time")):
-            out.append(toks[i])
-            i += 1
-        if i >= len(toks):
-            continue
-        out.append(toks[i])
-        if os.path.basename(toks[i].strip("'\"`")) not in PATTERN_CMDS:
-            out.extend(toks[i + 1:])
-            continue
+    lex = shlex.shlex(line, posix=True, punctuation_chars=True)
+    lex.whitespace_split = True
+    lex.commenters = ""
+    try:
+        tokens = list(lex)
+    except ValueError:
+        return None
+    segments, cur, skip = [], [], False
+    for t in tokens:
+        if skip:
+            skip = False
+        elif t in SEPARATORS:
+            segments.append(cur)
+            cur = []
+        elif t in OUT_REDIRECT:
+            skip = True
+        elif t not in IN_REDIRECT:
+            cur.append(t)
+    segments.append(cur)
+    return [s for s in segments if s]
+
+
+def _option(tok, grammar):
+    """(spec, joined value) for one option word, getopt-style.
+
+    A short cluster is read letter by letter and the first letter that takes a value
+    takes the rest of the word: `sed -ne 'p'` is `-n -e 'p'`, `grep -A3` is `-A 3`, and
+    `bash -ec 'x'` carries the shell `-c`.
+    """
+    if tok.startswith("--"):
+        opt, eq, val = tok.partition("=")
+        return grammar.get(opt), (val if eq else None)
+    if tok in grammar:
+        return grammar[tok], None
+    shell = None
+    for k, ch in enumerate(tok[1:], 1):
+        spec = grammar.get("-" + ch)
+        if spec == "S":
+            shell = spec
+        elif spec:
+            return spec, (tok[k + 1:] or None)
+    return shell, None
+
+
+def _parse_args(toks, grammar, first_only=False):
+    """Walk one command's arguments by its option table.
+
+    Returns (kept, operands, filled, shell): the option values that are real files, every
+    operand in order, whether an option supplied the program, and whether a shell `-c`
+    was seen. A `first_only` command stops at its first operand, or after an inline
+    program, and hands the remainder back as operands unread.
+    """
+    kept, operands, filled, shell = [], [], False, False
+    i = 0
+    while i < len(toks):
+        t = toks[i]
         i += 1
-        pattern_seen = False
-        while i < len(toks):
-            t = toks[i]
-            if t == "--":
-                # End of options: the next token is the pattern unless one was given
-                # with -e, and everything after it is a file.
-                rest = toks[i + 1:]
-                out.extend(rest if pattern_seen else rest[1:])
+        if t == "--":
+            operands.extend(toks[i:])
+            break
+        if not t.startswith("-") or t == "-":
+            operands.append(t)
+            if first_only:
+                operands.extend(toks[i:])
                 break
-            if t in PATTERN_OPTS:
-                pattern_seen = True
-                i += 2
-                continue
-            if t in FILE_OPTS:
-                # `-f FILE` names a real path AND supplies the patterns, so the file is
-                # kept and the pattern slot is already spoken for — without the second
-                # half the command's actual input file was eaten as the pattern.
-                out.extend(toks[i + 1:i + 2])
-                pattern_seen = True
-                i += 2
-                continue
-            if t.startswith("-") and len(t) > 1:
-                # The `=`-joined and letter-joined spellings of the same two options.
-                # `--file=p.txt` names a path in the token itself, and both forms fill
-                # the pattern slot — missed, the command's input file was read as the
-                # pattern and a genuinely dead path stopped being reported.
-                if t.startswith(JOINED_PATTERN) or t.startswith(JOINED_FILE):
-                    pattern_seen = True
-                if t.startswith(JOINED_FILE):
-                    out.append(t.split("=", 1)[1])
-                i += 1
-                continue
-            if not pattern_seen:
-                pattern_seen = True      # the pattern slot, dropped
-                i += 1
-                continue
-            out.append(t)
-            i += 1
+            continue
+        spec, joined = _option(t, grammar)
+        if spec == "S":
+            shell = True
+        if spec in (None, "S"):
+            continue
+        n = len(spec) - (joined is not None)
+        vals = ([joined] if joined is not None else []) + toks[i:i + n]
+        i += n
+        kept.extend(v for kind, v in zip(spec, vals) if kind in "pP")
+        if spec[0] in "cP":
+            filled = True
+            if first_only and spec[0] == "c":
+                operands.extend(toks[i:])     # the inline program's own argv
+                break
+    return kept, operands, filled, shell
+
+
+def _command_args(toks, depth):
+    """The words of one command that may name a file, in order: the command word itself,
+    the files its options name, and its operands, with every program slot dropped."""
+    out = []
+    while toks and (ASSIGN_RX.match(toks[0]) or toks[0] in WRAPPERS):
+        if toks[0] not in WRAPPERS:
+            toks = toks[1:]
+            continue
+        kept, operands, _filled, _shell = _parse_args(toks[1:], WRAPPERS[toks[0]], True)
+        out.extend(kept)
+        toks = operands[1:] if toks[0] == "timeout" else operands
+    if not toks:
+        return out
+    cmd = os.path.basename(toks[0])
+    out.append(toks[0])
+    grammar = ARG_GRAMMAR.get(cmd)
+    if grammar is None:
+        out.extend(toks[1:])
+        return out
+    rest = toks[1:]
+    if cmd == "find":
+        for k, t in enumerate(rest):
+            if t in FIND_EXEC:
+                if depth < NEST_LIMIT:
+                    out.extend(_command_args([x for x in rest[k + 1:] if x not in ("{}", "+")],
+                                             depth + 1))
+                rest = rest[:k]
+                break
+    kept, operands, filled, shell = _parse_args(rest, grammar, cmd in FIRST)
+    out.extend(kept)
+    if cmd in SLOT and not filled:
+        operands = operands[1:]          # the pattern, program or filter
+    if shell and operands:
+        # `bash -c 'script' [$0 ...]`: the script is itself a shell line, so a real path
+        # inside it is still read rather than lost with its quotes.
+        if depth < NEST_LIMIT:
+            out.extend(_line_tokens(operands[0], depth + 1))
+        operands = operands[1:]
+    out.extend(operands)
     return out
+
+
+def _line_tokens(line, depth=0):
+    """The words of one shell line that may name a file, with every program dropped.
+
+    A QUOTED GREP PATTERN IS NOT A PATH, and neither is a sed script, an awk program, a jq
+    filter, a `find -name` pattern or a `python3 -c` body. Each is found by its POSITION
+    in its command's grammar (`ARG_GRAMMAR`), because that slot cannot hold a path whether
+    or not the author quoted it. Quoting decides only where each word begins and ends.
+
+    The position rule alone was the 2026-09-25 fix (`grep -c "x/catalog.md" f`), and it
+    held only while the pattern was one whitespace word with no `|` in it.
+
+    A line that does not lex (an apostrophe in prose quoted in backticks) falls back to
+    the whitespace split, with the same grammar applied to the words it yields.
+    """
+    segments = _shell_words(line)
+    if segments is None:
+        segments = [[t.strip("'\"`") for t in re.split(r"\s+", seg.strip()) if t]
+                    for seg in re.split(r"[|;()&]+", line)]
+    out = []
+    for toks in segments:
+        # A QUOTED `"$(grep -c x docs/b.md)"` is one word to the shell's quoting, so its
+        # command is read here as a line of its own, or the real file inside it is lost.
+        for word in toks:
+            if "$(" in word and depth < NEST_LIMIT:
+                for inner in _substitutions(word):
+                    out.extend(_line_tokens(inner, depth + 1))
+        if toks:
+            out.extend(_command_args(toks, depth))
+    return out
+
+
+def _substitutions(word):
+    """The command line inside each outermost `$( … )` of one word."""
+    found, level, start, i = [], 0, 0, 0
+    while i < len(word):
+        if level == 0 and word.startswith("$(", i):
+            level, start, i = 1, i + 2, i + 2
+            continue
+        if level and word[i] == "(":
+            level += 1
+        elif level and word[i] == ")":
+            level -= 1
+            if not level:
+                found.append(word[start:i])
+        i += 1
+    return found
 
 
 def _filter_tokens(tokens):
@@ -623,7 +789,9 @@ BARE_WF_RX = re.compile(r"^wf-[a-z][a-z0-9-]*$")
 # match, so a quoted flag fragment (`--brief <agent-id>`, shown as the SHAPE of a printed
 # line rather than as a command to run) is not mistaken for an invocation. NOT `re.I`:
 # with it, the prose fragment `I/we wrote about` parsed as a command named `I/we`.
-GUARD_CMD_RX = re.compile(r"^(?:[~./]|[a-z])[\w./~-]*(?:\s+\S+)+$")
+# A QUOTED PATH is a command word too: `"./bin/run check.sh" --all` started with a quote,
+# matched nothing, and a dead script written that way was never examined.
+GUARD_CMD_RX = re.compile(r"^(?:([\"'])[~./][^\"']*\1|(?:[~./]|[a-z])[\w./~-]*)(?:\s+\S+)+$")
 
 
 def check_guardrails(path, body, masked, root, rep, governed):
@@ -652,7 +820,10 @@ def check_guardrails(path, body, masked, root, rep, governed):
         raw = raw.strip()
         if not GUARD_CMD_RX.match(raw):
             continue
-        token = raw.split()[0].strip("'\"")
+        # The first WORD, by the shell's quoting: `"./my tool.sh" --x` is one word, and
+        # the whitespace split read it as `./my`, a file that is never on disk.
+        words = _shell_words(raw)
+        token = words[0][0] if words else raw.split()[0].strip("'\"")
         if token in seen:
             continue
         seen.add(token)
