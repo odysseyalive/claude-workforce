@@ -55,18 +55,18 @@
     "not": ["Traceback", "ignored/secret.md", "inside an ignored directory"]
   },
   "map-tests-never-runs-project-prove": {
-    "_why": "THE EXECUTION CLASS, FAILING FIRST. The first version of `--tests` RAN the mapped tree's bin/prove, gated on a docstring match -- and a docstring is text anybody can copy, so wf-map inside a hostile checkout would have run that checkout's code (security review of fabecb3, before it reached anyone). This tree's bin/prove carries the copied docstring verbatim and writes `ran-prove.marker` if it is ever executed. The marker must not exist afterwards, and the coverage command must be PRINTED for the caller instead -- there is no identity check an installed copy can make, so the capability is gone rather than guarded.",
+    "_why": "THE EXECUTION CLASS, FAILING FIRST. The first version of `--tests` RAN the mapped tree's bin/prove, gated on a docstring match -- and a docstring is text anybody can copy, so wf-map inside a hostile checkout would have run that checkout's code (security review of fabecb3, before it reached anyone). This tree's bin/script-conformance carries that script's docstring verbatim and writes `ran-suite.marker` if it is ever executed. The marker must not exist afterwards, and the coverage command must be PRINTED for the caller instead -- there is no identity check an installed copy can make, so the capability is gone rather than guarded. The hostile file was bin/prove until 136074d retired bin/prove and left bin/script-conformance as the only suite wf-map names; it moved there so the case still plants a script wf-map would print, and the security point is unchanged.",
     "script": "wf-map",
     "args": ["--tests", "src/widget.py"],
     "exit": 0,
     "want": [
       "suites in this tree · 1 command(s) — RUN THESE YOURSELF",
-      "bin/prove --cases-for src/widget.py",
+      "bin/script-conformance --list --touching src/widget.py",
       "handbook checks · 1",
       "Check: `pytest tests/test_widget.py -k build`"
     ],
-    "not": ["Traceback", "hostile bin/prove ran", "ran-prove.marker"],
-    "after": {"ran-prove.marker": {"absent": true}}
+    "not": ["Traceback", "hostile bin/script-conformance ran", "ran-suite.marker"],
+    "after": {"ran-suite.marker": {"absent": true}}
   },
   "map-tests-handbook-check": {
     "_why": "THE PROJECT PATH OF `--tests`, and the common one: a staffed project has no bin/prove and no conformance suite, so the test map is the employees' own runnable proofs. `handbook-templates.md` Verification is the shape -- `Check:` targeted, `Regression:` the full suite -- and only the lines that NAME the file or its directory are reported, which is why the bare `Regression: pytest` line here must be absent from the output. A fixture with no bin/prove also proves the identity gate: a project's own scripts are not run to answer this.",
