@@ -2770,8 +2770,10 @@ read it.** Run it immediately after `deferred.md` is written, and print its `INV
 
 One file per row under `<config-root>/workforce/upstream/<project>--<row>.md`, holding the row verbatim
 with its evidence, this project's root, this run id and the installed version. Idempotent by project and
-row id: the next audit of the same project rewrites the same file rather than filing a second copy, and a
-row a maintainer has already marked resolved is left resolved.
+row id: the next audit of the same project rewrites the same file rather than filing a second copy. A row
+a maintainer has marked resolved stays resolved, unless this run re-files it measured on a NEWER release
+than the one that claimed the fix: then it is reopened and the output says `reopened`, because that is
+the claimed fix failing here.
 
 **It does not close the downstream row, and must not.** `references/deferred.md` is explicit that the row
 is closed by the downstream run that RE-RUNS its own reproduction and watches it pass — never by an

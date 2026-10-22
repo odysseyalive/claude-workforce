@@ -7008,7 +7008,7 @@
     "exit": 0,
     "want": [
       "would add row DEF-Q-001  \u2192 upstream-canonical-shape--DEF-Q-001.md \u00b7 strict",
-      "skipped   row DEF-Q-002  neither a repository path nor the category named",
+      "skipped   row DEF-Q-002  names nothing of this distribution's",
       "skipped   row DEF-Q-003  row state is CLOSED",
       "INV-UPSTREAM 3 row(s) read \u00b7 1 upstream (1 strict \u00b7 0 loose) \u00b7 2 not"
     ],
@@ -7044,6 +7044,117 @@
       "INV-UPSTREAM 0 row(s) read \u00b7 0 upstream"
     ],
     "not": ["Traceback", "would add"]
+  },
+  "upstream-not-workforce-shapes": {
+    "_why": "MEASURED 2026-10-22 on the live inbox: 68 open rows, about 45 of them no defect of this distribution, every one matched `loose`. This tree holds each shape that got in, taken from `odyssey-alive`'s real queue. A proposal whose Disposition cell opens `**DISCHARGED**` (it names `wf-stamp`, which the old rule read as a workforce defect). A row whose fix is the user rotating an Apple password. A `Closed row | Fix, and how it was verified here` table (`wf-settings-apply`, `wf-checkrun`, `Rewritten upstream`) under a section heading that names only a run. An `F-6` fix-list row saying `a trailing comma upstream makes it a tuple`, which matched the word `upstream`. A fragment of a `Handbook | Lines` table. The two `Resolution repo` rows naming `odysseyalive/claude-workforce` are the real defects and are taken; before the fix, BB-U5 and 27 were MISSED because `Resolution repo` matched no discharge column and the evidence cell was read in its place. Against the prior source: 6 taken, 2 of them right.",
+    "script": "wf-upstream",
+    "args": ["--verbose"],
+    "env": {"CLAUDE_CONFIG_DIR": "${TREE}/.inbox"},
+    "exit": 0,
+    "want": [
+      "would add row BB-U5      → upstream-not-workforce-shapes--BB-U5.md · loose",
+      "would add row 27         → upstream-not-workforce-shapes--27.md · loose",
+      "a cell records it DISCHARGED — the project closed this row itself",
+      "skipped   row 6 — wf-settings-apply cannot recognize its own past work sits in a table whose first column is headed as closed rows",
+      "skipped   row 7 — the phase-boundary clause is not runnable sits in a table whose first column is headed as closed rows",
+      "skipped   row F-6        the queue declares the another-repository carve-out, and the declaration does not say WHICH repository",
+      "skipped   row content-drafter the queue declares",
+      "skipped   row 1          the queue declares",
+      "INV-UPSTREAM 8 row(s) read · 2 upstream (0 strict · 2 loose) · 6 not"
+    ],
+    "not": ["Traceback", "would add row F-6", "would add row 7 ", "would add row 19"]
+  },
+  "upstream-declared-workforce-needs-a-word": {
+    "_why": "A DECLARATION THAT NAMES WORKFORCE speaks for a row that says `An upstream producer.` and nothing else — `university` row 7, a real workforce defect whose row names no script and no path — but not for a row that says nothing of this distribution at all. Here the declaration names `the workforce distribution` in apposition, row 7 says `upstream` and is taken, and a plugin row and a fragment of a line-count table under the same declaration are not. The declaration alone is how a table of handbook line counts reached the maintainer's inbox; the word alone is how a project's note about its own trailing comma did.",
+    "script": "wf-upstream",
+    "args": ["--verbose"],
+    "env": {"CLAUDE_CONFIG_DIR": "${TREE}/.inbox"},
+    "exit": 0,
+    "want": [
+      "would add row 7          → upstream-declared-workforce-needs-a-word--7.md · loose",
+      "skipped   row 9          the queue names workforce as the repository, and this row says nothing of it",
+      "skipped   row content-drafter the queue names workforce as the repository",
+      "INV-UPSTREAM 3 row(s) read · 1 upstream (0 strict · 1 loose) · 2 not"
+    ],
+    "not": ["Traceback", "would add row 9", "would add row content-drafter"]
+  },
+  "upstream-reopen-newer": {
+    "_why": "`university` row 17, MEASURED 2026-10-14: rows 2, 3 and 11 marked `resolved in 1.72.1`, their reproductions re-run against 1.77.5 and still failing, and every `--execute` printed `left as the maintainer closed it` and wrote nothing — so the one fact the close was waiting for never reached the maintainer. Row 2 here is that case: closed in 1.72.1, re-filed from an install at 1.77.5, so it REOPENS and the file says which release's claim failed. Row 3 was closed in 1.77.5, the release this project measured on, so its re-filing says nothing new and it stays closed. Row 11 is the guard against the install's version speaking for a stale queue (`amishwbf.com`: queue written 2026-10-02, rows closed 2026-10-03 in 1.74.0, install now 1.80.1): its close is dated after any checkout of this fixture, so this queue cannot have measured the fix, and it stays closed.",
+    "script": "wf-upstream",
+    "args": ["--execute"],
+    "env": {"CLAUDE_CONFIG_DIR": "${TREE}/.inbox"},
+    "exit": 0,
+    "want": [
+      "reopened  row 2          → upstream-reopen-newer--2.md · loose — resolved in 1.72.1, re-filed measured on 1.77.5",
+      "resolved  row 3          upstream-reopen-newer--3.md — left as the maintainer closed it (1.77.5; re-filed measured on 1.77.5)",
+      "resolved  row 11         upstream-reopen-newer--11.md — left as the maintainer closed it (1.72.1 on 2099-12-31; this queue was last written"
+    ],
+    "not": ["Traceback", "reopened  row 3", "reopened  row 11"],
+    "after": {
+      ".inbox/workforce/upstream/upstream-reopen-newer--2.md": {
+        "want": [
+          "row=2 | status=open -->",
+          "- status: **open**",
+          "marked resolved in `1.72.1`, and this project re-filed it measured on `1.77.5`",
+          "- installed workforce: `1.77.5`"
+        ],
+        "not": ["status=resolved"]
+      },
+      ".inbox/workforce/upstream/upstream-reopen-newer--3.md": {
+        "want": ["status=resolved | version=1.77.5"],
+        "not": ["status=open"]
+      },
+      ".inbox/workforce/upstream/upstream-reopen-newer--11.md": {
+        "want": ["status=resolved | version=1.72.1"],
+        "not": ["status=open"]
+      }
+    }
+  },
+  "upstream-recheck-withdraw": {
+    "_why": "THE RULE CHANGED UNDER ROWS ALREADY FILED. Tightening the harvest stops new non-defects reaching the inbox and does nothing for the ~45 already there, so `--recheck` applies the current rule to every OPEN row and marks the ones it no longer takes `withdrawn` with the reason — never `resolved`, which would name a release that fixed a defect there never was, and never deleted, which would destroy the record. Row 6 is still in its queue, so it is RE-READ there, where the `Closed row` table header closes it; the inbox copy alone carries no header and would have kept it. F-6 and 19 point at a project that is gone, so they are judged from the inbox copy and the output says so. Row 27 is a real defect and stays open. Row 1 is resolved: a maintainer's close is not the recheck's to rewrite.",
+    "script": "wf-upstream",
+    "args": ["--recheck", "--execute", "--verbose"],
+    "env": {"CLAUDE_CONFIG_DIR": "${TREE}/.inbox"},
+    "subst": [
+      ".inbox/workforce/upstream/upstream-recheck-withdraw--6-wf-settings-apply-cannot-recognize-its-own-past-work.md",
+      ".inbox/workforce/upstream/upstream-recheck-withdraw--27.md"
+    ],
+    "exit": 0,
+    "want": [
+      "withdrawn upstream-recheck-withdraw--6-wf-settings-apply-cannot-recognize-its-own-past-work.md — sits in a table whose first column is headed as closed rows (read from ",
+      "withdrawn upstream-recheck-withdraw--F-6.md — names nothing of this distribution's",
+      "the inbox copy alone — the row is no longer in its queue",
+      "withdrawn upstream-recheck-withdraw--19.md — a cell records it DISCHARGED",
+      "kept      upstream-recheck-withdraw--27.md · loose",
+      "INV-UPSTREAM-RECHECK 4 open · 1 kept · 3 withdrawn · 0 unread"
+    ],
+    "not": ["Traceback", "upstream-recheck-withdraw--1.md", "DISPLAY ONLY"],
+    "after": {
+      ".inbox/workforce/upstream/upstream-recheck-withdraw--F-6.md": {
+        "want": [
+          "row=F-6 | status=withdrawn -->",
+          "- status: **withdrawn**",
+          "| F-6 | The constant is type-checked; a trailing comma upstream makes it a tuple |"
+        ],
+        "not": ["status=open", "status=resolved", "version="]
+      },
+      ".inbox/workforce/upstream/upstream-recheck-withdraw--19.md": {
+        "want": ["status=withdrawn -->"],
+        "not": ["status=open"]
+      },
+      ".inbox/workforce/upstream/upstream-recheck-withdraw--6-wf-settings-apply-cannot-recognize-its-own-past-work.md": {
+        "want": ["status=withdrawn -->", "deferred.md:10)"],
+        "not": ["status=open"]
+      },
+      ".inbox/workforce/upstream/upstream-recheck-withdraw--27.md": {
+        "want": ["row=27 | status=open -->"],
+        "not": ["withdrawn"]
+      },
+      ".inbox/workforce/upstream/upstream-recheck-withdraw--1.md": {
+        "want": ["status=resolved | version=1.74.0"],
+        "not": ["withdrawn"]
+      }
+    }
   },
   "catalog-grep-reads-cited-copy-file": {
     "_why": "MEASURED 2026-09-25 on a copy of `university` with BOTH `--migrate --execute` and `--house-rules --execute` already run: `--kind image --grep 'Consistent edge quality'` answered `no match` while the row sat at `.claude/skills/image-eval/references/watercolor.md:16`, a file the migration itself had listed `STAYS … cited by` five readers. Only the rows of a file that GOES are lifted into CATALOG-ANCHOR.md, so a kept file's rows were in no layer the resolver read — and for three audits the project's own grader was told its rule did not exist (`university` deferred row 3). This tree reproduces that shape exactly: `references/image-tells.md` is byte-identical to the install's and is removable, `references/watercolor.md` has no install counterpart and STAYS because an employee cites it. The grep now reads install, then the anchor, then the copy's staying files, and each hit carries its layer — which is also what proves the removable duplicate is NOT searched a second time from the copy.",

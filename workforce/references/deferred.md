@@ -123,14 +123,23 @@ re-reading last run's wording. A row whose `Measured` evidence cannot be re-exec
 the same reason a bare flag is.
 
 **AND THE ROW NAMES THE REPOSITORY, NOT THE CATEGORY — a preamble declaring the carve-out does not say
-WHICH repository.** `wf-upstream` files a row into the workforce maintainer's inbox only when the row's
-own text names a shipped script, an install path, or the category in words; a file-level declaration no
-longer carries a row that names none of them. *Measured 2026-10-02: ten of the rows one project filed
-were taken on that sentence alone and not one was workforce's — a credential in the project's own legacy
-web sources, an accessibility defect in a plugin that is its own git repository, a package absent from a
-container image, a container that was not running, two stale backup archives. An
-inbox read as "defects in this distribution" was 77% another tree's.* A row owned by some other
-repository is still a legal survivor here; it routes to that repository, which is what naming it is for.
+WHICH repository.** `wf-upstream` files a row into the workforce maintainer's inbox only when the row is
+still open in its own queue and NAMES this distribution as where the fix lies: its repository or install
+path (`odysseyalive/claude-workforce`, `~/.claude/skills/workforce/...`), a script it ships, or a
+reference file it ships. The category in words — `upstream`, `another repository` — is not enough on
+its own; it counts only under a declaration that names workforce as the repository ("a fix that lies in
+another repository, the `workforce` distribution"). A row the project has already closed — a cell
+opening `DISCHARGED`, a table headed `Closed row` — is never filed: its close is not a defect.
+*Measured 2026-10-02: ten of the rows one project filed were taken on a declaration alone and not one
+was workforce's — a credential in the project's own legacy web sources, an accessibility defect in a
+plugin that is its own git repository, a package absent from a container image, a container that was
+not running, two stale backup archives. Measured 2026-10-22 on the live inbox: 47 of 68 open rows were
+no defect of this distribution — proposals their project had already discharged, a fix-list table,
+fragments of a handbook line-count table, other trees' secrets and plugin code — every one matched
+`loose`.* `wf-upstream --recheck
+--execute` marks such already-filed rows `withdrawn`, with the reason, rather than resolving or deleting
+them. A row owned by some other repository is still a legal survivor here; it routes to that
+repository, which is what naming it is for.
 
 **BLOCKING — a settings or frontmatter write the auto-mode self-modification classifier refused is NOT
 a host limit, and it is never queued as one.** The classifier sits above the permissions layer, so no

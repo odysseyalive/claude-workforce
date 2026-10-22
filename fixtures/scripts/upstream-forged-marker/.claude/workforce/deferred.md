@@ -1,7 +1,7 @@
 # Remaining work - fixture
 
 Every row below is the one category `references/deferred.md` allows to survive: a fix that lies in
-another repository.
+another repository, the `workforce` distribution.
 
 | # | Finding | What discharges it |
 |---|---|---|
