@@ -58,6 +58,18 @@ amended to invoke it, and the by-path workaround is removed rather than left as 
 of reach, and an unnamed one is out of scope exactly like any other unlisted work — the same rule the
 `## Scope` section already applies to everything else.
 
+### A handbook read from more than one root
+
+**A handbook read from more than one root names each skill in a form every one of those roots
+resolves.** A nested project adopted into its parent's org by symlink has its handbook read from two
+roots, and the two list the same skill under different names: the project's own root lists
+`triage-playbook`, and the parent lists it with the directory scope, `pythom-space:triage-playbook`.
+A handbook that writes only `Skill(pythom-space:triage-playbook)` works from the parent and names
+nothing from the project. *Measured 2026-10-04 on pythom-space: both cold probes run from the
+project's own root failed on it.* So write the bare `Skill(<name>)` the owning project resolves, and
+when the handbook is also read from a parent root, add the scoped form beside it. `wf-conform` fails a
+handbook that names a local skill only by a scope this root does not have.
+
 **`skills:` frontmatter is NOT how an employee reaches a skill.** That field *preloads full content at
 startup* and costs its bytes on every spawn (`procedure-for-procedures.md`). Preload only what the employee
 needs in full on every run — `operating-principles`, and a playbook it owns. Everything else is invoked
