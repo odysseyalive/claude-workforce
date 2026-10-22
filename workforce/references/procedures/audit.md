@@ -1460,6 +1460,19 @@ Per **governed** handbook (adopted agents stay exempt until their first amendmen
    A handbook that already carries both is reported healed-zero rather than re-amended, and a project
    with no design or front-end employee reports `0 of 0` — a measurement, not a skip.
 
+2e. **Re-pin a catalog version the install has moved past, on the pin and not on the stamp.** A
+   release that bumps an evaluator catalog's anchor (`<kind>-ref-version: N`) leaves every check
+   grepping for the old number unpassable. `wf-conform` reports each one as `catalog pin `<key>: N`
+   is not the installed anchor (M)`, naming the value the resolver reads today and every file that
+   carries it. For each such row, rewrite the pin in `## Procedure` or `## Verification` to `M`, and
+   restate any expected count or file list on that line from the files the row names. Nothing else
+   on the line changes, and a `Negative:` line's deliberately absent pin is never touched. This is a
+   citation heal on the footing of 2c — the check performs the same read against the catalog that
+   is actually installed — so item 2's bar on rewriting `## Procedure` prose does not reach it. Run
+   the re-pinned Check once and quote its output; a pin is healed to a value observed to answer.
+   *Measured 2026-10-09 on odyssey-alive (row 29): 1.76.0 took the ui anchor from 1 in two files to 2
+   in four, `design-evaluator`'s Check could no longer pass, and only a cold probe found it.*
+
 3. **Stamp and re-gate.** Set `workforce-version:` to the installed version, bump
    `handbook-version:`, and treat the edit as the amendment it is: the release gate re-opens
    (the Off-the-Street Release Gate (`SKILL.md`) rule 6) and the handbook is re-probed, or marked

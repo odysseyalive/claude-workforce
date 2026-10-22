@@ -314,12 +314,21 @@ LENGTH_FLOORS_HEADER = (
     "handbook itself. Read by `wf-conform`: while a handbook is at or under its row, the length\n"
     "row reports the floor instead of ordering the split. A handbook that grows past either\n"
     "number, or whose evidence file is gone, is ordered again.\n\n"
-    "| handbook | lines | bytes | evidence | measured |\n"
-    "|---|---|---|---|---|\n"
+    "| handbook | lines | bytes | evidence | measured | basis |\n"
+    "|---|---|---|---|---|---|\n"
 )
+# THE BASIS CELL SAYS WHAT WAS MEASURED, because two different things have been. A row
+# carrying `authored` holds `floor_measure` — the body with the frontmatter, every `ORG-*`
+# line and every contract-mandated clause taken out — so a restamp, a model re-pin or a
+# Step 5d clause insertion leaves it standing. A row with no basis cell is the whole file,
+# as every row written before 2026-10-22 was, and it is still compared as the whole file:
+# reading an old whole-file number as an authored one would loosen it by the size of the
+# generated block, silently. MEASURED on odyssey-alive (row 28): seven floors recorded
+# 2026-09-25 were voided by the 2026-10-07 restamp alone, +69 B each, zero content change.
+FLOOR_BASIS = "authored"
 FLOOR_ROW_RX = re.compile(
     r"^\|\s*`?([\w.-]+\.md)`?\s*\|\s*(\d+)\s*\|\s*(\d+)\s*\|\s*`?([^|`]+?)`?\s*\|"
-    r"\s*(\d{4}-\d{2}-\d{2})\s*\|\s*$")
+    r"\s*(\d{4}-\d{2}-\d{2})\s*\|(?:\s*(" + FLOOR_BASIS + r")\s*\|)?\s*$")
 
 
 def read_length_floors(root):
@@ -350,7 +359,7 @@ def read_length_floors(root):
         ev_abs = os.path.realpath(os.path.join(root, ev))
         floors[m.group(1)] = {
             "lines": int(m.group(2)), "bytes": int(m.group(3)), "evidence": ev,
-            "measured": m.group(5),
+            "measured": m.group(5), "basis": m.group(6),
             "evidence_ok": (not os.path.isabs(ev) and ev_abs.startswith(real_root + os.sep)
                             and os.path.isfile(ev_abs)),
         }
@@ -364,6 +373,153 @@ def read_length_floors(root):
 RELOCATABLE_SECTIONS = ("Scope", "Sources", "Procedure", "Verification")
 _ORG_OPEN_RX = re.compile(r"^[ \t]*<!--\s*(ORG-[A-Z-]+)\s+START\b")
 _ORG_LINE_RX = re.compile(r"^[ \t]*<!--\s*(?:ORG-[A-Z-]+\b|Tier ceiling:|tier-ceiling)", re.I)
+
+
+def _generated_lines(body):
+    """0-based indexes of the lines no author writes: the frontmatter, every line of an
+    `ORG-*` block (the `embed` step writes them) and the tier-ceiling line."""
+    lines = body.splitlines()
+    fm = FM_RX.match(body)
+    fm_n = fm.group(0).count("\n") if fm else 0
+    out = set(range(fm_n))
+    in_org = None
+    for i in range(fm_n, len(lines)):
+        line = lines[i]
+        if in_org:
+            out.add(i)
+            if re.search(r"<!--\s*" + re.escape(in_org) + r"\s+END\b", line) or \
+                    re.search(re.escape(in_org) + r"\s+END\s*-->", line):
+                in_org = None
+            continue
+        m = _ORG_OPEN_RX.match(line)
+        if m:
+            out.add(i)
+            if not re.search(r"END\s*-->", line):
+                in_org = m.group(1)
+        elif _ORG_LINE_RX.match(line):
+            out.add(i)
+    return out
+
+
+# THE CONTRACT-MANDATED CLAUSES: text the template requires word for word and `audit`
+# Step 5d inserts into every handbook that lacks it, so no author wrote it and none can
+# relocate it. `procedure-for-procedures.md` § A mandated section is allowance: "When a new
+# section is made mandatory, it grows the allowance." The length row counted all of it as
+# authored body. MEASURED 2026-10-10 on nsayka-wawa (DEF-Q-001): twelve ICs at or under 172
+# lines before Step 5d and 184 to 187 after it inserted only these clauses, which forced a
+# relocation split of text the author had not written.
+#
+# Each entry is (section, the clause's opening words), matched case-blind after any list
+# marker and emphasis. How many lines a clause may claim is read from the IC template
+# itself (`_template_clause_caps`), so a handbook that appended its own sentences to a
+# clause's paragraph has those counted as authored. A clause made mandatory later is added
+# here in the same change that adds it to the template and to Step 5d.
+MANDATED_CLAUSES = (
+    ("Sources", "the project's authoritative reference material"),
+    ("Sources", "before you report anything as missing"),
+    ("Guardrails", "if your work order names a tool you do not have"),
+    ("Guardrails", "never leave a background shell or process running"),
+    ("Reporting", "write the output.md incrementally"),
+    ("Reporting", "say the state, not the journey"),
+)
+_LIST_ITEM_RX = re.compile(r"^\s*(?:[-*+]|\d+[a-z]?[.)])\s+")
+
+
+def _clause_key(line):
+    return re.sub(r"[*_`]", "", _LIST_ITEM_RX.sub("", line, count=1)).strip().lower()
+
+
+def _clause_extent(lines, i):
+    """Lines in the paragraph or list item that starts at `i`: up to a blank line, a
+    heading, an HTML comment or the next list item; a list item also ends at the first
+    line that is not indented under it."""
+    item = bool(_LIST_ITEM_RX.match(lines[i]))
+    n = 1
+    for line in lines[i + 1:]:
+        s = line.strip()
+        if (not s or s.startswith("#") or s.startswith("<!--") or _LIST_ITEM_RX.match(line)
+                or (item and not line[:1].isspace())):
+            break
+        n += 1
+    return n
+
+
+def _clause_hits(lines):
+    """[(clause, first line index, extent)] for every MANDATED_CLAUSES opener in `lines`,
+    read inside the section the clause belongs to."""
+    hits, sec = [], None
+    for i, line in enumerate(lines):
+        mh = re.match(r"^## (.+?)[ \t]*$", line)
+        if mh:
+            sec = mh.group(1)
+            continue
+        key = _clause_key(line)
+        for clause in MANDATED_CLAUSES:
+            if sec and (sec == clause[0] or sec.startswith(clause[0] + " ")) \
+                    and key.startswith(clause[1]):
+                hits.append((clause, i, _clause_extent(lines, i)))
+                break
+    return hits
+
+
+_TEMPLATE_CAPS = None
+
+
+def _template_clause_caps():
+    """{clause: lines it spans in the shipped IC template}, read once from the install's
+    `references/handbook-templates.md`. An unreadable template, or a clause it no longer
+    carries, caps that clause at 0, so the row falls back to counting it as authored —
+    the behaviour before the allowance existed, never a guessed size."""
+    global _TEMPLATE_CAPS
+    if _TEMPLATE_CAPS is None:
+        _TEMPLATE_CAPS = {}
+        path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                            "references", "handbook-templates.md")
+        try:
+            text = open(path, encoding="utf-8").read()
+        except (OSError, UnicodeDecodeError):
+            text = ""
+        m = re.search(r"^## IC\n.*?^```markdown\n(.*?)^```\n", text, re.S | re.M)
+        if m:
+            for clause, _i, extent in _clause_hits(m.group(1).splitlines()):
+                _TEMPLATE_CAPS.setdefault(clause, extent)
+    return _TEMPLATE_CAPS
+
+
+def _mandated_clause_lines(body):
+    """0-based indexes of the lines `MANDATED_CLAUSES` account for in `body`."""
+    caps, out = _template_clause_caps(), set()
+    for clause, i, extent in _clause_hits(body.splitlines()):
+        out.update(range(i, i + min(extent, caps.get(clause, 0))))
+    return out
+
+
+def _without(body, drop):
+    kept = [l for i, l in enumerate(body.splitlines()) if i not in drop]
+    return "\n".join(kept) + ("\n" if kept and body.endswith("\n") else "")
+
+
+def length_measure(body):
+    """What the length row measures, and what a recorded floor is measured in.
+
+    `lines`/`bytes` — the handbook less its contract-mandated clauses: the figure compared
+    against the ceiling, whose 18-line allowance already holds the `ORG-*` block.
+    `clause_lines`/`clause_bytes` — what those clauses came to.
+    `floor_lines`/`floor_bytes` — the AUTHORED body, which is the same text less the
+    frontmatter and every `ORG-*` line too. A floor is a statement about what an author can
+    still relocate, so nothing a restamp, a re-pin or a Step 5d insertion writes may move it.
+    `wf-stamp --floor` records these two with basis `FLOOR_BASIS`.
+    """
+    clauses = _mandated_clause_lines(body)
+    counted = _without(body, clauses)
+    authored = _without(body, clauses | _generated_lines(body))
+    size = len(counted.encode("utf-8"))
+    return {
+        "lines": len(counted.splitlines()), "bytes": size,
+        "clause_lines": len(clauses), "clause_bytes": len(body.encode("utf-8")) - size,
+        "floor_lines": len(authored.splitlines()), "floor_bytes": len(authored.encode("utf-8")),
+        "counted": counted,
+    }
 
 
 def _ic_floor(body):
@@ -384,25 +540,7 @@ def _ic_floor(body):
     what drives the size.
     """
     lines = body.splitlines()
-    mandated = 0
-    fm = FM_RX.match(body)
-    fm_n = fm.group(0).count("\n") if fm else 0
-    mandated += fm_n
-    in_org = None
-    for line in lines[fm_n:]:
-        if in_org:
-            mandated += 1
-            if re.search(r"<!--\s*" + re.escape(in_org) + r"\s+END\b", line) or \
-                    re.search(re.escape(in_org) + r"\s+END\s*-->", line):
-                in_org = None
-            continue
-        m = _ORG_OPEN_RX.match(line)
-        if m:
-            mandated += 1
-            if not re.search(r"END\s*-->", line):
-                in_org = m.group(1)
-        elif _ORG_LINE_RX.match(line):
-            mandated += 1
+    mandated = len(_generated_lines(body))
     probe = section(body, "## Probe") or ""
     for l in probe.splitlines():
         cells = l.strip().split("|")
@@ -862,14 +1000,25 @@ def check_handbook(path, body, res, ceiling, floors=None):
     # unreachable goal and reported the same row again next time. The measurement that
     # would make a Lead ceiling real is the `engineering-site` exercise repeated on a
     # Lead; until someone runs it, this states the count and names what is owed.
-    body_lines = len(body.splitlines())
+    # THE MEASURE LEAVES OUT THE CONTRACT-MANDATED CLAUSES (see MANDATED_CLAUSES): they are
+    # allowance, not authored body, and every figure below is taken on what remains.
+    _lm = length_measure(body)
+    _counted = _lm["counted"]
+    body_lines = _lm["lines"]
     # The byte budget is the measured ceiling at the measured density (see
     # MEASURED_BYTES_PER_LINE). Reported on EVERY row, whatever the tier, because a
     # line count that passes says nothing about what the employee is actually handed.
-    body_bytes = len(body.encode("utf-8"))
+    body_bytes = _lm["bytes"]
     byte_budget = ceiling * MEASURED_BYTES_PER_LINE
     _over_bytes = body_bytes > byte_budget
     _density = f"{body_bytes:,} B ({body_bytes // max(body_lines, 1)} B/line)"
+    # Said on every row that states a size, so a reader comparing it with `wc -l` knows
+    # where the difference went.
+    _clause_note = ("" if not _lm["clause_lines"] else
+                    f"; {_lm['clause_lines']} line(s) / {_lm['clause_bytes']:,} B of contract-"
+                    f"mandated clauses not counted (procedure-for-procedures.md § A mandated "
+                    f"section is allowance)")
+    _density += _clause_note
     _tier_m = TIER_RX.search(body)
     if _tier_m and _tier_m.group(1) == "2":
         res.advise(
@@ -887,7 +1036,7 @@ def check_handbook(path, body, res, ceiling, floors=None):
             f"this row blocks nothing")
     elif body_lines <= ceiling and not _over_bytes:
         res.add(True, f"{n}: within the {ceiling}-line ceiling")
-    elif body_lines > ceiling and _ic_floor(body)[0] > ceiling:
+    elif body_lines > ceiling and _ic_floor(_counted)[0] > ceiling:
         # THE IC BRANCH OF THE SAME REASONING AS THE LEAD BRANCH ABOVE. MEASURED 2026-09-15
         # on a customer host (nc-audit, Nevada Classics): three IC handbooks at 297, 231
         # and 296 lines, still over after verbatim relocation. The 297 carries no user
@@ -896,7 +1045,7 @@ def check_handbook(path, body, res, ceiling, floors=None):
         # Probe and Reporting for a report-only reviewer. An order to relocate to 172 could
         # not be followed. So the row states what it measured, section by section, and
         # orders nothing it cannot reach.
-        _floor, _mand, _brk = _ic_floor(body)
+        _floor, _mand, _brk = _ic_floor(_counted)
         res.advise(
             f"{n}: IC handbook length OBSERVED — the required content alone exceeds the "
             f"ceiling",
@@ -919,14 +1068,14 @@ def check_handbook(path, body, res, ceiling, floors=None):
             _why = (f"{body_lines} lines AND {_density}, against {ceiling} lines / "
                     f"{byte_budget:,} B")
         elif body_lines > ceiling:
-            _why = f"{body_lines} lines, against {ceiling}"
+            _why = f"{body_lines} lines, against {ceiling}{_clause_note}"
         else:
             # WHERE the weight sits is MEASURED, never asserted. A handbook can be
             # over the byte budget because a handful of lines are enormous, or
             # because every line is dense — and an author told to look for "a few
             # very long lines" in a uniformly dense document is sent hunting for
             # something that is not there.
-            _longest = max((len(l) for l in body.splitlines()), default=0)
+            _longest = max((len(l) for l in _counted.splitlines()), default=0)
             _shape = (f"the weight is concentrated — longest line {_longest:,} "
                       f"characters" if _longest > 4 * MEASURED_BYTES_PER_LINE
                       else f"the prose is uniformly dense — longest line "
@@ -935,17 +1084,25 @@ def check_handbook(path, body, res, ceiling, floors=None):
                     f"{byte_budget:,} B the same ceiling buys at the density it was "
                     f"measured at ({MEASURED_BYTES_PER_LINE} B/line); {_shape}")
         if body_lines > ceiling:
-            _f, _m, _b = _ic_floor(body)
+            _f, _m, _b = _ic_floor(_counted)
             _why += (f" ({_m} of them required by this check, {body_lines - _m} authored; "
                      f"{_f} with the relocatable sections at their irreducible residue. By section: {_b})")
         # A RECORDED FLOOR REPLACES THE ORDER WHILE IT HOLDS (DEF-Q-23, see LENGTH_FLOORS_REL).
         _fl = (floors or {}).get(n)
-        if (_fl and _fl["evidence_ok"] and body_lines <= _fl["lines"]
-                and body_bytes <= _fl["bytes"]):
+        # A floor is compared in the unit it was recorded in: the authored body for a row
+        # carrying FLOOR_BASIS, the whole file for a row written before the basis existed.
+        if _fl and _fl.get("basis") == FLOOR_BASIS:
+            _now_l, _now_b = _lm["floor_lines"], _lm["floor_bytes"]
+            _unit = " of authored body (frontmatter, ORG-* lines and mandated clauses excluded)"
+        else:
+            _now_l, _now_b = len(body.splitlines()), len(body.encode("utf-8"))
+            _unit = " (whole file)"
+        if (_fl and _fl["evidence_ok"] and _now_l <= _fl["lines"]
+                and _now_b <= _fl["bytes"]):
             res.advise(
                 f"{n}: IC handbook length at its MEASURED FLOOR — no split ordered",
                 f"{_why}. A relocation pass stopped at a measured floor of {_fl['lines']} "
-                f"lines / {_fl['bytes']:,} B on {_fl['measured']}; evidence "
+                f"lines / {_fl['bytes']:,} B{_unit} on {_fl['measured']}; evidence "
                 f"{_fl['evidence']} ({LENGTH_FLOORS_REL}). This row reports that floor instead "
                 f"of ordering the same split again. It stops counting the moment the handbook "
                 f"grows past either number. ADVISORY: this row blocks nothing")
@@ -955,10 +1112,10 @@ def check_handbook(path, body, res, ceiling, floors=None):
                 _floor_note = (f"The floor recorded for it cites {_fl['evidence']}, which is not "
                                f"a file inside this project, so it does not count. ")
             elif _fl:
-                _floor_note = (f"A floor of {_fl['lines']} lines / {_fl['bytes']:,} B was "
+                _floor_note = (f"A floor of {_fl['lines']} lines / {_fl['bytes']:,} B{_unit} was "
                                f"recorded on {_fl['measured']}, and this handbook is now past "
-                               f"it ({body_lines - _fl['lines']:+d} lines, "
-                               f"{body_bytes - _fl['bytes']:+,} B), so the floor no longer "
+                               f"it ({_now_l - _fl['lines']:+d} lines, "
+                               f"{_now_b - _fl['bytes']:+,} B), so the floor no longer "
                                f"counts. ")
             # WHO PERFORMS THE SPLIT IS NAMED, because this script runs inside read-only
             # commands too. The row said "the split is PERFORMED this run" inside `verify`,
@@ -2051,9 +2208,14 @@ def check_catalogs(root, res):
     sk = os.path.join(root, ".claude", "skills")
     if not os.path.isdir(sk):
         return
+    # AN EVALUATOR IS A NAME WORKFORCE SHIPS, NEVER A SUBSTRING. This selected every
+    # directory whose name contained `eval`, so a project's own skill that happens to be
+    # spelled that way was held to a contract it never entered. MEASURED 2026-10-16 on
+    # ComfyUI (DEF-Q-001): `frame-eval`, the user's calibration loop, failed this row on
+    # every run and held `verify` at exit 1. `CATALOG_KIND` is the declared set — the
+    # skill directory names `wf-catalog` resolves, every spelling included.
     evs = sorted(d for d in os.listdir(sk)
-                 if os.path.isdir(os.path.join(sk, d))
-                 and ("eval" in d or "evaluator" in d))
+                 if os.path.isdir(os.path.join(sk, d)) and d in CATALOG_KIND)
     for e in evs:
         anchor = os.path.join(sk, e, "CATALOG-ANCHOR.md")
         ok = os.path.isfile(anchor)
@@ -2797,6 +2959,57 @@ def check_catalog_read(n, body, res, tally):
         "empty, so this read resolves and returns nothing. This is "
         f"{where}. See `references/evaluators.md` § An IC READS the catalog; the fix is "
         "`audit` Step 5d item 2c. ADVISORY: this row blocks nothing")
+
+
+# A `Negative:` line pins a version that must NOT exist (`ui-design-ref-version: 99`), so a
+# pin there disagreeing with the installed anchor is the line working, not a stale pin.
+_NEGATIVE_LINE_RX = re.compile(r"^\s*(?:[-*+]\s+)?(?:\*\*)?Negative\b\s*:", re.I)
+
+
+def check_catalog_pins(n, body, res, pins):
+    """A handbook's `<kind>-ref-version: N` pin against the anchor its catalog now carries.
+
+    A release that bumps a catalog's anchor leaves every check pinned to the old one
+    unpassable, and nothing said so. MEASURED 2026-10-09 on odyssey-alive (row 29): 1.76.0
+    took the ui catalog from `ui-design-ref-version: 1` in two files to `2` in four, and
+    `design-evaluator`'s Check — a grep for the old pin — could no longer pass. Only a cold
+    probe found it. Read in `## Procedure` and `## Verification`, where a handbook runs
+    what it pins; a `Negative:` line is skipped (see _NEGATIVE_LINE_RX).
+
+    The installed value is what `wf-catalog` resolves for the kind today, the read the
+    handbook itself makes, never a number written here. A kind that resolves nowhere is
+    not compared: there is nothing to compare against. `pins` is the per-run cache:
+    {"cat": the wf-catalog module, "kinds": {kind: resolve() result}, "root": root}.
+
+    ADVISORY, as `INV-CATREAD` is, and with its fix in the same place: `audit` Step 5d
+    item 2e re-pins, and this row prints the value and the files that item writes in.
+    """
+    cat = pins["cat"]
+    acts = "\n".join((section(body, h) or "") for h in ("## Procedure", "## Verification"))
+    for line in acts.splitlines():
+        if _NEGATIVE_LINE_RX.match(line):
+            continue
+        for m in pins["rx"].finditer(line):
+            key, pinned = m.group(1), int(m.group(2))
+            kind, slot = pins["keys"][key]
+            if kind not in pins["kinds"]:
+                pins["kinds"][kind] = cat.resolve(pins["root"], kind)
+            info = pins["kinds"][kind]
+            now = info["additions_version" if slot == "additions" else "version"]
+            if now is None or now == pinned:
+                continue
+            where = ([info["additions_path"]] if slot == "additions"
+                     else cat.catalog_files(info["path"]))
+            carry = sorted(os.path.basename(f) for f in where
+                           if f and re.search(re.escape(key) + r":\s*" + str(now) + r"\b",
+                                              cat.slurp(f)))
+            res.advise(
+                f"{n}: catalog pin `{key}: {pinned}` is not the installed anchor ({now})",
+                f"the {kind} catalog this handbook reads ({info['source']}, {info['path']}) "
+                f"carries `{key}: {now}`, in {len(carry)} file(s): {', '.join(carry)}. A check "
+                f"grepping for `{key}: {pinned}` cannot pass against it, and nothing else "
+                f"reports that. Re-pin it to `{now}` and restate any expected count from the "
+                f"files listed here: `audit` Step 5d item 2e. ADVISORY: this row blocks nothing")
 
 
 # ── THE PROBE SUBSTITUTION TABLE (handbook-templates.md § Probe) ──────────────
@@ -3568,9 +3781,20 @@ def main():
     for _bad in _floor_bad:
         res.advise(f"length floors: malformed row {_bad!r}",
                    f"{LENGTH_FLOORS_REL} grammar: | `<handbook>.md` | <lines> | <bytes> | "
-                   f"`<evidence path>` | <YYYY-MM-DD> |. A row that does not parse records no "
+                   f"`<evidence path>` | <YYYY-MM-DD> | [{FLOOR_BASIS} |]. A row that does not parse records no "
                    f"floor. `wf-stamp --floor` writes it. ADVISORY: this row blocks nothing")
     _catread = {"flagged": 0, "clean": 0}
+    # Every anchor key `wf-catalog` declares, corpus and additions slot alike, mapped to its
+    # kind — read from its table, so a sixth catalog is pinned-checked the day it ships.
+    _cat = _load_sibling("wf-catalog")
+    _pin_keys = {}
+    for _k, _spec in _cat.CATALOGS.items():
+        _pin_keys[_spec["anchor"]] = (_k, "corpus")
+        if _spec.get("additions_anchor"):
+            _pin_keys[_spec["additions_anchor"]] = (_k, "additions")
+    _pins = {"cat": _cat, "root": root, "kinds": {}, "keys": _pin_keys,
+             "rx": re.compile(r"(?<![\w-])(" + "|".join(map(re.escape, sorted(_pin_keys)))
+                              + r")\s*:\s*(\d+)\b")}
     _selfcon = {"checked": 0, "flagged": 0}
     org_edge_map = {}
     own_map = {}
@@ -3585,6 +3809,7 @@ def main():
             org_edge_map[_name] = org_edges(_name, body)
             check_anti_gaslight(_name, body, res)
             check_catalog_read(_name, body, res, _catread)
+            check_catalog_pins(_name, body, res, _pins)
             # GOVERNED ONLY, and deliberately outside `check_handbook` for that reason:
             # `--strict-adopted` holds an adopted agent to the handbook contract, and
             # neither of these is a contract workforce can hold a file it did not author
