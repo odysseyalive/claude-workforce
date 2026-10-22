@@ -314,7 +314,21 @@ became mandatory in v1.7.0 and the say-the-state clause in v1.26.0, and both lan
 authored-body half where they do not belong — measured as +9 lines on an IC and +13 on a Lead, all
 of it text the contract requires. When a new section is made mandatory, it grows the allowance. A
 ceiling that counts required text against an author's budget is measuring the contract and blaming
-the writer.
+the writer. **`wf-conform` applies this**: the clauses `audit` Step 5d inserts — `## Sources`' two
+fixed paragraphs, the tool-not-held and close-out `## Guardrails` lines, and the write-incrementally
+and say-the-state `## Reporting` paragraphs — are listed in its `MANDATED_CLAUSES`, each capped at
+the lines it spans in the IC template, and left out of the count the ceiling compares. A clause made
+mandatory later joins that list in the same change that adds it to the template and to Step 5d.
+*Measured 2026-10-10 on nsayka-wawa: twelve ICs at or under 172 lines went to 184–187 when Step 5d
+inserted only these clauses, and a split of text no author wrote was ordered.*
+
+**A recorded floor is measured on the authored body.** A floor is a statement about what an author
+can still relocate, so nothing an author did not write may move it: `wf-stamp --floor` records the
+handbook less its frontmatter, every `ORG-*` line and the mandated clauses, with basis `authored`.
+A row without that basis was recorded on the whole file and is still compared as the whole file, so
+an old row is never silently loosened; re-recording it moves it to the authored basis. *Measured
+2026-10-07 on odyssey-alive: seven whole-file floors were voided by a restamp alone, +69 B on the
+ORG-RECORD line and no content change.*
 
 **172 IS NOT REACHABLE FOR EVERY IC EITHER, AND THE ADVISORY NO LONGER PRETENDS IT IS.** MEASURED
 2026-09-15 by `nc-audit` on the Nevada Classics host: three IC handbooks sat at **297, 231 and 296

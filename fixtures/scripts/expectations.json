@@ -10488,5 +10488,94 @@
               ]
           }
       }
+  },
+  "conform-catalogs-declared-evaluators": {
+      "_why": "ComfyUI DEF-Q-001, MEASURED 2026-10-16: check_catalogs selected every `.claude/skills/*` directory whose name contained `eval`, so the user's own `frame-eval` calibration loop failed `catalogs: frame-eval carries a reconciliation anchor` on every run. An evaluator is a name workforce declares (`CATALOG_KIND`), never a substring. The project copy of `text-eval` with no anchor is the falsifying half: it must still fail.",
+      "script": "wf-conform",
+      "exit": 1,
+      "want": [
+          "catalogs: text-eval carries a reconciliation anchor"
+      ],
+      "not": [
+          "frame-eval"
+      ]
+  },
+  "conform-html-closer-not-a-skill": {
+      "_why": "ComfyUI DEF-Q-002: a closing `<!-- /origin -->` marker was advised as `/origin resolves to no skill`. Fixed in 1.80.1 (ce16fcd) by stripping every HTML comment before the command grammar runs; this pins the class — an inline closer, a multi-line comment opening with a slash word — and keeps a real unresolved `/shot-maker` reported, so a strip that silenced everything fails here.",
+      "script": "wf-conform",
+      "exit": 0,
+      "want": [
+          "/shot-maker resolves to no skill"
+      ],
+      "not": [
+          "/origin resolves",
+          "/handoff resolves",
+          "/storyboard resolves"
+      ]
+  },
+  "conform-mandated-clauses-allowance": {
+      "_why": "nsayka-wawa DEF-Q-001, MEASURED 2026-10-10: Step 5d inserted only template-mandated clauses into twelve ICs at or under 172 lines and took them to 184-187, which ordered a split of text no author wrote. procedure-for-procedures.md § A mandated section is allowance. This IC is 205 lines, 43 of them the template's Sources, Guardrails and Reporting clauses verbatim, so 162 count and the ceiling row passes. Against 1.80.1: `within the 172-line ceiling` advised, split owed.",
+      "script": "wf-conform",
+      "exit": 0,
+      "not": [
+          "g.md: within the 172-line ceiling",
+          "split is owed"
+      ],
+      "want": [
+          "1 governed"
+      ]
+  },
+  "conform-mandated-clauses-authored": {
+      "_why": "The paired negative for conform-mandated-clauses-allowance: the same 205 lines with the 17-line say-the-state paragraph replaced by 17 authored lines. Only the mandated clauses are allowance, so 179 count and the split is still owed — a blanket exemption fails here.",
+      "script": "wf-conform",
+      "exit": 0,
+      "want": [
+          "g.md: within the 172-line ceiling",
+          "179 lines, against 172; 26 line(s)",
+          "of contract-mandated clauses not counted",
+          "the split is owed"
+      ]
+  },
+  "conform-floor-survives-restamp": {
+      "_why": "odyssey-alive row 28, MEASURED 2026-10-07: seven floors were voided by a restamp alone (+69 B on the ORG-RECORD line, zero content change), because the floor was the whole file. A row carrying basis `authored` holds the body without frontmatter, ORG-* lines and mandated clauses, so this handbook — restamped after the floor was recorded — is still at its floor.",
+      "script": "wf-conform",
+      "exit": 0,
+      "want": [
+          "g.md: IC handbook length at its MEASURED FLOOR",
+          "170 lines / 7,416 B of authored body"
+      ],
+      "not": [
+          "the split is owed"
+      ]
+  },
+  "conform-floor-legacy-whole-file": {
+      "_why": "The other half of conform-floor-survives-restamp: a row with no basis cell was recorded on the whole file and is still compared as the whole file, so reading old rows never loosens them silently. The same restamp voids it, which is what re-recording with `wf-stamp --floor` cures.",
+      "script": "wf-conform",
+      "exit": 0,
+      "want": [
+          "A floor of 205 lines / 10,018 B (whole file)",
+          "+0 lines, +51 B",
+          "the split is owed"
+      ],
+      "not": [
+          "MEASURED FLOOR"
+      ]
+  },
+  "conform-catalog-pin-stale": {
+      "_why": "odyssey-alive row 29, MEASURED 2026-10-09: 1.76.0 moved the ui anchor from 1 to 2 and `design-evaluator`'s Check, a grep for `ui-design-ref-version: 1`, could never pass again; nothing reported it. The installed catalog here carries 2; `design-evaluator` pins 1 and is advised with the files to re-pin against, `front-end` pins 2 and is silent, and both `Negative:` lines pinning 99 are skipped by design.",
+      "script": "wf-conform",
+      "env": {
+          "CLAUDE_CONFIG_DIR": "${TREE}/cfg"
+      },
+      "exit": 0,
+      "want": [
+          "design-evaluator: catalog pin `ui-design-ref-version: 1` is not the installed anchor (2)",
+          "in 4 file(s): design-quality-catalog.md, direction.md, rendered-checks.md, version.md",
+          "Step 5d item 2e"
+      ],
+      "not": [
+          "front-end: catalog pin",
+          "ref-version: 99` is not"
+      ]
   }
 }
