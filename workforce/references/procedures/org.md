@@ -176,6 +176,7 @@ parse is the "reads as success" failure:
 | `reports-to` names nobody | `ORPHAN → provisionally under ceo (flagged)` |
 | stamp ≠ recomputed | `CONTRACT-DRIFT` → queue a `review` (`references/deferred.md`) |
 | on disk, not loadable this session | `PENDING-RESTART` |
+| `wf-stamp --root . --agent <name>` reports it `UNRELEASED` (exit 1) | `UNRELEASED` → not dispatchable until its re-probe is recorded (`amend.md` Step 6) |
 
 `PENDING-RESTART` compares the roster against the agent types actually available. Agents register on a
 **delay, not on a restart** (`platform.md` § Fact 3), so a handbook written this session is real on disk
@@ -471,6 +472,8 @@ someone can read instead of re-derive.
 9. **A newly written employee is not reachable yet.** If the chart marks it `PENDING-RESTART`, do not
    dispatch. Say: "<name> is registered but not loaded in this session. It loads later in this session;
    restart if you want it now." Trying anyway fails with an unhelpful error.
+
+   9a. **Never dispatch to a handbook `wf-stamp --root . --agent <name>` reports `UNRELEASED` (exit 1)** — it is amended and not yet re-probed.
 
 10. **When nothing matches**, in order: (a) check for a stale chart per rung 8; (b) if the capability is
    genuinely missing, hand the user's **exact words** to `/workforce hire` — it decides whether to hire

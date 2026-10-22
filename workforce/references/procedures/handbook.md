@@ -325,7 +325,8 @@ Same steps, plus:
   untouched.
 - **Any amendment returns the handbook to UNRELEASED** until it re-passes its probe. An
   amended-but-unprobed handbook may not be delegated to.
-- **Recompute the `contract-stamp`** with `wf-stamp` (`procedures/checksums.md` § Where it runs). A
+- **Recompute the `contract-stamp`** with `wf-stamp --execute --restamp --authority <AMD record> --agent <name>`
+  once the re-probe is recorded (`amend.md` Steps 6-7; refused while UNRELEASED). A
   changed stamp means the eval baseline is stale; queue a `review` (`references/deferred.md`).
 - **Never reword hand-authored text.** Append only.
 
