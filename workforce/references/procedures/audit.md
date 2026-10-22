@@ -1473,8 +1473,9 @@ Per **governed** handbook (adopted agents stay exempt until their first amendmen
    *Measured 2026-10-09 on odyssey-alive (row 29): 1.76.0 took the ui anchor from 1 in two files to 2
    in four, `design-evaluator`'s Check could no longer pass, and only a cold probe found it.*
 
-3. **Stamp and re-gate.** Set `workforce-version:` to the installed version, bump
-   `handbook-version:`, and treat the edit as the amendment it is: the release gate re-opens
+3. **Stamp and re-gate.** Set `workforce-version:` to the installed version and bump
+   `handbook-version:` with `"$WF/bin/wf-stamp" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --versions --execute`
+   — the producer for both fields, never a hand edit. Treat the edit as the amendment it is: the release gate re-opens
    (the Off-the-Street Release Gate (`SKILL.md`) rule 6) and the handbook is re-probed, or marked
    `not probed (spawning unavailable)` DEGRADED exactly as a fresh registration would be.
 4. **The between-audit detector is `wf-conform`'s advisory rows** (echo-back, version stamp) — this
@@ -1489,7 +1490,7 @@ amend, and any one of them alone leaves the org in this state.
 
 ```bash
 "$WF/bin/wf-stamp" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --execute            # stamp the unstamped
-"$WF/bin/wf-stamp" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --execute --restamp  # clear what THIS run moved
+"$WF/bin/wf-stamp" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --execute --restamp --authority .claude/workforce/work/<run-id>  # clear what THIS run moved
 "$WF/bin/wf-stamp" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --directives --execute            # cover new sacred blocks
 "$WF/bin/wf-stamp" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --directives --execute --restamp  # and what THIS run moved
 ```

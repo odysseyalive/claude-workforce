@@ -190,8 +190,10 @@ staged-matches-registered check keep agreeing.
 
 **`--execute` writes a FIRST stamp only.** A placeholder or an absent line has no prior claim to
 erase. A stamp that is a real digest and no longer matches is `MISMATCH`, and § On mismatch above
-governs: reported, exit 1, never rewritten. `--restamp` is the separate gesture, and `amend` is what
-makes it — the amendment is the authorization.
+governs: reported, exit 1, never rewritten. `--restamp --authority <AMD record>` is the separate
+gesture, and `amend` is what makes it — the amendment is the authorization, and `wf-stamp` refuses a
+`--restamp` that cites none (exit 2, nothing written). An audit cites its run directory instead
+(`audit.md` Step 5-STAMP).
 
 *The row for `contract-stamp` in § What is stamped is four days older than this paragraph and the
 whole time nothing wrote the field. Six surfaces recomputed the hash and compared it against the
