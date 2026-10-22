@@ -733,7 +733,11 @@ DIRECTIVES_DIR_REL = os.path.join(".claude", "workforce", "directives")
 # in every shape real orgs write (`— sha \`sha256:<hex>\` —`, a bare hex, a trailing
 # "binds you" clause). The template's own `<directives-sha>` placeholder carries no hex
 # and is not a pin.
-PIN_RX = re.compile(r"(\.claude/workforce/directives/[^\s`'\"()|]+?\.md)[^\n]*?\b([0-9a-f]{64})\b")
+# THE PATH IS THE WHOLE TOKEN, up to its delimiter and ending at its LAST `.md`. A lazy
+# `+?\.md` cut a block mirror's name (`<skill>__references__<file>.md__L17.md`) at its
+# first `.md` and reported a file that exists as PIN MISSING: 3 false fires on
+# the university org, 2026-10-22.
+PIN_RX = re.compile(r"(\.claude/workforce/directives/[^\s`'\"()|]+\.md)[^\n]*?\b([0-9a-f]{64})\b")
 
 
 def _sha_file(path):
@@ -759,7 +763,11 @@ def repin_body(body, rel, old, new):
     out = body
     m = re.search(r"^## Directives[ \t]*[^\n]*$(.*?)(?=^## |\Z)", out, re.S | re.M)
     if m:
-        seg = "\n".join(line.replace(old, new) if rel in line else line
+        # The line's own parsed pin decides, never a substring: `rel in line` also matched
+        # a longer mirror name that merely starts with `rel` (`x.md` inside `x.md__L17.md`).
+        seg = "\n".join(line.replace(old, new)
+                        if any(p.group(1) == rel and p.group(2) == old
+                               for p in PIN_RX.finditer(line)) else line
                         for line in m.group(1).split("\n"))
         out = out[:m.start(1)] + seg + out[m.end(1):]
     span = org_record_span(out)

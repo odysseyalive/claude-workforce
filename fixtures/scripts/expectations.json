@@ -11203,6 +11203,83 @@
       "missing 1"
     ]
   },
+  "stampdir-pin-block-mirror": {
+    "_why": "The university org, 2026-10-22: a block mirror is named `<skill>__references__<file>.md__L<n>.md`, and PIN_RX's lazy `+?\\.md` cut the pin at the first `.md` and reported a file that exists as PIN MISSING, exit 1, on three handbooks. The pin is the whole path token: a current pin to a `__L17.md` mirror is current, and nothing is reported.",
+    "args": [
+      "--directives"
+    ],
+    "exit": 0,
+    "not": [
+      "PIN MISSING",
+      "STALE PIN"
+    ],
+    "script": "wf-stamp",
+    "want": [
+      "INV-PINS  1 pin(s) in 1 handbook(s) · current 1 · stale 0 · repinned 0 · missing 0"
+    ]
+  },
+  "stampdir-pin-block-mirror-stale": {
+    "_why": "The same `__L17.md` mirror pinned at a sha it no longer has is a STALE PIN naming the full mirror path, never a PIN MISSING naming the path cut at its first `.md`.",
+    "args": [
+      "--directives"
+    ],
+    "exit": 1,
+    "not": [
+      "PIN MISSING",
+      "s__references__r.md —"
+    ],
+    "script": "wf-stamp",
+    "want": [
+      "✗ STALE PIN    g  .claude/workforce/directives/s__references__r.md__L17.md  pinned sha256:555555555555",
+      "stale 1 · repinned 0 · missing 0"
+    ]
+  },
+  "stampdir-pin-block-mirror-restamp": {
+    "_why": "repin_body moves a pin only on a line whose parsed pin IS that path at that sha, so the full `__L17.md` path re-pins and reads back.",
+    "after": {
+      ".claude/agents/g.md": {
+        "not": [
+          "5555555555555555"
+        ],
+        "want": [
+          "s__references__r.md__L17.md` — sha `sha256:a9339e5b215b699d6a02e4e75a56f5e163dd2d6e3b28936a490ac6a04cc9a45e`"
+        ]
+      }
+    },
+    "args": [
+      "--directives",
+      "--execute",
+      "--restamp"
+    ],
+    "exit": 0,
+    "script": "wf-stamp",
+    "want": [
+      "+ repinned     g  .claude/workforce/directives/s__references__r.md__L17.md",
+      "stale 0 · repinned 1 · missing 0"
+    ]
+  },
+  "stampdir-pin-prefix-repin": {
+    "_why": "THE NEGATIVE for repin_body. `s__references__r.md` is stale at the sha its `__L17.md` mirror is current at, and the shorter path is a prefix of the longer. Re-pinning it chose lines by `rel in line`, so the mirror's current pin was moved too, exit 0, and the next run reported it STALE. Only the line whose parsed pin is that path at that sha moves.",
+    "after": {
+      ".claude/agents/g.md": {
+        "want": [
+          "s__references__r.md` — sha `sha256:3836c70fc0df0e03ea6de9a3cddc68d0b538c5b07b81350c19dac52b78bcc6dd` — 2 block(s)",
+          "s__references__r.md__L17.md` — sha `sha256:a9339e5b215b699d6a02e4e75a56f5e163dd2d6e3b28936a490ac6a04cc9a45e`"
+        ]
+      }
+    },
+    "args": [
+      "--directives",
+      "--execute",
+      "--restamp"
+    ],
+    "exit": 0,
+    "script": "wf-stamp",
+    "want": [
+      "+ repinned     g  .claude/workforce/directives/s__references__r.md  sha256:a9339e5b215b",
+      "current 1 · stale 0 · repinned 1 · missing 0"
+    ]
+  },
   "companion-migration-repins": {
     "_why": "nsayka-wawa DEF-Q-003 (2026-10-10). The WF-PRINCIPLES migration appends the user's span to `directives/operating-principles.md`, which changes its sha, and nothing re-pinned the handbooks pinned to it: `elder-anchor-curator`'s cold probe stopped on DIRECTIVE-DRIFT. The migration now re-pins exactly the pins that equalled the file's sha before its own write, and names them. `other` was already stale and is left for a person.",
     "after": {
