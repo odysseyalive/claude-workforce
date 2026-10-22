@@ -245,8 +245,15 @@ this project's most safety-critical constant and nothing above moved. After the 
 before T3 lints it, run:
 
 ```bash
-wf-stamp --root <tree> --execute
+wf-stamp --root <tree> --agent <name> --execute
 ```
+
+`--agent` is what makes this reach the staged draft: `<name>` is not registered yet, so `wf-stamp`
+stamps `.claude/workforce/staging/agents/<name>.md`, the T1 path above, prints
+`+ stamped   <name> (staged .claude/workforce/staging/agents/<name>.md)`, and records the write in
+`.claude/workforce/stamp-ledger.jsonl`. It touches no other handbook: without `--agent` the command
+walks every registered handbook and also upgrades any PRE-FOLD stamp it finds, which is a write on a
+handbook this hire never named (odyssey-alive PL-U2, PL-U3).
 
 `contract-stamp` hashes the normalized `## Procedure` + `## Verification`, and the field lives in the
 `ORG-RECORD` block, which is **not** part of either section — so writing it cannot change the digest it

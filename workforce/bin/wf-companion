@@ -410,6 +410,11 @@ def write(root, path, text, eol="\n", makedirs=False):
     _sibling("wf-ledger").atomic_write(root, path, body.encode("utf-8"), makedirs=makedirs)
 
 
+def _sha256(data):
+    import hashlib
+    return hashlib.sha256(data).hexdigest() if data is not None else None
+
+
 def raw_bytes(path):
     """The file's bytes, or None. The read-back compares these, never decoded text."""
     try:
@@ -847,10 +852,29 @@ def migrate_write(root, wf, entry, path, new_body, t2):
         return False, "stopped decoding as UTF-8 between the read and the write; nothing written"
     eol = "\r\n" if "\r\n" in before_text else "\n"
     detail = "no sacred span changed"
+    mirror = os.path.join(root, ".claude", "workforce", "directives", "operating-principles.md")
+    mirror_before = _sha256(raw_bytes(mirror))
     if t2:
         ok, detail = extract_first(root, t2, before_text, eol)
         if not ok:
             return False, detail + "; SKILL.md not written"
+    # THE EXTRACTION MOVED A FILE HANDBOOKS PIN, AND THIS RUN IS WHAT MOVED IT (nsayka-wawa
+    # DEF-Q-003, 2026-10-10). Appending to `directives/operating-principles.md` changes its
+    # sha, and every handbook whose `## Directives` pinned the old sha STOPPED on
+    # DIRECTIVE-DRIFT at its next spawn; the audit re-pinned `elder-anchor-curator` by hand.
+    # `wf-stamp.repin` moves exactly the pins that equalled the sha measured just before
+    # this run's own write, so a pin that was already stale stays for a person to judge.
+    # It runs HERE, straight after the extraction and before the SKILL.md write, because
+    # the extraction is append-only and stays whatever happens to that write.
+    unpinned = []
+    mirror_after = _sha256(raw_bytes(mirror))
+    if mirror_before and mirror_after and mirror_before != mirror_after:
+        rel = os.path.relpath(mirror, root).replace(os.sep, "/")
+        results = _sibling("wf-stamp").repin(root, rel, mirror_before, mirror_after)
+        done = [n for n, err in results if err is None]
+        unpinned = [f"{n} ({err})" for n, err in results if err is not None]
+        detail += (f"; re-pinned {len(done)} handbook(s) to the extracted file's new sha"
+                   + (f": {', '.join(done)}" if done else ""))
     want_bytes = new_body.encode("utf-8")
     try:
         write(root, path, new_body)
@@ -871,10 +895,14 @@ def migrate_write(root, wf, entry, path, new_body, t2):
             restored = f"and restoring the original FAILED ({exc.strerror})"
         if raw_bytes(path) != before:
             restored = "and the file does NOT hold its original bytes — restore it from version control"
-        return False, (f"read back {state} (want {want}), {len(lost)} other user span(s) "
-                       f"changed — {restored}")
+        return False, (f"{detail}; read back {state} (want {want}), {len(lost)} other user "
+                       f"span(s) changed — {restored}")
     kept = len(_user_blocks(before_lf)) - len(changed)
-    return True, f"{detail}; {kept} other user span(s) byte-identical"
+    detail = f"{detail}; {kept} other user span(s) byte-identical"
+    if unpinned:
+        return False, (f"{detail}; and these pins still name the old sha: "
+                       f"{', '.join(unpinned)}")
+    return True, detail
 
 
 def write_and_prove(root, wf, entry, path, new_body, materialize=False):
@@ -1196,7 +1224,17 @@ def draft_objective(root, wf, draft, by, execute):
 
 
 def main():
-    ap = argparse.ArgumentParser()
+    ap = argparse.ArgumentParser(
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=(
+            "Refresh the Core skills' machine-owned regions from shipped source.\n\n"
+            "  (default)   report every Core skill's refresh state; exit 1 while one is absent\n"
+            "  --execute   refresh, materialize, append or migrate. A migration extracts the\n"
+            "              user's spans verbatim to .claude/workforce/directives/ first, and\n"
+            "              then RE-PINS every handbook whose ## Directives pinned that file's\n"
+            "              old sha, naming each one (wf-stamp.repin); a pin that was already\n"
+            "              stale is left for `wf-stamp --directives --execute --restamp`\n"
+            "  --objective / --draft-objective   the Strategic Objective"))
     ap.add_argument("--root", default=os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd())
     ap.add_argument("--execute", action="store_true")
     ap.add_argument("--objective", action="store_true",

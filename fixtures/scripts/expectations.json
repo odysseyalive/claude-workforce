@@ -10811,5 +10811,423 @@
           "front-end: catalog pin",
           "ref-version: 99` is not"
       ]
+  },
+  "stamp-versions": {
+    "_why": "nsayka-wawa DEF-Q-002 (2026-10-10). audit Step 5d item 3 orders `workforce-version:` set to the installed release and `handbook-version:` bumped, and no shipped script wrote either: `--execute --restamp` set the contract stamps and left all 17 handbooks at 1.61.0, so the run set them by hand. Report mode names the write it owes on the governed handbook, skips the adopted one by name, and writes nothing.",
+    "after": {
+      ".claude/agents/g.md": {
+        "want": [
+          "handbook-version: 3 | workforce-version: 1.61.0"
+        ]
+      }
+    },
+    "args": [
+      "--versions"
+    ],
+    "exit": 0,
+    "script": "wf-stamp",
+    "want": [
+      "~ would version g",
+      "workforce-version 1.61.0 ->",
+      "handbook-version 3 -> 4",
+      "owed 1",
+      "adopted 1"
+    ]
+  },
+  "stamp-versions-execute": {
+    "_why": "The write half of stamp-versions, asserted on the handbook and on the ledger: the hired line carries the bumped handbook-version and no longer the old release, and the write is recorded.",
+    "after": {
+      ".claude/agents/g.md": {
+        "not": [
+          "1.61.0"
+        ],
+        "want": [
+          "<!-- hired: 2026-01-01 | handbook-version: 4 | workforce-version: "
+        ]
+      },
+      ".claude/workforce/stamp-ledger.jsonl": {
+        "want": [
+          "\"event\": \"versioned\"",
+          "workforce-version 1.61.0 \u00b7 handbook-version 3"
+        ]
+      }
+    },
+    "args": [
+      "--versions",
+      "--execute"
+    ],
+    "exit": 0,
+    "script": "wf-stamp",
+    "want": [
+      "+ versioned   g",
+      "handbook-version 3 -> 4",
+      "versioned 1 \u00b7 owed 0"
+    ]
+  },
+  "stamp-agent-staged": {
+    "_why": "odyssey-alive PL-U2 and PL-U3. hire.md T1 stages to `staging/agents/<name>.md` and runs wf-stamp before registration, and wf-stamp scanned only `.claude/agents/*.md`, so the new hire was not seen and every other unstamped or PRE-FOLD handbook in the tree was written instead. `--agent` reaches the named handbook only, and an unregistered name is stamped as its staged draft. `old` stays exactly as it was.",
+    "after": {
+      ".claude/agents/old.md": {
+        "want": [
+          "contract-stamp: (set at registration)"
+        ]
+      },
+      ".claude/workforce/staging/agents/newhire.md": {
+        "not": [
+          "(set at registration)"
+        ],
+        "want": [
+          "contract-stamp: sha256:"
+        ]
+      }
+    },
+    "args": [
+      "--agent",
+      "newhire",
+      "--execute"
+    ],
+    "exit": 0,
+    "not": [
+      "old"
+    ],
+    "script": "wf-stamp",
+    "want": [
+      "+ stamped   newhire (staged .claude/workforce/staging/agents/newhire.md)",
+      "INV-STAMP  1 handbook(s) \u00b7 stamped 1"
+    ]
+  },
+  "stamp-removed-ledger": {
+    "_why": "odyssey-alive PL-U1. A never-stamped handbook and one whose stamp line was deleted after its contract moved both classified UNSTAMPED, and plain --execute stamped the second as a first stamp, erasing the evidence. The ledger records that this handbook was stamped on 2026-10-01, so it is STAMP-REMOVED: refused like a MISMATCH, exit 1, placeholder left in place.",
+    "after": {
+      ".claude/agents/g.md": {
+        "want": [
+          "contract-stamp: (set at registration)"
+        ]
+      }
+    },
+    "args": [
+      "--execute"
+    ],
+    "exit": 1,
+    "not": [
+      "+ stamped"
+    ],
+    "script": "wf-stamp",
+    "want": [
+      "\u2717 STAMP-REMOVED g",
+      "records `stamped`",
+      "stamp-removed 1"
+    ]
+  },
+  "stamp-restamp-needs-authority": {
+    "_why": "odyssey-alive PL-U4, the gate half. `--restamp` erases the evidence a MISMATCH is, and any caller could pass it from inside an order. It now needs --authority naming an AMD record or an audit run directory; without one the run is refused before anything is read, and the stale digest stays on disk.",
+    "after": {
+      ".claude/agents/g.md": {
+        "want": [
+          "de1e7edde1e7ed"
+        ]
+      }
+    },
+    "args": [
+      "--execute",
+      "--restamp"
+    ],
+    "exit": 2,
+    "not": [
+      "restamped"
+    ],
+    "script": "wf-stamp",
+    "want": [
+      "--restamp REFUSED",
+      "no --authority given"
+    ]
+  },
+  "stamp-restamp-amd": {
+    "_why": "odyssey-alive PL-U4, the trace half, and the AMD's reach. The AMD names g and not h: g is restamped and the ledger records the prior digest and the AMD; h stays a refused MISMATCH because the authority does not name it.",
+    "after": {
+      ".claude/agents/g.md": {
+        "not": [
+          "de1e7edde1e7ed"
+        ]
+      },
+      ".claude/agents/h.md": {
+        "want": [
+          "de1e7edde1e7ed"
+        ]
+      },
+      ".claude/workforce/stamp-ledger.jsonl": {
+        "want": [
+          "\"event\": \"restamped\"",
+          "\"authority\": \".claude/workforce/personnel/AMD-2026-10-22-g-guardrail.md\"",
+          "\"from\": \"sha256:de1e7edde1e7ed"
+        ]
+      }
+    },
+    "args": [
+      "--execute",
+      "--restamp",
+      "--authority",
+      ".claude/workforce/personnel/AMD-2026-10-22-g-guardrail.md"
+    ],
+    "exit": 1,
+    "script": "wf-stamp",
+    "want": [
+      "+ restamped   g",
+      "does not name .claude/agents/h.md",
+      "mismatch 1"
+    ]
+  },
+  "stamp-amended": {
+    "_why": "odyssey-alive BB-U2. amend.md said an amended handbook is UNPROBED until it re-passes, and nothing recorded that an amendment happened. `--amended` bumps handbook-version and records the amendment under its AMD.",
+    "after": {
+      ".claude/agents/g.md": {
+        "want": [
+          "handbook-version: 3"
+        ]
+      },
+      ".claude/workforce/stamp-ledger.jsonl": {
+        "want": [
+          "\"event\": \"amended\"",
+          ".claude/workforce/personnel/AMD-2026-10-22-g-guardrail.md"
+        ]
+      }
+    },
+    "args": [
+      "--amended",
+      ".claude/workforce/personnel/AMD-2026-10-22-g-guardrail.md",
+      "--agent",
+      "g",
+      "--execute"
+    ],
+    "exit": 0,
+    "script": "wf-stamp",
+    "want": [
+      "+ amended     g",
+      "handbook-version 2 -> 3",
+      "UNRELEASED until"
+    ]
+  },
+  "stamp-unreleased": {
+    "_why": "odyssey-alive BB-U2, the detector. The ledger holds an amendment and no release after it, so every report run prints UNRELEASED for g and exits 1, although its contract stamp is current.",
+    "args": [],
+    "exit": 1,
+    "script": "wf-stamp",
+    "want": [
+      "+ OK          g",
+      "! UNRELEASED  g",
+      "amended under `.claude/workforce/personnel/AMD-2026-10-22-g-guardrail.md`",
+      "unreleased 1"
+    ]
+  },
+  "stamp-released": {
+    "_why": "odyssey-alive BB-U2, the release. `--released` records the probe report against the open amendment, and the ledger then holds the release.",
+    "after": {
+      ".claude/workforce/stamp-ledger.jsonl": {
+        "want": [
+          "\"event\": \"released\""
+        ]
+      }
+    },
+    "args": [
+      "--released",
+      ".claude/workforce/work/amend-20261022T100000Z/probe-g/OUTPUT.md",
+      "--agent",
+      "g",
+      "--execute"
+    ],
+    "exit": 0,
+    "script": "wf-stamp",
+    "want": [
+      "+ released    g"
+    ]
+  },
+  "stamp-restamp-unreleased": {
+    "_why": "The amend.md order made mechanical: Step 7 restamps after Step 6 records the re-probe. An AMD-authorized restamp of a handbook whose amendment has no release is refused, and the stale digest stays.",
+    "after": {
+      ".claude/agents/g.md": {
+        "want": [
+          "de1e7edde1e7ed"
+        ]
+      }
+    },
+    "args": [
+      "--execute",
+      "--restamp",
+      "--authority",
+      ".claude/workforce/personnel/AMD-2026-10-22-g-guardrail.md"
+    ],
+    "exit": 1,
+    "not": [
+      "+ restamped"
+    ],
+    "script": "wf-stamp",
+    "want": [
+      "UNRELEASED since",
+      "--released <probe report> --agent g"
+    ]
+  },
+  "stampdir-unmirrored": {
+    "_why": "odyssey-alive row 26. A directive the user added to the skill after the last extraction never reached the mirror, and INV-DIRECTIVES called it covered because the sidecar stamps the SOURCE. Measured live on odyssey-alive 2026-10-22: three `invest` blocks. Report mode names the block by file:line and exits 1.",
+    "after": {
+      ".claude/workforce/directives/s.md": {
+        "not": [
+          "paywalled"
+        ]
+      }
+    },
+    "args": [
+      "--directives"
+    ],
+    "exit": 1,
+    "script": "wf-stamp",
+    "want": [
+      "\u2717 UNMIRRORED   .claude/skills/s/SKILL.md:13",
+      "unmirrored 1",
+      "current 1"
+    ]
+  },
+  "stampdir-unmirrored-execute": {
+    "_why": "Rows 26 and 27 and DEF-Q-003 in one write. The missing block is appended verbatim with its citation, which moves the mirror's sha, and the handbook pinned at the old sha is re-pinned in `## Directives` and in its ORG-RECORD because this run moved the file.",
+    "after": {
+      ".claude/agents/g.md": {
+        "not": [
+          "aa91b43e4ef320ae9742c82943de580e233931dc77058820fe2bfbd58e6420fc"
+        ]
+      },
+      ".claude/workforce/directives/s.md": {
+        "want": [
+          "<!-- extracted: .claude/skills/s/SKILL.md:13-15 | by wf-stamp",
+          "> Never summarise a paywalled article from its headline alone.\n<!-- /origin -->"
+        ]
+      },
+      ".claude/workforce/stamp-ledger.jsonl": {
+        "want": [
+          "\"event\": \"mirrored\"",
+          "\"event\": \"repinned\""
+        ]
+      }
+    },
+    "args": [
+      "--directives",
+      "--execute"
+    ],
+    "exit": 0,
+    "script": "wf-stamp",
+    "want": [
+      "+ appended     1 block(s) to .claude/workforce/directives/s.md",
+      "+ repinned     g",
+      "(this run moved it)",
+      "unmirrored 0 \u00b7 appended 1",
+      "stale 0 \u00b7 repinned 1"
+    ]
+  },
+  "stampdir-stale-pin": {
+    "_why": "odyssey-alive row 27. A pin that no longer matches the file is the employee's own DIRECTIVE-DRIFT STOP, and only a cold probe ever found it. It is reported and exits 1; plain --execute does not re-pin it, because this run did not move the file.",
+    "after": {
+      ".claude/agents/g.md": {
+        "want": [
+          "5555555555555555"
+        ]
+      }
+    },
+    "args": [
+      "--directives",
+      "--execute"
+    ],
+    "exit": 1,
+    "script": "wf-stamp",
+    "want": [
+      "\u2717 STALE PIN    g",
+      "moved before this run",
+      "stale 1"
+    ]
+  },
+  "stampdir-stale-pin-restamp": {
+    "_why": "The confirm-it-was-authorized gesture re-pins a pin that was stale before the run, and records it.",
+    "after": {
+      ".claude/agents/g.md": {
+        "not": [
+          "5555555555555555"
+        ]
+      }
+    },
+    "args": [
+      "--directives",
+      "--execute",
+      "--restamp"
+    ],
+    "exit": 0,
+    "script": "wf-stamp",
+    "want": [
+      "+ repinned     g",
+      "(--restamp)",
+      "stale 0 \u00b7 repinned 1"
+    ]
+  },
+  "stampdir-mirror-conflicted": {
+    "_why": "THE NEGATIVE for the append. The source block was EDITED, not only added to: the mirror holds the old wording, which no source block matches. Appending the new wording would leave both for the employee to obey, so nothing is written and the run exits 1.",
+    "after": {
+      ".claude/workforce/directives/s.md": {
+        "not": [
+          "with its date",
+          "paywalled"
+        ]
+      }
+    },
+    "args": [
+      "--directives",
+      "--execute"
+    ],
+    "exit": 1,
+    "not": [
+      "+ appended"
+    ],
+    "script": "wf-stamp",
+    "want": [
+      "CONFLICTED",
+      "conflicted 2"
+    ]
+  },
+  "stampdir-pin-missing": {
+    "_why": "A pin naming a directives file that does not exist STOPs its employee on every spawn and has nothing to re-pin to. Reported, exit 1, never repaired.",
+    "args": [
+      "--directives",
+      "--execute",
+      "--restamp"
+    ],
+    "exit": 1,
+    "script": "wf-stamp",
+    "want": [
+      "\u2717 PIN MISSING  g",
+      ".claude/workforce/directives/gone.md",
+      "missing 1"
+    ]
+  },
+  "companion-migration-repins": {
+    "_why": "nsayka-wawa DEF-Q-003 (2026-10-10). The WF-PRINCIPLES migration appends the user's span to `directives/operating-principles.md`, which changes its sha, and nothing re-pinned the handbooks pinned to it: `elder-anchor-curator`'s cold probe stopped on DIRECTIVE-DRIFT. The migration now re-pins exactly the pins that equalled the file's sha before its own write, and names them. `other` was already stale and is left for a person.",
+    "after": {
+      ".claude/agents/elder.md": {
+        "not": [
+          "e2bbdac35e8d5a2cf9df2cc5cba1e1ed0fd5a412ddbf706eada35c465d733556"
+        ]
+      },
+      ".claude/agents/other.md": {
+        "want": [
+          "6666666666666666"
+        ]
+      }
+    },
+    "args": [
+      "--execute"
+    ],
+    "exit": 0,
+    "must_not": [
+      "FAILED"
+    ],
+    "script": "wf-companion",
+    "want": [
+      "re-pinned 1 handbook(s) to the extracted file's new sha: elder",
+      "migrated 1 \u00b7 supplemented 0"
+    ]
   }
 }

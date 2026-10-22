@@ -82,7 +82,15 @@ days is worse than a record admitting it waited.
 
 ## Step 5 — Write the change
 
-Before and after, **verbatim**, in the `AMD`. Then apply to the handbook.
+Before and after, **verbatim**, in the `AMD`. Then apply to the handbook, and record the amendment:
+
+```bash
+"$WF/bin/wf-stamp" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --amended <AMD record> --agent <name> --execute
+```
+
+That bumps `handbook-version:` and appends the amendment to `.claude/workforce/stamp-ledger.jsonl`.
+From that line until Step 6 records a release, every `wf-stamp` report run prints
+`UNRELEASED <name>` and exits 1.
 
 **Move content; do not rewrite it.** An amendment fixing an ambiguity changes the ambiguous words —
 not the surrounding paragraph, and not the section's structure.
@@ -92,8 +100,13 @@ not the surrounding paragraph, and not the section's structure.
 **An amended handbook is an unreleased handbook until it re-passes its probe.** Re-run Phase B; record
 the result in the `AMD` § Re-Release Gate and in the employee's `EMP` file.
 
-**An amended-but-unprobed handbook may not be delegated to.** `org index` marks it, and `/org` will
-not dispatch to it.
+**An amended-but-unprobed handbook may not be delegated to.** The mark is the ledger line Step 5
+wrote: `wf-stamp` reports the handbook `UNRELEASED` and exits 1 until its re-probe is recorded, and
+an `AMD`-authorized `--restamp` (Step 7) is refused while it is. When the probe returns PASS, record it:
+
+```bash
+"$WF/bin/wf-stamp" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --released <probe OUTPUT.md> --agent <name> --execute
+```
 
 **If the amendment touched `## Verification`, write its negative input and RUN BOTH COMMANDS
 YOURSELF.** A `Negative:` naming a file that does not exist exits non-zero because the file is absent,
@@ -124,7 +137,9 @@ tell you the check works — only running it does.
 
 Recompute the `contract-stamp`; a changed stamp means the eval baseline is stale, so queue a `review`
 (`references/deferred.md` — the queue, and who drains it). **This is the one caller that may overwrite
-a stamp** — `wf-stamp --root <tree> --execute --restamp` (`procedures/checksums.md` § Where it runs).
+a stamp** — `wf-stamp --root <tree> --execute --restamp --authority <AMD record> --agent <name>`
+(`procedures/checksums.md` § Where it runs). The `AMD` must name `.claude/agents/<name>.md`; the
+restamp is refused without it, and is written to the stamp ledger with it.
 Everywhere else a differing stamp is `MISMATCH` and is reported rather than repaired; here the
 amendment IS the authorization, which is why the flag exists and why it is not the default.
 Update the `EMP` amendment history with both keys and the real latency. Close the triggering record.
