@@ -527,7 +527,7 @@ someone can read instead of re-derive.
     1. The work order, verbatim — the `REQUEST (verbatim):` block unchanged, never summarised
     2. Exit criteria, each MET or UNMET, with its evidence
     3. What is done, and the file or command that shows it
-    4. What is left, as the next concrete action
+    4. What is left, as the next concrete action; for a job still running, its log path and the line that means it finished
     5. What must not be redone, named file by file
     6. The commands to re-run, and what each returned last
     7. What went wrong or blocked, and what to try instead
@@ -537,6 +537,16 @@ someone can read instead of re-derive.
    reproduced verbatim rather than summarized.** Section 5 is the one that saves the next agent's
    budget, and section 1 is the one a summary destroys — an agent handed a paraphrase of the ask
    solves the paraphrase.
+
+   **A `HANDOFF` that leaves a job running is resumed when the job finishes, and you are what
+   notices.** Nothing wakes a returned agent, or you, when its render or build ends. In the same
+   message that reads the hand-back, arm ONE watcher on the done-line in the log that section 4
+   names — the Monitor tool, or a `timeout`-capped background wait — and resume the agent with
+   `SendMessage` when it fires. A brief that names a running job without its log path and done-line
+   goes back for them. *Measured 2026-10-22, mutze-studio run
+   `org-20261022T115924Z-necklacescale`: the brief named `run exit` in `render.log`, both renders
+   finished, and the results sat unread for about 20 minutes until the user asked whether things
+   were still running.*
 
    **A `HANDOFF` you leave unread is worse than a stalled run**, because the predecessor already
    stopped and reported success at stopping. *Added 2026-09-08: `wf-handoff` shipped, five Lead
@@ -572,6 +582,12 @@ someone can read instead of re-derive.
    cut agents were cut during cleanup and verification, after the build was done. Splitting it also
    buys the quality gain of an independent check, under the 2026-09-09 directive that *evaluations
    are always done by the independent agent*.
+
+   **The same split holds for a long job: launch, then read.** An order that starts a render or a
+   long build ends when the job is launched, with its log path and done-line in the report. You
+   watch for that line (rung 12b) and then resume the IC, or spawn the reader. Waiting is not work
+   an IC's turns should pay for: on 2026-10-22 three render orders in mutze-studio (`toothfixA`,
+   `toothfixB`, `necklacescale`) reached the turn cap with a render still to read.
 
 12e. **Before a parallel fan-out, put the data contract in code**, not in plan prose — the types, the
    schema, or the function signature the parallel orders both write against. Two ICs working from a

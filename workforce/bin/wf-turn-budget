@@ -207,7 +207,7 @@ def final_pending(home, state, cap):
 BRIEF_SECTIONS = """1. The work order, verbatim — the `REQUEST (verbatim):` block unchanged, never summarised
 2. Exit criteria, each MET or UNMET, with its evidence
 3. What is done, and the file or command that shows it
-4. What is left, as the next concrete action
+4. What is left, as the next concrete action; for a job still running, its log path and the line that means it finished
 5. What must not be redone, named file by file
 6. The commands to re-run, and what each returned last
 7. What went wrong or blocked, and what to try instead"""
@@ -222,6 +222,11 @@ manager receives no report, and every verified thing you have not written down i
 This is the only notice you get, and you cannot count your own turns.
 
 IF YOUR WORK IS ALREADY COMPLETE: finish normally, as your handbook says. Ignore the rest.
+
+IF A JOB YOU STARTED IS STILL RUNNING (a render, a build, anything in the background):
+do not wait for it and do not poll it. Hand back now, with its log path and the line that
+means it finished in section 4 of the brief. Your manager watches for that line and
+resumes you when it appears; nothing else will wake you.
 
 OTHERWISE, START NO NEW WORK and do these three things now, in this order:
 
@@ -285,6 +290,89 @@ FINAL_MARK = FINAL_TEXT.split("{turns}")[0]
 # exists for.
 BUDGET_MARK = (os.path.commonprefix([WARN_MARK, FINAL_MARK])
                or FINAL_MARK).encode("ascii", "ignore").rstrip()
+
+
+# ── a job started in the last fifth of the budget ─────────────────────────────
+# MEASURED 2026-10-22, mutze-studio run `org-20261022T115924Z-necklacescale`: an IC took
+# the 80% notice on turn 32, launched two renders with `nohup … &` on its NEXT call, and
+# handed back. Both renders finished and nothing woke it or its manager; the results sat
+# unread for about 20 minutes. The notice had gone out before the job existed, so it could
+# not mention it. This one is said on the call that starts the job, once per round, and
+# only at or past the 80% mark: earlier, a background job is ordinary work.
+#
+# IT DETECTS THE LAUNCH, NOT THE JOB. Whether a process is still alive is not something a
+# hook can tie to one agent, so the text is conditional and the agent, which knows what it
+# started, decides. Its first words are not the budget prefix on purpose: `count_turns`
+# reads a row carrying `BUDGET_MARK` as a round ending, and this notice must not move that.
+JOB_TEXT = """BACKGROUND JOB, near your turn limit. This call started a job in the background.
+Do not wait for it and do not poll it: polling spends the turns you have left. Hand back
+now, with the job's log path and the line that means it finished in section 4 of your
+HANDOFF.md. Your manager watches for that line and resumes you when it appears; nothing
+else will wake you."""
+JOB_MARK = JOB_TEXT.split(",")[0]
+
+# A HEREDOC BODY OR A QUOTED STRING IS TEXT, NOT A COMMAND, and the IC in the measured run
+# wrote its OUTPUT.md through a heredoc. Both are removed before the `&` test, so a line of
+# prose ending in " &" is not read as a launch.
+#
+# ONE LINEAR PASS, NOT A SUBSTITUTION REGEX. The command is the agent's, and it can carry
+# text the agent fetched. A quoted-string pattern with an alternation inside a repeat took
+# a MEASURED 73 s on 100 KB of `\"` with no closing quote, in a hook the harness waits on.
+# Every character here is visited once, and an unclosed quote or heredoc runs to the end.
+HEREDOC_HEAD_RX = re.compile(r"<<-?[ \t]*(['\"]?)([A-Za-z_]\w*)\1")
+# A lone `&` ending a command: not `&&`, `|&`, `>&`, `&>` or `\&`, and followed by a space,
+# a `)` or the end of a line. `nohup`, `setsid` and `disown` count where a command starts.
+BACKGROUND_RX = re.compile(
+    r"(?<![&|>\\])&(?=[ \t)]|$)|(?:^|[;&|(])[ \t]*(?:nohup|setsid|disown)\b", re.M)
+
+
+def code_only(command):
+    """`command` with its quoted strings and heredoc bodies removed."""
+    out, i, n = [], 0, len(command)
+    while i < n:
+        c = command[i]
+        # `<<<` is a here-string, not a heredoc, so a `<` right after a `<` opens nothing.
+        head = (HEREDOC_HEAD_RX.match(command, i)
+                if c == "<" and command[i - 1:i] != "<" else None)
+        if c == "'":
+            j = command.find("'", i + 1)
+            i = n if j < 0 else j + 1
+            out.append("''")
+        elif c == '"':
+            j = i + 1
+            while j < n and command[j] != '"':
+                j += 2 if command[j] == "\\" else 1
+            i = j + 1
+            out.append("''")
+        elif head:
+            i = command.find("\n", head.end())
+            i = n if i < 0 else i + 1
+            while i < n:                      # skip the body, through its closing line
+                eol = command.find("\n", i)
+                eol = n if eol < 0 else eol
+                line, i = command[i:eol], eol + 1
+                if line.strip() == head.group(2):
+                    break
+            out.append("\n")
+        else:
+            out.append(c)
+            i += 1
+    return "".join(out)
+
+
+def launched_background(payload):
+    """True when this `Bash` call started a job in the background."""
+    if payload.get("tool_name") != "Bash":
+        return False
+    tool_input = payload.get("tool_input")
+    if not isinstance(tool_input, dict):
+        return False
+    if tool_input.get("run_in_background") is True:
+        return True
+    command = tool_input.get("command")
+    if not isinstance(command, str):
+        return False
+    return bool(BACKGROUND_RX.search(code_only(command)))
 
 
 # `agent_type` ARRIVES IN A PAYLOAD AND BECOMES A PATH, so it is validated as a bare
@@ -1023,7 +1111,7 @@ def main():
         # injections included, so it can see for itself which prompt row ended a round. No
         # transcript AND no state leaves nothing to count, and a number nothing measured is
         # not worth stopping a run on.
-        tail = count_turns(tpath, 0, (WARN_MARK, FINAL_MARK))
+        tail = count_turns(tpath, 0, (WARN_MARK, FINAL_MARK, JOB_MARK))
         if tail["turns"] is None:
             return 0
         spent = tail["seen"]
@@ -1075,6 +1163,12 @@ def main():
             emit(FINAL_TEXT.format(turns=in_round, cap=cap, sections=BRIEF_SECTIONS))
     elif in_round >= warn_at(cap) and once("fired-warn", WARN_MARK, round_):
         emit(WARN_TEXT.format(turns=in_round, cap=cap, sections=BRIEF_SECTIONS))
+    # A JOB STARTED AFTER THE NOTICE, which the notice could not name (`JOB_TEXT`). Never on
+    # a call that already spoke, and never past the final threshold, whose branch above
+    # owns the call: one paragraph per call, and the final notice already says return now.
+    elif (in_round >= warn_at(cap) and launched_background(payload)
+          and once("fired-job", JOB_MARK, round_)):
+        emit(JOB_TEXT)
     # AND THE OTHER END: THIS CALL IS A CUT AGENT WORKING AGAIN. Not on the call that just
     # told it to resume, which would flip the mark it had this moment written. No state
     # directory means no claim and no flip: the transcript records an injection but not a

@@ -8599,7 +8599,7 @@
     "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"transcript_path\": \"s1.jsonl\", \"tool_name\": \"Bash\", \"tool_input\": {\"command\": \"echo hi\"}, \"agent_id\": \"a1\", \"agent_type\": \"eng-coder\"}"
   },
   "turn-budget-eighty-percent-warns": {
-    "_why": "32 OF 40 IS THE 80% BOUNDARY, and this is the whole point of the hook: a cut-off that arrives unannounced delivers nothing to read back (REPORT.md 5), and an agent cannot count its own turns. The injected text must name all three artefacts the successor needs -- an OUTPUT.md with every exit criterion MET or UNMET, a HANDOFF.md continuation brief in the section shape `org.md` rung 12b verifies, and the `HANDOFF` verdict that makes rung 12b fire. IT MUST ALSO SAY WHAT RUNG 12b ACTUALLY DOES WITH THAT VERDICT: resume this same agent with `SendMessage` and a fresh turn allowance, context intact, spawning a successor only on exhausted context. Until e06d730 the rung spawned a successor and this text said so; an agent told it will be replaced writes a brief for a stranger instead of a checkpoint for itself, and `RESUME YOU` is what keeps the two from drifting apart again. `fired-warn` is the once-only marker.",
+    "_why": "32 OF 40 IS THE 80% BOUNDARY, and this is the whole point of the hook: a cut-off that arrives unannounced delivers nothing to read back (REPORT.md 5), and an agent cannot count its own turns. The injected text must name all three artefacts the successor needs -- an OUTPUT.md with every exit criterion MET or UNMET, a HANDOFF.md continuation brief in the section shape `org.md` rung 12b verifies, and the `HANDOFF` verdict that makes rung 12b fire. IT MUST ALSO SAY WHAT RUNG 12b ACTUALLY DOES WITH THAT VERDICT: resume this same agent with `SendMessage` and a fresh turn allowance, context intact, spawning a successor only on exhausted context. Until e06d730 the rung spawned a successor and this text said so; an agent told it will be replaced writes a brief for a stranger instead of a checkpoint for itself, and `RESUME YOU` is what keeps the two from drifting apart again. `fired-warn` is the once-only marker. A JOB STILL RUNNING is handed back with its log path and done-line rather than polled (2026-10-22, mutze-studio: a render's results sat unread for 20 minutes because nothing watched for that line), so the last three wants pin that clause.",
     "after": {
       "tmp/wf-turn-budget/s1/a1/fired-final": {
         "absent": true
@@ -8627,7 +8627,10 @@
       "HANDOFF.md",
       "MET or UNMET",
       "7. What went wrong",
-      "RESUME YOU"
+      "RESUME YOU",
+      "IF A JOB YOU STARTED IS STILL RUNNING",
+      "do not poll it",
+      "its log path and the line that means it finished"
     ]
   },
   "turn-budget-final-returns-now": {
@@ -8998,6 +9001,51 @@
     ],
     "script": "wf-turn-budget",
     "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"transcript_path\": \"s1.jsonl\", \"tool_name\": \"Bash\", \"tool_input\": {\"command\": \"echo hi\"}, \"agent_id\": \"a1\", \"agent_type\": \"eng-coder\"}"
+  },
+  "turn-budget-background-launch-after-warn": {
+    "_why": "A JOB STARTED AFTER THE 80% NOTICE IS NAMED ON THE CALL THAT STARTS IT. Measured 2026-10-22, mutze-studio run org-20261022T115924Z-necklacescale: an IC took the notice on turn 32, launched two renders with `nohup ... &` on its next call and handed back; the renders finished, nothing woke it or its manager, and the results sat unread for about 20 minutes. The notice went out before the job existed, so it could not mention it. Here `fired-warn` is already spent and the call is that launch, so the hook says BACKGROUND JOB once (`fired-job`), tells the agent not to poll, and asks for the log path and the done-line in section 4 of HANDOFF.md -- the two things `org.md` rung 12b's watcher needs.",
+    "after": {
+      "tmp/wf-turn-budget/s1/a1/fired-job": {
+        "want": []
+      }
+    },
+    "env": {
+      "TMPDIR": "${TREE}/tmp"
+    },
+    "exit": 0,
+    "not": [
+      "Traceback",
+      "TURN BUDGET"
+    ],
+    "script": "wf-turn-budget",
+    "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"transcript_path\": \"s1.jsonl\", \"tool_name\": \"Bash\", \"tool_input\": {\"command\": \"W=out; nohup bash -c \\\"timeout 2700 python bench.py run N7a N7b; echo run exit \\\\$?\\\" > $W/render.log 2>&1 &\\necho launched\"}, \"agent_id\": \"a1\", \"agent_type\": \"eng-coder\"}",
+    "want": [
+      "\"additionalContext\"",
+      "BACKGROUND JOB",
+      "do not poll it",
+      "log path",
+      "the line that means it finished",
+      "section 4"
+    ]
+  },
+  "turn-budget-heredoc-ampersand-is-not-a-launch": {
+    "_why": "THE NEGATIVE OF turn-budget-background-launch-after-warn: same tree, past the 80% mark with the notice spent, and a command whose only lone `&` characters sit in a heredoc body (the measured IC wrote its OUTPUT.md this way) or a quoted string, beside `2>&1` and `&&`. None of them starts a job, so the hook stays silent and claims no `fired-job` marker. Without the heredoc and quote stripping, `Q & A &` ends a line and reads as a launch.",
+    "after": {
+      "tmp/wf-turn-budget/s1/a1/fired-job": {
+        "absent": true
+      }
+    },
+    "env": {
+      "TMPDIR": "${TREE}/tmp"
+    },
+    "exit": 0,
+    "not": [
+      "hookSpecificOutput",
+      "BACKGROUND JOB",
+      "Traceback"
+    ],
+    "script": "wf-turn-budget",
+    "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"transcript_path\": \"s1.jsonl\", \"tool_name\": \"Bash\", \"tool_input\": {\"command\": \"cat > OUTPUT.md <<'EOF'\\n| 2 | renders & sheet | MET |\\nQ & A &\\nEOF\\necho \\\"a & b\\\"; make 2>&1 | tail && echo ok\"}, \"agent_id\": \"a1\", \"agent_type\": \"eng-coder\"}"
   },
   "turn-budget-counter-symlink-not-followed": {
     "_why": "THE SAME ATTACK ONE LEVEL IN: the directories are ours, and a symlink is planted at `count.json` aiming at a file outside them. Both halves of the refusal are asserted here. The READ is `O_NOFOLLOW`, so the link is refused rather than followed -- without it this is an arbitrary-file read aimed by whoever planted the link. The WRITE creates its temporary name `O_CREAT|O_EXCL|O_NOFOLLOW` and then RENAMES over `count.json`: rename acts on the name, so the link is replaced and its target is never opened. `victim.txt` unchanged is the proof; a real counter in its place is the proof the refusal did not also break the feature.",
