@@ -8,7 +8,7 @@
 
 | Version | Date | Surface | Org | Change |
 |---|---|---|---|---|
-| 1.81.0 | 2026-10-22 | changes, installer | no | (pending — message lands on the next regeneration) |
+| 1.81.0 | 2026-10-22 | handbook, chart, audit, update, changes, hooks, scripts, installer, platform | **yes** | Release 1.81.0: the upstream inbox takes only real workforce bugs, and twenty-odd downstream rows are fixed |
 | 1.80.1 | 2026-10-18 | handbook, changes, scripts, installer | **yes** | Release 1.80.1: four audit scripts stop misreading real handbooks, and the template says what an injection is |
 | 1.80.0 | 2026-10-16 | changes, installer | no | Release 1.80.0: text-eval catches empty maxims, buried points, bare statistics and US defaults |
 | 1.79.1 | 2026-10-16 | verify, update, changes, scripts, installer | no | Release 1.79.1: update and verify say whether THIS project needs an audit |
