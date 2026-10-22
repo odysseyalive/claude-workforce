@@ -1,4 +1,4 @@
-<!-- image-eval-ref-version: 1 -->
+<!-- image-eval-ref-version: 2 -->
 <!-- origin: workforce | modifiable: true -->
 # image-eval reference version
 
@@ -9,8 +9,10 @@ project's references are stale → the refresh updates the workforce-owned (`mod
 reference blocks, preserving any `origin: user` seams.
 
 ```
-image-eval-ref-version: 1
+image-eval-ref-version: 2
 ```
+
+**v2** (2026-10-22) — `image-tells.md` § Watercolor restores three impossible-technique rows the v1 catalog dropped: **Impossible bloom placement**, **Consistent edge quality** and **Colors mixing impossibly**. The table was distilled from odyssey-alive's `image-eval/references/watercolor.md`, which carries twelve rows; v1 shipped the nine its `image-validator` agent lists and lost the three pigment-physics rows. They are medium physics, not one project's taste, and a project grading on them (university upstream row 3) read `no match` from the install. Wording is the source's, in this table's two columns. The shipped `agents/image-validator/AGENT.md` grades from the same nine-row list and gains the same three rows, so the agent and the catalog it is graded against carry one set.
 
 **v1** (2026-09-10) — first built catalog. Promoted from workforce's former `image-eval-seed.md`, which shipped as a single seed spec copied into a project once and never tracked afterwards. The content is unchanged; what changed is that it is now resolvable from the install like every other corpus.
 

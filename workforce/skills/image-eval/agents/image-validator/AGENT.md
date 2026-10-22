@@ -163,7 +163,10 @@ Real watercolor has physical constraints. Flag violations:
 | **No paper texture visible** | Pigment settles into paper grain |
 | **Crisp fine details** | Pigment bleeds on wet paper |
 | **Absent cauliflowering** | Wet-on-drying creates blooms unavoidably |
+| **Impossible bloom placement** | Blooms happen at wet/drying boundaries |
+| **Consistent edge quality** | Real paintings have varied edges (wet vs. dry) |
 | **Symmetric organic effects** | Water doesn't create bilateral symmetry |
+| **Colors mixing impossibly** | Some pigments granulate, separate, or don't mix cleanly |
 
 **Quick test:** "Could a skilled watercolorist actually paint this?"
 
