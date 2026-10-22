@@ -3,18 +3,41 @@
 
     wf-stamp --root <dir>              report every handbook's stamp state, write nothing
     wf-stamp --root <dir> --execute    write the stamp where there is not one yet
-    wf-stamp --root <dir> --execute --restamp
+    wf-stamp --root <dir> --execute --restamp --authority <AMD record | audit run dir>
                                        ALSO overwrite a stamp that no longer matches —
                                        the authorized-amendment path, and only that
+    ... --agent <name> [--agent <name>]
+                                       only these handbooks. A name not yet registered is
+                                       stamped in its staged draft, `staging/agents/<name>.md`
+                                       (hire.md T1)
 
-    wf-stamp --root <dir> --directives            report `.directives.sha` coverage
-    wf-stamp --root <dir> --directives --execute  write rows for blocks that have none
+    wf-stamp --root <dir> --versions [--agent <name>] [--execute]
+                                       set ORG-RECORD `workforce-version:` to the installed
+                                       release and bump `handbook-version:` on every handbook
+                                       stamped older (audit Step 5d item 3)
+    wf-stamp --root <dir> --amended <AMD record> --agent <name> [--execute]
+                                       record an amendment: bump `handbook-version:`, and the
+                                       handbook reads UNRELEASED until --released
+    wf-stamp --root <dir> --released <probe report> --agent <name> [--execute]
+                                       record the re-probe PASS that releases it again
+
+    wf-stamp --root <dir> --directives            report `.directives.sha` coverage, every
+                                       extracted mirror against its live skill, and every
+                                       handbook's `## Directives` sha pin against the file
+    wf-stamp --root <dir> --directives --execute  write rows for blocks that have none,
+                                       append a source block the mirror lacks, and re-pin
+                                       the handbooks whose pin THIS run moved
     wf-stamp --root <dir> --directives --execute --restamp
-                                       ALSO rewrite a row whose digest no longer matches
+                                       ALSO rewrite a row whose digest no longer matches,
+                                       and re-pin a pin that was already stale
 
     wf-stamp --root <dir> --floor <handbook> --evidence <path> [--execute]
                                        record a handbook's measured length floor, which
                                        wf-conform reports instead of re-ordering the split
+
+EVERY WRITE IS RECORDED in `.claude/workforce/stamp-ledger.jsonl`, one JSON object per line,
+append-only: what was written, the value it replaced, the authority, and the argv. See
+§ THE LEDGER below.
 
 THE SECOND HALF, AND IT IS THE SAME DEFECT ONE FILE OVER. `.directives.sha` is the
 sidecar `wf-protect-directives` compares every edit against and `wf-conform` re-hashes
@@ -83,11 +106,42 @@ registered file's sha against the staged handbook's — so stamping one and not 
 other manufactures a divergence in the very record that proves a registration was
 verified. The stamp value depends only on `## Procedure` + `## Verification`, which
 are identical in both copies, so both receive the same line and stay byte-equal.
+The staged draft is the one `wf-conform` and `hire.md` T1 name, `staging/agents/<name>.md`;
+the older `staging/<name>/HANDBOOK.md` is still read. A staged draft whose contract has
+moved apart from the registered one (normal after any `amend`) is left alone, because the
+registered handbook's digest would be a false claim about it.
+
+THE LEDGER (odyssey-alive PL-U1, PL-U4; 2026-10-22). Until this file wrote one, nothing on
+a host could say that a stamp had ever existed. `classify` gave the same UNSTAMPED to a
+handbook that was never stamped and to one whose stamp line somebody deleted after editing
+its `## Procedure`, and plain `--execute` then stamped the edited contract as if it were
+new: the one piece of evidence that the contract moved, erased by the command that is
+supposed to refuse that. A `--restamp` left no trace either, so a restamp run inside an
+order was invisible afterwards. Now every write appends a line, an UNSTAMPED registered
+handbook that the ledger or git HEAD shows was stamped before reads STAMP-REMOVED and is
+refused exactly like a MISMATCH, and `--restamp` takes an `--authority` that must resolve
+to an AMD record naming the handbook or an audit run directory, and is recorded with it.
+
+UNRELEASED (odyssey-alive BB-U2). `amend.md` said an amended handbook is marked and not
+dispatched to until it re-passes its probe, and nothing recorded that an amendment had
+happened. `--amended` records it, `--released` records the PASS, and every report run
+prints UNRELEASED for the gap between them and exits 1.
+
+THE DIRECTIVE PINS AND MIRRORS (odyssey-alive 26, 27; nsayka-wawa DEF-Q-003). A handbook's
+`## Directives` pins `.claude/workforce/directives/<skill>.md` by sha, and the employee's
+first step STOPs on `DIRECTIVE-DRIFT` when the file no longer hashes to it. Nothing compared
+the pin to the file between probes, and an extraction that appended to the file moved
+every pin on it. The mirror itself was never compared to the live skill it was extracted
+from, so a directive the user added afterwards never reached the employee, while
+`INV-DIRECTIVES` reported it covered because the sidecar stamps the SOURCE. `--directives`
+now measures both, appends what the mirror lacks, and re-pins what that append moved.
 """
 
 import argparse
+import errno
 import glob
 import hashlib
+import json
 import os
 import re
 import sys
@@ -389,7 +443,18 @@ def stamp_directives(root, execute, restamp):
     apart. `--execute` writes rows that do not exist yet — a block with no row has no
     prior claim to erase — and REFUSES every differing row, exiting 1. `--restamp` is
     the separate gesture, and the amendment is what authorizes it.
+
+    THE MIRRORS AND THE PINS RUN FIRST, and in that order, because each one's write is
+    the next one's input: an appended mirror block is a new sacred block the sidecar must
+    then cover, and an appended mirror is a moved file every pin on it must then follow.
+    Their rules are `mirror_pass`'s and `pins_pass`'s.
     """
+    print(f"wf-stamp --directives — {root}")
+    agents = os.path.join(root, ".claude", "agents")
+    links_before = symlink_census(agents) if os.path.isdir(agents) else {}
+    mirrors, moved = mirror_pass(root, execute)
+    pins = pins_pass(root, execute, restamp, moved)
+
     path = os.path.join(root, DIRECTIVES_REL)
     unreadable, malformed = [], []
     found = scan_blocks(root, unreadable)
@@ -400,7 +465,6 @@ def stamp_directives(root, execute, restamp):
     agree = sorted(k for k in found if k in recorded and recorded[k] == found[k])
     orphan = sorted(k for k in recorded if k not in found)
 
-    print(f"wf-stamp --directives — {root}")
     for key, kind in ((k, "UNPROTECTED") for k in fresh):
         print(f"  ~ {kind}   {key}  no row — the hook cannot verify this block")
     for key in drift:
@@ -445,6 +509,15 @@ def stamp_directives(root, execute, restamp):
                   file=sys.stderr)
             return 2
         print(f"  + wrote {DIRECTIVES_REL}  {len(merged)} row(s), read back and re-parsed")
+        blessed = sorted(k for k in drift if restamp)
+        try:
+            ledger_append(root, [{"event": "sidecar", "file": DIRECTIVES_REL.replace(os.sep, "/"),
+                                  "from": f"{len(recorded)} row(s)", "to": f"{len(merged)} row(s)",
+                                  "authority": "--restamp" if blessed else None,
+                                  "restamped": blessed}])
+        except OSError as exc:
+            print(f"  ! the ledger was NOT written: {exc.strerror}", file=sys.stderr)
+            return 2
         print("    the counts below are the state AFTER this write, re-read from disk")
         # RE-DERIVE FROM WHAT IS NOW ON DISK, never from what was found before the
         # write. The counts used to be computed once, at the top, so a run that had
@@ -461,7 +534,15 @@ def stamp_directives(root, execute, restamp):
     print(f"\nINV-DIRECTIVES  {len(found)} block(s) in scope · covered {len(agree)} · "
           f"unprotected {len(fresh)} · drift {len(drift)} · orphan {len(orphan)} · "
           f"malformed {len(malformed)} · unreadable {len(unreadable)}")
+    print(f"INV-MIRROR  {mirrors['mirrors']} mirror(s) with a live source · "
+          f"{mirrors['blocks']} source block(s) · mirrored {mirrors['mirrored']} · "
+          f"unmirrored {mirrors['unmirrored']} · appended {mirrors['appended']} · "
+          f"conflicted {mirrors['conflicted']} · failed {mirrors['failed']}")
+    print(f"INV-PINS  {pins['pins']} pin(s) in {pins['handbooks']} handbook(s) · "
+          f"current {pins['current']} · stale {pins['stale']} · repinned {pins['repinned']} · "
+          f"missing {pins['missing']} · failed {pins['failed']}")
 
+    rc = 0
     if not execute and (fresh or orphan or malformed):
         print("Re-run with --directives --execute to write the missing rows. Until a "
               "block carries one, wf-protect-directives reports it UNPROTECTED on every "
@@ -472,8 +553,24 @@ def stamp_directives(root, execute, restamp):
               "recorded digest. A sacred block changed after it was stamped; confirm "
               "the change was authorized, then "
               "`wf-stamp --directives --execute --restamp`.")
-        return 1
-    return 0
+        rc = 1
+    # AN UNMIRRORED DIRECTIVE OR A STALE PIN FAILS THE RUN IN BOTH MODES. Unlike an
+    # UNPROTECTED row, which costs a hook its check, each one is an employee working
+    # without the user's words or STOPPING on them, and a report that exits 0 over that
+    # is the detector nobody acts on.
+    if mirrors["unmirrored"] and not execute:
+        print("Re-run with --directives --execute to append the unmirrored blocks to their "
+              "mirror, verbatim, and re-pin the handbooks that pin it.")
+    if pins["stale"]:
+        print("A STALE PIN STOPS its employee on every spawn. Where this run did not move "
+              "the file, confirm the change to it was authorized, then "
+              "`wf-stamp --directives --execute --restamp`.")
+    if (mirrors["unmirrored"] or mirrors["conflicted"] or mirrors["failed"]
+            or pins["stale"] or pins["missing"] or pins["failed"]):
+        rc = 1
+    if links_before and report_symlink_drift(links_before, symlink_census(agents)):
+        rc = 1
+    return rc
 
 
 def symlink_census(agents):
@@ -621,117 +718,616 @@ def record_floor(root, name, evidence, execute):
     return 0
 
 
-def staged_path(root, name):
-    return os.path.join(root, ".claude", "workforce", "staging", name, "HANDBOOK.md")
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--root", default=os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd())
-    ap.add_argument("--execute", action="store_true")
-    ap.add_argument("--restamp", action="store_true",
-                    help="also overwrite a MISMATCH — the authorized-amendment path")
-    ap.add_argument("--directives", action="store_true",
-                    help="stamp `.directives.sha` instead of the handbook contract stamps")
-    ap.add_argument("--floor", metavar="HANDBOOK",
-                    help="record this handbook's measured length floor, so wf-conform reports "
-                         "it instead of ordering the split again")
-    ap.add_argument("--evidence", metavar="PATH",
-                    help="with --floor: the project-relative report that measured the floor")
-    args = ap.parse_args()
+# ── mirrors and pins: the directive half's other two questions ──────────────────
+DIRECTIVES_DIR_REL = os.path.join(".claude", "workforce", "directives")
+# A pin is a directives path and the sha after it ON THE SAME LINE of `## Directives`,
+# in every shape real orgs write (`— sha \`sha256:<hex>\` —`, a bare hex, a trailing
+# "binds you" clause). The template's own `<directives-sha>` placeholder carries no hex
+# and is not a pin.
+PIN_RX = re.compile(r"(\.claude/workforce/directives/[^\s`'\"()|]+?\.md)[^\n]*?\b([0-9a-f]{64})\b")
 
-    root = os.path.abspath(args.root)
-    # THE TWO HALVES ARE SEPARATE GESTURES, never one sweep. They stamp different
-    # artifacts with different mismatch consequences: a stale contract-stamp means an
-    # eval baseline is old, while a drifted directive block means the user's own words
-    # may have been reworded. Folding them into one flag would let a run that meant to
-    # refresh an eval baseline silently re-bless a changed directive.
-    if args.floor:
-        return record_floor(root, args.floor, args.evidence, args.execute)
-    if args.directives:
-        if not os.path.isdir(os.path.join(root, ".claude")):
-            print(f"wf-stamp: no .claude under {root}", file=sys.stderr)
-            return 2
-        return stamp_directives(root, args.execute, args.restamp)
 
+def _sha_file(path):
+    try:
+        return hashlib.sha256(open(path, "rb").read()).hexdigest()
+    except OSError:
+        return None
+
+
+def directive_pins(body):
+    """[(directives path, pinned sha)] from `## Directives`, in order."""
+    sec = section(body, "## Directives")
+    if sec is None:
+        return []
+    return [(m.group(1), m.group(2)) for line in sec.splitlines()
+            for m in PIN_RX.finditer(line)]
+
+
+def repin_body(body, rel, old, new):
+    """Body with every pin of `rel` at `old` moved to `new`: the `## Directives` lines that
+    name `rel`, and the ORG-RECORD `directives-sha:` line that carries `old`. Nothing else
+    is touched, and a pin on another sha is not this function's to move."""
+    out = body
+    m = re.search(r"^## Directives[ \t]*[^\n]*$(.*?)(?=^## |\Z)", out, re.S | re.M)
+    if m:
+        seg = "\n".join(line.replace(old, new) if rel in line else line
+                        for line in m.group(1).split("\n"))
+        out = out[:m.start(1)] + seg + out[m.end(1):]
+    span = org_record_span(out)
+    if span:
+        block = out[span[0]:span[1]]
+        block = "\n".join(line.replace(old, new) if "directives-sha:" in line else line
+                          for line in block.split("\n"))
+        out = out[:span[0]] + block + out[span[1]:]
+    return out
+
+
+def repin(root, rel, old, new, execute=True):
+    """Re-pin every governed handbook whose `## Directives` pins `rel` at `old` to `new`.
+    [(name, None | the reason it was not written)].
+
+    THE CALLER IS THE AUTHORITY, and the narrowing is what makes that safe: only a pin
+    equal to `old` moves, and `old` is the sha the caller measured immediately before its
+    own write. A pin that was already stale before that write is somebody else's change
+    and is left for `--directives --restamp` to decide. `wf-companion`'s T2 extraction
+    calls this (nsayka-wawa DEF-Q-003: an extraction moved `operating-principles.md` and
+    `elder-anchor-curator`'s cold probe STOPPED on DIRECTIVE-DRIFT), and so does the mirror
+    append below."""
+    out = []
+    for path in sorted(glob.glob(os.path.join(root, ".claude", "agents", "*.md"))):
+        name = os.path.basename(path)[:-3]
+        try:
+            body = open(path, encoding="utf-8").read()
+        except (OSError, UnicodeDecodeError) as exc:
+            out.append((name, f"unreadable ({type(exc).__name__})"))
+            continue
+        if not ORG_RECORD_RX.search(body) or (rel, old) not in directive_pins(body):
+            continue
+        if not execute:
+            out.append((name, None))
+            continue
+        new_body = repin_body(body, rel, old, new)
+        _write_handbook(path, new_body)
+        if (rel, new) not in directive_pins(open(path, encoding="utf-8").read()):
+            out.append((name, "re-pinned and read back a different pin"))
+            continue
+        try:
+            ledger_append(root, [{"event": "repinned", "file": _rel(root, path),
+                                  "from": f"{rel} sha256:{old}", "to": f"{rel} sha256:{new}",
+                                  "authority": None}])
+        except OSError as exc:
+            out.append((name, f"re-pinned, ledger NOT written ({exc.strerror})"))
+            continue
+        out.append((name, None))
+    return out
+
+
+def _source_blocks(root, skill_dir):
+    """[(rel, first line, last line, block text with markers, normalized body)] for every
+    sacred block in every `.md` under one skill directory, in path order."""
+    out = []
+    for dirpath, dirnames, filenames in os.walk(skill_dir):
+        dirnames[:] = sorted(d for d in dirnames if d not in (".git", "node_modules"))
+        for fn in sorted(filenames):
+            if not fn.endswith(".md"):
+                continue
+            p = os.path.join(dirpath, fn)
+            try:
+                body = open(p, encoding="utf-8").read()
+            except (OSError, UnicodeDecodeError):
+                continue
+            for m in BLOCK_RX.finditer(body):
+                a = body.count("\n", 0, m.start()) + 1
+                out.append((_rel(root, p), a, a + m.group(0).count("\n"), m.group(0),
+                            normalize(m.group(1))))
+    return out
+
+
+def mirror_pass(root, execute):
+    """Compare every extracted mirror with the live skill it came from; under `execute`,
+    append a source block the mirror lacks. Returns (summary dict, {rel: (old, new)}).
+
+    THE QUESTION NOTHING ASKED (odyssey-alive row 26). `.claude/workforce/directives/<skill>.md`
+    is extracted once, and the user goes on adding directives to `<skill>/SKILL.md`. The
+    sidecar stamps the SOURCE, so `INV-DIRECTIVES` reported those blocks covered, and the
+    employee bound to the mirror never saw them: five on odyssey-alive (agenda, ynab) found
+    by hand, and three more in `invest` measured on 2026-10-22.
+
+    MIRRORED MEANS CONTAINED, compared on the normalized block body: a source block is
+    mirrored when its text sits inside some block of the mirror. Equality alone calls the
+    `operating-principles` split unmirrored on every org it ran on, because the mirror
+    keeps the pre-split span and the source keeps the user's remainder of it.
+
+    APPEND-ONLY, AND ONLY FOR AN ADDITION. A missing block is appended verbatim with its
+    `file:line` citation, the template's `<!-- extracted: ... -->` shape. When the mirror
+    also holds a block that no source block is contained in, the source EDITED or deleted
+    something, and appending the new text would leave the old one beside it for the
+    employee to obey. That is CONFLICTED: reported, never written, left to a person."""
+    ddir = os.path.join(root, DIRECTIVES_DIR_REL)
+    summary = {"mirrors": 0, "blocks": 0, "mirrored": 0, "unmirrored": 0, "appended": 0,
+               "conflicted": 0, "failed": 0}
+    moved = {}
+    rows = []
+    for mpath in sorted(glob.glob(os.path.join(ddir, "*.md"))):
+        skill = os.path.basename(mpath)[:-3]
+        skill_dir = os.path.join(root, ".claude", "skills", skill)
+        if skill.startswith("_") or not os.path.isdir(skill_dir):
+            continue
+        try:
+            mtext = open(mpath, encoding="utf-8").read()
+        except (OSError, UnicodeDecodeError) as exc:
+            summary["failed"] += 1
+            rows.append(f"  ! UNREADABLE   {_rel(root, mpath)}  ({type(exc).__name__})")
+            continue
+        summary["mirrors"] += 1
+        mirror = [normalize(m.group(1)) for m in BLOCK_RX.finditer(mtext)]
+        source = _source_blocks(root, skill_dir)
+        summary["blocks"] += len(source)
+        missing = [b for b in source if not any(b[4] in mb for mb in mirror)]
+        summary["mirrored"] += len(source) - len(missing)
+        if not missing:
+            continue
+        stale = [mb for mb in mirror if not any(b[4] in mb for b in source)]
+        mrel = _rel(root, mpath)
+        for rel, a, b, _text, _n in missing:
+            rows.append(f"  ✗ UNMIRRORED   {rel}:{a}  sacred block not in {mrel} — the "
+                        f"employee bound to the mirror never reads it")
+        if stale:
+            summary["conflicted"] += len(missing)
+            rows.append(f"      CONFLICTED: {mrel} holds {len(stale)} block(s) no source block "
+                        f"matches, so the source edited or removed a directive rather than only "
+                        f"adding one. Not appended: the old text would stay beside the new. "
+                        f"Reconcile the mirror by hand, verbatim.")
+            continue
+        if not execute:
+            summary["unmirrored"] += len(missing)
+            continue
+        today = time.strftime("%Y-%m-%d", time.gmtime())
+        add = "".join(f"\n<!-- extracted: {rel}:{a}-{b} | by wf-stamp {today}, added to the "
+                      f"source after the last extraction -->\n{text}\n"
+                      for rel, a, b, text, _n in missing)
+        new = mtext.rstrip("\n") + "\n" + add
+        old_sha = _sha_file(mpath)
+        try:
+            _load_sibling("wf-ledger").atomic_write(root, mpath, new.encode("utf-8"))
+        except OSError as exc:
+            summary["failed"] += 1
+            summary["unmirrored"] += len(missing)
+            rows.append(f"      not written, the mirror keeps its bytes: {exc.strerror}")
+            continue
+        back = [normalize(m.group(1)) for m in BLOCK_RX.finditer(
+            open(mpath, encoding="utf-8").read())]
+        if any(not any(b[4] in mb for mb in back) for b in missing):
+            summary["failed"] += 1
+            summary["unmirrored"] += len(missing)
+            rows.append(f"      appended and read back a mirror still missing a block — not counted")
+            continue
+        new_sha = _sha_file(mpath)
+        moved[mrel] = (old_sha, new_sha)
+        summary["appended"] += len(missing)
+        rows.append(f"  + appended     {len(missing)} block(s) to {mrel}, verbatim, each cited "
+                    f"to its source line")
+        try:
+            ledger_append(root, [{"event": "mirrored", "file": mrel,
+                                  "from": f"sha256:{old_sha}", "to": f"sha256:{new_sha}",
+                                  "authority": None,
+                                  "blocks": [f"{r}:{a}" for r, a, _b, _t, _n in missing]}])
+        except OSError as exc:
+            summary["failed"] += 1
+            rows.append(f"      appended, and the ledger was NOT written: {exc.strerror}")
+    for row in rows:
+        print(row)
+    return summary, moved
+
+
+def pins_pass(root, execute, restamp, moved):
+    """Compare every governed handbook's `## Directives` pins with the files on disk.
+    Returns a summary dict. Prints its own rows.
+
+    THE CHECK odyssey-alive row 27 found absent. A pin that no longer matches is the
+    employee's own STOP condition (`DIRECTIVE-DRIFT`), and until now only a cold probe ran
+    it, after the fact. STALE is re-pinned under `--execute` only where THIS run moved the
+    file (`moved`, the mirror append above), because the run that changed the bytes is the
+    authority for the pin following them; any other stale pin needs `--restamp`, the same
+    confirm-it-was-authorized gesture the sidecar's DRIFT rows take. MISSING is never
+    repaired: there is no file to pin to."""
+    summary = {"pins": 0, "handbooks": 0, "current": 0, "stale": 0, "repinned": 0,
+               "missing": 0, "failed": 0}
+    for path in sorted(glob.glob(os.path.join(root, ".claude", "agents", "*.md"))):
+        name = os.path.basename(path)[:-3]
+        try:
+            body = open(path, encoding="utf-8").read()
+        except (OSError, UnicodeDecodeError):
+            continue
+        if not ORG_RECORD_RX.search(body):
+            continue
+        pins = directive_pins(body)
+        if not pins:
+            continue
+        summary["handbooks"] += 1
+        for rel, pinned in pins:
+            summary["pins"] += 1
+            fp = os.path.join(root, rel)
+            inside = os.path.realpath(fp).startswith(os.path.realpath(root) + os.sep)
+            cur = _sha_file(fp) if inside else None
+            if cur == pinned:
+                summary["current"] += 1
+                continue
+            if cur is None:
+                summary["missing"] += 1
+                print(f"  ✗ PIN MISSING  {name}  {rel} — no such file in this project; its "
+                      f"`## Directives` STOP fires on every spawn")
+                continue
+            ours = rel in moved and moved[rel][0] == pinned
+            if not execute or not (ours or restamp):
+                summary["stale"] += 1
+                print(f"  ✗ STALE PIN    {name}  {rel}  pinned sha256:{pinned[:12]}… · file "
+                      f"sha256:{cur[:12]}…" + ("" if ours or restamp else
+                      "  (moved before this run; --restamp re-pins it once the change is "
+                      "confirmed authorized)"))
+                continue
+            new_body = repin_body(body, rel, pinned, cur)
+            _write_handbook(path, new_body)
+            body = open(path, encoding="utf-8").read()
+            if (rel, cur) not in directive_pins(body):
+                summary["failed"] += 1
+                print(f"  ! {name}  re-pinned {rel} and read back a different pin — not counted")
+                continue
+            try:
+                ledger_append(root, [{"event": "repinned", "file": _rel(root, path),
+                                      "from": f"{rel} sha256:{pinned}",
+                                      "to": f"{rel} sha256:{cur}",
+                                      "authority": None if ours else "--restamp"}])
+            except OSError as exc:
+                summary["failed"] += 1
+                print(f"  ! {name}  re-pinned, and the ledger was NOT written: {exc.strerror}")
+                continue
+            summary["repinned"] += 1
+            print(f"  + repinned     {name}  {rel}  sha256:{pinned[:12]}… -> sha256:{cur[:12]}…"
+                  + ("  (this run moved it)" if ours else "  (--restamp)"))
+    return summary
+
+
+# ── which handbooks a run touches ────────────────────────────────────────────────
+NAME_RX = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+
+
+def staged_paths(root, name):
+    """Every place a staged draft of `name` may be, canonical first.
+
+    `staging/agents/<name>.md` is where `hire.md` T1 writes and what `wf-conform` pairs
+    against the registered file. `staging/<name>/HANDBOOK.md` is the layout this script
+    alone used to read (odyssey-alive PL-U3); older orgs still carry it, so both are read.
+    """
+    base = os.path.join(root, ".claude", "workforce", "staging")
+    return [os.path.join(base, "agents", name + ".md"),
+            os.path.join(base, name, "HANDBOOK.md")]
+
+
+def _rel(root, path):
+    return os.path.relpath(path, root).replace(os.sep, "/")
+
+
+def select_targets(root, names):
+    """([(name, path, kind)], [unresolved names]). `kind` is `registered` or `staged`.
+
+    No `--agent`: every `.claude/agents/*.md`, as before. With it: only those names, the
+    per-handbook target the hire carve-out needed (odyssey-alive PL-U2), so stamping a new
+    hire no longer also upgrades every PRE-FOLD stamp in the tree. A named handbook that is
+    not registered yet is looked for as its staged draft, which is where T1 stamps it
+    (PL-U3). A name carrying a path separator is refused rather than joined.
+    """
+    agents = os.path.join(root, ".claude", "agents")
+    if not names:
+        return [(os.path.basename(p)[:-3], p, "registered")
+                for p in sorted(glob.glob(os.path.join(agents, "*.md")))], []
+    out, unresolved = [], []
+    for raw in names:
+        name = raw[:-3] if raw.endswith(".md") else raw
+        if not NAME_RX.match(name):
+            unresolved.append(raw)
+            continue
+        reg = os.path.join(agents, name + ".md")
+        if os.path.isfile(reg):
+            out.append((name, reg, "registered"))
+            continue
+        staged = [p for p in staged_paths(root, name) if os.path.isfile(p)]
+        if staged:
+            out.append((name, staged[0], "staged"))
+        else:
+            unresolved.append(raw)
+    return out, unresolved
+
+
+# ── the ledger ──────────────────────────────────────────────────────────────────
+# APPEND-ONLY, ONE JSON OBJECT PER LINE, AND WRITTEN BY THIS SCRIPT ALONE. It is the trace
+# odyssey-alive PL-U4 asked for (a `--restamp` inside an order left nothing behind but its
+# own stdout) and the history PL-U1 needed (nothing could say a stamp had ever existed).
+# Each record names the file, what it held before, what it holds now and the authority,
+# so a restamp is recoverable after the fact rather than erased by the act of making it.
+LEDGER_REL = os.path.join(".claude", "workforce", "stamp-ledger.jsonl")
+CONTRACT_EVENTS = ("stamped", "upgraded", "restamped")
+
+
+def ledger_read(root):
+    """([record], unreadable line count). Readers are liberal: a line that does not parse
+    is counted and reported, never taken as evidence of anything."""
+    out, bad = [], 0
+    try:
+        text = open(os.path.join(root, LEDGER_REL), encoding="utf-8").read()
+    except FileNotFoundError:
+        return out, 0
+    except (OSError, UnicodeDecodeError):
+        return out, 1
+    for line in text.splitlines():
+        if not line.strip():
+            continue
+        try:
+            rec = json.loads(line)
+        except ValueError:
+            bad += 1
+            continue
+        if isinstance(rec, dict) and rec.get("event") and rec.get("file"):
+            out.append(rec)
+        else:
+            bad += 1
+    return out, bad
+
+
+def ledger_append(root, records):
+    """Append `records`, then read the file back. Raises OSError when refused or when the
+    file does not end with exactly what was appended (`checksums.md` rule 2).
+
+    Refused when the ledger resolves outside the project: a symlinked `.claude/workforce`
+    must not carry this project's record into somebody else's tree."""
+    if not records:
+        return
+    path = os.path.join(root, LEDGER_REL)
+    if not _load_sibling("wf-ledger").inside_root(root, path):
+        raise OSError(errno.EPERM, "resolves outside the project root; nothing is written there",
+                      path)
+    at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    blob = "".join(json.dumps({"at": at, **rec, "argv": sys.argv[1:]}, sort_keys=True,
+                              ensure_ascii=False) + "\n" for rec in records)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    try:
+        with open(path, "rb") as fh:
+            fh.seek(0, os.SEEK_END)
+            if fh.tell():
+                fh.seek(-1, os.SEEK_END)
+                if fh.read(1) != b"\n":
+                    blob = "\n" + blob
+    except FileNotFoundError:
+        pass
+    with open(path, "a", encoding="utf-8") as fh:
+        fh.write(blob)
+        fh.flush()
+        os.fsync(fh.fileno())
+    if not open(path, encoding="utf-8").read().endswith(blob):
+        raise OSError(0, "read back a ledger that does not end with the lines appended", path)
+
+
+def git_head_stamp(root, path):
+    """The real digest git HEAD's copy of `path` carries, or None.
+
+    None on every failure: not a repository, the file untracked or ignored, no `git`. An
+    absent answer is never read as "never stamped", only as no evidence from git."""
+    import subprocess
+    try:
+        r = subprocess.run(["git", "-C", root, "show", "HEAD:./" + _rel(root, path)],
+                           capture_output=True, timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if r.returncode != 0:
+        return None
+    m = STAMP_LINE_RX.search(r.stdout.decode("utf-8", "replace"))
+    return m.group(1) if m and DIGEST_RX.match(m.group(1)) else None
+
+
+def prior_stamp_evidence(root, path, ledger):
+    """Why an UNSTAMPED registered handbook is known to have been stamped before, or None.
+
+    THE DISTINCTION odyssey-alive PL-U1 found missing. A never-stamped handbook and one
+    whose stamp line was deleted after its `## Procedure` changed both classify UNSTAMPED,
+    and plain `--execute` stamped the second as a first stamp, which erases the only
+    evidence that the contract moved. Two records can say a stamp existed: this script's
+    own ledger, and the committed copy in git HEAD. Either one is enough. Staged drafts are
+    never asked: a draft being written at T1 is new by definition."""
+    rel = _rel(root, path)
+    for rec in reversed(ledger):
+        if rec.get("file") == rel and rec.get("event") in CONTRACT_EVENTS:
+            return (f"{LEDGER_REL.replace(os.sep, '/')} records `{rec['event']}` "
+                    f"{str(rec.get('to', ''))[:19]}… at {rec.get('at', '?')}")
+    head = git_head_stamp(root, path)
+    if head:
+        return f"git HEAD carries {head[:19]}…"
+    return None
+
+
+def release_state(ledger, rel):
+    """The `amended` record that has no `released` after it, or None."""
+    amended = None
+    for rec in ledger:
+        if rec.get("file") != rel:
+            continue
+        if rec.get("event") == "amended":
+            amended = rec
+        elif rec.get("event") == "released":
+            amended = None
+    return amended
+
+
+def resolve_authority(root, arg):
+    """(kind, project-relative path, text) or (None, the reason it was refused, None).
+
+    THE GATE odyssey-alive PL-U4 asked for. `--restamp` erases the evidence a MISMATCH is,
+    so it is accepted on exactly the two authorities the procedures name: an `AMD` record
+    under `.claude/workforce/personnel/` (`amend.md` Step 7), which then reaches only the
+    handbooks it names, or an audit's run directory under `.claude/workforce/work/audit-*`
+    (`audit.md` Step 5-STAMP). An order dispatched by `/org` holds neither, so an employee
+    cannot restamp inside one without citing a record that a later reader can open."""
+    if not arg:
+        return None, ("no --authority given. --restamp needs the AMD record that authorized "
+                      "the amendment, or the audit run directory"), None
+    real_root = os.path.realpath(root)
+    real = os.path.realpath(arg if os.path.isabs(arg) else os.path.join(root, arg))
+    if not real.startswith(real_root + os.sep):
+        return None, f"--authority {arg!r} is not inside {root}", None
+    rel = _rel(real_root, real)
+    personnel = os.path.join(real_root, ".claude", "workforce", "personnel") + os.sep
+    work = os.path.join(real_root, ".claude", "workforce", "work")
+    base = os.path.basename(real)
+    if (real.startswith(personnel) and base.startswith("AMD-") and base.endswith(".md")
+            and os.path.isfile(real)):
+        try:
+            return "amd", rel, open(real, encoding="utf-8", errors="replace").read()
+        except OSError as exc:
+            return None, f"--authority {rel} unreadable ({exc.strerror})", None
+    if os.path.dirname(real) == work and base.startswith("audit-") and os.path.isdir(real):
+        return "audit", rel, None
+    return None, (f"--authority {arg!r} is neither an AMD-*.md record under "
+                  f".claude/workforce/personnel/ nor an audit-* run directory under "
+                  f".claude/workforce/work/"), None
+
+
+def authority_covers(authority, name):
+    kind, _rel_path, text = authority
+    return kind == "audit" or f".claude/agents/{name}.md" in (text or "")
+
+
+# ── the contract half ───────────────────────────────────────────────────────────
+def stamp_contracts(root, args):
     agents = os.path.join(root, ".claude", "agents")
     if not os.path.isdir(agents):
         # NEVER 0 ON AN UNREADABLE TARGET. A validator exiting clean on a tree it could
         # not open reports health it did not measure (`verify.md` § Handbook conformance).
         print(f"wf-stamp: no .claude/agents under {root}", file=sys.stderr)
         return 2
+    authority = None
+    if args.restamp:
+        kind, why, text = resolve_authority(root, args.authority)
+        if kind is None:
+            print(f"wf-stamp: --restamp REFUSED, nothing written: {why}", file=sys.stderr)
+            return 2
+        authority = (kind, why, text)
+    targets, unresolved = select_targets(root, args.agent)
+    if unresolved:
+        print(f"wf-stamp: no registered handbook and no staged draft for "
+              f"{', '.join(unresolved)} (looked in .claude/agents/ and "
+              f".claude/workforce/staging/agents/)", file=sys.stderr)
+        return 2
+    ledger, bad = ledger_read(root)
 
     print(f"wf-stamp — {root}")
+    if authority:
+        print(f"  authority: {authority[1]} ({authority[0]})")
+    if bad:
+        print(f"  ! {LEDGER_REL}: {bad} unreadable line(s), not taken as evidence of anything")
     counts = {k: 0 for k in
               ("OK", "MISMATCH", "UNSTAMPED", "N/A", "NO-SECTIONS", "NO-RECORD",
-               "STAMPED", "UNREADABLE")}
+               "STAMPED", "UNREADABLE", "STAMP-REMOVED", "UNRELEASED")}
     refused = []
+    ledger_failed = False
     # BEFORE THE FIRST WRITE, not before the first write that happens to be reached.
     # Taken unconditionally — a review run writes nothing, and its INV-SYMLINK line is
     # still the record of what the directory looked like going in.
     links_before = symlink_census(agents)
 
-    for path in sorted(glob.glob(os.path.join(agents, "*.md"))):
-        name = os.path.basename(path)[:-3]
+    for name, path, kind in targets:
+        label = name if kind == "registered" else f"{name} (staged {_rel(root, path)})"
         try:
             body = open(path, encoding="utf-8").read()
         except OSError as exc:
             counts["UNREADABLE"] += 1
-            print(f"  ! UNREADABLE  {name}  ({exc.strerror})")
+            print(f"  ! UNREADABLE  {label}  ({exc.strerror})")
             continue
 
         state, want, recorded = classify(body, root)
 
         if state == "NO-RECORD":
             counts[state] += 1
-            print(f"  . adopted     {name}  no ORG-RECORD — workforce did not author it, not stamped")
+            print(f"  . adopted     {label}  no ORG-RECORD — workforce did not author it, not stamped")
             continue
         if state == "N/A":
             counts[state] += 1
-            print(f"  . n/a         {name}  delegating tier — a coordinator's job is "
+            print(f"  . n/a         {label}  delegating tier — a coordinator's job is "
                   f"judgment, so there is no ## Procedure to hash and no contract to stamp")
             continue
         if state == "NO-SECTIONS":
             counts[state] += 1
-            print(f"  ~ NO-SECTIONS {name}  ## Procedure or ## Verification absent — "
+            print(f"  ~ NO-SECTIONS {label}  ## Procedure or ## Verification absent — "
                   f"nothing to hash; wf-conform owns that verdict")
             continue
         if state == "OK":
             counts[state] += 1
-            print(f"  + OK          {name}  sha256:{want[:12]}…")
+            print(f"  + OK          {label}  sha256:{want[:12]}…")
             continue
 
-        if state == "MISMATCH" and not args.restamp:
-            counts[state] += 1
-            refused.append(name)
-            print(f"  ✗ MISMATCH    {name}")
-            print(f"      recorded sha256:{recorded[7:19]}… · recomputed sha256:{want[:12]}…")
-            print(f"      the contract moved since this stamp was written, so the eval baseline "
-                  f"is stale. FLAGGED, NEVER REPAIRED (checksums.md § On mismatch): a legitimate "
-                  f"amendment and an unauthorized edit are indistinguishable from the hash, and "
-                  f"re-stamping erases the only evidence. Run `review {name}`; where the "
-                  f"amendment IS the authorization, `wf-stamp --execute --restamp`.")
-            continue
+        evidence = None
+        if state == "UNSTAMPED" and kind == "registered":
+            evidence = prior_stamp_evidence(root, path, ledger)
+            if evidence:
+                state = "STAMP-REMOVED"
+
+        if state in ("MISMATCH", "STAMP-REMOVED"):
+            why = None
+            if not args.restamp:
+                why = "flag"
+            elif not authority_covers(authority, name):
+                why = "authority"
+            elif authority[0] == "amd" and release_state(ledger, _rel(root, path)):
+                why = "unreleased"
+            if why:
+                counts[state] += 1
+                refused.append(name)
+                if state == "MISMATCH":
+                    print(f"  ✗ MISMATCH    {label}")
+                    print(f"      recorded sha256:{recorded[7:19]}… · recomputed sha256:{want[:12]}…")
+                else:
+                    print(f"  ✗ STAMP-REMOVED {label}")
+                    print(f"      {'placeholder' if recorded else 'no stamp line'} now, and "
+                          f"{evidence}. A stamp existed and is gone, so the contract it "
+                          f"described may have moved with it.")
+                if why == "flag":
+                    print(f"      the contract moved since this stamp was written, so the eval baseline "
+                          f"is stale. FLAGGED, NEVER REPAIRED (checksums.md § On mismatch): a legitimate "
+                          f"amendment and an unauthorized edit are indistinguishable from the hash, and "
+                          f"re-stamping erases the only evidence. Run `review {name}`; where the "
+                          f"amendment IS the authorization, `wf-stamp --execute --restamp "
+                          f"--authority <AMD record> --agent {name}`.")
+                elif why == "authority":
+                    print(f"      --authority {authority[1]} does not name .claude/agents/{name}.md, "
+                          f"so it does not authorize this one. Not written.")
+                else:
+                    rec = release_state(ledger, _rel(root, path))
+                    print(f"      UNRELEASED since `{rec.get('authority')}` ({rec.get('at')}): the "
+                          f"re-probe is not recorded, so the amendment is not finished. Record the "
+                          f"PASS with `--released <probe report> --agent {name}` first (amend.md "
+                          f"Step 6). Not written.")
+                continue
 
         verb, future = {"MISMATCH": ("restamped", "restamp"),
+                        "STAMP-REMOVED": ("restamped", "restamp"),
                         "PRE-FOLD": ("upgraded", "upgrade")}.get(state, ("stamped", "stamp"))
         if not args.execute:
             # PRE-FOLD COUNTS AS UNSTAMPED: its script half has never been stamped, and
             # plain `--execute` is what writes it, which is what that count's hint says.
-            counts["MISMATCH" if state == "MISMATCH" else "UNSTAMPED"] += 1
+            counts[state if state in ("MISMATCH", "STAMP-REMOVED") else "UNSTAMPED"] += 1
             had = "placeholder" if recorded else "no stamp line"
             if state == "MISMATCH":
                 had = f"sha256:{recorded[7:19]}…"
             elif state == "PRE-FOLD":
                 had = (f"sha256:{recorded[7:19]}… (text-only stamp from before check scripts "
                        f"were folded; the text still matches, so this is not drift)")
-            print(f"  ~ would {future:9s} {name}  {had} -> sha256:{want[:12]}…")
+            print(f"  ~ would {future:9s} {label}  {had} -> sha256:{want[:12]}…")
             continue
 
         updated = write_stamp(body, want)
         if updated is None:
             counts["UNREADABLE"] += 1
-            print(f"  ! {name}  ORG-RECORD has no END marker and no owns-records line; "
+            print(f"  ! {label}  ORG-RECORD has no END marker and no owns-records line; "
                   f"refusing to place a stamp outside the block")
             continue
         open(path, "w", encoding="utf-8").write(updated)
@@ -743,27 +1339,54 @@ def main():
         back, _, _ = classify(open(path, encoding="utf-8").read(), root)
         if back != "OK":
             counts["UNREADABLE"] += 1
-            print(f"  ! {name}  wrote the stamp and read back {back} — not counted as stamped")
+            print(f"  ! {label}  wrote the stamp and read back {back} — not counted as stamped")
             continue
+        auth = authority[1] if verb == "restamped" else None
+        records = [{"event": verb, "file": _rel(root, path), "from": recorded,
+                    "to": f"sha256:{want}", "authority": auth}]
 
         also = ""
-        sp = staged_path(root, name)
-        if os.path.isfile(sp):
+        for sp in (staged_paths(root, name) if kind == "registered" else []):
+            if not os.path.isfile(sp):
+                continue
             staged = open(sp, encoding="utf-8").read()
+            if contract_digest(staged, root) != want:
+                also += f" (staged {_rel(root, sp)} has a different contract — left alone)"
+                continue
             s_updated = write_stamp(staged, want)
             if s_updated is not None and s_updated != staged:
                 open(sp, "w", encoding="utf-8").write(s_updated)
-                also = " (staged copy too)"
+                s_old = STAMP_LINE_RX.search(staged)
+                records.append({"event": verb, "file": _rel(root, sp),
+                                "from": s_old.group(1) if s_old else None,
+                                "to": f"sha256:{want}", "authority": auth})
+                also += " (staged copy too)"
             elif s_updated == staged:
-                also = " (staged copy already agreed)"
+                also += " (staged copy already agreed)"
+        try:
+            ledger_append(root, records)
+        except OSError as exc:
+            ledger_failed = True
+            print(f"  ! {label}  stamped, and the ledger was NOT written: {exc.strerror}. "
+                  f"The trace this write owes is missing", file=sys.stderr)
         counts["STAMPED"] += 1
-        print(f"  + {verb}   {name}  sha256:{want[:12]}…{also}")
+        print(f"  + {verb}   {label}  sha256:{want[:12]}…{also}")
 
-    total = sum(counts.values())
+    for name, path, kind in targets:
+        rec = release_state(ledger, _rel(root, path)) if kind == "registered" else None
+        if rec:
+            counts["UNRELEASED"] += 1
+            print(f"  ! UNRELEASED  {name}  amended under `{rec.get('authority')}` at "
+                  f"{rec.get('at')}; no re-probe recorded since. An amended-but-unprobed "
+                  f"handbook may not be delegated to (amend.md Step 6). Record the PASS with "
+                  f"`wf-stamp --released <probe report> --agent {name} --execute`.")
+
+    total = len(targets)
     print(f"\nINV-STAMP  {total} handbook(s) · stamped {counts['STAMPED']} · ok {counts['OK']} · "
           f"unstamped {counts['UNSTAMPED']} · mismatch {counts['MISMATCH']} · "
           f"n/a {counts['N/A']} · no-sections {counts['NO-SECTIONS']} · "
-          f"adopted {counts['NO-RECORD']} · unreadable {counts['UNREADABLE']}")
+          f"adopted {counts['NO-RECORD']} · unreadable {counts['UNREADABLE']} · "
+          f"stamp-removed {counts['STAMP-REMOVED']} · unreleased {counts['UNRELEASED']}")
 
     # THE HINT NAMES THE FLAG THAT WOULD ACTUALLY DO IT. `--execute` alone never
     # touches a MISMATCH, so printing it under a drift-only run sends the reader to a
@@ -773,13 +1396,13 @@ def main():
         print("Re-run with --execute to write the stamps. Until a handbook carries a real "
               "digest, CONTRACT-DRIFT cannot fire for it — org index, verify and review all "
               "compare a recomputation against a placeholder and find nothing.")
-    if counts["MISMATCH"] and not args.restamp:
-        print("A MISMATCH is not written by --execute. Resolve it with `review <employee>`, "
-              "or, where an authorized amendment is what moved the contract, "
-              "`wf-stamp --execute --restamp`.")
+    if (counts["MISMATCH"] or counts["STAMP-REMOVED"]) and not args.restamp:
+        print("A MISMATCH or STAMP-REMOVED is not written by --execute. Resolve it with "
+              "`review <employee>`, or, where an authorized amendment is what moved the "
+              "contract, `wf-stamp --execute --restamp --authority <AMD record | audit run dir>`.")
     symlink_drift = report_symlink_drift(links_before, symlink_census(agents))
 
-    if refused:
+    if refused or counts["UNRELEASED"] or ledger_failed:
         return 1
     # A LOST LINK OUTRANKS A CLEAN STAMP REPORT. Every handbook above can stamp OK and
     # the registration still be broken, so this cannot be folded into `counts` — it is
@@ -787,6 +1410,337 @@ def main():
     if symlink_drift:
         return 1
     return 0
+
+
+# ── the version stamps ──────────────────────────────────────────────────────────
+# `audit.md` Step 5d item 3: "Set `workforce-version:` to the installed version, bump
+# `handbook-version:`". No shipped script wrote either (nsayka-wawa DEF-Q-002, 2026-10-10:
+# `--execute --restamp` set the contract stamps and left all 17 handbooks at
+# `workforce-version: 1.61.0`, and the run set them by hand). Both fields live on the
+# ORG-RECORD `hired:` line (`handbook-templates.md`), and they are read nowhere else.
+WV_RX = re.compile(r"(workforce-version:[ \t]*)(\d+(?:\.\d+)*)")
+HV_RX = re.compile(r"(handbook-version:[ \t]*)(\d+)")
+HIRED_LINE_RX = re.compile(r"^([ \t]*<!--[^\n]*?\bhired:[^\n]*?)([ \t]*-->[ \t]*)$", re.M)
+
+
+def org_record_span(body):
+    start = ORG_RECORD_RX.search(body)
+    if not start:
+        return None
+    end = ORG_RECORD_END_RX.search(body, start.end())
+    return (start.start(), end.end()) if end else None
+
+
+def read_versions(body):
+    """(workforce-version or None, handbook-version int or None), ORG-RECORD only."""
+    span = org_record_span(body)
+    if span is None:
+        return None, None
+    block = body[span[0]:span[1]]
+    wv, hv = WV_RX.search(block), HV_RX.search(block)
+    return (wv.group(2) if wv else None), (int(hv.group(2)) if hv else None)
+
+
+def set_versions(body, workforce_version=None, bump=False):
+    """Body with `workforce-version:` set and/or `handbook-version:` bumped, inside the
+    ORG-RECORD block only; None when the block has no END marker.
+
+    An absent `workforce-version:` is added to the `hired:` line, where the template puts
+    it and where `wf-conform`'s advisory tells a reader to add it; with no `hired:` line it
+    gets its own line before `ORG-RECORD END`. An absent `handbook-version:` is NOT
+    invented: nothing recorded what number it would follow from."""
+    span = org_record_span(body)
+    if span is None:
+        return None
+    s, e = span
+    block = body[s:e]
+    if workforce_version is not None:
+        wv = WV_RX.search(block)
+        if wv:
+            block = block[:wv.start(2)] + workforce_version + block[wv.end(2):]
+        else:
+            m = HIRED_LINE_RX.search(block)
+            if m:
+                block = block[:m.end(1)] + f" | workforce-version: {workforce_version}" + block[m.end(1):]
+            else:
+                end = ORG_RECORD_END_RX.search(block)
+                block = (block[:end.start()] + f"<!-- workforce-version: {workforce_version} -->\n"
+                         + block[end.start():])
+    if bump:
+        hv = HV_RX.search(block)
+        if hv:
+            block = block[:hv.start(2)] + str(int(hv.group(2)) + 1) + block[hv.end(2):]
+    return body[:s] + block + body[e:]
+
+
+def _write_handbook(path, body):
+    """Write through a symlink, never over it: `open(path, "w")` follows the link, which is
+    the sanctioned form `symlink_census` above records the reasoning for."""
+    open(path, "w", encoding="utf-8").write(body)
+
+
+def stamp_versions(root, args):
+    agents = os.path.join(root, ".claude", "agents")
+    if not os.path.isdir(agents):
+        print(f"wf-stamp: no .claude/agents under {root}", file=sys.stderr)
+        return 2
+    conform = _load_sibling("wf-conform")
+    installed = conform.installed_version()
+    want = conform.version_tuple(installed) if installed else None
+    if want is None:
+        # NONE MEANS NO WRITE. A script that cannot read its own release has no business
+        # stamping one into a project's handbooks (`wf-conform.installed_version`).
+        print("wf-stamp: the installed WORKFORCE-VERSION is unreadable; nothing stamped",
+              file=sys.stderr)
+        return 2
+    targets, unresolved = select_targets(root, args.agent)
+    targets = [t for t in targets if t[2] == "registered"]
+    if unresolved or (args.agent and not targets):
+        print(f"wf-stamp: no registered handbook for {', '.join(unresolved or args.agent)}",
+              file=sys.stderr)
+        return 2
+    print(f"wf-stamp --versions — {root}  ·  installed WORKFORCE-VERSION {installed}")
+    counts = {k: 0 for k in ("versioned", "current", "newer", "adopted", "failed", "owed")}
+    links_before = symlink_census(agents)
+    for name, path, _kind in targets:
+        try:
+            body = open(path, encoding="utf-8").read()
+        except OSError as exc:
+            counts["failed"] += 1
+            print(f"  ! UNREADABLE  {name}  ({exc.strerror})")
+            continue
+        if not ORG_RECORD_RX.search(body):
+            counts["adopted"] += 1
+            print(f"  . adopted     {name}  no ORG-RECORD — workforce did not author it")
+            continue
+        wv, hv = read_versions(body)
+        have = conform.version_tuple(wv) if wv else None
+        if have is not None and have == want:
+            counts["current"] += 1
+            print(f"  = current     {name}  workforce-version {wv} · handbook-version {hv}")
+            continue
+        if have is not None and have > want:
+            counts["newer"] += 1
+            print(f"  ! newer       {name}  workforce-version {wv} is AHEAD of the installed "
+                  f"{installed}; left alone — this install is older than the one that wrote it")
+            continue
+        hv_to = hv + 1 if hv is not None else None
+        detail = (f"workforce-version {wv or '(absent)'} -> {installed} · handbook-version "
+                  + (f"{hv} -> {hv_to}" if hv is not None else "absent, not invented"))
+        if not args.execute:
+            counts["owed"] += 1
+            print(f"  ~ would version {name}  {detail}")
+            continue
+        new = set_versions(body, installed, bump=True)
+        if new is None:
+            counts["failed"] += 1
+            print(f"  ! {name}  ORG-RECORD has no END marker; nothing written")
+            continue
+        _write_handbook(path, new)
+        back = read_versions(open(path, encoding="utf-8").read())
+        if back != (installed, hv_to):
+            counts["failed"] += 1
+            print(f"  ! {name}  wrote the versions and read back {back} — not counted")
+            continue
+        try:
+            ledger_append(root, [{"event": "versioned", "file": _rel(root, path),
+                                  "from": f"workforce-version {wv} · handbook-version {hv}",
+                                  "to": f"workforce-version {installed} · handbook-version {hv_to}",
+                                  "authority": None}])
+        except OSError as exc:
+            counts["failed"] += 1
+            print(f"  ! {name}  versioned, and the ledger was NOT written: {exc.strerror}",
+                  file=sys.stderr)
+            continue
+        counts["versioned"] += 1
+        print(f"  + versioned   {name}  {detail}")
+    print(f"\nINV-VERSION  {len(targets)} handbook(s) · installed {installed} · "
+          f"versioned {counts['versioned']} · owed {counts['owed']} · current {counts['current']} · "
+          f"newer {counts['newer']} · adopted {counts['adopted']} · failed {counts['failed']}")
+    if counts["owed"]:
+        print("Re-run with --versions --execute to write them. This is the stamp audit Step 5d "
+              "item 3 sets after it applies the shipped deltas, never before.")
+    drift = report_symlink_drift(links_before, symlink_census(agents))
+    return 1 if (counts["failed"] or drift) else 0
+
+
+# ── amendment and release ───────────────────────────────────────────────────────
+def record_amendment(root, args):
+    """`--amended <AMD> --agent <name>`: bump `handbook-version:` and record the amendment,
+    so the handbook reads UNRELEASED until `--released` records its re-probe."""
+    kind, rel, text = resolve_authority(root, args.amended)
+    if kind != "amd":
+        print(f"wf-stamp: --amended REFUSED: "
+              f"{rel if kind is None else '--amended takes an AMD record, not a run directory'}",
+              file=sys.stderr)
+        return 2
+    if not args.agent:
+        print("wf-stamp: --amended needs --agent <name>", file=sys.stderr)
+        return 2
+    targets, unresolved = select_targets(root, args.agent)
+    targets = [t for t in targets if t[2] == "registered"]
+    if unresolved or len(targets) != len(args.agent):
+        print(f"wf-stamp: --amended reaches registered handbooks only; not registered: "
+              f"{', '.join(unresolved or args.agent)}", file=sys.stderr)
+        return 2
+    print(f"wf-stamp --amended — {root}  ·  {rel}")
+    failed = 0
+    for name, path, _kind in targets:
+        if not authority_covers((kind, rel, text), name):
+            failed += 1
+            print(f"  ✗ {name}  {rel} does not name .claude/agents/{name}.md — not recorded")
+            continue
+        body = open(path, encoding="utf-8").read()
+        if not ORG_RECORD_RX.search(body):
+            failed += 1
+            print(f"  ✗ {name}  no ORG-RECORD — an adopted agent has no version to bump")
+            continue
+        _wv, hv = read_versions(body)
+        hv_to = hv + 1 if hv is not None else None
+        bump = f"handbook-version {hv} -> {hv_to}" if hv is not None else \
+            "handbook-version absent, not invented"
+        if not args.execute:
+            print(f"  ~ would record amended {name}  {bump}; it then reads UNRELEASED")
+            continue
+        if hv is not None:
+            new = set_versions(body, bump=True)
+            if new is None:
+                failed += 1
+                print(f"  ! {name}  ORG-RECORD has no END marker; nothing written")
+                continue
+            _write_handbook(path, new)
+            if read_versions(open(path, encoding="utf-8").read())[1] != hv_to:
+                failed += 1
+                print(f"  ! {name}  bumped and read back a different handbook-version — not recorded")
+                continue
+        try:
+            ledger_append(root, [{"event": "amended", "file": _rel(root, path),
+                                  "from": hv, "to": hv_to, "authority": rel}])
+        except OSError as exc:
+            failed += 1
+            print(f"  ! {name}  ledger NOT written ({exc.strerror}); the amendment is not "
+                  f"recorded", file=sys.stderr)
+            continue
+        print(f"  + amended     {name}  {bump} · UNRELEASED until its re-probe is recorded "
+              f"with --released")
+    return 1 if failed else 0
+
+
+def record_release(root, args):
+    """`--released <probe report> --agent <name>`: the re-probe PASS that ends UNRELEASED."""
+    ev = args.released
+    real_root = os.path.realpath(root)
+    real = os.path.realpath(ev if os.path.isabs(ev) else os.path.join(root, ev))
+    if not real.startswith(real_root + os.sep) or not os.path.isfile(real):
+        print(f"wf-stamp: --released REFUSED: {ev!r} is not a file inside {root}. Cite the "
+              f"probe report that returned PASS", file=sys.stderr)
+        return 2
+    if not args.agent:
+        print("wf-stamp: --released needs --agent <name>", file=sys.stderr)
+        return 2
+    targets, unresolved = select_targets(root, args.agent)
+    targets = [t for t in targets if t[2] == "registered"]
+    if unresolved or len(targets) != len(args.agent):
+        print(f"wf-stamp: --released reaches registered handbooks only; not registered: "
+              f"{', '.join(unresolved or args.agent)}", file=sys.stderr)
+        return 2
+    ledger, _bad = ledger_read(root)
+    evidence = _rel(real_root, real)
+    print(f"wf-stamp --released — {root}  ·  {evidence}")
+    failed = 0
+    for name, path, _kind in targets:
+        rec = release_state(ledger, _rel(root, path))
+        if rec is None:
+            print(f"  . {name}  not UNRELEASED — no amendment is waiting on a probe; nothing "
+                  f"recorded")
+            continue
+        if not args.execute:
+            print(f"  ~ would release {name}  amended under `{rec.get('authority')}`")
+            continue
+        try:
+            ledger_append(root, [{"event": "released", "file": _rel(root, path),
+                                  "from": rec.get("authority"), "to": evidence,
+                                  "authority": evidence}])
+        except OSError as exc:
+            failed += 1
+            print(f"  ! {name}  ledger NOT written ({exc.strerror}); still UNRELEASED",
+                  file=sys.stderr)
+            continue
+        print(f"  + released    {name}  amended under `{rec.get('authority')}`, re-probed: "
+              f"{evidence}")
+    return 1 if failed else 0
+
+
+def main():
+    ap = argparse.ArgumentParser(
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=(
+            "Write and check the records a handbook carries about itself.\n\n"
+            "  (default)      contract-stamp: report; --execute writes a first stamp;\n"
+            "                 --restamp --authority <AMD|audit run dir> overwrites a MISMATCH\n"
+            "  --versions     ORG-RECORD workforce-version -> installed release, and\n"
+            "                 handbook-version + 1, on every handbook stamped older\n"
+            "  --amended AMD  record an amendment: handbook-version + 1, UNRELEASED until\n"
+            "  --released R   records the re-probe PASS\n"
+            "  --directives   .directives.sha rows, each extracted mirror against its live\n"
+            "                 skill (appends what it lacks), and each `## Directives` sha pin\n"
+            "                 against the file (re-pins what this run moved)\n"
+            "  --floor H      a handbook's measured length floor\n\n"
+            "Nothing is written without --execute. Every write is appended to\n"
+            ".claude/workforce/stamp-ledger.jsonl."))
+    ap.add_argument("--root", default=os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd())
+    ap.add_argument("--execute", action="store_true")
+    ap.add_argument("--restamp", action="store_true",
+                    help="also overwrite a MISMATCH — the authorized-amendment path; the "
+                         "contract half needs --authority")
+    ap.add_argument("--authority", metavar="PATH",
+                    help="with --restamp: the AMD record (.claude/workforce/personnel/AMD-*.md) "
+                         "naming the handbook, or the audit run dir (.claude/workforce/work/audit-*)")
+    ap.add_argument("--agent", action="append", metavar="NAME",
+                    help="only this handbook (repeatable). Unregistered: its staged draft")
+    ap.add_argument("--versions", action="store_true",
+                    help="set workforce-version to the installed release and bump "
+                         "handbook-version where the handbook is stamped older")
+    ap.add_argument("--amended", metavar="AMD",
+                    help="record an amendment under this AMD record; needs --agent")
+    ap.add_argument("--released", metavar="REPORT",
+                    help="record the re-probe PASS in this report; needs --agent")
+    ap.add_argument("--directives", action="store_true",
+                    help="stamp `.directives.sha`, check every mirror and every pin, "
+                         "instead of the handbook contract stamps")
+    ap.add_argument("--floor", metavar="HANDBOOK",
+                    help="record this handbook's measured length floor, so wf-conform reports "
+                         "it instead of ordering the split again")
+    ap.add_argument("--evidence", metavar="PATH",
+                    help="with --floor: the project-relative report that measured the floor")
+    args = ap.parse_args()
+
+    root = os.path.abspath(args.root)
+    modes = [m for m in ("floor", "directives", "versions", "amended", "released")
+             if getattr(args, m)]
+    if len(modes) > 1:
+        print(f"wf-stamp: --{' and --'.join(modes)} are separate gestures; run them apart",
+              file=sys.stderr)
+        return 2
+    # THE HALVES ARE SEPARATE GESTURES, never one sweep. They stamp different
+    # artifacts with different mismatch consequences: a stale contract-stamp means an
+    # eval baseline is old, while a drifted directive block means the user's own words
+    # may have been reworded. Folding them into one flag would let a run that meant to
+    # refresh an eval baseline silently re-bless a changed directive.
+    if args.floor:
+        return record_floor(root, args.floor, args.evidence, args.execute)
+    if args.directives:
+        if not os.path.isdir(os.path.join(root, ".claude")):
+            print(f"wf-stamp: no .claude under {root}", file=sys.stderr)
+            return 2
+        return stamp_directives(root, args.execute, args.restamp)
+    if args.versions:
+        return stamp_versions(root, args)
+    if args.amended:
+        return record_amendment(root, args)
+    if args.released:
+        return record_release(root, args)
+    return stamp_contracts(root, args)
 
 
 if __name__ == "__main__":
