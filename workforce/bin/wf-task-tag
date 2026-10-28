@@ -631,9 +631,9 @@ IGNORE_RULE = "*\n"
 # file that carries them and a reader needs the set.
 #
 #   running    linked at `SubagentStart`; the issue holding one is a HOLD, never a failure.
-#              A RESUMED agent returns to it at its next tool call (`agent_resumed`), which
-#              is the only moment anything sees a `SendMessage` resume: a resume fires no
-#              `SubagentStart`.
+#              A RESUMED agent returns to it at its next tool call (`agent_resumed`), and a
+#              background agent's resume fires `SubagentStart` again, linking it anew on
+#              the current issue (measured 2026-10-28; `agents_finished`).
 #   returned   it handed back HAVING DELIVERED, and `wf-widen` recorded its judgment on the
 #              issue. The only two ways in are a stop that delivered the report its order
 #              asked for with nothing UNMET in it, and the issue closing.
@@ -1315,19 +1315,19 @@ def plain_text(value, limit):
     return one[:limit]
 
 
-def agent_task(payload, aid):
-    """The task description the session gave an agent when it started it, or "".
+def agent_meta(payload, aid):
+    """The harness's own record of an agent, as a dict, or None.
 
     THE HARNESS ALREADY RECORDS IT: every agent has `subagents/agent-<id>.meta.json` beside
     the session transcript, holding `agentType` and `description`. Read, never trusted as a
     path: `aid` is checked as one bare component before it is joined, and the file is read
     without following a link."""
     if not bare_name(aid):
-        return ""
+        return None
     tp = payload.get("transcript_path")
     sid = payload.get("session_id")
     if not isinstance(tp, str) or not tp:
-        return ""
+        return None
     base = os.path.dirname(tp)
     names = [os.path.join(base, "subagents", f"agent-{aid}.meta.json")]
     if bare_name(sid):
@@ -1335,8 +1335,13 @@ def agent_task(payload, aid):
     for path in names:
         meta = read_json_nofollow(path)
         if isinstance(meta, dict):
-            return plain_text(meta.get("description"), TASK_MAX)
-    return ""
+            return meta
+    return None
+
+
+def agent_task(payload, aid):
+    """The task description the session gave an agent when it started it, or ""."""
+    return plain_text((agent_meta(payload, aid) or {}).get("description"), TASK_MAX)
 
 
 def issue_named(led, text):
@@ -1387,6 +1392,47 @@ STOPPED_NOTICE = re.compile(
     r"<status>(?:killed|stopped|cancell?ed)</status>", re.S)
 
 
+def agents_finished(led, payload):
+    """Mark `returned` every `running` entry that is not a live round. The count.
+
+    A RESUMED AGENT IS LINKED AGAIN, so one id can sit on several issues. MEASURED
+    2026-10-28, mutze session `6caae2f5`: `af88605b6ba45d04d` was `running` on six issues
+    after it had finished, and those issues held forever. One agent runs one round at a
+    time, so every `running` entry older than the id's newest one is over. The newest is
+    over when the harness's meta file says `"finished": true`; that key is harness state,
+    MEASURED on this host on 2026-10-28 (absent on the five agents still writing, `true` on
+    every stopped one). Anything else leaves it `running`, the recoverable direction.
+    """
+    entries = {}
+    for iss in led.get("issues", []):
+        for a in issue_agents(iss):
+            entries.setdefault(a["agent_id"], []).append(a)
+    n = 0
+    for aid, seen in entries.items():
+        stale = [a for a in seen[:-1] if a.get("state") == "running"]
+        newest = seen[-1]
+        if newest.get("state") == "running" and (
+                agent_meta(payload, aid) or {}).get("finished") is True:
+            stale.append(newest)
+        for a in stale:
+            a["state"] = "returned"
+        n += len(stale)
+    return n
+
+
+def newest_entry(led, aid):
+    """`(issue, entry)` for the NEWEST entry carrying `aid`, or `(None, None)`.
+
+    NEWEST, because a resumed agent is linked again on the issue current at the resume
+    (`agents_finished`), and its stop belongs to that round. Oldest-first sent every later
+    stop to the first issue and left the newer entries `running` forever."""
+    for iss in reversed(led.get("issues", [])):
+        for a in reversed(issue_agents(iss)):
+            if a.get("agent_id") == aid:
+                return iss, a
+    return None, None
+
+
 def link_agent(payload, led):
     """Link the starting agent to the issue being worked, as `running`. The issue id, or None.
 
@@ -1420,6 +1466,7 @@ def agent_returned(payload, led, judgment, delivered=False, cut=True):
     THE ISSUE IS FOUND BY THE AGENT'S ID, never by which issue is newest. That is the
     no-cross-talk rule: two issues are open, each has two agents, and the hand-backs
     interleave, so "the current issue" is the wrong answer for every stop but the luckiest.
+    Of that id's entries it takes the NEWEST (`newest_entry`): a resume links it again.
     An agent whose id appears on no issue is an agent this session never linked, and
     nothing is recorded for it — a stop with no `agent_id` is NOT KEYABLE and is never
     given a guessed one.
@@ -1458,39 +1505,44 @@ def agent_returned(payload, led, judgment, delivered=False, cut=True):
     Returns the issue id it landed on, or None.
     """
     aid = agent_component(payload)
-    if not aid:
+    iss, a = newest_entry(led, aid) if aid else (None, None)
+    if a is None:
         return None
-    for iss in led.get("issues", []):
-        for a in issue_agents(iss):
-            if a.get("agent_id") == aid:
-                a["judgment"] = str(judgment or "")[:500]
-                if a.get("state") != "handoff" or delivered or not cut:
-                    a["state"] = "returned"
-                return iss.get("id")
-    return None
+    a["judgment"] = str(judgment or "")[:500]
+    if a.get("state") != "handoff" or delivered or not cut:
+        a["state"] = "returned"
+    return iss.get("id")
 
 
 def agent_resumed(payload, led):
     """Put a RESUMED agent back to `running` on its own issue. Issue id, or None.
 
-    `wf-turn-budget` calls this on the first tool call after a cut, which is the only
-    moment anything observes that a `SendMessage` resume happened: a resume fires no
-    `SubagentStart`, so `link_agent` never runs for it and the entry would sit at
-    `handoff` while the agent is working. `judge_issue` would then ask the user to resume
-    an agent that is already resumed.
+    `wf-turn-budget` calls this on the first tool call after a cut, so an entry never sits
+    at `handoff` while the agent is working and `judge_issue` never asks the user to resume
+    an agent that is already resumed. A resume DOES fire `SubagentStart` for a background
+    agent — MEASURED 2026-10-28, mutze session `6caae2f5`, seven `link_agent` entries for
+    one id — so `link_agent` may already have put it back to `running` on the current
+    issue. The `handoff` it left on the older issue is that round's mark, and it is
+    retired to `returned` here: left alone, `held_by` refuses this role's spawns and the
+    old issue asks for a resume of an agent that is running.
 
     ONLY FROM `handoff`, and None otherwise, so the caller writes nothing on an ordinary
     call. An agent already `running` is the common case and must cost no ledger write.
     """
     aid = agent_component(payload)
-    if not aid:
+    iss, a = newest_entry(led, aid) if aid else (None, None)
+    if a is None:
         return None
-    for iss in led.get("issues", []):
-        for a in issue_agents(iss):
-            if a.get("agent_id") == aid and a.get("state") == "handoff":
-                a["state"] = "running"
-                return iss.get("id")
-    return None
+    moved = None
+    for old in led.get("issues", []):
+        for b in issue_agents(old):
+            if b is not a and b.get("agent_id") == aid and b.get("state") == "handoff":
+                b["state"] = "returned"
+                moved = old.get("id")
+    if a.get("state") == "handoff":
+        a["state"] = "running"
+        moved = iss.get("id")
+    return moved
 
 
 # ── and the guard's reader: who is still holding work of this role ──────────
@@ -1670,36 +1722,33 @@ def agent_handoff(payload, led, writes=None):
     behaviour that shipped before — never worse than it, and gated on a non-empty set.
     """
     aid = agent_component(payload)
-    if not aid:
+    iss, a = newest_entry(led, aid) if aid else (None, None)
+    if a is None:
         return None
-    for iss in led.get("issues", []):
-        for a in issue_agents(iss):
-            if a.get("agent_id") == aid:
-                digest = unmet_digest(iss)
-                measured = isinstance(writes, int) and writes >= 0
-                # THE STORED COUNT IS VALIDATED WHERE IT IS READ, which is this file's rule
-                # for everything that comes off the ledger: the file lives in a repository
-                # and a string or null on this key would make the comparison below raise
-                # inside the hook's own try/except — and a mark that silently does not get
-                # written is the whole silence this mechanism exists to remove.
-                prev = a.get("handoff_writes")
-                prev = prev if isinstance(prev, int) and prev >= 0 else 0
-                moved = measured and writes > prev
-                if (measured and unmet_asks(iss) and not moved
-                        and a.get("handoff_digest") == digest):
-                    a["handoff_stalled"] = True
-                a["state"] = "handoff"
-                # WHEN, BECAUSE A MARK WITH NO AGE CANNOT BE REFUSED. `held_by` is the
-                # spawn guard's reader and it DENIES a tool call, so the one thing it
-                # must never do is wedge a session against an agent that is long gone.
-                # The stamp is what makes the refusal expire by itself; a mark written
-                # by a release that did not record one reads as stale and blocks nothing.
-                a["handoff_at"] = int(time.time())
-                a["handoff_digest"] = digest
-                if writes is not None:
-                    a["handoff_writes"] = writes
-                return iss.get("id")
-    return None
+    digest = unmet_digest(iss)
+    measured = isinstance(writes, int) and writes >= 0
+    # THE STORED COUNT IS VALIDATED WHERE IT IS READ, which is this file's rule
+    # for everything that comes off the ledger: the file lives in a repository
+    # and a string or null on this key would make the comparison below raise
+    # inside the hook's own try/except — and a mark that silently does not get
+    # written is the whole silence this mechanism exists to remove.
+    prev = a.get("handoff_writes")
+    prev = prev if isinstance(prev, int) and prev >= 0 else 0
+    moved = measured and writes > prev
+    if (measured and unmet_asks(iss) and not moved
+            and a.get("handoff_digest") == digest):
+        a["handoff_stalled"] = True
+    a["state"] = "handoff"
+    # WHEN, BECAUSE A MARK WITH NO AGE CANNOT BE REFUSED. `held_by` is the
+    # spawn guard's reader and it DENIES a tool call, so the one thing it
+    # must never do is wedge a session against an agent that is long gone.
+    # The stamp is what makes the refusal expire by itself; a mark written
+    # by a release that did not record one reads as stale and blocks nothing.
+    a["handoff_at"] = int(time.time())
+    a["handoff_digest"] = digest
+    if writes is not None:
+        a["handoff_writes"] = writes
+    return iss.get("id")
 
 
 def judge_issue(iss):

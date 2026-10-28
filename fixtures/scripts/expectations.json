@@ -9602,6 +9602,78 @@
       "issue i3"
     ]
   },
+  "issues-handback-lands-on-its-newest-entry": {
+    "_why": "A RESUMED AGENT IS LINKED AGAIN, AND ITS STOP BELONGS TO THE NEWEST LINK. MEASURED 2026-10-28, mutze session `6caae2f5`: a background agent resumed with SendMessage fired `SubagentStart` again, so `link_agent` put a second `running` entry on the then-current issue -- seven entries for one id. `agent_returned` walked oldest-first and landed every later stop on the first issue, so the newer entries read `running` forever and their issues held. Here `a3` already `returned` on i1 and is `running` on i2; this stop must settle i2 and leave i1's recorded judgment alone. Oldest-first fails both assertions.",
+    "after": {
+      ".claude/workforce/issues/s1.json": {
+        "not": [
+          "\"state\": \"running\""
+        ],
+        "want": [
+          "{\"agent_id\": \"a3\", \"agent_type\": \"engineering-coder\", \"state\": \"returned\", \"judgment\": \"OUTPUT.md written\"}"
+        ]
+      }
+    },
+    "env": {
+      "WF_BLIND_SAMPLE": "0"
+    },
+    "exit": 0,
+    "not": [
+      "Traceback"
+    ],
+    "script": "wf-widen",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"agent_transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"session_id\": \"s1\", \"hook_event_name\": \"SubagentStop\", \"last_assistant_message\": \"The boundary is shipped and the fixture passes.\", \"agent_id\": \"a3\", \"agent_type\": \"engineering-coder\"}"
+  },
+  "widen-resumed-agent-finished-closes-its-issues": {
+    "_why": "THE HEAL FOR LEDGERS ALREADY WRITTEN THE OLD WAY. `a1` was linked on i1, i2 and i3 by resumes, every item is done, and nothing settled the i2 and i3 entries, so both issues read PROCESSING forever (the shape of mutze session `6caae2f5`, 2026-10-28). `agents_finished` settles the i2 entry because it is older than the id's newest, and the i3 entry because the harness's `s1/subagents/agent-a1.meta.json` says `\"finished\": true` -- harness state MEASURED on one host on 2026-10-28, absent on every agent still writing. Without the heal both issues print PROCESSING.",
+    "after": {
+      ".claude/workforce/issues/s1.json": {
+        "not": [
+          "\"state\": \"running\""
+        ],
+        "want": [
+          "\"id\": \"i2\", \"prompt\": \"resume the describe tool run\", \"state\": \"closed\"",
+          "\"id\": \"i3\", \"prompt\": \"resume it again for the last section\", \"state\": \"closed\""
+        ]
+      }
+    },
+    "env": {
+      "WF_BLIND_SAMPLE": "0"
+    },
+    "exit": 0,
+    "not": [
+      "Traceback",
+      "PROCESSING"
+    ],
+    "script": "wf-widen",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"session_id\": \"s1\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"Everything is handed back.\"}"
+  },
+  "widen-resumed-agent-live-round-still-holds": {
+    "_why": "THE RECOVERABLE DIRECTION. `a2` is `running` on i1 and again on i2. The i1 entry is older than the id's newest, and one agent runs one round at a time, so it is settled and i1 (every item done) closes. The i2 entry is the live round: its meta file carries no `finished` key, which is what MEASURED 2026-10-28 every still-writing agent looked like, so it stays `running` and i2 stays PROCESSING. Anything but a literal `true` keeps an entry running.",
+    "after": {
+      ".claude/workforce/issues/s1.json": {
+        "want": [
+          "\"id\": \"i1\", \"prompt\": \"describe the tool run\", \"state\": \"closed\"",
+          "\"id\": \"i2\", \"prompt\": \"resume the describe tool run\", \"state\": \"open\"",
+          "{\"agent_id\": \"a2\", \"agent_type\": \"workflow-engineer\", \"state\": \"running\""
+        ]
+      }
+    },
+    "env": {
+      "WF_BLIND_SAMPLE": "0"
+    },
+    "exit": 0,
+    "not": [
+      "Traceback",
+      "i1  PROCESSING"
+    ],
+    "script": "wf-widen",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"session_id\": \"s1\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"Everything is handed back.\"}",
+    "want": [
+      "ISSUES",
+      "i2  PROCESSING  [resume the describe tool run]"
+    ]
+  },
   "issues-handback-lands-on-its-own-issue": {
     "_why": "NO CROSS-TALK, and this is the case that pins it. Two issues are open with two agents each, and a3 -- i2's agent -- hands back while a2, a3's and a4's siblings are still out. The issue is found BY `agent_id`, never by which issue is newest, because with interleaved hand-backs \"the current issue\" is the wrong answer for every stop but the luckiest. So a3 goes `returned` on i2 and NOTHING on i1 moves: a2 is still `running` on i1 and a4 is still `running` on i2, both asserted, because a verdict that marked the wrong agent would otherwise pass a test that only looked at a3.",
     "after": {
@@ -10325,6 +10397,32 @@
           "permissionDecision",
           "deny"
       ]
+  },
+  "turn-budget-resume-retires-the-older-issues-handoff": {
+    "_why": "A RESUME THAT RELINKS LEAVES ITS CUT BEHIND. MEASURED 2026-10-28, mutze session `6caae2f5`: a background agent resumed with SendMessage fires `SubagentStart` again, so `link_agent` gives it a new `running` entry on the then-current issue while its `handoff` mark sits on the issue it was cut on. `agent_resumed` takes the id's NEWEST entry, which is already `running`, so the old mark survived it: `held_by` kept refusing spawns of the role and i1 kept asking for a resume of an agent that is working. This transcript is a cap-10 agent cut at turn 8 and two calls into its fresh allowance; the resume flips nothing on i2 and retires i1's mark to `returned`. Oldest-first set i1 back to `running` and never settled it.",
+    "after": {
+      ".claude/workforce/issues/s1.json": {
+        "not": [
+          "\"state\": \"handoff\""
+        ],
+        "want": [
+          "\"id\": \"i1\", \"prompt\": \"finish the turn limit work\", \"state\": \"open\", \"items\": [{\"ask\": \"ship the anchored round\", \"status\": \"open\"}], \"agents\": [{\"agent_id\": \"a1\", \"agent_type\": \"eng-coder\", \"state\": \"returned\"",
+          "{\"agent_id\": \"a1\", \"agent_type\": \"eng-coder\", \"state\": \"running\""
+        ]
+      },
+      "tmp/wf-turn-budget/s1/a1/resumed-after-fired-final": {
+        "want": []
+      }
+    },
+    "env": {
+      "TMPDIR": "${TREE}/tmp"
+    },
+    "exit": 0,
+    "not": [
+      "Traceback"
+    ],
+    "script": "wf-turn-budget",
+    "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"transcript_path\": \"s1.jsonl\", \"tool_name\": \"Bash\", \"tool_input\": {\"command\": \"echo hi\"}, \"agent_id\": \"a1\", \"agent_type\": \"eng-coder\"}"
   },
   "turn-budget-same-allowance-call-is-not-a-resume": {
       "_why": "THE NOTICE LEAVES THREE TURNS, AND THE AGENT SPENDS THEM. The final notice fires at `cap - 3`, so the agent's own next tool call arrives in the SAME allowance -- and a resume test bounded at the current round read that call as a `SendMessage` resume and flipped the entry back to `running`. MEASURED in trial e2e3: filer `a26b1c41eecfb3119` was flipped that way after each of its two notices, the harness cut it for real at the end, and `agent_returned` then recorded `returned` on an agent that was still holding work -- so the main Stop never asked for it. Here `fired-final` is claimed for round 0 and the counter is at turn 38 of 40, still inside allowance 1: the mark must survive. A resume is a NEW ALLOWANCE and nothing in this transcript opens one.",
