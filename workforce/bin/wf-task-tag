@@ -1073,6 +1073,13 @@ def absorb_items(led, issue_id, items, title=""):
         own.pop("state", None)
     if not mine and any(i.get("fallback") is True for i in issue_items(own)):
         return
+    # AN EMPTY LIST NEVER ERASES ITEMS THE SESSION WROTE. MEASURED 2026-10-28, mutze session
+    # `6caae2f5`: i22's one written item was gone by the session's end, `items: []`. Both
+    # ways here end in that write: a list holding nothing for this issue (another turn's
+    # file, or a carry-only one), and a fold refused over a running agent. A withdrawn
+    # ask is marked "dropped", never deleted, so nothing legitimate is lost.
+    if not mine and session_items(own):
+        return
     own["items"] = mine
 
 

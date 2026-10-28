@@ -9674,6 +9674,25 @@
       "i2  PROCESSING  [resume the describe tool run]"
     ]
   },
+  "tag-empty-list-keeps-the-issues-written-items": {
+    "_why": "AN EMPTY LIST NEVER ERASES WHAT THE SESSION WROTE. MEASURED 2026-10-28, mutze session `6caae2f5`: issue i22 ended the session with `items: []` although the session wrote one item for it. Here the tag still names i1 while the asks file holds an empty list, and the next user message absorbs that list onto i1. `absorb_items` replaced i1's written item with nothing; the guard keeps it.",
+    "after": {
+      ".claude/workforce/issues/s1.json": {
+        "not": [
+          "\"id\": \"i1\", \"prompt\": \"then i'd like to have a haunting woman's yodel as the drum starts the fade a bit.\", \"state\": \"open\", \"items\": []"
+        ],
+        "want": [
+          "\"items\": [{\"ask\": \"a haunting woman's yodel as the drum starts the fade a bit\", \"status\": \"open\"}]"
+        ]
+      }
+    },
+    "exit": 0,
+    "not": [
+      "Traceback"
+    ],
+    "script": "wf-task-tag",
+    "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"so the composer will most likely need to find the software for these effects and have me download and stage it\"}"
+  },
   "issues-handback-lands-on-its-own-issue": {
     "_why": "NO CROSS-TALK, and this is the case that pins it. Two issues are open with two agents each, and a3 -- i2's agent -- hands back while a2, a3's and a4's siblings are still out. The issue is found BY `agent_id`, never by which issue is newest, because with interleaved hand-backs \"the current issue\" is the wrong answer for every stop but the luckiest. So a3 goes `returned` on i2 and NOTHING on i1 moves: a2 is still `running` on i1 and a4 is still `running` on i2, both asserted, because a verdict that marked the wrong agent would otherwise pass a test that only looked at a3.",
     "after": {
