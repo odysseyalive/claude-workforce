@@ -4328,6 +4328,44 @@
       "reached through its tools rather than started from the shell"
     ]
   },
+  "tasktag-copyable-text-operator": {
+    "_why": "THE 2026-10-28 TERMINAL-TEXT RULE, on the untagged UserPromptSubmit branch. Two slips in one odyssey-alive session: a Sources list written as markdown links, where the user said \"none of those link sources are clickable\" because the terminal makes a bare https:// URL clickable and not `[title](url)`; and an email draft shown as a `>` blockquote, which the terminal re-quoted on every wrapped line - \"It's really hard to copy each line individually and stick them together for the correspondence\" - with the session's own sentence running straight on from the email body, so it would have been pasted into the email. The rule rides `wf-task-tag` and not `/org` rung 13 because this hook is wired at user scope and reaches every project on `update`, where `/org` is a per-project copy only an audit rewrites (the 2026-09-16 correction, \"this shouldn't live in org\"). Each `want` is a clause the user's report named: the bare URL, the plain one-line paragraphs, the clipboard, the end-of-draft line.",
+    "exit": 0,
+    "script": "wf-task-tag",
+    "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"prompt\": \"walk the agenda\", \"session_id\": \"fx\"}",
+    "want": [
+      "a bare https:// URL is clickable and markdown link syntax is not",
+      "no quote markers or indentation",
+      "wl-copy, xclip, pbcopy",
+      "followed by a line saying it has ended"
+    ]
+  },
+  "tasktag-copyable-text-tagged-ask": {
+    "_why": "THE SAME RULE ON THE OTHER UserPromptSubmit BRANCH. `main` builds the injection twice - a joined tuple when the ask matches no kind, a `lines` list when it does - so a rule added to one and forgotten in the other is the likely slip, and the untagged sibling cannot see it. This ask is a `history` question, so the docket is seated (`HEARING`) and the rule must still be in the block above it.",
+    "exit": 0,
+    "script": "wf-task-tag",
+    "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"prompt\": \"why was wf-pin-check removed, should we restore it\", \"session_id\": \"fx\"}",
+    "want": [
+      "HEARING",
+      "a bare https:// URL is clickable and markdown link syntax is not",
+      "no quote markers or indentation",
+      "followed by a line saying it has ended"
+    ]
+  },
+  "tasktag-copyable-text-not-employee": {
+    "_why": "THE RULE IS NOT GIVEN TO A SPAWNED AGENT. A subagent writes to its caller, never to the user, so a link format and a copy-out format for the user's terminal are text it would pay for on every spawn and never use - the same asymmetry that keeps `CHOOSER_RULE` off this event. The `want` is what keeps the `not` honest: the SubagentStart block is still emitted (the close-out rule is in it), so the absence is of the rule and not of the output.",
+    "exit": 0,
+    "not": [
+      "markdown link syntax",
+      "quote markers",
+      "wl-copy"
+    ],
+    "script": "wf-task-tag",
+    "stdin_raw": "{\"hook_event_name\": \"SubagentStart\"}",
+    "want": [
+      "shutdown_request once its report has been read"
+    ]
+  },
   "tasktag-two-kinds": {
     "_why": "An ask can be two kinds at once and BOTH channels are then required. First-match-wins would name one and drop the other silently, which is the narrowing this whole mechanism is built against.",
     "exit": 0,

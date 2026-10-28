@@ -303,6 +303,40 @@ CHOOSER_RULE = (
 )
 
 
+# WHAT THE TERMINAL DOES TO A LINK AND TO A DRAFT. User report 2026-10-28, odyssey-alive,
+# on two slips in one session. A Sources list written as markdown links `[title](url)`:
+# "none of those link sources are clickable" — the terminal makes a bare https:// URL
+# clickable and does nothing with link syntax. An email draft shown as a `>` blockquote,
+# which the terminal re-quoted on every wrapped line: "It's really hard to copy each line
+# individually and stick them together for the correspondence." What worked was plain
+# one-line paragraphs with a blank line between them, the text put on the clipboard with
+# wl-copy and saved to a scratchpad .txt. The second slip in the same draft: the session's
+# own sentence ran straight on from the email body, so it would have been pasted into the
+# email. A draft needs a visible end.
+#
+# IT LIVES HERE FOR THE REASON `USER_WORDS` AND `CHOOSER_RULE` DO, and not in `/org` rung
+# 13. This hook is wired at user scope, so the rule reaches every project on the next
+# `update`; `/org` is a per-project copy that only an `audit` rewrites, and the user
+# corrected exactly that placement on 2026-09-16: "this shouldn't live in org".
+#
+# UserPromptSubmit ONLY, like `CHOOSER_RULE`: a subagent writes to its caller, never to the
+# user, so a format for the user's terminal is text it would pay for on every spawn and
+# never use.
+#
+# Stated as facts, never as an instruction (see the note above the injection in `main`).
+TERMINAL_TEXT_RULE = (
+    "In the terminal a bare https:// URL is clickable and markdown link syntax is not, so "
+    "each link that reaches the user is its title followed by the full bare URL on its own "
+    "line, whatever a tool's reminder says about markdown hyperlinks. Text the user will "
+    "copy out, such as an email, a message or a post, is plain paragraphs of one line each "
+    "with a blank line between them and no quote markers or indentation, because the "
+    "terminal repeats a > on every wrapped line. It is also saved to a .txt in the "
+    "scratchpad and put on the clipboard where a clipboard command exists (wl-copy, xclip, "
+    "pbcopy), and the draft is followed by a line saying it has ended, before anything "
+    "else the reply says."
+)
+
+
 # WHAT IS LEFT RUNNING WHEN THE WORK IS DONE. User report 2026-09-24, on a real run in a
 # sibling project: "we also have an issue with shell items staying open after they have
 # expired and agents staying open after their work is done ... the 1 shell gives the
@@ -2295,9 +2329,11 @@ def main():
     # clearing there would drop a flag the main session's `Stop` still needs.
     #
     # NOT `CHOOSER_RULE`, and the asymmetry is deliberate: a subagent has no user to ask
-    # and no `AskUserQuestion`. `CLEANUP_RULE` is the opposite case — the employee is
-    # exactly where the shell hangs and the missing-tool workaround happen, and it is the
-    # only text that reaches it, because a subagent runs its own system prompt.
+    # and no `AskUserQuestion`. NOT `TERMINAL_TEXT_RULE` either, for the same reason: a
+    # subagent writes to its caller, never to the user's terminal. `CLEANUP_RULE` is the
+    # opposite case — the employee is exactly where the shell hangs and the missing-tool
+    # workaround happen, and it is the only text that reaches it, because a subagent runs
+    # its own system prompt.
     #
     # IT ALSO GETS ITS OWN SLOT, which is the one thing this event can do that no later one
     # can: see `open_agent_tag`. The main session's tag is NOT touched here — this branch
@@ -2373,7 +2409,8 @@ def main():
         print(json.dumps({"hookSpecificOutput": {
             "hookEventName": "UserPromptSubmit",
             "additionalContext": "\n\n".join(
-                x for x in (USER_WORDS, CHOOSER_RULE, CLEANUP_RULE, checklist_line) if x),
+                x for x in (USER_WORDS, CHOOSER_RULE, TERMINAL_TEXT_RULE, CLEANUP_RULE,
+                            checklist_line) if x),
         }}))
         return 0
 
@@ -2403,7 +2440,7 @@ def main():
     # explicit that text framed as an out-of-band command trips the prompt-injection
     # defences and gets surfaced to the user instead of read — which would turn a tag
     # into one more thing a human has to deal with.
-    lines = [USER_WORDS, "", CHOOSER_RULE, "", CLEANUP_RULE, "",
+    lines = [USER_WORDS, "", CHOOSER_RULE, "", TERMINAL_TEXT_RULE, "", CLEANUP_RULE, "",
              "This ask is of a kind whose wrong answers are on record in this project."]
     for h in hits:
         lines.append(f"  · {h['kind']} — closed by {h['sense'].upper()}: {h['why']}. "
