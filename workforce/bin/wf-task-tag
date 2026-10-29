@@ -93,6 +93,12 @@ INJECTED = re.compile(
     r"|Another Claude session sent a message"
     r"|Stop hook feedback"
     r"|\d+ background agents? (?:was|were) stopped"
+    # A PEER SESSION GOING IDLE arrives as this bracketed line, the one injected opener here
+    # that is not a tag. MEASURED 2026-10-29: it was missing, and 11 issues in this
+    # machine's ledgers were opened by one — `/home/francis/Work` `4e1b090a` i4 among them,
+    # left open with no items. Over 403 transcripts it is the only bracketed harness opener
+    # (12 rows; the rest are image markers), and every tag-wrapped one was already matched.
+    r"|\[Cross-session idle notice\]"
     # A background task finishing arrives as a user row wrapped in these. MEASURED
     # 2026-09-13: the first live asks checklist opened on a task notification.
     r"|<(?:[a-z-]+-message|system-reminder|task-notification)\b)", re.I)
@@ -950,6 +956,7 @@ def refresh_index(payload, led):
     if not isinstance(sessions, dict):
         sessions = {}
     sid = session_component(payload)
+    prune_dead_rows(d, sessions, sid)
     rows = []
     for iss in open_issues(led):
         rows.append({"id": iss.get("id"),
@@ -965,6 +972,38 @@ def refresh_index(payload, led):
     else:
         sessions.pop(sid, None)
     write_json_atomic(p, {"sessions": sessions})
+
+
+def prune_dead_rows(d, sessions, sid):
+    """Drop from OTHER sessions' index rows every issue their own file shows `stale_empty`.
+
+    A SESSION THAT NEVER RUNS AGAIN NEVER REACHES `heal_empty`: `/home/francis/Work`
+    `e7dcb602` ended mid-turn on 2026-10-15 and was still listed open on 2026-10-29. So the
+    session that is writing the index anyway reads that session's file and leaves out what
+    it holds empty. THE FILE DECIDES, NOT THE ROW: `items_open: 0, agents_running: 0` is also
+    what an issue holding only a cut agent shows, and that one is a handoff and stays listed.
+
+    READ-ONLY, and only for a row showing an issue at zero and zero, so the cost is paid
+    once per dead row. The other session's file is never written — it may be live, and its
+    own next submit heals it. A key that is not one filename component, or a file this
+    account cannot read as its own, leaves its row exactly as it was.
+    """
+    for key, row in list(sessions.items()):
+        rows = row.get("open") if isinstance(row, dict) else None
+        if key == sid or not isinstance(rows, list) or not bare_name(key):
+            continue
+        if not any(isinstance(r, dict) and r.get("items_open") == 0
+                   and r.get("agents_running") == 0 for r in rows):
+            continue
+        other = read_json_nofollow(os.path.join(d, f"{key}.json"))
+        if not isinstance(other, dict) or not isinstance(other.get("issues"), list):
+            continue
+        empty = {i.get("id") for i in other["issues"] if stale_empty(i)}
+        kept = [r for r in rows if not (isinstance(r, dict) and r.get("id") in empty)]
+        if kept:
+            row["open"] = kept
+        else:
+            sessions.pop(key, None)
 
 
 def issue_items(iss):
@@ -1047,10 +1086,57 @@ def add_issue(payload, led):
                 n = max(n, int(str(iss["id"]).lstrip("i") or 0) + 1)
             except ValueError:
                 pass
+    # THE MESSAGE IS ITS OWN FIRST ITEM FROM THE MOMENT IT IS SENT (`fallback_item`), because
+    # this is the one event every user message reaches. See `track_message` for what was
+    # measured when the item waited for the Stop.
+    fallback = fallback_item(prompt)
     iss = {"id": "i%d" % n, "prompt": prompt[:2000], "state": "open",
-           "items": [], "agents": []}
+           "items": [fallback] if fallback else [], "agents": []}
     led.setdefault("issues", []).append(iss)
     return iss
+
+
+def fallback_item(prompt, status="open"):
+    """The user's message as the hook's own item on its issue, or None for an empty one.
+
+    Flattened to one line and cut to `CARRY_ASK`, the cut a carried row gets, so the session
+    can mark it through the carry like any item it wrote. `fallback: true` keeps it out of
+    `session_items`, so no verdict that can reach the user as a failure ever reads it.
+    """
+    text = " ".join(str(prompt or "").split())[:CARRY_ASK]
+    return {"ask": text, "status": status, "fallback": True} if text else None
+
+
+def stale_empty(iss):
+    """Whether an issue is open with no item and no agent: the shape no issue opened by
+    `add_issue` can have, since it is seeded, and the shape older releases left behind."""
+    return (isinstance(iss, dict) and iss.get("state") != "closed"
+            and not issue_items(iss) and not issue_agents(iss))
+
+
+def heal_empty(led):
+    """Close every open issue that holds no item and no agent, as `superseded`. How many.
+
+    WHAT IT HEALS, MEASURED 2026-10-29 in `/home/francis/Work`: four issues an older release
+    left open with `items: []`, listed in `index.json` with `items_open: 0`, which nothing
+    would ever close — no item to mark done and no agent to come back. An audit is not what
+    reaches them, so the next message does. Each is given the user's message as its fallback
+    item, already `superseded` (a later message has arrived, which is what that status
+    means at `track_message`), and closed, which is what `judge_issue` would make of it.
+
+    CALLED AT THE SUBMIT ONLY, AFTER THE OUTGOING LIST IS ABSORBED, so an issue whose items
+    are still in the checklist file gets them first and is not healed. Never on a load that
+    only consults the ledger (`wf-turn-budget._ledger_read`, which saves nothing).
+    """
+    healed = 0
+    for iss in open_issues(led):
+        if not stale_empty(iss):
+            continue
+        item = fallback_item(iss.get("prompt"), "superseded")
+        iss["items"] = [item] if item else []
+        iss["state"] = "closed"
+        healed += 1
+    return healed
 
 
 def absorb_items(led, issue_id, items, title=""):
@@ -1268,6 +1354,14 @@ def track_message(led, issue_id, written):
     finished. Injected turns (a hand-back, a notification) are not user messages and supersede
     nothing, so the line stays up while dispatched work comes back. ISSUES therefore shows at
     most one fallback, the newest message's, and never a pile of stale one-liners.
+
+    THE ITEM IS NOW WRITTEN AT THE SUBMIT (`add_issue`), and only the supersede is this
+    Stop's. MEASURED 2026-10-29 in `/home/francis/Work`, three issues stayed `items: []`
+    because the Stop never had the right issue to give one to: `e7dcb602` i1's session ended
+    six seconds after its submit and no Stop ran, and in `b6047346` and `3ca2e8f7` the NEXT
+    message's submit fired at ENQUEUE, mid-turn (17:21:55 against a 17:21:59 Stop), so the
+    tag's one record named the newer issue — that Stop printed `i2 TRACKED` and i1 kept
+    nothing. The add below remains for an issue an older release opened unseeded.
     """
     target = None
     for iss in open_issues(led):
@@ -1279,9 +1373,9 @@ def track_message(led, issue_id, written):
                 item["status"] = "superseded"
     if target is None or written or issue_items(target) or issue_agents(target):
         return
-    text = " ".join(str(target.get("prompt") or "").split())[:CARRY_ASK]
-    if text:
-        target["items"] = [{"ask": text, "status": "open", "fallback": True}]
+    item = fallback_item(target.get("prompt"))
+    if item:
+        target["items"] = [item]
 
 
 def _note_key(text):
@@ -2023,6 +2117,9 @@ def start_checklist(payload, prev=None):
         landed += absorb_titles(led, checklist_titles(cl))
         if prev is not None:
             absorb_items(led, prev.get("issue"), checklist_items(cl), checklist_title(cl))
+        # AFTER THE ABSORB AND BEFORE THIS MESSAGE'S ISSUE, so what is healed is only what an
+        # older release left empty (`heal_empty`).
+        landed += heal_empty(led)
         iss = add_issue(payload, led)
         issue_id = iss.get("id") if iss else None
         if iss is not None or prev is not None or landed:

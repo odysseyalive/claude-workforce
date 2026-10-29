@@ -2791,6 +2791,9 @@ def ledger_verdict(payload, decided):
     # `carry_only` marks an injected or short turn, and `ended` is `with_checklist`'s once-per-
     # list mark, set after this. A side query (`confirmed_reply` None) is mid-turn, before the
     # session may have written its list. `TT.track_message` carries the rule and its why.
+    # THE MESSAGE'S OWN ITEM IS NOT WRITTEN HERE ANY MORE: `TT.add_issue` seeds it at the
+    # submit, because a Stop that never ran, or a record a queued message had replaced, left
+    # it unwritten (measured 2026-10-29). This Stop supersedes the earlier ones.
     cl, record = checklist(payload)
     reply, how = TL.confirmed_reply(payload)
     # THIS TURN'S LIST LANDS ON ITS ISSUE AT ITS OWN STOP, title and continuations included,

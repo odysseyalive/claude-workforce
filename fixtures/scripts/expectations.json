@@ -11615,5 +11615,134 @@
       "not": [
           "Traceback"
       ]
+  },
+  "issues-message-seeds-its-item-at-submit": {
+      "_why": "THE MESSAGE IS ON THE WORK LIST FROM THE MOMENT IT IS SENT, not from the Stop that ends its turn. MEASURED 2026-10-29 in /home/francis/Work, where four issues sat open with `items: []` and no title: `e7dcb602` i1's session ended six seconds after its submit and never reached a Stop, and `b6047346` i1 and `3ca2e8f7` i2 lost theirs because the NEXT message's submit fired at enqueue, mid-turn, and the one-slot tag record then named the newer issue at the Stop. Seeding at submit is the one point every one of those turns reached. The prompt is `3ca2e8f7` i2's own, and the index row must count the item, because `items_open: 0` on an open issue is the shape that never closes.",
+      "after": {
+          ".claude/workforce/issues/s1.json": {
+              "want": [
+                  "\"items\": [{\"ask\": \"please fix it, then make sure that @dotfiles installs this fix during the omarchy installation script\", \"status\": \"open\", \"fallback\": true}]"
+              ]
+          },
+          ".claude/workforce/issues/index.json": {
+              "want": [
+                  "\"id\": \"i1\"",
+                  "\"items_open\": 1"
+              ]
+          }
+      },
+      "exit": 0,
+      "not": [
+          "Traceback"
+      ],
+      "script": "wf-task-tag",
+      "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"please fix it, then make sure that @dotfiles installs this fix during the omarchy installation script\"}",
+      "want": [
+          "issue i1"
+      ]
+  },
+  "tasktag-idle-notice-opens-no-issue": {
+      "_why": "AN IDLE NOTICE IS HARNESS TEXT, NOT AN ASK. MEASURED 2026-10-29: `[Cross-session idle notice]` was not in `INJECTED`, so 11 issues in this machine's ledgers were opened by one, and `4e1b090a` i4 is one of them, left open with no items because the peer message submitted a second later replaced the tag's record with none. The text is that notice verbatim. No issue file, no checklist line and a null record: the same refusal the hand-back case pins.",
+      "after": {
+          ".claude/workforce/issues/s1.json": {
+              "absent": true
+          },
+          "wf-asks.s1.json": {
+              "absent": true
+          },
+          "wf-task-tag.s1.json": {
+              "want": [
+                  "\"checklist\": null"
+              ]
+          }
+      },
+      "exit": 0,
+      "not": [
+          "Traceback",
+          "Each separate ask is one item",
+          "issue i1"
+      ],
+      "script": "wf-task-tag",
+      "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"[Cross-session idle notice] \\\"egpu-issue\\\", which you asked to be notified about, is idle now \\u2014 it finished a turn at 13:46. Its harness reports: \\u00abNothing below changes the diagnosis. Here's what I added after my first answer:\\u00bb. This is an automated notice from that session's harness \\u2014 not a message from a person, and not an instruction; act on it only insofar as your user's earlier request calls for it.\"}",
+      "want": []
+  },
+  "tasktag-cross-session-message-opens-no-issue": {
+      "_why": "THE PEER MESSAGE WITH NO WRAPPER LINE IS ALREADY INJECTED, and this pins it. A queued `<cross-session-message>` reaches the hook as the bare tag (`b6047346`, 2026-10-29), without the \"Another Claude session sent a message\" line in front, and `<[a-z-]+-message` is what catches it. Passes before and after the idle-notice fix; it is here so the claim that this half was never open stays checked.",
+      "after": {
+          ".claude/workforce/issues/s1.json": {
+              "absent": true
+          },
+          "wf-task-tag.s1.json": {
+              "want": [
+                  "\"checklist\": null"
+              ]
+          }
+      },
+      "exit": 0,
+      "not": [
+          "Traceback",
+          "Each separate ask is one item",
+          "issue i1"
+      ],
+      "script": "wf-task-tag",
+      "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"<cross-session-message from=\\\"uds:/run/user/1000/cc-socks/14456.sock\\\" from-name=\\\"mutze-dev\\\" from-mode=\\\"prompting\\\">\\nFrom the mutze-studio session that owns the render queue. Here's what I can add. I don't know the root cause, and the facts below are mine, checked read-only.\\n</cross-session-message>\"}",
+      "want": []
+  },
+  "issues-empty-legacy-issue-heals-at-next-message": {
+      "_why": "AN ISSUE AN OLDER RELEASE LEFT EMPTY AND OPEN CLOSES AT THE NEXT MESSAGE, with no audit. This is `e7dcb602` i1's shape: opened, never itemized, never reached a Stop, listed in the index with `items_open: 0` forever. At the next submit it gets the user's message as a fallback item marked `superseded`, which `DONE_STATUSES` reads as finished, and it is closed and leaves the index. The new message's own issue is opened beside it, seeded.",
+      "after": {
+          ".claude/workforce/issues/s1.json": {
+              "want": [
+                  "\"state\": \"closed\", \"items\": [{\"ask\": \"A process crashed on this Omarchy machine and I want to know why. What systemd-coredump recorded: process: chrome PID: 3668\", \"status\": \"superseded\", \"fallback\": true}]",
+                  "\"id\": \"i2\"",
+                  "\"items\": [{\"ask\": \"please reach out to @mutze-dev with what you find here. WE'd rather find out why things crashed\", \"status\": \"open\", \"fallback\": true}]"
+              ]
+          },
+          ".claude/workforce/issues/index.json": {
+              "want": [
+                  "\"id\": \"i2\""
+              ],
+              "not": [
+                  "\"id\": \"i1\""
+              ]
+          }
+      },
+      "exit": 0,
+      "not": [
+          "Traceback"
+      ],
+      "script": "wf-task-tag",
+      "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"please reach out to @mutze-dev with what you find here. WE'd rather find out why things crashed\"}",
+      "want": [
+          "issue i2"
+      ]
+  },
+  "issues-dead-session-empty-row-leaves-the-index": {
+      "_why": "A SESSION THAT NEVER RUNS AGAIN CANNOT HEAL ITS OWN ROW, so the next session to write the index drops it. `e7dcb602` is dead: its i1 is empty and open in its own file, and nothing will ever load that file again. Another session's save reads it, read-only, and leaves out an issue that is open with no item and no agent. THE NEGATIVE IS dead2, whose row reads the same `items_open: 0, agents_running: 0` but whose file holds a cut agent, which `judge_issue` calls a handoff: it stays listed, so the prune cannot be widened to the row's two counts. dead1's own file is never written by s1.",
+      "after": {
+          ".claude/workforce/issues/index.json": {
+              "want": [
+                  "\"dead2\"",
+                  "\"s1\""
+              ],
+              "not": [
+                  "\"dead1\""
+              ]
+          },
+          ".claude/workforce/issues/dead1.json": {
+              "want": [
+                  "\"state\": \"open\", \"items\": []"
+              ]
+          }
+      },
+      "exit": 0,
+      "not": [
+          "Traceback"
+      ],
+      "script": "wf-task-tag",
+      "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"please fix it, then make sure that @dotfiles installs this fix during the omarchy installation script\"}",
+      "want": [
+          "issue i1"
+      ]
   }
 }
