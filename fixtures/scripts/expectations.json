@@ -12114,5 +12114,68 @@
               ]
           }
       }
+  },
+  "issues-notice-opened-issue-heals-at-next-message": {
+      "_why": "AN ISSUE AN IDLE NOTICE OPENED, UNDER A RELEASE WHOSE `INJECTED` DID NOT MATCH IT, CLOSES AT THE NEXT MESSAGE even though it holds an item, when that item only restates the notice. i1 is `/home/francis/Work` `4e1b090a` i6's shape: the hook's fallback, open, set to the notice text. i2 is the same notice with an item the session wrote whose ask is the notice text. Both are closed and their items marked `superseded`. THE NEGATIVE IS i3: a notice opened it, but the session wrote a real ask under it, so it stays open with its item open and stays in the index. The new message's own issue is i4.",
+      "after": {
+          ".claude/workforce/issues/s1.json": {
+              "want": [
+                  "\"state\": \"closed\", \"items\": [{\"ask\": \"[Cross-session idle notice] \\\"workforce-dev\\\"",
+                  "\"state\": \"closed\", \"items\": [{\"ask\": \"[Cross-session idle notice] \\\"oa-work\\\"",
+                  "\"status\": \"superseded\", \"fallback\": true}]",
+                  "\"status\": \"superseded\"}]",
+                  "\"state\": \"open\", \"items\": [{\"ask\": \"send the eGPU fallback benchmark numbers back to egpu-issue\", \"status\": \"open\"}]",
+                  "\"id\": \"i4\""
+              ]
+          },
+          ".claude/workforce/issues/index.json": {
+              "want": [
+                  "\"id\": \"i3\"",
+                  "\"id\": \"i4\""
+              ],
+              "not": [
+                  "workforce-dev",
+                  "oa-work"
+              ]
+          }
+      },
+      "exit": 0,
+      "not": [
+          "Traceback"
+      ],
+      "script": "wf-task-tag",
+      "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"please reach out to @mutze-dev with what you find here. WE'd rather find out why things crashed\"}",
+      "want": [
+          "issue i4"
+      ]
+  },
+  "issues-dead-session-notice-row-leaves-the-index": {
+      "_why": "A DEAD SESSION'S NOTICE-OPENED ISSUE LEAVES THE INDEX TOO, though its row reads `items_open: 1`, because the item is the hook's fallback holding the notice text. The next session to write the index reads dead1's file, read-only, and drops i1. THE NEGATIVE IS dead1's i2: a notice opened it, but the session wrote a real ask under it, so its row stays. dead1's own file is never written by s1.",
+      "after": {
+          ".claude/workforce/issues/index.json": {
+              "want": [
+                  "\"dead1\"",
+                  "egpu-issue",
+                  "\"s1\""
+              ],
+              "not": [
+                  "workforce-dev"
+              ]
+          },
+          ".claude/workforce/issues/dead1.json": {
+              "want": [
+                  "\"state\": \"open\", \"items\": [{\"ask\": \"[Cross-session idle notice] \\\"workforce-dev\\\""
+              ]
+          }
+      },
+      "exit": 0,
+      "not": [
+          "Traceback"
+      ],
+      "script": "wf-task-tag",
+      "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"please fix it, then make sure that @dotfiles installs this fix during the omarchy installation script\"}",
+      "want": [
+          "issue i1"
+      ]
   }
 }

@@ -975,7 +975,7 @@ def refresh_index(payload, led):
 
 
 def prune_dead_rows(d, sessions, sid):
-    """Drop from OTHER sessions' index rows every issue their own file shows `stale_empty`.
+    """Drop from OTHER sessions' index rows every issue their own file shows `stale`.
 
     A SESSION THAT NEVER RUNS AGAIN NEVER REACHES `heal_empty`: `/home/francis/Work`
     `e7dcb602` ended mid-turn on 2026-10-15 and was still listed open on 2026-10-29. So the
@@ -983,22 +983,28 @@ def prune_dead_rows(d, sessions, sid):
     it holds empty. THE FILE DECIDES, NOT THE ROW: `items_open: 0, agents_running: 0` is also
     what an issue holding only a cut agent shows, and that one is a handoff and stays listed.
 
-    READ-ONLY, and only for a row showing an issue at zero and zero, so the cost is paid
-    once per dead row. The other session's file is never written — it may be live, and its
-    own next submit heals it. A key that is not one filename component, or a file this
-    account cannot read as its own, leaves its row exactly as it was.
+    AN ISSUE INJECTED TEXT OPENED (`stale_notice`) is dropped too. Its row reads
+    `items_open: 1`, the notice as its fallback, so its `ask`, the prompt's first 120
+    characters, is what `INJECTED` is asked about. The file still decides.
+
+    READ-ONLY, and only for a row showing an issue at zero and zero or an injected ask, so the
+    cost is paid once per dead row. The other session's file is never written — it may be
+    live, and its own next submit heals it. A key that is not one filename component, or a
+    file this account cannot read as its own, leaves its row exactly as it was.
     """
     for key, row in list(sessions.items()):
         rows = row.get("open") if isinstance(row, dict) else None
         if key == sid or not isinstance(rows, list) or not bare_name(key):
             continue
-        if not any(isinstance(r, dict) and r.get("items_open") == 0
-                   and r.get("agents_running") == 0 for r in rows):
+        if not any(isinstance(r, dict)
+                   and ((r.get("items_open") == 0 and r.get("agents_running") == 0)
+                        or INJECTED.search(str(r.get("ask") or "")))
+                   for r in rows):
             continue
         other = read_json_nofollow(os.path.join(d, f"{key}.json"))
         if not isinstance(other, dict) or not isinstance(other.get("issues"), list):
             continue
-        empty = {i.get("id") for i in other["issues"] if stale_empty(i)}
+        empty = {i.get("id") for i in other["issues"] if stale(i)}
         kept = [r for r in rows if not (isinstance(r, dict) and r.get("id") in empty)]
         if kept:
             row["open"] = kept
@@ -1114,8 +1120,38 @@ def stale_empty(iss):
             and not issue_items(iss) and not issue_agents(iss))
 
 
+def stale_notice(iss):
+    """Whether an issue is open, was opened by injected text, and holds nothing but that text:
+    no agent, and every item either the hook's fallback or an ask `INJECTED` itself matches.
+
+    THE CLASSIFIER IS `INJECTED`, the one `opens_issue` refuses an issue with, so an issue is
+    healed for exactly the reason no issue is opened now. An older release's `INJECTED` missed
+    `[Cross-session idle notice]`, and an issue it opened was seeded with the notice as its
+    fallback, which is not `stale_empty` and is carried into every later turn as an open ask.
+
+    ANY OTHER ITEM KEEPS IT OPEN: a session that wrote a real ask under a notice did work there.
+    MEASURED 2026-10-29 over the 144 ledgers under `/home/francis` (fixtures and worktrees
+    excluded): 14 issues have a prompt `INJECTED` matches, all idle notices. None holds an item
+    the session wrote or an agent. 11 were closed by their sessions, 2 are open on their
+    fallback alone (`efwnow.com` `00f55692` i2, `university` `bcf48e2e` i3), and 1 is open with
+    no item (`university` `c978bd75` i25, already `stale_empty`).
+
+    `prune_dead_rows` asks this of ANOTHER session's file, so a prompt that is not a string is
+    read as one rather than raising.
+    """
+    return (isinstance(iss, dict) and iss.get("state") != "closed"
+            and bool(INJECTED.search(str(iss.get("prompt") or ""))) and not issue_agents(iss)
+            and all(i.get("fallback") is True or INJECTED.search(i["ask"])
+                    for i in issue_items(iss)))
+
+
+def stale(iss):
+    """Whether an open issue holds nothing to finish: `stale_empty` or `stale_notice`."""
+    return stale_empty(iss) or stale_notice(iss)
+
+
 def heal_empty(led):
-    """Close every open issue that holds no item and no agent, as `superseded`. How many.
+    """Close every open issue that is `stale`, its open items `superseded`. How many.
 
     WHAT IT HEALS, MEASURED 2026-10-29 in `/home/francis/Work`: four issues an older release
     left open with `items: []`, listed in `index.json` with `items_open: 0`, which nothing
@@ -1127,13 +1163,21 @@ def heal_empty(led):
     CALLED AT THE SUBMIT ONLY, AFTER THE OUTGOING LIST IS ABSORBED, so an issue whose items
     are still in the checklist file gets them first and is not healed. Never on a load that
     only consults the ledger (`wf-turn-budget._ledger_read`, which saves nothing).
+
+    AN ISSUE INJECTED TEXT OPENED (`stale_notice`) is closed the same way. Its items are the
+    notice and nothing else, so each one still open is marked `superseded` in place.
     """
     healed = 0
     for iss in open_issues(led):
-        if not stale_empty(iss):
+        if stale_empty(iss):
+            item = fallback_item(iss.get("prompt"), "superseded")
+            iss["items"] = [item] if item else []
+        elif stale_notice(iss):
+            for item in issue_items(iss):
+                if not item_done(item):
+                    item["status"] = "superseded"
+        else:
             continue
-        item = fallback_item(iss.get("prompt"), "superseded")
-        iss["items"] = [item] if item else []
         iss["state"] = "closed"
         healed += 1
     return healed
