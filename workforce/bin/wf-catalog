@@ -1019,6 +1019,16 @@ def house_substance(region):
     return "\n".join(l.rstrip() for l in text.splitlines() if l.strip())
 
 
+def house_clause(region):
+    """The precedence clause of a region: its substance up to the register heading.
+
+    READ APART FROM THE REGISTER, so a region whose rows are about to change still reports
+    its clause as it is. A predecessor migration always rewrites the register, and a word
+    derived from the whole region called a current clause `stale` on every one of them.
+    """
+    return house_substance(region).split(HOUSE_REGISTER_HEADING, 1)[0]
+
+
 def house_dirs(root, kind):
     """Every project-scope directory that can hold this kind's house rules, in spelling
     order. NOT ownership-tested, exactly as `project_anchors` is not: the anchor is never
@@ -1508,6 +1518,10 @@ def house_state(root, kind):
         st.update(verdict="current", why="register %d row(s)%s · precedence clause present"
                   % (len(rows), " · %d carried" % len(st["carried"]) if st["carried"] else ""))
         return st
+    # THE CLAUSE WORD IS THE REGION'S OWN STATE, not the verdict's: a refresh driven by
+    # the register or a migration still reports a current clause as `current`.
+    st["clause"] = (("current" if house_clause(region) == house_clause(house_wrap(st["body"], ""))
+                     else "stale") if region else ("appended" if existing else "written"))
     # A PREDECESSOR NEVER READS `current`, and the report says what moves before it moves:
     # which section, at which line, and how many of its rows cross into the region.
     mig = "".join(" · migrates the %s predecessor at %s:%d, carrying %d row(s)"
@@ -1522,7 +1536,7 @@ def house_state(root, kind):
     st.update(verdict="refresh",
               why="register %d row(s)%s · precedence clause %s%s"
               % (len(rows), " · %d carried" % len(st["carried"]) if st["carried"] else "",
-                 "stale" if region else ("appended" if existing else "written"), mig))
+                 st["clause"], mig))
     return st
 
 
@@ -1604,10 +1618,14 @@ def house_write(root, st):
             return True, ("region written to %s; %s still carries its copy after the write"
                           % (os.path.relpath(dest, root), os.path.relpath(f, root)))
         cleared.append(os.path.relpath(f, root))
-    return True, ("register %d row(s)%s%s%s"
+    # THE SAME CLAUSE WORD AS DISPLAY, in the past tense: a clause that was current is
+    # kept, a stale one refreshed, so the two modes never disagree about the region.
+    done = {"current": "kept", "stale": "refreshed"}.get(st.get("clause"), st.get("clause"))
+    return True, ("register %d row(s)%s%s%s%s"
                   % (len(st["rows"]),
                      " · %d carried" % len(st["carried"]) if st["carried"] else "",
                      " · lifted out of %s" % ", ".join(cleared) if cleared else "",
+                     " · precedence clause %s" % done if done else "",
                      "".join(" · migrated the %s predecessor at line %d, %d of its %d "
                              "row(s) carried verbatim"
                              % (predecessor_form(m), l, sum(x in new for x in r), len(r))
