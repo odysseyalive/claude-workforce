@@ -1462,8 +1462,19 @@ Per **governed** handbook (adopted agents stay exempt until their first amendmen
    table, then re-probe under item 3. **Role-specific judgment is NEVER rewritten here**; this adds a
    named step and a named source and touches nothing else in the section.
 
-   A handbook that already carries both is reported healed-zero rather than re-amended, and a project
-   with no design or front-end employee reports `0 of 0` — a measurement, not a skip.
+   **A Lead whose department builds UI has no `## Procedure` for the second half to land in**
+   (`handbook-templates.md` § Lead). It takes that half as a READY condition on the orders it writes:
+   one line in its `## Guardrails` COMPLETENESS list, worded as `evaluators.md` § Wiring into the org
+   gives it. The Sources half is unchanged. A Lead's `## Probe` has no arm range and no step rows, so
+   nothing in it is extended. The probe requirement becomes the item 3 re-probe alone, and where the
+   probe carries a substitution table, its existing `## Guardrails` row already covers the new line.
+
+   A handbook that already carries both halves for its tier is reported healed-zero rather than
+   re-amended. For a Lead, the READY condition counts in its Sources row as well as in `## Guardrails`.
+   Report `wf-conform`'s `design direction:` line, zeroes included. It counts the handbooks that carry
+   either half and the ones missing their tier's other half. A project with no design or front-end
+   employee reports `0 of 0`, a measurement and not a skip. The line cannot see a UI-producing
+   handbook that carries neither half, because whether a role produces UI is this item's judgment.
 
 2e. **Re-pin a catalog version the install has moved past, on the pin and not on the stamp.** A
    release that bumps an evaluator catalog's anchor (`<kind>-ref-version: N`) leaves every check

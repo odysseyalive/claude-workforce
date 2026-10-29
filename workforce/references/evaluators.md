@@ -812,8 +812,26 @@ references for the job each screen does, and writes the project's design record 
   are selected by; an employee that cannot cite it is building to whatever the work order happened to
   say, which is the state BF-02 exists to report.
 
+**A Lead whose department builds UI takes the `## Procedure` half as a READY condition on the orders
+it writes.** A Lead's charter has no `## Procedure` (`handbook-templates.md` § Lead), so the step goes
+where its other order obligations already live: one line in the COMPLETENESS list of its
+`## Guardrails`, beside PLAN-READINESS. The `## Sources` half is the same as an IC's. The line reads:
+
+```markdown
+- **Design direction first.** An order that first builds UI on a surface `.claude/design/direction.md`
+  has no entry for, or builds a pattern the record does not cover, is not READY until it carries
+  `/ui-design direct <surface>` (or `direct --component <pattern>`) as the step before that build.
+  The pick is the user's, so that step ends in `QUESTION:` with the shortlist, and the order says so.
+```
+
+The IC that receives such an order may carry the step in its own `## Procedure` too. The Lead's line
+still holds, because the order is the one thing every IC it dispatches reads. `wf-conform` reports a
+handbook that carries one half without the other for its tier. It also counts a Lead as healed when
+the Lead states the condition in its Sources row instead of `## Guardrails`.
+
 **`review`** — reports any employee producing catalog-relevant work with no evaluator path — a
 web-working employee with no `security-evaluator` path, a visual/UI employee with no `ui-design` path —
 and any catalog whose version is behind the shipped one. A visual/UI employee whose handbook names no
-design record, or whose `## Procedure` reaches a UI build with no `direct` step before it, is reported
-on the same footing: half a path is not a path.
+design record, or whose `## Procedure` reaches a UI build with no `direct` step before it (for a Lead,
+whose orders carry no READY condition for it), is reported on the same footing: half a path is not a
+path.

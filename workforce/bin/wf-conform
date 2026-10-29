@@ -2964,6 +2964,62 @@ def check_catalog_read(n, body, res, tally):
         "`audit` Step 5d item 2c. ADVISORY: this row blocks nothing")
 
 
+DESIGN_RECORD_RX = re.compile(r"\.claude/design/direction\.md")
+# The STEP, never a mention of the command. A Sources row describing the record as "written by
+# `/ui-design direct`" names the command that wrote it and obliges nothing; an obligation names
+# what it runs on — a `<surface>` placeholder, `--component`, or a surface closing the span.
+DIRECT_STEP_RX = re.compile(r"ui-design\s+direct\s+(?:<[^>`\n]+>|--component\b|[^\s`<>]+`)")
+
+
+def check_design_direction(n, body, res, tally):
+    """A UI-producing handbook carries both halves of the direction contract for its tier.
+
+    `evaluators.md` § Wiring into the org: `## Sources` names the design record, and the
+    `/ui-design direct` step lands in `## Procedure` for an IC and, because a delegating
+    tier has no `## Procedure`, as a READY condition on the orders a Lead writes — stated in
+    its `## Guardrails` COMPLETENESS list, or in the Sources row that names the record.
+    Measured 2026-10-29 on `apps-odyssey-alive` (DEF-Q-25): two of its three UI-producing
+    roles are Leads, `audit` 2d gave the step half nowhere to land, and the project wrote
+    the obligation into each Lead's Sources row by hand. Both rows read healed here.
+
+    THE POPULATION IS A HANDBOOK THAT ALREADY CARRIES ONE HALF, not one that cites the ui
+    catalog. Measured on the same org: `presentation-critic` (the catalog's Records Owner)
+    and `graphic-system-designer` (image assets, not UI) both cite it and produce no UI, so
+    a catalog-citation predicate fires twice wrongly on the org that reported the defect.
+    Whether a role with neither half produces UI is judgment, and `audit` 2d owns it.
+    ADVISORY, and `audit` Step 5d item 2d is the fix.
+    """
+    if not (DESIGN_RECORD_RX.search(body) or DIRECT_STEP_RX.search(body)):
+        return
+    tally["under"] += 1
+    m = TIER_RX.search(body)
+    lead = bool(m) and int(m.group(1)) in (1, 2)
+    sources = section(body, "## Sources") or ""
+    if lead:
+        seg = sources + "\n" + (section(body, "## Guardrails") or "")
+    else:
+        seg = section(body, "## Procedure") or ""
+    missing = []
+    if not DESIGN_RECORD_RX.search(sources):
+        missing.append("`## Sources` names no design record (`.claude/design/direction.md`)")
+    if not DIRECT_STEP_RX.search(seg):
+        missing.append(
+            "no `## Sources` or `## Guardrails` line makes an order for a first UI build on a "
+            "surface not READY until it carries `/ui-design direct <surface>` — a delegating "
+            "tier has no `## Procedure`, so the step lands on the orders it writes"
+            if lead else
+            "`## Procedure` carries no `/ui-design direct <surface>` step before the first UI "
+            "build on a surface")
+    if not missing:
+        return
+    tally["flagged"] += 1
+    res.advise(
+        f"{n}: design direction contract is half-wired ({'Lead' if lead else 'IC'} form)",
+        "; ".join(missing) + ". The handbook carries the other half, so its role produces UI "
+        "by its own account. See `references/evaluators.md` § Wiring into the org; the fix "
+        "is `audit` Step 5d item 2d. ADVISORY: this row blocks nothing")
+
+
 # A `Negative:` line pins a version that must NOT exist (`ui-design-ref-version: 99`), so a
 # pin there disagreeing with the installed anchor is the line working, not a stale pin.
 _NEGATIVE_LINE_RX = re.compile(r"^\s*(?:[-*+]\s+)?(?:\*\*)?Negative\b\s*:", re.I)
@@ -4176,6 +4232,7 @@ def main():
                    f"`<evidence path>` | <YYYY-MM-DD> | [{FLOOR_BASIS} |]. A row that does not parse records no "
                    f"floor. `wf-stamp --floor` writes it. ADVISORY: this row blocks nothing")
     _catread = {"flagged": 0, "clean": 0}
+    _direct = {"under": 0, "flagged": 0}
     # Every anchor key `wf-catalog` declares, corpus and additions slot alike, mapped to its
     # kind — read from its table, so a sixth catalog is pinned-checked the day it ships.
     _cat = _load_sibling("wf-catalog")
@@ -4203,6 +4260,7 @@ def main():
             org_edge_map[_name] = org_edges(_name, body)
             check_anti_gaslight(_name, body, res)
             check_catalog_read(_name, body, res, _catread)
+            check_design_direction(_name, body, res, _direct)
             check_catalog_pins(_name, body, res, _pins)
             # GOVERNED ONLY, and deliberately outside `check_handbook` for that reason:
             # `--strict-adopted` holds an adopted agent to the handbook contract, and
@@ -4342,6 +4400,15 @@ def main():
             # shape as the `n/a` vs `no-sections` fix in INV-STAMP — a zero has to be
             # visible to be a measurement.
             res.count(_cr_line)
+        # The `audit` 2d count, printed at zero for the same reason: `0 of 0` is a
+        # measurement only when a tool produced it.
+        _dd_line = (f"design direction: {_direct['under']} handbook(s) carry a half · "
+                    f"{_direct['flagged']} missing their tier's other half")
+        if _direct["flagged"]:
+            res.advise(_dd_line, "rows above name each one; the fix is `audit` Step 5d "
+                       "item 2d. ADVISORY: this row blocks nothing")
+        else:
+            res.count(_dd_line)
     check_companions(root, res, governed_n)
     check_journal(root, res)
     check_defects(root, res)
