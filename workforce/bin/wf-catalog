@@ -932,10 +932,27 @@ HOUSE_ATTR_RX = re.compile(r"\b([A-Za-z][A-Za-z-]*):\s*([^|>]*?)\s*(?=\||-->|$)"
 # at a `WF-HOUSE-RULES` marker (the duplicated state 1.81.0 left puts the region's own
 # heading right after it), or at the first `origin: user` marker, so an immutable span
 # that follows is never inside what the migration removes.
+#
+# A SECOND PREDECESSOR SHAPE, SAME CLASS. The 2026-09-11 audit wrote a MARKED region,
+# `<!-- WF-HOUSERULES:<skill> START … -->` … `<!-- WF-HOUSERULES:<skill> END -->` (no
+# hyphen in HOUSERULES, a skill suffix), headed `## House rules — the register and the
+# precedence clause`; on one anchor the same heading stands with no markers at all. All
+# five of odyssey-alive's anchors carried one of these AND the current region below it,
+# and every one read `current`, so an evaluator read two house-rules texts. The marked
+# form is bounded by its own START/END pair with the same skill name on both; the
+# unmarked heading is bounded exactly as the first shape is. Matched left to right in one
+# pass, so the heading inside a marked region is consumed with it and never matched twice.
 HOUSE_PREDECESSOR_RX = re.compile(
-    r"^##[ \t]+House rules — refreshed by `/workforce audit`[^\n]*\n"
-    r".*?(?=^#{1,2}[ \t]|^<!--\s*WF-HOUSE-RULES\b|^<!--[^>]*\borigin:\s*user\b|\Z)",
+    r"^<!--[ \t]*WF-HOUSERULES:(?P<marked>[A-Za-z0-9._-]+)[ \t]+START\b[^>]*-->.*?"
+    r"^<!--[ \t]*WF-HOUSERULES:(?P=marked)[ \t]+END[ \t]*-->[ \t]*(?:\n[ \t]*(?=\n))*\n?"
+    r"|^##[ \t]+House rules — (?:refreshed by `/workforce audit`[^\n]*"
+    r"|the register and the precedence clause[ \t]*)\n"
+    r".*?(?=^#{1,2}[ \t]|^<!--\s*WF-HOUSE-?RULES\b|^<!--[^>]*\borigin:\s*user\b|\Z)",
     re.M | re.S)
+# `| *(none)* | — | — | — |` — the written-out empty register. A measurement of zero rows,
+# not a row: carried, it would put a shipped entry named `*(none)*` into the register.
+PLACEHOLDER_ROW_RX = re.compile(r"^\|[ \t]*[*_]*\(?none\)?[*_]*[ \t]*(?:\|[ \t]*[—–-]?[ \t]*)*\|$",
+                                re.I)
 
 
 def house_text(rows, carried):
@@ -1070,13 +1087,19 @@ def table_rows(text):
         if not line.startswith("|") or line.count("|") < 4:
             continue
         first = line.split("|")[1].strip()
-        if first and not first.startswith("---") and first != "Shipped entry":
+        if (first and not first.startswith("---") and first != "Shipped entry"
+                and not PLACEHOLDER_ROW_RX.match(line)):
             out.append(line)
     return out
 
 
+def predecessor_form(m):
+    """How a predecessor match is named in a report: its marker, or `unmarked`."""
+    return "`WF-HOUSERULES:%s`" % m.group("marked") if m.group("marked") else "unmarked"
+
+
 def house_predecessors(text):
-    """`[(match, heading, line, rows)]` — every unmarked predecessor section in `text`."""
+    """`[(match, heading, line, rows)]` — every predecessor house-rules text in `text`."""
     out = []
     for m in HOUSE_PREDECESSOR_RX.finditer(text or ""):
         out.append((m, m.group(0).splitlines()[0].strip(),
@@ -1094,7 +1117,7 @@ def stray_table_lines(section):
     return [l.strip() for l in section.splitlines()
             if l.strip().startswith("|") and l.count("|") >= 4
             and not set(l.replace("|", "").strip()) <= set("-: ")
-            and l.strip() not in rows
+            and l.strip() not in rows and not PLACEHOLDER_ROW_RX.match(l.strip())
             and l.split("|")[1].strip() != "Shipped entry"]
 
 
@@ -1446,17 +1469,19 @@ def house_state(root, kind):
     for _m, _h, _l, prows in old:
         carried += [r for r in prows
                     if r.split("|")[1].strip() not in have and r not in carried]
-    predecessor = [{"line": l, "heading": h, "rows": len(prows)} for _m, h, l, prows in old]
+    predecessor = [{"line": l, "heading": h, "rows": len(prows), "form": predecessor_form(m)}
+                   for m, h, l, prows in old]
     st = {"kind": kind, "dest": dest, "rows": rows, "cites": cites, "carried": carried,
           "stray": stray, "predecessor": predecessor, "body": house_text(rows, carried)}
-    unread = [(l, x) for m, _h, l, _r in old for x in stray_table_lines(m.group(0))]
+    unread = [(l, predecessor_form(m), x) for m, _h, l, _r in old
+              for x in stray_table_lines(m.group(0))]
     if unread:
-        st.update(verdict="unappendable", why="%s:%d holds an unmarked predecessor "
+        st.update(verdict="unappendable", why="%s:%d holds an %s predecessor "
                   "house-rules section with %d table line(s) outside its `%s` table (first: "
                   "%s); migrating it would drop them, so the anchor keeps its bytes until "
                   "they are moved under that heading"
-                  % (os.path.relpath(dest, root), unread[0][0], len(unread),
-                     HOUSE_REGISTER_HEADING, unread[0][1][:80]))
+                  % (os.path.relpath(dest, root), unread[0][0], unread[0][1], len(unread),
+                     HOUSE_REGISTER_HEADING, unread[0][2][:80]))
         return st
     if os.path.islink(dest):
         st.update(verdict="unappendable", why="%s is a symlink; writing through it puts "
@@ -1485,8 +1510,9 @@ def house_state(root, kind):
         return st
     # A PREDECESSOR NEVER READS `current`, and the report says what moves before it moves:
     # which section, at which line, and how many of its rows cross into the region.
-    mig = "".join(" · migrates the unmarked predecessor at %s:%d, carrying %d row(s)"
-                  % (os.path.relpath(dest, root), p["line"], p["rows"]) for p in predecessor)
+    mig = "".join(" · migrates the %s predecessor at %s:%d, carrying %d row(s)"
+                  % (p["form"], os.path.relpath(dest, root), p["line"], p["rows"])
+                  for p in predecessor)
     if stray and not region:
         st.update(verdict="relocate", why="register %d row(s) · the region sits in %s, "
                   "which the migration removes — it moves into %s%s"
@@ -1564,7 +1590,7 @@ def house_write(root, st):
     if back is None or house_substance(back) != house_substance(region):
         return False, "written and read back changed or absent — nothing else touched"
     if house_predecessors(back_text):
-        return False, "written, but the unmarked predecessor section still reads back"
+        return False, "written, but a predecessor house-rules text still reads back"
     cleared = []
     for f in st["stray"]:
         text = slurp(f)
@@ -1582,9 +1608,10 @@ def house_write(root, st):
                   % (len(st["rows"]),
                      " · %d carried" % len(st["carried"]) if st["carried"] else "",
                      " · lifted out of %s" % ", ".join(cleared) if cleared else "",
-                     "".join(" · migrated the unmarked predecessor at line %d, %d of its "
-                             "%d row(s) carried verbatim" % (l, sum(x in new for x in r), len(r))
-                             for _m, _h, l, r in old)))
+                     "".join(" · migrated the %s predecessor at line %d, %d of its %d "
+                             "row(s) carried verbatim"
+                             % (predecessor_form(m), l, sum(x in new for x in r), len(r))
+                             for m, _h, l, r in old)))
 
 
 def house_rules(root, args):

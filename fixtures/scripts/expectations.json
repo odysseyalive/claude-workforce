@@ -7576,6 +7576,58 @@
       }
     }
   },
+  "catalog-house-rules-migrates-predecessor-marked": {
+    "_why": "MEASURED 2026-10-29 on copies of odyssey-alive's five anchors: the SECOND predecessor shape. The 2026-09-11 audit wrote a MARKED region `<!-- WF-HOUSERULES:<skill> START … -->` … `END -->` (no hyphen in HOUSERULES, a skill suffix) headed `## House rules — the register and the precedence clause`, and on ui-design the same heading with no markers. The current WF-HOUSE-RULES region sat below each, so the producer read all five `current` while an evaluator read two house-rules texts. Display must name each predecessor by its form and line, and how many rows cross. image-eval's predecessor holds two rows, one already in the region; ui-design's holds only the written-out `*(none)*` placeholder, which is not a row. A user heading `## House rules of our own` sits between predecessor and region and is not a predecessor. Against main this tree printed `= image-eval … 1 carried · precedence clause present` and `= ui-design … precedence clause present`. Sanitized: the shape of the real anchors, none of their bytes.",
+    "script": "wf-catalog",
+    "args": ["--house-rules"],
+    "env": {"CLAUDE_CONFIG_DIR": "/nonexistent-config"},
+    "exit": 0,
+    "want": [
+      "~ image-eval           register 0 row(s) · 2 carried · precedence clause stale · migrates the `WF-HOUSERULES:image-eval` predecessor at .claude/skills/image-eval/CATALOG-ANCHOR.md:13, carrying 2 row(s) — would refresh into .claude/skills/image-eval/CATALOG-ANCHOR.md",
+      "~ ui-design            register 0 row(s) · precedence clause stale · migrates the unmarked predecessor at .claude/skills/ui-design/CATALOG-ANCHOR.md:11, carrying 0 row(s) — would refresh into .claude/skills/ui-design/CATALOG-ANCHOR.md",
+      "INV-HOUSERULES  5 evaluator(s) · 0 current · 2 would refresh",
+      "DISPLAY ONLY — nothing written"
+    ],
+    "not": ["Traceback", "= image-eval", "= ui-design"],
+    "after": {
+      ".claude/skills/image-eval/CATALOG-ANCHOR.md": {
+        "want": ["<!-- WF-HOUSERULES:image-eval START", "propagated: 2026-10-07 run audit-20261007T000000Z"]
+      }
+    }
+  },
+  "catalog-house-rules-migrates-predecessor-marked-execute": {
+    "_why": "The same tree with --execute, asserted on disk: one house-rules text per anchor. image-eval: the `WF-HOUSERULES:image-eval` pair and its heading are gone, both of its rows are in the one region, and the row the region already held appears once, not twice. ui-design: the unmarked heading is gone and the `*(none)*` placeholder is not carried as a row. Every `origin: user | immutable: true` span survives byte for byte, and the user's own `## House rules of our own` section stays. Against main: both anchors keep both texts and nothing is written.",
+    "script": "wf-catalog",
+    "args": ["--house-rules", "--execute"],
+    "env": {"CLAUDE_CONFIG_DIR": "/nonexistent-config"},
+    "exit": 0,
+    "want": [
+      "+ image-eval           register 0 row(s) · 2 carried · migrated the `WF-HOUSERULES:image-eval` predecessor at line 13, 2 of its 2 row(s) carried verbatim",
+      "+ ui-design            register 0 row(s) · migrated the unmarked predecessor at line 11, 0 of its 0 row(s) carried verbatim",
+      "INV-HOUSERULES  5 evaluator(s) · 2 register(s) refreshed"
+    ],
+    "not": ["Traceback", "FAILED"],
+    "after": {
+      ".claude/skills/image-eval/CATALOG-ANCHOR.md": {
+        "want": [
+          "| watercolour-technique authenticity | integrity of the drawn system | this file § *House rules of our own* | 2026-07-22 |",
+          " run audit-20261029T120000Z -->",
+          "<!-- origin: user | added: 2026-04-28 | immutable: true -->\nEvery image in a set shares one palette. A set that drifts off it is the defect; a set that shares\nit is the target.\n<!-- /origin -->",
+          "## House rules of our own\n\n<!-- origin: user | added: 2026-07-22 | immutable: true -->\nWhat replaces watercolour-technique authenticity is the integrity of the drawn system. This\nheading is the user's, and no migration reads it as a predecessor.\n<!-- /origin -->"
+        ],
+        "once": ["## House rules —", "<!-- WF-HOUSE-RULES START", "| palette variety across a set"],
+        "not": ["WF-HOUSERULES", "the register and the precedence clause", "0 rows._"]
+      },
+      ".claude/skills/ui-design/CATALOG-ANCHOR.md": {
+        "want": [
+          "<!-- origin: user | added: 2026-09-14 | immutable: true -->\n> **RULE-01** — *A project-owned rule, kept verbatim.* Severity: MAJOR.\n<!-- /origin -->",
+          " run audit-20261029T120000Z -->"
+        ],
+        "once": ["## House rules —", "<!-- WF-HOUSE-RULES START", "0 rows._"],
+        "not": ["the register and the precedence clause", "*(none)*"]
+      }
+    }
+  },
   "catalog-migrate-lifts-house-rules": {
     "_why": "MEASURED 2026-09-25 (item 6): NON_CORPUS holds only SKILL.md and CATALOG-ANCHOR.md, so a WF-HOUSE-RULES region propagated into a corpus file is removed with it — which is exactly what happened to code-evaluator's on 2026-09-11 while Step 6-F promised the house rules survive. Against HEAD's wf-catalog this tree prints `retire references/ai-patterns.md` and nothing else: the region goes. The region is now lifted into CATALOG-ANCHOR.md and read back BEFORE anything is removed, and the file goes only after that.",
     "script": "wf-catalog",
