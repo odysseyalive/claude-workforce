@@ -31,6 +31,7 @@ Usage
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -56,6 +57,7 @@ ROW_KEYS = {"script", "exit", "args", "env", "want", "after", "chmod", "concurre
 AFTER_KEYS = {"want", "once", "absent", *NEGATIVE_KEYS}
 GIT_KEYS = {"init", "hooks_from", "commit", "config", "links", "corrupt_index"}
 STEP_KEYS = {"script", "stdin_raw"}
+WRITE_STEP_KEYS = {"write", "path_from", "path_rx"}
 
 
 def _unknown_keys(spec, allowed, where):
@@ -378,7 +380,26 @@ def _run_in(tree, script, spec):
     # it. Added 2026-10-29 for the queued-message race, whose whole subject is the ORDER
     # (submit 1, submit 2, Stop 1, Stop 2): a staged file shows what one release wrote, and
     # a sequence shows what this release writes. A step that fails fails the row.
+    #
+    # A `write` STEP IS THE SESSION WRITING A FILE IT WAS TOLD ABOUT, added the same day for
+    # the asks checklist a running turn writes around a queued submit. The case does not
+    # spell the path: it is the first match of `path_rx` in step `path_from`'s output, the
+    # path that hook told the session, so each release is tested at the path it told.
+    _outs = []
     for _i, _step in enumerate(spec.get("before") or []):
+        if isinstance(_step, dict) and "write" in _step:
+            _bad = _unknown_keys(_step, WRITE_STEP_KEYS, f"before[{_i}]")
+            if _bad:
+                return False, "; ".join(_bad)
+            _from = _step.get("path_from")
+            _m = (re.search(_step.get("path_rx") or "", _outs[_from])
+                  if isinstance(_from, int) and 0 <= _from < len(_outs) else None)
+            if not _m or not _m.group(0):
+                return False, f"before[{_i}] found no path in before[{_from}]'s output"
+            with open(os.path.join(tree, _m.group(0)), "w", encoding="utf-8") as _fh:
+                _fh.write(_step["write"])
+            _outs.append("")
+            continue
         if not isinstance(_step, dict) or "script" not in _step:
             return False, f"before[{_i}] names no script"
         _bad = _unknown_keys(_step, STEP_KEYS, f"before[{_i}]")
@@ -390,6 +411,7 @@ def _run_in(tree, script, spec):
         if _sp.returncode != 0:
             return False, (f"before[{_i}] {_step['script']} exit {_sp.returncode}: "
                            f"{(_sp.stdout + _sp.stderr)[-400:]}")
+        _outs.append(_sp.stdout)
 
     # `concurrent: N` starts N copies at once against the same tree and asserts on the
     # FIRST one's output; `after` then sees what all N left behind. It exists for a

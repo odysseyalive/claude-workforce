@@ -10367,7 +10367,7 @@
           "\"items\": [{\"ask\": \"fix the deploy\", \"status\": \"done\"}, {\"ask\": \"explain the migration error\", \"status\": \"open\"}]"
         ]
       },
-      "wf-asks.s1.json": {
+      "wf-asks.s1.i3.json": {
         "want": [
           "\"carried\": [{\"issue\": \"i1\", \"ask\": \"explain the migration error\", \"status\": \"open\"}]"
         ]
@@ -10386,7 +10386,7 @@
   "issues-carried-list-is-capped": {
     "_why": "A CARRY WITH NO BOUND IS A FILE THAT GROWS FOR THE LIFE OF A SESSION. The rows ride in the checklist FILE rather than in the prompt, so the cost is the session's read and rewrite of that file on every turn, and a session twenty messages deep would be handed every item it ever left open. The newest open issue here holds exactly twenty items and the older one holds five more: the twenty land, newest issue first, and not one row of the older issue is carried. Both halves are asserted -- the ceiling and the ORDER -- because a cap that took the oldest twenty would pass a test that only counted.",
     "after": {
-      "wf-asks.s1.json": {
+      "wf-asks.s1.i3.json": {
         "not": [
           "\"issue\": \"i1\"",
           "ask21"
@@ -11962,5 +11962,157 @@
           "WIDEN  not scored",
           "i1  TRACKED"
       ]
+  },
+  "issues-queued-asks-written-before-submit-2-stop-1": {
+      "_why": "THE RUNNING TURN'S LIST STAYS ITS OWN WHEN A QUEUED MESSAGE ARRIVES. Real order: submit 1, the session writes turn 1's two items to the path submit 1 told it, message 2 is queued and its submit fires mid-turn (`b6047346`), then Stop 1. With one `wf-asks.<sid>.json` per session the queued submit replaced that file with message 2's empty list, so Stop 1 read message 2's list for turn 1 and the juror was handed no checklist at all for the turn that wrote two items. With the file keyed by message (`checklist_path`), Stop 1 reads the file of the record it picked and the flag carries turn 1's two items under turn 1's prompt. Fails on the one-file code.",
+      "before": [
+          {
+              "script": "wf-task-tag",
+              "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"A process crashed on this Omarchy machine and I want to know why. What systemd-coredump recorded: process python3.13, PID 59295, signal SIGABRT.\"}"
+          },
+          {
+              "write": "{\"title\": \"Crash cause\", \"items\": [{\"ask\": \"find why python3.13 PID 59295 aborted\", \"status\": \"done\"}, {\"ask\": \"say whether it will recur\", \"status\": \"open\"}]}",
+              "path_from": 0,
+              "path_rx": "wf-asks\\.[A-Za-z0-9_.-]+?\\.json"
+          },
+          {
+              "script": "wf-task-tag",
+              "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"Two things: please reach out to @mutze-dev with what you find here, and tell me whether the crash came from the GPU driver or from ComfyUI.\"}"
+          }
+      ],
+      "env": {
+          "WF_BLIND_SAMPLE": "0"
+      },
+      "exit": 0,
+      "not": [
+          "Traceback"
+      ],
+      "script": "wf-widen",
+      "stdin_raw": "{\"hook_event_name\": \"Stop\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"transcript_path\": \"t1.jsonl\", \"last_assistant_message\": \"No core dump survived for PID 59295; the journal shows ComfyUI aborting on a CUDA error.\"}",
+      "want": [
+          "i1  KICKBACK  Crash cause"
+      ],
+      "after": {
+          "wf-widen-flag.s1.json": {
+              "want": [
+                  "\"prompt\": \"A process crashed on this Omarchy machine",
+                  "\"checklist\": [{\"ask\": \"find why python3.13 PID 59295 aborted\""
+              ],
+              "not": [
+                  "Two things"
+              ]
+          }
+      }
+  },
+  "issues-queued-asks-written-before-submit-2-stop-2": {
+      "_why": "THE SAME ORDER CARRIED THROUGH STOP 2: submit 1, turn 1 writes its items, submit 2, Stop 1, then message 2's turn writes its own two items to the path submit 2 told it and Stop 2 fires. Each issue ends with its own list and no other: i1 holds turn 1's items once, i2 holds message 2's once, and Stop 2's juror gets message 2's list. Passes on the one-file code too, because message 2's write replaced the shared file before Stop 2 read it; it pins that keeping turn 1's file through the queued submit leaves message 2's half whole.",
+      "before": [
+          {
+              "script": "wf-task-tag",
+              "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"A process crashed on this Omarchy machine and I want to know why. What systemd-coredump recorded: process python3.13, PID 59295, signal SIGABRT.\"}"
+          },
+          {
+              "write": "{\"title\": \"Crash cause\", \"items\": [{\"ask\": \"find why python3.13 PID 59295 aborted\", \"status\": \"done\"}, {\"ask\": \"say whether it will recur\", \"status\": \"open\"}]}",
+              "path_from": 0,
+              "path_rx": "wf-asks\\.[A-Za-z0-9_.-]+?\\.json"
+          },
+          {
+              "script": "wf-task-tag",
+              "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"Two things: please reach out to @mutze-dev with what you find here, and tell me whether the crash came from the GPU driver or from ComfyUI.\"}"
+          },
+          {
+              "script": "wf-widen",
+              "stdin_raw": "{\"hook_event_name\": \"Stop\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"transcript_path\": \"t1.jsonl\", \"last_assistant_message\": \"No core dump survived for PID 59295; the journal shows ComfyUI aborting on a CUDA error.\"}"
+          },
+          {
+              "write": "{\"title\": \"Mutze and driver\", \"items\": [{\"ask\": \"reach out to @mutze-dev\", \"status\": \"done\"}, {\"ask\": \"GPU driver or ComfyUI\", \"status\": \"answered\"}]}",
+              "path_from": 2,
+              "path_rx": "wf-asks\\.[A-Za-z0-9_.-]+?\\.json"
+          }
+      ],
+      "env": {
+          "WF_BLIND_SAMPLE": "0"
+      },
+      "exit": 0,
+      "not": [
+          "Traceback",
+          "i2  KICKBACK"
+      ],
+      "script": "wf-widen",
+      "stdin_raw": "{\"hook_event_name\": \"Stop\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"transcript_path\": \"t2.jsonl\", \"last_assistant_message\": \"## @mutze-dev\\n\\nSent.\\n\\n## GPU driver or ComfyUI\\n\\nComfyUI's allocator, not the driver.\"}",
+      "want": [
+          "i1  KICKBACK  Crash cause"
+      ],
+      "after": {
+          "wf-widen-flag.s1.json": {
+              "want": [
+                  "\"prompt\": \"Two things",
+                  "\"checklist\": [{\"ask\": \"reach out to @mutze-dev\""
+              ],
+              "not": [
+                  "find why python3.13"
+              ]
+          },
+          ".claude/workforce/issues/s1.json": {
+              "once": [
+                  "find why python3.13 PID 59295 aborted",
+                  "say whether it will recur",
+                  "\"ask\": \"reach out to @mutze-dev\"",
+                  "\"title\": \"Crash cause\"",
+                  "\"title\": \"Mutze and driver\""
+              ]
+          }
+      }
+  },
+  "issues-queued-asks-written-after-submit-2-stop-2": {
+      "_why": "THE RUNNING TURN WRITES ITS LIST AFTER THE QUEUED SUBMIT. Real order: submit 1, submit 2 fires mid-turn, then turn 1 writes its two items to the path submit 1 told it, Stop 1, and Stop 2 with message 2's turn writing no list. With one file per session the late write replaced message 2's fresh list, Stop 1 absorbed it onto i1, and Stop 2 absorbed it AGAIN onto i2: i2 printed `KICKBACK  Crash cause`, took turn 1's title and items, and its juror was handed turn 1's checklist as message 2's. Keyed by message, the late write lands in turn 1's own file, i1 holds those items once, and i2 keeps only its own seeded item and is TRACKED. Fails on the one-file code.",
+      "before": [
+          {
+              "script": "wf-task-tag",
+              "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"A process crashed on this Omarchy machine and I want to know why. What systemd-coredump recorded: process python3.13, PID 59295, signal SIGABRT.\"}"
+          },
+          {
+              "script": "wf-task-tag",
+              "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"Two things: please reach out to @mutze-dev with what you find here, and tell me whether the crash came from the GPU driver or from ComfyUI.\"}"
+          },
+          {
+              "write": "{\"title\": \"Crash cause\", \"items\": [{\"ask\": \"find why python3.13 PID 59295 aborted\", \"status\": \"done\"}, {\"ask\": \"say whether it will recur\", \"status\": \"open\"}]}",
+              "path_from": 0,
+              "path_rx": "wf-asks\\.[A-Za-z0-9_.-]+?\\.json"
+          },
+          {
+              "script": "wf-widen",
+              "stdin_raw": "{\"hook_event_name\": \"Stop\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"transcript_path\": \"t1.jsonl\", \"last_assistant_message\": \"No core dump survived for PID 59295; the journal shows ComfyUI aborting on a CUDA error.\"}"
+          }
+      ],
+      "env": {
+          "WF_BLIND_SAMPLE": "0"
+      },
+      "exit": 0,
+      "not": [
+          "Traceback",
+          "i2  KICKBACK"
+      ],
+      "script": "wf-widen",
+      "stdin_raw": "{\"hook_event_name\": \"Stop\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"transcript_path\": \"t2.jsonl\", \"last_assistant_message\": \"## @mutze-dev\\n\\nSent.\\n\\n## GPU driver or ComfyUI\\n\\nComfyUI's allocator, not the driver.\"}",
+      "want": [
+          "i2  TRACKED  [Two things"
+      ],
+      "after": {
+          "wf-widen-flag.s1.json": {
+              "want": [
+                  "\"prompt\": \"Two things"
+              ],
+              "not": [
+                  "find why python3.13"
+              ]
+          },
+          ".claude/workforce/issues/s1.json": {
+              "once": [
+                  "find why python3.13 PID 59295 aborted",
+                  "\"title\": \"Crash cause\""
+              ]
+          }
+      }
   }
 }

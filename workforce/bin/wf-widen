@@ -2422,10 +2422,15 @@ def checklist(payload):
     """
     d = payload.get("scratchpad_dir") or os.environ.get("TMPDIR") or "/tmp"
     sid = TT.state_component(payload)
-    p = os.path.join(d, f"wf-asks.{sid}.json")
     record = (task_tag(payload) or {}).get("checklist")
     if not isinstance(record, dict):
         return None, None
+    # THE FILE OF THE RECORD THIS STOP PICKED, by its `key` (`TT.checklist_path`), so a
+    # queued message's list and the running turn's are never the same file.
+    key = record.get("key")
+    p = os.path.join(d, f"wf-asks.{sid}.{key}.json"
+                     if isinstance(key, str) and TT.CHECKLIST_KEY.fullmatch(key)
+                     else f"wf-asks.{sid}.json")
     # Through the sibling's guarded reader, never a plain `open()`: the list sits beside
     # the tag, under a name as predictable as the tag's (`wf-task-tag.tag_path`).
     cl = TT.read_json_nofollow(p) or {}

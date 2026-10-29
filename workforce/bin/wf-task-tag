@@ -2060,11 +2060,28 @@ TITLES_LINE = ("No title yet on %s: give each a few words in "
                "\"titles\": {\"<id>\": \"<title>\"}.")
 
 
-def checklist_path(payload):
-    """Where this turn's asks checklist lives. Keyed exactly like the tag, so a concurrent
-    agent's stop can never read or rewrite the main session's list."""
+# THE PER-MESSAGE PART OF A CHECKLIST'S NAME: the issue id its record pairs it with.
+CHECKLIST_KEY = re.compile(r"i[0-9]{1,9}")
+
+
+def checklist_path(payload, record=None):
+    """Where a message's asks checklist lives. Keyed exactly like the tag, so a concurrent
+    agent's stop can never read or rewrite the main session's list.
+
+    AND KEYED BY THE MESSAGE, through the `key` its record carries. A queued message's
+    submit fires before the running turn's Stop (`earlier_records`), and with one file per
+    session it rewrote the list the running turn had been told to write: a late write for
+    turn 1 then replaced message 2's fresh list, and message 2's Stop absorbed turn 1's
+    items onto message 2's issue. Each message is told its own path, so each turn writes
+    its own file, and each Stop reads the file of the record it picked. A record with no
+    `key` (a carry-only list, or one an older release wrote) names the bare file, as before.
+    `wf-widen.checklist` composes the same two names.
+    """
     d = payload.get("scratchpad_dir") or os.environ.get("TMPDIR") or "/tmp"
     sid = state_component(payload)
+    key = record.get("key") if isinstance(record, dict) else None
+    if isinstance(key, str) and CHECKLIST_KEY.fullmatch(key):
+        return os.path.join(d, f"wf-asks.{sid}.{key}.json")
     return os.path.join(d, f"wf-asks.{sid}.json")
 
 
@@ -2109,18 +2126,20 @@ def earlier_records(tag):
     return ([top] + older)[:EARLIER_MAX]
 
 
-def start_checklist(payload, prev=None):
+def start_checklist(payload, prev=None, earlier=()):
     """Replace last turn's checklist with an empty one for this ask. Returns the context line
     naming it ("" when this message gets none) and the record the tag carries (None when none).
 
     Last turn's file is removed first, so a short reply never inherits a list of asks it was
-    never given.
+    never given. A TURN STILL RUNNING KEEPS ITS FILE: a keyed record no `Stop` has ended is a
+    queued message's predecessor, whose session may still write the path it was told
+    (`checklist_path`). Its file goes at a later submit, once a `Stop` has ended it.
 
     A MESSAGE THAT OPENS NO LIST OF ITS OWN STILL CARRIES this session's earlier open items,
     through `carry_only_checklist`, and gets no file at all when there are none.
     """
     prompt = payload.get("prompt") or ""
-    p = checklist_path(payload)
+    p = checklist_path(payload, prev)
     # A NOTIFICATION MID-TURN LEAVES THE CHECKLIST ALONE. MEASURED 2026-09-13: a background task
     # finished mid-turn, its notification fired this event, and the remove below erased the
     # checklist for the user's real message.
@@ -2170,21 +2189,32 @@ def start_checklist(payload, prev=None):
         untitled = untitled_issues(led, skip=issue_id)
     except OSError:
         pass
-    try:
-        os.remove(p)
-    except OSError:
-        pass
+    bare = checklist_path(payload)
+    running = isinstance(prev, dict) and p != bare and not prev.get("ended")
+    gone = [] if running else [p]
+    gone += [bare] + [checklist_path(payload, r.get("checklist")) for r in earlier
+                      if isinstance(r, dict) and isinstance(r.get("checklist"), dict)
+                      and r["checklist"].get("ended")]
+    for old in set(gone):
+        try:
+            os.remove(old)
+        except OSError:
+            pass
     # Injected text opens no list of its own: it is not the user's ask. IT STILL CARRIES,
     # when this session has earlier open items — see `carry_only_checklist`, which is where
     # the measured hand-back case is written down.
     if not opens_issue(prompt):
-        return carry_only_checklist(p, carried, untitled)
+        return carry_only_checklist(bare, carried, untitled)
+    # `issue` PAIRS THE LIST WITH THE ISSUE IT BELONGS TO, and it is what the next
+    # message's absorb reads. Without it the items would have no issue to land on. `key`
+    # names this message's own file (`checklist_path`).
+    record = {"prompt": prompt[:2000], "ended": False, "issue": issue_id}
+    if issue_id:
+        record["key"] = issue_id
+    p = checklist_path(payload, record)
     if not write_json_atomic(p, {"prompt": prompt[:2000], "items": [],
                                  "carried": carried}):
         return "", None
-    # `issue` PAIRS THE LIST WITH THE ISSUE IT BELONGS TO, and it is what the next
-    # message's absorb reads. Without it the items would have no issue to land on.
-    record = {"prompt": prompt[:2000], "ended": False, "issue": issue_id}
     # Stated as facts about the file, never as an out-of-band command (see the note above
     # the injection in `main`).
     return (CHECKLIST_HEAD % p
@@ -2521,7 +2551,7 @@ def main():
     _old_tag = read_json_nofollow(tag_path(payload))
     earlier = earlier_records(_old_tag)
     checklist_line, checklist_record = start_checklist(
-        payload, previous_checklist(payload, _old_tag))
+        payload, previous_checklist(payload, _old_tag), earlier)
 
     hits = classify(payload.get("prompt") or "")
     if not hits:
