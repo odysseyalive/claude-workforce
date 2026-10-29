@@ -216,7 +216,106 @@ def task_tag(payload):
     # A tag that is not an object is no tag: every reader calls `.get` on it, and
     # `read_json_nofollow` already answers None for one — and for a planted link at the
     # name, which is the sibling's rule (`tag_path`) and not a second design.
-    return TT.read_json_nofollow(tag_file(payload))
+    return answered_record(payload, TT.read_json_nofollow(tag_file(payload)))
+
+
+def answered_record(payload, tag):
+    """The record in `tag` for the message the stopping turn answered: the tag itself, or
+    one of its `earlier` records. The object is the one inside `tag`, so a caller that
+    marks it and writes `tag` back marks that record.
+
+    A QUEUED MESSAGE'S SUBMIT LANDS BEFORE THE RUNNING TURN'S STOP (`TT.earlier_records`),
+    so the newest record is not always this turn's. The transcript says which is: the
+    turn's own user row, the last real one before its reply. A queued message has no row
+    until its own turn starts (`b6047346`: enqueued 17:21:55, its row written at 17:22:22,
+    after turn 1's Stop), and one delivered into the running turn arrives as an attachment
+    and never gets one (`3ca2e8f7`, 23:09:25). `prompt_id` is in every hook payload, but
+    whether it already names the queued message at an enqueue-time submit is unmeasured,
+    and the text is in the rows.
+
+    THE NEWEST RECORD WHENEVER THAT CANNOT BE SHOWN, which is what every stop read before:
+    a `SubagentStop` (an agent's slot holds no `earlier`), a tag from an older release, no
+    transcript, or a user row matching no record — a slash command's row is not the text
+    its submit saw.
+    """
+    if not isinstance(tag, dict) or payload.get("hook_event_name") != "Stop":
+        return tag
+    earlier = earlier_of(tag)
+    if not earlier:
+        return tag
+    records = [r for r in [tag] + earlier
+               if isinstance(r.get("prompt"), str) and r["prompt"].strip()]
+    for said, typed in turn_user_rows(payload.get("transcript_path")):
+        for rec in records:
+            if " ".join(rec["prompt"].split()) in said:
+                return rec
+        if typed:
+            break
+    return tag
+
+
+def earlier_of(tag):
+    """The tag's `earlier` records that are objects, newest first; [] for any other shape."""
+    rows = tag.get("earlier") if isinstance(tag, dict) else None
+    return [r for r in rows if isinstance(r, dict)] if isinstance(rows, list) else []
+
+
+_TURN_ROWS = {}
+# THE ROWS THAT END A TURN, written after its Stop hooks return. A walk that reaches one has
+# left the stopping turn.
+TURN_END = ("stop_hook_summary", "turn_duration")
+
+
+def turn_user_rows(path):
+    """The stopping turn's user rows, newest first, as (normalised texts, typed).
+
+    FROM THE LAST ASSISTANT ROW BACK, so a message queued during the hooks, which lands
+    after the reply, is never read as this turn's. A tool result is a user row and not a
+    message, and is skipped. An `isMeta` row is yielded with `typed` False: a skill's loaded
+    text and a system reminder sit inside a turn with that mark, and so does the row that
+    OPENS a turn for a peer session's message (measured 2026-10-29: 901 of 901
+    "Another Claude session sent a message" rows over 200 transcripts). The walk ends at
+    the first typed row or at a `TURN_END` row, so it never reaches an earlier turn's
+    message. Each text block counts alone and all of them joined, since a message carrying
+    an image is several blocks.
+    """
+    if not isinstance(path, str) or not path:
+        return []
+    if path in _TURN_ROWS:
+        return _TURN_ROWS[path]
+    out, replied = [], False
+    for line in reversed(TL._read_lines(path) or []):
+        try:
+            row = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(row, dict):
+            continue
+        if row.get("type") == "assistant":
+            replied = True
+            continue
+        if not replied:
+            continue
+        if row.get("type") == "system" and row.get("subtype") in TURN_END:
+            break
+        msg = row.get("message") if row.get("type") == "user" else None
+        c = msg.get("content") if isinstance(msg, dict) else None
+        if isinstance(c, list):
+            if any(isinstance(b, dict) and b.get("type") == "tool_result" for b in c):
+                continue
+            texts = [b["text"] for b in c if isinstance(b, dict)
+                     and b.get("type") == "text" and isinstance(b.get("text"), str)]
+            texts.append("\n".join(texts))
+        elif isinstance(c, str):
+            texts = [c]
+        else:
+            continue
+        typed = not row.get("isMeta")
+        out.append(({" ".join(t[:2000].split()) for t in texts}, typed))
+        if typed:
+            break
+    _TURN_ROWS[path] = out
+    return out
 
 
 def tag_file(payload):
@@ -2016,6 +2115,17 @@ def widen(payload):
                 pass
         return {"systemMessage": note}
 
+    # A FLAG AN EARLIER TURN RAISED AND ITS STOP FINISHED WITH GOES BEFORE THIS TURN IS
+    # JUDGED. `wf-task-tag` clears the flag at the submit that starts a turn, and a queued
+    # message's submit fires before the running turn's Stop (`b6047346`, 17:21:55 against
+    # 17:21:59): turn 1's flag was then raised after the clear and was still on disk when
+    # turn 2 stopped. `audited` is the rule the side query above already uses.
+    if not subagent and audited(payload):
+        try:
+            os.remove(widen_flag(payload))
+        except OSError:
+            pass
+
     # THE STOPPING AGENT'S OWN SHELLS, BEFORE THE WAIT GATE. See `closeout_subagent`: the
     # `background_tasks` exemption below is precisely what let the measured agent hand back
     # with a live shell, so this one fact has to be read above it. Nothing else moves — the
@@ -2331,12 +2441,25 @@ def mark_ended(payload):
     """
     path = tag_file(payload)
     tag = TT.read_json_nofollow(path)
+    rec = answered_record(payload, tag)
     # A tag that is absent, unparsable, a planted link, or carries no checklist record
     # leaves nothing to mark. `TypeError` is the None and the non-object cases together.
     try:
-        tag["checklist"]["ended"] = True
-    except (KeyError, TypeError):
+        ended = dict(rec["checklist"])
+        rec["checklist"]["ended"] = True
+    except (KeyError, TypeError, ValueError):
         return
+    # THE SAME LIST UNDER ANOTHER RECORD IS THE SAME TURN, and so is every record older than
+    # the one answered. A notification mid-turn copies the list's record onto its own tag
+    # (`TT.start_checklist`), and a message delivered into a running turn never gets a Stop
+    # of its own; either left un-ended would hand the next notification a finished list.
+    records = [tag] + earlier_of(tag)
+    older = False
+    for r in records:
+        cl = r.get("checklist")
+        if isinstance(cl, dict) and (older or cl == ended):
+            cl["ended"] = True
+        older = older or r is rec
     TT.write_json_atomic(path, tag)
 
 

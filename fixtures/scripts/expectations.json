@@ -11796,5 +11796,171 @@
       "want": [
           "issue i1"
       ]
+  },
+  "issues-queued-message-stop-1-judges-message-1": {
+      "_why": "A QUEUED MESSAGE'S SUBMIT FIRES BEFORE THE RUNNING TURN'S STOP, and that Stop must still judge the message it answered. MEASURED 2026-10-29 in `/home/francis/Work` `b6047346`: message 2 was enqueued at 17:21:55 and its `UserPromptSubmit` fired then; turn 1's Stop came at 17:21:59, read the one-slot tag, handed the jury \"please reach out to @mutze-dev...\" as turn 1's ask and printed `i2 TRACKED`. This is that order, run for real: submit 1, submit 2, then Stop 1 against the transcript as it stood (message 2 is only an `enqueue` row, and an `isMeta` skill row sits inside turn 1). Stop 1 picks the earlier record by the turn's own user row: its flag carries message 1, its record is the one ended, i1 is TRACKED, and i2's seeded item is NOT superseded, because i2 is the later message. On the one-slot code the ASKS line counts message 2's two asks against turn 1's reply and i1 is superseded.",
+      "after": {
+          "wf-widen-flag.s1.json": {
+              "want": [
+                  "\"prompt\": \"A process crashed on this Omarchy machine"
+              ],
+              "not": [
+                  "Two things"
+              ]
+          },
+          "wf-task-tag.s1.json": {
+              "want": [
+                  "\"ended\": true, \"issue\": \"i1\"",
+                  "\"ended\": false, \"issue\": \"i2\""
+              ]
+          },
+          ".claude/workforce/issues/s1.json": {
+              "want": [
+                  "\"id\": \"i1\"",
+                  "\"id\": \"i2\""
+              ],
+              "not": [
+                  "superseded",
+                  "\"state\": \"closed\""
+              ]
+          }
+      },
+      "before": [
+          {
+              "script": "wf-task-tag",
+              "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"A process crashed on this Omarchy machine and I want to know why. What systemd-coredump recorded: process python3.13, PID 59295, signal SIGABRT.\"}"
+          },
+          {
+              "script": "wf-task-tag",
+              "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"Two things: please reach out to @mutze-dev with what you find here, and tell me whether the crash came from the GPU driver or from ComfyUI.\"}"
+          }
+      ],
+      "env": {
+          "WF_BLIND_SAMPLE": "0"
+      },
+      "exit": 0,
+      "not": [
+          "Traceback",
+          "ASKS  the prompt made 2"
+      ],
+      "script": "wf-widen",
+      "stdin_raw": "{\"hook_event_name\": \"Stop\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"transcript_path\": \"t1.jsonl\", \"last_assistant_message\": \"No core dump survived for PID 59295; the journal shows ComfyUI aborting on a CUDA error.\"}",
+      "want": [
+          "i1  TRACKED  [A process crashed on this Omarchy machine"
+      ]
+  },
+  "issues-queued-message-stop-2-judges-message-2": {
+      "_why": "THE QUEUED MESSAGE'S OWN TURN IS STILL JUDGED AT ITS OWN STOP. The same order one event further: submit 1, submit 2, Stop 1, then Stop 2 against the transcript once message 2's row exists. Its record was not ended by Stop 1, so its checklist goes to the jury (message 2 states two asks) with ITS OWN reply as the conclusion, and the flag Stop 1 raised is gone first: its submit-time clear had already run before Stop 1 wrote it, and `audited` (the `stop_hook_summary` row) says Stop 1 finished with it. i1 is superseded here, by the later message's Stop, and i2 is TRACKED. On the one-slot code Stop 1 ended message 2's record, so Stop 2 hands nothing over and the flag left on disk pairs message 2's prompt with turn 1's reply.",
+      "after": {
+          "wf-widen-flag.s1.json": {
+              "want": [
+                  "\"prompt\": \"Two things",
+                  "\"conclusion\": \"## @mutze-dev"
+              ],
+              "not": [
+                  "No core dump survived"
+              ]
+          },
+          "wf-task-tag.s1.json": {
+              "want": [
+                  "\"ended\": true, \"issue\": \"i2\"",
+                  "\"ended\": true, \"issue\": \"i1\""
+              ]
+          },
+          ".claude/workforce/issues/s1.json": {
+              "want": [
+                  "\"status\": \"superseded\""
+              ]
+          }
+      },
+      "before": [
+          {
+              "script": "wf-task-tag",
+              "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"A process crashed on this Omarchy machine and I want to know why. What systemd-coredump recorded: process python3.13, PID 59295, signal SIGABRT.\"}"
+          },
+          {
+              "script": "wf-task-tag",
+              "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"Two things: please reach out to @mutze-dev with what you find here, and tell me whether the crash came from the GPU driver or from ComfyUI.\"}"
+          },
+          {
+              "script": "wf-widen",
+              "stdin_raw": "{\"hook_event_name\": \"Stop\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"transcript_path\": \"t1.jsonl\", \"last_assistant_message\": \"No core dump survived for PID 59295; the journal shows ComfyUI aborting on a CUDA error.\"}"
+          }
+      ],
+      "env": {
+          "WF_BLIND_SAMPLE": "0"
+      },
+      "exit": 0,
+      "not": [
+          "Traceback",
+          "i1  TRACKED"
+      ],
+      "script": "wf-widen",
+      "stdin_raw": "{\"hook_event_name\": \"Stop\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"transcript_path\": \"t2.jsonl\", \"last_assistant_message\": \"## @mutze-dev\\n\\nSent.\\n\\n## GPU driver or ComfyUI\\n\\nComfyUI's allocator, not the driver.\"}",
+      "want": [
+          "i2  TRACKED  [Two things"
+      ]
+  },
+  "issues-queued-message-heals-a-single-slot-tag": {
+      "_why": "AN INSTALL UPGRADED MID-TURN HEALS AT THE NEXT SUBMIT. `wf-task-tag.s1.json` and the ledger here were written by the one-slot release's submit 1: a tag with no `earlier` key. The queued submit 2 runs on this release and keeps that record as `earlier`, and Stop 1 then judges message 1 and tracks i1. The old file is read without error and nothing on disk is migrated by hand.",
+      "after": {
+          "wf-task-tag.s1.json": {
+              "want": [
+                  "\"earlier\": [{\"hits\": [{\"kind\": \"incident\"",
+                  "\"ended\": true, \"issue\": \"i1\""
+              ]
+          }
+      },
+      "before": [
+          {
+              "script": "wf-task-tag",
+              "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"Two things: please reach out to @mutze-dev with what you find here, and tell me whether the crash came from the GPU driver or from ComfyUI.\"}"
+          }
+      ],
+      "env": {
+          "WF_BLIND_SAMPLE": "0"
+      },
+      "exit": 0,
+      "not": [
+          "Traceback",
+          "ASKS  the prompt made 2"
+      ],
+      "script": "wf-widen",
+      "stdin_raw": "{\"hook_event_name\": \"Stop\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"transcript_path\": \"t1.jsonl\", \"last_assistant_message\": \"No core dump survived for PID 59295; the journal shows ComfyUI aborting on a CUDA error.\"}",
+      "want": [
+          "i1  TRACKED  [A process crashed on this Omarchy machine"
+      ]
+  },
+  "issues-queued-message-peer-turn-keeps-its-own-record": {
+      "_why": "THE WALK BACK TO THE TURN'S OWN ROW STOPS AT THE TURN BEFORE. A peer session's message opens its turn with an `isMeta` user row (901 of 901 \"Another Claude session sent a message\" rows over 200 transcripts, measured 2026-10-29), and that row's text is not the bare tag the submit saw, so it matches no record. The walk passes it, as it passes a skill's loaded text, and must then stop at the previous turn's `stop_hook_summary` / `turn_duration` rows. Without that stop it reaches message 1's typed row, picks message 1's record, and the peer turn is blocked as an `incident` claim. Passes on the one-slot code too, which only ever read the newest record: this pins that the new selection never reaches into an earlier turn.",
+      "before": [
+          {
+              "script": "wf-task-tag",
+              "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"A process crashed on this Omarchy machine and I want to know why. What systemd-coredump recorded: process python3.13, PID 59295, signal SIGABRT.\"}"
+          },
+          {
+              "script": "wf-widen",
+              "stdin_raw": "{\"hook_event_name\": \"Stop\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"transcript_path\": \"t1.jsonl\", \"last_assistant_message\": \"No core dump survived for PID 59295; the journal shows ComfyUI aborting on a CUDA error.\"}"
+          },
+          {
+              "script": "wf-task-tag",
+              "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"<cross-session-message from=\\\"uds:/run/user/1000/cc-socks/14456.sock\\\" from-name=\\\"mutze-dev\\\" from-mode=\\\"prompting\\\">\\nFrom the mutze-studio session that owns the render queue. The crash was ours: the allocator, not the driver.\\n</cross-session-message>\"}"
+          }
+      ],
+      "env": {
+          "WF_BLIND_SAMPLE": "0"
+      },
+      "exit": 0,
+      "not": [
+          "Traceback",
+          "incident claim",
+          "\"decision\": \"block\""
+      ],
+      "script": "wf-widen",
+      "stdin_raw": "{\"hook_event_name\": \"Stop\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"transcript_path\": \"t3.jsonl\", \"last_assistant_message\": \"Noted: mutze-dev confirms the allocator.\"}",
+      "want": [
+          "WIDEN  not scored",
+          "i1  TRACKED"
+      ]
   }
 }

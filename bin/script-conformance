@@ -51,10 +51,11 @@ BIN = os.path.join(ROOT, "workforce", "bin")
 # be invented, but it can no longer be ignored. Measured 2026-09-13.
 NEGATIVE_KEYS = ("not", "must_not", "reject")
 ROW_KEYS = {"script", "exit", "args", "env", "want", "after", "chmod", "concurrent",
-            "subst", "hardlink", "git",
+            "subst", "hardlink", "git", "before",
             "stdin_file", "stdin_raw", "_why", *NEGATIVE_KEYS}
 AFTER_KEYS = {"want", "once", "absent", *NEGATIVE_KEYS}
 GIT_KEYS = {"init", "hooks_from", "commit", "config", "links", "corrupt_index"}
+STEP_KEYS = {"script", "stdin_raw"}
 
 
 def _unknown_keys(spec, allowed, where):
@@ -372,6 +373,24 @@ def _run_in(tree, script, spec):
         if _gp:
             return False, _gp
 
+    # `before` RUNS EARLIER HOOK EVENTS IN THE SAME TREE, in order, so a case can be the
+    # LAST event of a real sequence instead of a hand-written picture of the state before
+    # it. Added 2026-10-29 for the queued-message race, whose whole subject is the ORDER
+    # (submit 1, submit 2, Stop 1, Stop 2): a staged file shows what one release wrote, and
+    # a sequence shows what this release writes. A step that fails fails the row.
+    for _i, _step in enumerate(spec.get("before") or []):
+        if not isinstance(_step, dict) or "script" not in _step:
+            return False, f"before[{_i}] names no script"
+        _bad = _unknown_keys(_step, STEP_KEYS, f"before[{_i}]")
+        if _bad:
+            return False, "; ".join(_bad)
+        _sp = subprocess.run([sys.executable, os.path.join(BIN, _step["script"])],
+                             input=_step.get("stdin_raw") or "", text=True,
+                             capture_output=True, env=env, cwd=tree, timeout=CASE_TIMEOUT)
+        if _sp.returncode != 0:
+            return False, (f"before[{_i}] {_step['script']} exit {_sp.returncode}: "
+                           f"{(_sp.stdout + _sp.stderr)[-400:]}")
+
     # `concurrent: N` starts N copies at once against the same tree and asserts on the
     # FIRST one's output; `after` then sees what all N left behind. It exists for a
     # writer every session start runs, where two sessions opening at once is ordinary.
@@ -505,7 +524,9 @@ def touching(relpath, cases):
                 reach.add(n)
                 grew = True
     return sorted(c for c in cases if isinstance(cases[c], dict)
-                  and cases[c].get("script") in reach) or None
+                  and (cases[c].get("script") in reach
+                       or any(isinstance(st, dict) and st.get("script") in reach
+                              for st in cases[c].get("before") or []))) or None
 
 
 def main():

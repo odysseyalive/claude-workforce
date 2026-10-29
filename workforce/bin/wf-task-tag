@@ -1362,11 +1362,18 @@ def track_message(led, issue_id, written):
     message's submit fired at ENQUEUE, mid-turn (17:21:55 against a 17:21:59 Stop), so the
     tag's one record named the newer issue — that Stop printed `i2 TRACKED` and i1 kept
     nothing. The add below remains for an issue an older release opened unseeded.
+
+    ONLY ISSUES OPENED BEFORE THIS ONE ARE SUPERSEDED. A queued message's issue is opened at
+    its enqueue, before the running turn's Stop (`earlier_records`), and that Stop now tracks
+    the earlier message's issue. Superseding every other issue would close the queued one
+    before its own turn began; it is the later message, so nothing has replaced it yet.
     """
     target = None
     for iss in open_issues(led):
         if issue_id and iss.get("id") == issue_id:
             target = iss
+            continue
+        if target is not None:
             continue
         for item in issue_items(iss):
             if item.get("fallback") is True and not item_done(item):
@@ -2061,13 +2068,45 @@ def checklist_path(payload):
     return os.path.join(d, f"wf-asks.{sid}.json")
 
 
-def previous_checklist(payload):
+def previous_checklist(payload, tag=None):
     """The checklist record the last tag carried, or None. The record is this hook's, kept in
     the tag file, because the checklist file is the session's to rewrite and cannot be trusted
     to hold the user's prompt or whether a `Stop` has ended the turn it belongs to."""
-    tag = read_json_nofollow(tag_path(payload))
+    if tag is None:
+        tag = read_json_nofollow(tag_path(payload))
     rec = tag.get("checklist") if isinstance(tag, dict) else None
     return rec if isinstance(rec, dict) else None
+
+
+# HOW MANY EARLIER MESSAGES' RECORDS THE TAG KEEPS BESIDE THE NEWEST ONE.
+EARLIER_MAX = 3
+
+
+def earlier_records(tag):
+    """The records the tag being replaced held, newest first, for the new tag's `earlier`.
+
+    A QUEUED MESSAGE'S SUBMIT FIRES BEFORE THE RUNNING TURN'S STOP. MEASURED 2026-10-29 in
+    `/home/francis/Work` `b6047346`: the next message was enqueued at 17:21:55 and its
+    `UserPromptSubmit` fired then, mid-turn; turn 1's `Stop` came at 17:21:59. With one
+    record per slot that Stop read message 2's record, so the jury was handed "please reach
+    out to @mutze-dev…" as turn 1's ask and the WORK line tracked i2. `3ca2e8f7` shows the
+    same order with the queued message delivered INTO the running turn instead.
+
+    SO THE REPLACED RECORD IS KEPT, and the Stop picks the one its turn answered
+    (`wf-widen.answered_record`, which matches the transcript's last user row). The top-level
+    fields stay the NEWEST record, so every reader that never picks — the next submit's
+    `previous_checklist`, a `SubagentStop` slot — reads exactly what it read before.
+
+    A record from an older release has no `earlier` key and is kept like any other, which is
+    the whole heal. Capped at `EARLIER_MAX`: one queued message needs one, and an unmatched
+    record ages out instead of growing the file.
+    """
+    if not isinstance(tag, dict) or not isinstance(tag.get("prompt"), str):
+        return []
+    top = {k: v for k, v in tag.items() if k != "earlier"}
+    older = tag.get("earlier")
+    older = [r for r in older if isinstance(r, dict)] if isinstance(older, list) else []
+    return ([top] + older)[:EARLIER_MAX]
 
 
 def start_checklist(payload, prev=None):
@@ -2476,8 +2515,13 @@ def main():
     except OSError:
         pass
 
-    # Read before either write below replaces the tag that holds it.
-    checklist_line, checklist_record = start_checklist(payload, previous_checklist(payload))
+    # Read before either write below replaces the tag that holds it. ITS RECORD IS KEPT as
+    # the new tag's `earlier`, because a queued message's submit lands before the running
+    # turn's Stop (`earlier_records`).
+    _old_tag = read_json_nofollow(tag_path(payload))
+    earlier = earlier_records(_old_tag)
+    checklist_line, checklist_record = start_checklist(
+        payload, previous_checklist(payload, _old_tag))
 
     hits = classify(payload.get("prompt") or "")
     if not hits:
@@ -2502,7 +2546,7 @@ def main():
         write_json_atomic(tag_path(payload),
                           {"hits": [], "prompt": (payload.get("prompt") or "")[:2000],
                            "senses": [], "asks": _n, "asks_why": _how,
-                           "checklist": checklist_record})
+                           "checklist": checklist_record, "earlier": earlier})
         print(json.dumps({"hookSpecificOutput": {
             "hookEventName": "UserPromptSubmit",
             "additionalContext": "\n\n".join(
@@ -2531,7 +2575,8 @@ def main():
                        # THE CHECKLIST RECORD: the user's prompt and whether a `Stop` has
                        # ended its turn. Kept here, in a file this hook writes, and never in
                        # the checklist file the session edits.
-                       "checklist": checklist_record})
+                       "checklist": checklist_record,
+                       "earlier": earlier})
 
     # STATED AS FACTS ABOUT THE ASK, NEVER AS AN INSTRUCTION. The hooks reference is
     # explicit that text framed as an out-of-band command trips the prompt-injection
