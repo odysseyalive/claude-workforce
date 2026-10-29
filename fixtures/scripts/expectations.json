@@ -7509,6 +7509,73 @@
       }
     }
   },
+  "catalog-house-rules-migrates-predecessor": {
+    "_why": "MEASURED 2026-10-29 on a copy of apps-odyssey-alive's image-eval anchor (downstream DEF-Q-24): before the producer existed, audits wrote the house rules into the anchor BY HAND as an unmarked section headed `## House rules — refreshed by `/workforce audit`, run …`. HOUSE_RX never saw it, so 1.81.0 appended a second, marked region beside it, and the old section's two real register rows (the palette inversion and the watercolour replacement) were absent from the new region, which declared 0 rows because it derives only from `supersedes:` markers. Display mode must name the predecessor, its line, and how many rows cross. Against 1.81.0 this tree printed `register 0 row(s) · precedence clause appended` and nothing about the old section. The tree is a sanitized copy of the real anchor's shape, not its bytes: this repository is public.",
+    "script": "wf-catalog",
+    "args": ["--house-rules"],
+    "env": {"CLAUDE_CONFIG_DIR": "/nonexistent-config"},
+    "exit": 0,
+    "want": [
+      "~ image-eval           register 0 row(s) · 2 carried · precedence clause appended · migrates the unmarked predecessor at .claude/skills/image-eval/CATALOG-ANCHOR.md:22, carrying 2 row(s) — would refresh into .claude/skills/image-eval/CATALOG-ANCHOR.md",
+      "INV-HOUSERULES  5 evaluator(s) · 0 current · 1 would refresh",
+      "DISPLAY ONLY — nothing written"
+    ],
+    "not": ["Traceback"],
+    "after": {
+      ".claude/skills/image-eval/CATALOG-ANCHOR.md": {
+        "want": ["## House rules — refreshed by `/workforce audit`"],
+        "not": ["WF-HOUSE-RULES"]
+      }
+    }
+  },
+  "catalog-house-rules-migrates-predecessor-execute": {
+    "_why": "The same tree with --execute, asserted on disk, which is the DEF-Q-24 discharge test: (a) the unmarked predecessor is gone and exactly one house-rules heading remains, inside the marked region; (b) both of its register rows are carried verbatim rather than re-derived to 0; (c) the provenance line stamps the run id from `.claude/workforce/.current-run`. Every `origin: user | immutable: true` span survives byte for byte, including the one in the section AFTER the predecessor — the section ends at the next `##` heading and never reaches it. Against 1.81.0: two `## House rules` headings, the rows in the old section only, and `0 rows._` in the new one.",
+    "script": "wf-catalog",
+    "args": ["--house-rules", "--execute"],
+    "env": {"CLAUDE_CONFIG_DIR": "/nonexistent-config"},
+    "exit": 0,
+    "want": [
+      "+ image-eval           register 0 row(s) · 2 carried · migrated the unmarked predecessor at line 22, 2 of its 2 row(s) carried verbatim",
+      "INV-HOUSERULES  5 evaluator(s) · 1 register(s) refreshed"
+    ],
+    "not": ["Traceback", "FAILED"],
+    "after": {
+      ".claude/skills/image-eval/CATALOG-ANCHOR.md": {
+        "want": [
+          "| palette variety across a set (a set sharing one palette flagged as AI monotony) | inverted — one shared palette is REQUIRED; palette variation between assets is the defect | this file § *Directive amendment* (\"The palette check is INVERTED\") | 2026-07-22 |",
+          "| watercolour-technique authenticity | system integrity of the drawn graphic system | this file § *Directive amendment* (\"What replaces watercolour-technique authenticity\") | 2026-07-22 |",
+          "propagated: 2026-",
+          " run audit-20261029T120000Z -->",
+          "<!-- origin: user | added: 2026-07-22 | immutable: true | scope: this project's snapshot only -->\nThe palette check is INVERTED: one shared palette is required, and variation between assets is the\nfinding. What replaces watercolour-technique authenticity is the integrity of the drawn system.\n<!-- /origin -->",
+          "## Notes kept after the house rules\n\n<!-- origin: user | added: 2026-08-01 | immutable: true -->\nA user section that follows the predecessor. The migration ends at the heading above and never reaches it.\n<!-- /origin -->"
+        ],
+        "once": ["## House rules", "<!-- WF-HOUSE-RULES START", "| palette variety across a set"],
+        "not": ["refreshed by `/workforce audit`", "0 rows._"]
+      }
+    }
+  },
+  "catalog-house-rules-migrates-predecessor-duplicated": {
+    "_why": "The state 1.81.0 LEFT on every project it ran on: the unmarked predecessor, then the 0-row marked region that run appended (this tree was produced by running 1.81.0's own `--house-rules --execute` on the `-migrates-predecessor` tree). The predecessor must end at the region's START marker, not at the region's own `## House rules` heading, or the migration would eat the marker and provenance line. The repair converges on the same register the clean path writes: both rows carried, one heading, the old 0-row text gone.",
+    "script": "wf-catalog",
+    "args": ["--house-rules", "--execute"],
+    "env": {"CLAUDE_CONFIG_DIR": "/nonexistent-config"},
+    "exit": 0,
+    "want": [
+      "+ image-eval           register 0 row(s) · 2 carried · migrated the unmarked predecessor at line 22, 2 of its 2 row(s) carried verbatim"
+    ],
+    "not": ["Traceback", "FAILED"],
+    "after": {
+      ".claude/skills/image-eval/CATALOG-ANCHOR.md": {
+        "want": [
+          "| watercolour-technique authenticity | system integrity of the drawn graphic system |",
+          " run audit-20261029T120000Z -->"
+        ],
+        "once": ["## House rules", "<!-- WF-HOUSE-RULES START", "<!-- WF-HOUSE-RULES END -->",
+                 "| palette variety across a set"],
+        "not": ["refreshed by `/workforce audit`", "0 rows._", "audit-20261028T090000Z"]
+      }
+    }
+  },
   "catalog-migrate-lifts-house-rules": {
     "_why": "MEASURED 2026-09-25 (item 6): NON_CORPUS holds only SKILL.md and CATALOG-ANCHOR.md, so a WF-HOUSE-RULES region propagated into a corpus file is removed with it — which is exactly what happened to code-evaluator's on 2026-09-11 while Step 6-F promised the house rules survive. Against HEAD's wf-catalog this tree prints `retire references/ai-patterns.md` and nothing else: the region goes. The region is now lifted into CATALOG-ANCHOR.md and read back BEFORE anything is removed, and the file goes only after that.",
     "script": "wf-catalog",

@@ -154,6 +154,17 @@ WRITERS = {
     # written only beside a real change. The tree is the un-synced fixture on purpose: a
     # tree already settled would be a no-op twice over and measure nothing, the same trap
     # the `sync` row's seed note records.
+    # wf-catalog --house-rules --execute runs at audit Steps 4 and 6-E, every audit. The
+    # tree holds the duplicated state 1.81.0 left (unmarked predecessor + a 0-row region),
+    # so pass 1 migrates and pass 2 must read the region `current` and write nothing — a
+    # second pass that re-found the predecessor, or re-carried its rows, would show here.
+    "catalog-house-rules": {
+        "argv": ["workforce/bin/wf-catalog", "--root",
+                 "fixtures/scripts/catalog-house-rules-migrates-predecessor-duplicated",
+                 "--house-rules", "--execute"],
+        "env": {"CLAUDE_CONFIG_DIR": "/nonexistent-config"},
+        "watch": "fixtures/scripts/catalog-house-rules-migrates-predecessor-duplicated",
+    },
     "org-sync": {
         "argv": ["workforce/bin/wf-org-sync", "--root",
                  "fixtures/scripts/orgsync-new-agent"],

@@ -917,6 +917,25 @@ HOUSE_REGISTER_HEADING = "### Supersession register"
 # sentence, which is an invention with a line number attached.
 SUPERSEDES_RX = re.compile(r"^<!--(?=[^>]*\bsupersedes:)[^>]*-->[ \t]*$", re.M)
 HOUSE_ATTR_RX = re.compile(r"\b([A-Za-z][A-Za-z-]*):\s*([^|>]*?)\s*(?=\||-->|$)")
+# THE REGION'S UNMARKED PREDECESSOR. Before this producer existed, audits wrote the house
+# rules into the anchor BY HAND as a plain section headed exactly
+# `## House rules — refreshed by `/workforce audit`, run `<run>` (<date>)` — every one of
+# apps-odyssey-alive's five anchors carried one (run `audit-20260906T040806Z`, then
+# `audit-20260911T152332Z`). No marker, so `HOUSE_RX` never saw it: 1.81.0 appended a
+# second, marked region beside it, and on `image-eval` the old section's register held the
+# two real rows (the 2026-07-22 palette inversion and watercolour replacement) while the
+# new region, derived only from `supersedes:` markers, declared 0 (DEF-Q-24, 2026-10-29).
+# An evaluator reading the new region grades against rules the project inverted.
+#
+# MATCHED BY THE HEADING THAT AUDIT WROTE AND NO OTHER, so user prose is never taken for
+# it: a bare `## House rules` is not this section. It ends at the next `#`/`##` heading,
+# at a `WF-HOUSE-RULES` marker (the duplicated state 1.81.0 left puts the region's own
+# heading right after it), or at the first `origin: user` marker, so an immutable span
+# that follows is never inside what the migration removes.
+HOUSE_PREDECESSOR_RX = re.compile(
+    r"^##[ \t]+House rules — refreshed by `/workforce audit`[^\n]*\n"
+    r".*?(?=^#{1,2}[ \t]|^<!--\s*WF-HOUSE-RULES\b|^<!--[^>]*\borigin:\s*user\b|\Z)",
+    re.M | re.S)
 
 
 def house_text(rows, carried):
@@ -1036,23 +1055,47 @@ def carried_rows(region, derived):
     are carried verbatim and COUNTED, so a register that is growing rows nothing can
     derive is visible rather than quietly permanent.
     """
-    if not region:
-        return []
-    body = region.split(HOUSE_REGISTER_HEADING, 1)
+    have = {r.split("|")[1].strip() for r in derived if r.count("|") > 2}
+    return [l for l in table_rows(region) if l.split("|")[1].strip() not in have]
+
+
+def table_rows(text):
+    """Every data row of the register table in `text` — header and separator excluded."""
+    body = (text or "").split(HOUSE_REGISTER_HEADING, 1)
     if len(body) < 2:
         return []
-    have = {r.split("|")[1].strip() for r in derived if r.count("|") > 2}
     out = []
     for line in body[1].splitlines():
         line = line.strip()
         if not line.startswith("|") or line.count("|") < 4:
             continue
         first = line.split("|")[1].strip()
-        if not first or first.startswith("---") or first == "Shipped entry":
-            continue
-        if first not in have:
+        if first and not first.startswith("---") and first != "Shipped entry":
             out.append(line)
     return out
+
+
+def house_predecessors(text):
+    """`[(match, heading, line, rows)]` — every unmarked predecessor section in `text`."""
+    out = []
+    for m in HOUSE_PREDECESSOR_RX.finditer(text or ""):
+        out.append((m, m.group(0).splitlines()[0].strip(),
+                    text[:m.start()].count("\n") + 1, table_rows(m.group(0))))
+    return out
+
+
+def stray_table_lines(section):
+    """Table data lines in a predecessor section that `table_rows` did not read as rows.
+
+    A row under some heading other than `### Supersession register` would leave with the
+    section it sat in, so any such line REFUSES the migration rather than being dropped.
+    """
+    rows = set(table_rows(section))
+    return [l.strip() for l in section.splitlines()
+            if l.strip().startswith("|") and l.count("|") >= 4
+            and not set(l.replace("|", "").strip()) <= set("-: ")
+            and l.strip() not in rows
+            and l.split("|")[1].strip() != "Shipped entry"]
 
 
 def user_spans(d):
@@ -1393,8 +1436,28 @@ def house_state(root, kind):
                 stray.append(f)
     source_region = region or (house_region(slurp(stray[0])) if stray else None)
     carried = carried_rows(source_region, rows)
-    st = {"kind": kind, "dest": dest, "rows": rows, "cites": cites,
-          "carried": carried, "stray": stray, "body": house_text(rows, carried)}
+    # THE UNMARKED PREDECESSOR'S ROWS ARE CARRIED, NOT RE-DERIVED. They were written from
+    # the project's own amendment and carry no `supersedes:` marker, so a derivation alone
+    # returns 0 for a register that held real rows (DEF-Q-24). Deduped against the derived
+    # rows by first cell, as above, and against the region's rows by the whole line — two
+    # rows that differ anywhere are both kept.
+    old = house_predecessors(existing)
+    have = {r.split("|")[1].strip() for r in rows}
+    for _m, _h, _l, prows in old:
+        carried += [r for r in prows
+                    if r.split("|")[1].strip() not in have and r not in carried]
+    predecessor = [{"line": l, "heading": h, "rows": len(prows)} for _m, h, l, prows in old]
+    st = {"kind": kind, "dest": dest, "rows": rows, "cites": cites, "carried": carried,
+          "stray": stray, "predecessor": predecessor, "body": house_text(rows, carried)}
+    unread = [(l, x) for m, _h, l, _r in old for x in stray_table_lines(m.group(0))]
+    if unread:
+        st.update(verdict="unappendable", why="%s:%d holds an unmarked predecessor "
+                  "house-rules section with %d table line(s) outside its `%s` table (first: "
+                  "%s); migrating it would drop them, so the anchor keeps its bytes until "
+                  "they are moved under that heading"
+                  % (os.path.relpath(dest, root), unread[0][0], len(unread),
+                     HOUSE_REGISTER_HEADING, unread[0][1][:80]))
+        return st
     if os.path.islink(dest):
         st.update(verdict="unappendable", why="%s is a symlink; writing through it puts "
                   "the project's house rules somewhere this run never named"
@@ -1415,20 +1478,25 @@ def house_state(root, kind):
     # `NameError: name 'body' is not defined`, and audit Steps 4 and 6-E both call this.
     # Every fixture was a first-write tree, so the branch was never entered and 1,411
     # checks passed over it. `catalog-house-rules-current` and `-stale` enter it now.
-    if region and not stray and house_substance(region) == house_substance(house_wrap(st["body"], "")):
+    if (region and not stray and not old
+            and house_substance(region) == house_substance(house_wrap(st["body"], ""))):
         st.update(verdict="current", why="register %d row(s)%s · precedence clause present"
                   % (len(rows), " · %d carried" % len(st["carried"]) if st["carried"] else ""))
         return st
+    # A PREDECESSOR NEVER READS `current`, and the report says what moves before it moves:
+    # which section, at which line, and how many of its rows cross into the region.
+    mig = "".join(" · migrates the unmarked predecessor at %s:%d, carrying %d row(s)"
+                  % (os.path.relpath(dest, root), p["line"], p["rows"]) for p in predecessor)
     if stray and not region:
         st.update(verdict="relocate", why="register %d row(s) · the region sits in %s, "
-                  "which the migration removes — it moves into %s"
+                  "which the migration removes — it moves into %s%s"
                   % (len(rows), ", ".join(os.path.relpath(f, root) for f in stray[:3]),
-                     ANCHOR))
+                     ANCHOR, mig))
         return st
     st.update(verdict="refresh",
-              why="register %d row(s)%s · precedence clause %s"
+              why="register %d row(s)%s · precedence clause %s%s"
               % (len(rows), " · %d carried" % len(st["carried"]) if st["carried"] else "",
-                 "stale" if region else ("appended" if existing else "written")))
+                 "stale" if region else ("appended" if existing else "written"), mig))
     return st
 
 
@@ -1467,14 +1535,36 @@ def house_write(root, st):
                     "--path`); this file is the project-specific layer that outranks it "
                     "and survives every migration.\n"
                     % (os.path.basename(os.path.dirname(dest)), st["kind"], st["kind"]))
-    new = HOUSE_RX.sub("", existing).rstrip("\n") + "\n\n" + region + "\n"
+    base = HOUSE_RX.sub("", existing)
+    old = house_predecessors(existing)
+    kept = HOUSE_PREDECESSOR_RX.sub("", base)
+    new = kept.rstrip("\n") + "\n\n" + region + "\n"
+    # CHECKED BEFORE THE WRITE, IN MEMORY: the migration removes a section, so every
+    # `origin: user | immutable: true` span outside the region and every row being carried
+    # must survive into the bytes about to replace it. An unclosed span runs to the end of
+    # the file and so contains any predecessor after it; that case writes nothing. Each
+    # predecessor row is re-read here rather than trusted from `house_state`: it is in the
+    # new register verbatim, or a derived row answers for the same shipped entry. A
+    # removal that is not proven to be a move is never made.
+    derived = {r.split("|")[1].strip() for r in st["rows"]}
+    lost = [m.group(0) for m in IMMUTABLE_SPAN_RX.finditer(base) if m.group(0) not in kept]
+    lost += [r for r in st["carried"] if r not in new]
+    lost += [r for _m, _h, _l, rows in old for r in rows
+             if r not in new and r.split("|")[1].strip() not in derived]
+    if lost:
+        return False, ("not written, the file keeps its bytes: the write would drop %d "
+                       "user span(s) or carried row(s), first: %s" % (len(lost),
+                                                                     lost[0].strip()[:80]))
     try:
         _sibling("wf-ledger").atomic_write(root, dest, new.encode("utf-8"), makedirs=True)
     except OSError as exc:
         return False, "not written, the file keeps its bytes: %s" % exc
-    back = house_region(slurp(dest))
+    back_text = slurp(dest)
+    back = house_region(back_text)
     if back is None or house_substance(back) != house_substance(region):
         return False, "written and read back changed or absent — nothing else touched"
+    if house_predecessors(back_text):
+        return False, "written, but the unmarked predecessor section still reads back"
     cleared = []
     for f in st["stray"]:
         text = slurp(f)
@@ -1488,10 +1578,13 @@ def house_write(root, st):
             return True, ("region written to %s; %s still carries its copy after the write"
                           % (os.path.relpath(dest, root), os.path.relpath(f, root)))
         cleared.append(os.path.relpath(f, root))
-    return True, ("register %d row(s)%s%s"
+    return True, ("register %d row(s)%s%s%s"
                   % (len(st["rows"]),
                      " · %d carried" % len(st["carried"]) if st["carried"] else "",
-                     " · lifted out of %s" % ", ".join(cleared) if cleared else ""))
+                     " · lifted out of %s" % ", ".join(cleared) if cleared else "",
+                     "".join(" · migrated the unmarked predecessor at line %d, %d of its "
+                             "%d row(s) carried verbatim" % (l, sum(x in new for x in r), len(r))
+                             for _m, _h, l, r in old)))
 
 
 def house_rules(root, args):

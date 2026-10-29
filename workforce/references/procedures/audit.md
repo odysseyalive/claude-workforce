@@ -918,13 +918,13 @@ mechanically by `bin/wf-seed`, and this RULES refresh by `bin/wf-catalog --house
 "$WF/bin/wf-catalog" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --house-rules --execute  # propagate
 ```
 
-It writes the `WF-HOUSE-RULES` machine-owned region into each evaluator's **`CATALOG-ANCHOR.md`**, which is
-the one file Step 6-F leaves standing; derives the supersession register from structure — an `origin: user`
-span's own `supersedes:` attribute, never a prose grep (`evaluators.md` § A register scoped by enumeration
-goes stale); carries verbatim any register row a person added that it cannot derive; and RELOCATES a region
-an earlier audit propagated into a corpus file, which is how `code-evaluator`'s came to be deleted by the
-2026-09-11 migration. It reports per evaluator including the zeroes and closes with the run roll-up
-**`INV-HOUSERULES`** (`invariants.md` row 22):
+It writes the `WF-HOUSE-RULES` machine-owned region into each evaluator's **`CATALOG-ANCHOR.md`**, which is the one file
+Step 6-F leaves standing; derives the supersession register from structure — an `origin: user` span's own `supersedes:`
+attribute, never a prose grep (`evaluators.md` § A register scoped by enumeration goes stale); carries verbatim any register
+row a person added that it cannot derive; RELOCATES a region an earlier audit propagated into a corpus file, which is how
+`code-evaluator`'s came to be deleted by the 2026-09-11 migration; and MIGRATES the unmarked section an earlier audit wrote
+by hand, headed `## House rules — refreshed by …`, carrying its register rows rather than re-deriving them to 0 (DEF-Q-24).
+It reports per evaluator including the zeroes and closes with the run roll-up **`INV-HOUSERULES`** (`invariants.md` row 22):
 
 ```
 HOUSE RULES     + text-eval    register 2 row(s) · 1 carried · .claude/skills/text-eval/CATALOG-ANCHOR.md
