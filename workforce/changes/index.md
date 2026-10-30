@@ -8,7 +8,7 @@
 
 | Version | Date | Surface | Org | Change |
 |---|---|---|---|---|
-| 1.82.2 | 2026-10-29 | docs | no | (pending — message lands on the next regeneration) |
+| 1.82.2 | 2026-10-29 | changes, scripts, installer | no | Release 1.82.2: a follow-up joins the issue it names, even after that issue closed |
 | 1.82.1 | 2026-10-29 | changes, scripts, installer, platform | no | Release 1.82.1: the Work list is shown where the user can see it |
 | 1.82.0 | 2026-10-29 | audit, changes, hooks, scripts, installer | no | Release 1.82.0: the Work list tracks what sessions actually do, and jobs go to employees by default |
 | 1.81.0 | 2026-10-22 | handbook, chart, audit, update, changes, hooks, scripts, installer, platform | **yes** | Release 1.81.0: the upstream inbox takes only real workforce bugs, and twenty-odd downstream rows are fixed |
