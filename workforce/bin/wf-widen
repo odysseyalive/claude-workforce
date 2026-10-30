@@ -138,6 +138,57 @@ def widen_flag(payload):
     return os.path.join(d, f"wf-widen-flag.{sid}.json")
 
 
+def peer_sent(payload, peer):
+    """What the stopping turn sent back by `SendMessage` to the peer session that asked, oldest
+    first; [] when the ask was not a peer's or nothing went back.
+
+    A PEER'S REQUEST IS ANSWERED WHERE IT CAME FROM. MEASURED 2026-10-30 in odyssey-alive
+    `de3efe49`: the save-issue request said "send the findings back to session save-issue
+    with SendMessage", and the findings went in that call (row 2032, `to` the request's `from`
+    attribute, `message` a string) while the reply to the terminal said only that they were
+    sent. So the jury's `conclusion` is the reply AND this, or a turn that did the work is
+    judged on a one-line receipt. Read from the turn's own rows: back from the end to the
+    previous turn's end row or the last typed user row (`turn_user_rows`'s bound), and only
+    calls addressed to this sender, so a message to some third session is not the answer.
+    """
+    to = peer.get("from") if isinstance(peer, dict) else None
+    if not isinstance(to, str) or not to:
+        return []
+    sent = []
+    for line in reversed(TL._read_lines(TL.reply_transcript(payload)) or []):
+        try:
+            row = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(row, dict):
+            continue
+        if row.get("type") == "system" and row.get("subtype") in TURN_END:
+            break
+        c = (row.get("message") or {}).get("content") if isinstance(
+            row.get("message"), dict) else None
+        if row.get("type") == "user" and not row.get("isMeta") and not (
+                isinstance(c, list) and any(isinstance(b, dict) and b.get("type") == "tool_result"
+                                            for b in c)):
+            break
+        if row.get("type") != "assistant" or not isinstance(c, list):
+            continue
+        for b in reversed(c):
+            inp = b.get("input") if isinstance(b, dict) and b.get("name") == "SendMessage" else None
+            if (isinstance(inp, dict) and (inp.get("to") or inp.get("recipient")) == to
+                    and isinstance(inp.get("message"), str) and inp["message"].strip()):
+                sent.append(inp["message"])
+    return sent[::-1]
+
+
+def conclusion_for(payload, reply, peer):
+    """The jury's `conclusion`: the reply, then each `peer_sent` message under a label naming
+    where it went. Each part is capped on its own, so a long reply never cuts the answer."""
+    parts = [(reply or "")[:4000]]
+    name = (peer.get("from-name") or peer.get("from")) if isinstance(peer, dict) else ""
+    parts += [f"[sent to {name} by SendMessage]\n{m[:4000]}" for m in peer_sent(payload, peer)]
+    return "\n\n".join(p for p in parts if p)
+
+
 def raise_flag(payload, why, rows, counts, unopened, applicable,
                sampled=False, reply=""):
     _tag = task_tag(payload)
@@ -177,12 +228,15 @@ def raise_flag(payload, why, rows, counts, unopened, applicable,
                 # no juror seated — and it convicted anyway. A stale pre-patch
                 # tag carries no `senses` key at all, so the fallback was the
                 # only value there was.
-                "senses": sorted(applicable)},
+                "senses": sorted(applicable),
+                # A PEER SESSION ASKED, not the user here (`TT.peer_request`).
+                **({"peer": _tag["peer"]} if isinstance((_tag or {}).get("peer"), dict)
+                   else {})},
         "evidence": {"channels": {k: v for k, v in rows},
                      "reads": counts[0], "distinct": len(counts[1] or []),
                      "enumerating": counts[2], "outside": counts[3],
                      "ran": counts[4]},
-        "conclusion": (reply or "")[:4000],
+        "conclusion": conclusion_for(payload, reply, (_tag or {}).get("peer")),
         # PASSED IN, NEVER DERIVED FROM `why`. Deriving it listed every
         # APPLICABLE sense as unopened, which on a sampled turn is every sense
         # the ask needed — including ones the turn opened 24 times.
@@ -2476,7 +2530,8 @@ def hand_checklist_to_jury(payload, record, items):
     data = TT.read_json_nofollow(flag)
     if not isinstance(data, dict):
         data = {"sampled": True, "ask": {"prompt": "", "senses": []}, "evidence": {},
-                "conclusion": (TL.confirmed_reply(payload)[0] or "")[:4000],
+                "conclusion": conclusion_for(payload, TL.confirmed_reply(payload)[0],
+                                             record.get("peer")),
                 "unopened": [],
                 "why": [{"trigger": "ASKS", "sense": "asks",
                          "reason": "the message made several asks; each is checked"}]}
@@ -2493,6 +2548,9 @@ def hand_checklist_to_jury(payload, record, items):
     # read from it is the session choosing the question its reply is checked against.
     prompt = record.get("prompt")
     ask["prompt"] = (prompt if isinstance(prompt, str) else "") or ask.get("prompt") or ""
+    # A PEER SESSION ASKED (`TT.peer_request`): the juror is told so.
+    if isinstance(record.get("peer"), dict):
+        ask["peer"] = record["peer"]
     TT.write_json_atomic(flag, data)
 
 

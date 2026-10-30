@@ -98,7 +98,10 @@ INJECTED = re.compile(
     # machine's ledgers were opened by one — `/home/francis/Work` `4e1b090a` i4 among them,
     # left open with no items. Over 403 transcripts it is the only bracketed harness opener
     # (12 rows; the rest are image markers), and every tag-wrapped one was already matched.
-    r"|\[Cross-session idle notice\]"
+    # ITS SIBLING, `[Cross-session delivery notice]`, is named by the harness's own
+    # SendMessage description (57 copies across this machine's transcripts, 2026-10-30) and
+    # has never been seen arriving; it is matched so that the first one opens nothing.
+    r"|\[Cross-session (?:idle|delivery) notice\]"
     # A background task finishing arrives as a user row wrapped in these. MEASURED
     # 2026-09-13: the first live asks checklist opened on a task notification.
     r"|<(?:[a-z-]+-message|system-reminder|task-notification)\b)", re.I)
@@ -109,6 +112,35 @@ INJECTED = re.compile(
 # paste at the start of a real message ("Stop hook feedback: ...", "Caveat:", a copied
 # reminder), and a real message must never inherit last turn's asks.
 NOTIFICATION = re.compile(r"^\s*<task-notification\b", re.I)
+
+# A PEER SESSION'S REQUEST IS AN ASK, though `INJECTED` matches it. MEASURED 2026-10-30 in
+# odyssey-alive `de3efe49`: the save-issue session's request (transcript row 1863, a whole
+# turn) and wf-dev's (row 2008, delivered into a running turn as a `queued_command`) both
+# reached this event, and the tag this hook wrote holds both prompts as the bare tag,
+# `<cross-session-message from="…" from-name="…" from-mode="prompting">\n…\n
+# </cross-session-message>`, with no "Another Claude session sent a message" line before
+# it and no trailing note after it. Those are how the transcript renders the row, and the
+# line is matched as optional in case a payload ever carries it. `<[a-z-]+-message` refused
+# both, so neither opened an issue; nor did five mutze-studio requests in this repository's
+# `e1d85496`. THE TAG NAME DECIDES, read from the text because the payload carries no
+# `origin`: a subagent's hand-back is `<agent-message`, and it and every other `INJECTED`
+# opener still open nothing. THE ASK IS THE BODY between the tags, never the tag line.
+PEER_REQUEST = re.compile(
+    r"\A\s*(?:Another Claude session sent a message(?: while you were working)?:\s*)?"
+    r"<cross-session-message\b([^>]*)>(.*?)</cross-session-message>", re.S | re.I)
+PEER_ATTR = re.compile(r'\b(from|from-name)="([^"]*)"')
+
+
+def peer_request(prompt):
+    """(body, sender) for a peer session's request, or None for any other text. `sender` is
+    {"from": <the address SendMessage replies to>, "from-name": <the session's name>}, each
+    flattened to one line and capped, since both are another session's words."""
+    m = PEER_REQUEST.match(prompt if isinstance(prompt, str) else "")
+    body = m.group(2).strip() if m else ""
+    if not body:
+        return None
+    attrs = dict(PEER_ATTR.findall(m.group(1)))
+    return body, {k: " ".join(attrs.get(k, "").split())[:200] for k in ("from", "from-name")}
 
 KINDS = [
     ("history", re.compile(
@@ -965,6 +997,9 @@ def refresh_index(payload, led):
                      # THE ASK IN SHORT, so the index is readable without opening the
                      # ledger. The full prompt stays in the session's own file.
                      "ask": (iss.get("prompt") or "")[:120],
+                     # WHO ASKED, when it was a peer session and not the user here.
+                     **({"from": iss["peer"].get("from-name") or iss["peer"].get("from")}
+                        if isinstance(iss.get("peer"), dict) else {}),
                      # THE HOOK'S FALLBACK IS COUNTED, deliberately. It is the only record
                      # of a message the session never itemized, and the index is read by
                      # somebody who cannot see the session's file: leaving it out would show
@@ -1180,6 +1215,10 @@ def add_issue(payload, led):
     fallback = fallback_item(prompt)
     iss = {"id": "i%d" % n, "prompt": prompt[:2000], "state": "open",
            "items": [fallback] if fallback else [], "agents": []}
+    # A PEER SESSION'S REQUEST NAMES ITS SENDER (`peer_request`), so a reader of the ledger
+    # or the index can tell it from a message the user typed here.
+    if isinstance(payload.get("peer"), dict):
+        iss["peer"] = payload["peer"]
     led.setdefault("issues", []).append(iss)
     return iss
 
@@ -1220,6 +1259,10 @@ def stale_notice(iss):
 
     `prune_dead_rows` asks this of ANOTHER session's file, so a prompt that is not a string is
     read as one rather than raising.
+
+    AN ISSUE A PEER'S REQUEST OPENED (`peer`) IS NEVER ONE: its prompt is the request's body,
+    out of the tag (`peer_request`), and `opens_issue` opened it only because `INJECTED`
+    does not match that body.
     """
     return (isinstance(iss, dict) and iss.get("state") != "closed"
             and bool(INJECTED.search(str(iss.get("prompt") or ""))) and not issue_agents(iss)
@@ -2450,6 +2493,8 @@ def start_checklist(payload, prev=None, earlier=()):
     record = {"prompt": prompt[:2000], "ended": False, "issue": issue_id}
     if issue_id:
         record["key"] = issue_id
+    if isinstance(payload.get("peer"), dict):
+        record["peer"] = payload["peer"]
     p = checklist_path(payload, record)
     if not write_json_atomic(p, {"prompt": prompt[:2000], "items": [],
                                  "carried": carried}):
@@ -2833,6 +2878,13 @@ def main():
         }}))
         return 0
 
+    # A PEER SESSION'S REQUEST IS READ AS ITS BODY FROM HERE ON (`peer_request`), so every
+    # gate below — `opens_issue`, `classify`, `count_asks`, the checklist and the issue — sees
+    # the ask a user's message would give it, and the sender rides along as `peer`.
+    _peer = peer_request(payload.get("prompt"))
+    if _peer:
+        payload = dict(payload, prompt=_peer[0], peer=_peer[1])
+
     # CLEAR LAST TURN'S WIDEN FLAG FIRST, and do it before anything can return early.
     # The flag tells the widening agent to go open a sense; one left behind would send
     # a reader after a question the user has already moved past, and would do it on a
@@ -2877,7 +2929,8 @@ def main():
         write_json_atomic(tag_path(payload),
                           {"hits": [], "prompt": (payload.get("prompt") or "")[:2000],
                            "senses": [], "asks": _n, "asks_why": _how,
-                           "checklist": checklist_record, "earlier": earlier})
+                           "checklist": checklist_record, "earlier": earlier,
+                           **({"peer": _peer[1]} if _peer else {})})
         print(json.dumps({"hookSpecificOutput": {
             "hookEventName": "UserPromptSubmit",
             "additionalContext": "\n\n".join(
@@ -2907,7 +2960,8 @@ def main():
                        # ended its turn. Kept here, in a file this hook writes, and never in
                        # the checklist file the session edits.
                        "checklist": checklist_record,
-                       "earlier": earlier})
+                       "earlier": earlier,
+                       **({"peer": _peer[1]} if _peer else {})})
 
     # STATED AS FACTS ABOUT THE ASK, NEVER AS AN INSTRUCTION. The hooks reference is
     # explicit that text framed as an out-of-band command trips the prompt-injection
