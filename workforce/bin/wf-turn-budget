@@ -1058,7 +1058,10 @@ CHECKLIST_PREFIX = "wf-asks."
 
 
 def checklist_shown(payload):
-    """Print the checklist display for this main-thread call when there is one. Always 0."""
+    """Hand the session the checklist display for this main-thread call when there is one,
+    as `PostToolUse` `additionalContext` (`checklist_display` says why not `systemMessage`).
+    Checked in the 2.1.312 binary: its `PostToolUse` branch reads
+    `hookSpecificOutput.additionalContext` when `hookEventName` is `PostToolUse`. Always 0."""
     ti = payload.get("tool_input")
     if not isinstance(ti, dict) or not any(
             isinstance(ti.get(k), str) and CHECKLIST_PREFIX in ti[k]
@@ -1066,7 +1069,8 @@ def checklist_shown(payload):
         return 0
     text = _task_tag().checklist_display(payload)
     if text:
-        sys.stdout.write(json.dumps({"systemMessage": text}) + "\n")
+        sys.stdout.write(json.dumps({"hookSpecificOutput": {
+            "hookEventName": "PostToolUse", "additionalContext": text}}) + "\n")
     return 0
 
 

@@ -12613,7 +12613,7 @@
       ]
   },
   "checklist-display-shows-the-list-when-it-is-written": {
-      "_why": "THE LIST IS SHOWN BEFORE THE WORK. MEASURED 2026-10-29 in mutze-studio `29c3e592`: the session wrote i1's four items in the same Bash call as its first real work and the only display was the Stop-time WORK block, after the work. Now the main session's `Write` of its own asks checklist, with items, returns a `systemMessage` listing the issue, its title and each item with its status. The payload carries no `scratchpad_dir`, as a real `PostToolUse` does not; the path is taken from the call and confirmed against the tag. Fails on the old code, which says nothing on a main-thread call.",
+      "_why": "THE LIST IS SHOWN BEFORE THE WORK. MEASURED 2026-10-29 in mutze-studio `29c3e592`: the session wrote i1's four items in the same Bash call as its first real work and the only display was the Stop-time WORK block, after the work. Now the main session's `Write` of its own asks checklist, with items, returns PostToolUse `additionalContext`: the one instruction to show it as the reply's first text, then a list the issue, its title and each item with its status. The payload carries no `scratchpad_dir`, as a real `PostToolUse` does not; the path is taken from the call and confirmed against the tag. Fails on the old code, which says nothing on a main-thread call.",
       "before": [
           {
               "script": "wf-task-tag",
@@ -12628,19 +12628,19 @@
       "exit": 0,
       "not": [
           "Traceback",
-          "additionalContext"
+          "systemMessage"
       ],
       "script": "wf-turn-budget",
       "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"tool_name\": \"Write\", \"tool_input\": {\"file_path\": \"${TREE}/wf-asks.s1.i1.json\"}, \"tool_response\": {}}",
       "want": [
-          "{\"systemMessage\": \"WORK LIST",
+          "{\"hookSpecificOutput\": {\"hookEventName\": \"PostToolUse\", \"additionalContext\": \"Show the user this work list now, as the first text of your reply and before your next tool call:\\nWORK LIST",
           "WORK LIST  i1  eGPU replacement research",
           "\\n  open  pick a replacement eGPU",
           "  open  say whether the housing fits Thunderbolt 3"
       ]
   },
   "checklist-display-same-list-twice-shows-once": {
-      "_why": "SHOWN ONCE PER CHANGE. The same list written a second time, unchanged, prints nothing: the first display is remembered beside the tag (`wf-asks-shown.<sid>.json`).",
+      "_why": "SHOWN ONCE PER CHANGE. The same list written a second time, unchanged, prints nothing: the first display is remembered beside the tag (`wf-asks-shown.<sid>.json`). The first write's step asserts it was shown, as `additionalContext`, so the silence is the dedupe and not a display that never fires.",
       "before": [
           {
               "script": "wf-task-tag",
@@ -12653,7 +12653,10 @@
           },
           {
               "script": "wf-turn-budget",
-              "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"tool_name\": \"Write\", \"tool_input\": {\"file_path\": \"${TREE}/wf-asks.s1.i1.json\"}, \"tool_response\": {}}"
+              "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"tool_name\": \"Write\", \"tool_input\": {\"file_path\": \"${TREE}/wf-asks.s1.i1.json\"}, \"tool_response\": {}}",
+              "want": [
+                  "{\"hookSpecificOutput\": {\"hookEventName\": \"PostToolUse\", \"additionalContext\": \"Show the user this work list now, as the first text of your reply and before your next tool call:\\nWORK LIST"
+              ]
           }
       ],
       "exit": 0,
@@ -12698,7 +12701,7 @@
       ]
   },
   "checklist-display-unrelated-call-is-silent": {
-      "_why": "NEVER ON AN UNRELATED CALL. With a written list on disk, a Bash call that does not name it prints nothing and loads nothing.",
+      "_why": "NEVER ON AN UNRELATED CALL. With a written list on disk, a Bash call that does not name it prints nothing and loads nothing, asserted on its own step; and it does not use the display up, since the list's own write next is shown, as `additionalContext`.",
       "before": [
           {
               "script": "wf-task-tag",
@@ -12708,16 +12711,27 @@
               "path_from": 0,
               "path_rx": "/[^\\s\"]*wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
               "write": "{\"title\": \"eGPU replacement research\", \"items\": [{\"ask\": \"pick a replacement eGPU\", \"status\": \"open\"}, {\"ask\": \"say whether the housing fits Thunderbolt 3\", \"status\": \"open\"}]}"
+          },
+          {
+              "script": "wf-turn-budget",
+              "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"tool_name\": \"Bash\", \"tool_input\": {\"command\": \"ls -la ${TREE} && nvidia-smi\"}, \"tool_response\": {}}",
+              "not": [
+                  "WORK LIST",
+                  "additionalContext",
+                  "systemMessage"
+              ]
           }
       ],
       "exit": 0,
       "not": [
           "Traceback",
-          "WORK LIST",
           "systemMessage"
       ],
       "script": "wf-turn-budget",
-      "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"tool_name\": \"Bash\", \"tool_input\": {\"command\": \"ls -la ${TREE} && nvidia-smi\"}, \"tool_response\": {}}"
+      "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"tool_name\": \"Write\", \"tool_input\": {\"file_path\": \"${TREE}/wf-asks.s1.i1.json\"}, \"tool_response\": {}}",
+      "want": [
+          "{\"hookSpecificOutput\": {\"hookEventName\": \"PostToolUse\", \"additionalContext\": \"Show the user this work list now, as the first text of your reply and before your next tool call:\\nWORK LIST"
+      ]
   },
   "checklist-display-malformed-list-exits-0": {
       "_why": "A FILE THE SESSION BROKE IS NOT A FAILED TOOL CALL. The checklist holds text that is not JSON; the hook exits 0 and prints nothing.",
@@ -12736,6 +12750,7 @@
       "not": [
           "Traceback",
           "WORK LIST",
+          "additionalContext",
           "systemMessage"
       ],
       "script": "wf-turn-budget",
@@ -12758,6 +12773,7 @@
       "not": [
           "Traceback",
           "WORK LIST",
+          "additionalContext",
           "systemMessage"
       ],
       "script": "wf-turn-budget",
@@ -12791,7 +12807,7 @@
       ]
   },
   "checklist-line-asks-for-the-list-first": {
-      "_why": "THE ORDER IS IN THE LINE. The checklist sentence says the list is written in a tool call of its own before any other tool call, and that the write shows it to the user. A queued message's submit builds its line in the same place, for its own file.",
+      "_why": "THE ORDER IS IN THE LINE. The checklist sentence says the list is written in a tool call of its own before any other tool call, and that the session then shows it in its reply before working. A queued message's submit builds its line in the same place, for its own file.",
       "before": [
           {
               "script": "wf-task-tag",
@@ -12806,7 +12822,7 @@
       "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"prompt\": \"the egpu housing would need to be backwards compatible with the Thunderbolt 3 port on this machine\"}",
       "want": [
           "wf-asks.s1.i2.json",
-          "written in a tool call of its own before any other tool call, and that write shows the list to the user"
+          "written in a tool call of its own before any other tool call, and the session then shows the list in its reply before working"
       ]
   },
   "dispatch-line-org-project": {

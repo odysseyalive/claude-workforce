@@ -56,7 +56,7 @@ ROW_KEYS = {"script", "exit", "args", "env", "want", "after", "chmod", "concurre
             "stdin_file", "stdin_raw", "_why", *NEGATIVE_KEYS}
 AFTER_KEYS = {"want", "once", "absent", *NEGATIVE_KEYS}
 GIT_KEYS = {"init", "hooks_from", "commit", "config", "links", "corrupt_index"}
-STEP_KEYS = {"script", "stdin_raw"}
+STEP_KEYS = {"script", "stdin_raw", "want", *NEGATIVE_KEYS}
 WRITE_STEP_KEYS = {"write", "path_from", "path_rx"}
 
 
@@ -411,6 +411,14 @@ def _run_in(tree, script, spec):
         if _sp.returncode != 0:
             return False, (f"before[{_i}] {_step['script']} exit {_sp.returncode}: "
                            f"{(_sp.stdout + _sp.stderr)[-400:]}")
+        # A STEP MAY ASSERT ON ITS OWN OUTPUT, added for the checklist display: "the second
+        # write shows nothing" says nothing unless the first write is shown to have said it.
+        _said = _sp.stdout + _sp.stderr
+        _bad = ([f"before[{_i}] missing {w!r}" for w in _step.get("want", []) if w not in _said]
+                + [f"before[{_i}] present but forbidden: {w!r}" for _key in NEGATIVE_KEYS
+                   for w in _step.get(_key, []) if w in _said])
+        if _bad:
+            return False, "; ".join(_bad)
         _outs.append(_sp.stdout)
 
     # `concurrent: N` starts N copies at once against the same tree and asserts on the

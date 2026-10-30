@@ -2319,9 +2319,16 @@ SHOWN_NAME = "wf-asks-shown.%s.json"
 CHECKLIST_NAMED = re.compile(r"(/[^\s'\"`<>|;&()]*/)?(wf-asks\.[A-Za-z0-9_.-]{1,140}?\.json)\b")
 
 
+# THE ONE INSTRUCTION THE DISPLAY CARRIES, ahead of the list. The list reaches the session's
+# context, not the screen (platform.md fact 28), so the session is what puts it in front of
+# the user, in the reply it is about to write and before it does anything else.
+SHOW_LIST = ("Show the user this work list now, as the first text of your reply and before "
+             "your next tool call:\n")
+
+
 def checklist_display(payload):
-    """The text a PostToolUse shows the user when this call wrote this session's asks
-    checklist with items that differ from the last ones shown, or "".
+    """`SHOW_LIST` and the list, for a PostToolUse to hand the session when this call wrote
+    this session's asks checklist with items that differ from the last ones shown, or "".
 
     THE LIST IS SHOWN BEFORE THE WORK, which nothing did. MEASURED 2026-10-29 in
     mutze-studio `29c3e592`: the only display of a list was the WORK block at Stop, after
@@ -2338,7 +2345,10 @@ def checklist_display(payload):
     a queued message's predecessor in `earlier`. A list written through a relative path or a
     variable is not shown, the quiet direction.
 
-    `systemMessage` REACHING THE USER is documented hook behaviour, not measured here.
+    IT RIDES `additionalContext`, NOT `systemMessage`. MEASURED 2026-10-29 on Claude Code
+    2.1.312 (platform.md fact 28): the `systemMessage` this display first used was recorded in
+    the transcript as a `hook_system_message` and never seen on the user's screen, in two
+    sessions. The dedupe below is over the list alone, so the instruction never re-shows it.
     """
     tool_input = payload.get("tool_input")
     if not isinstance(tool_input, dict):
@@ -2354,7 +2364,7 @@ def checklist_display(payload):
                 continue
             shown = _show_checklist(payload, d, m.group(2), sid)
             if shown:
-                return shown
+                return SHOW_LIST + shown
     return ""
 
 
@@ -2529,17 +2539,18 @@ def start_checklist(payload, prev=None, earlier=()):
     # Stated as facts about the file, never as an out-of-band command (see the note above
     # the injection in `main`).
     #
-    # THE LIST IS WRITTEN IN A TOOL CALL OF ITS OWN, FIRST, because that write is what shows
-    # it to the user (`checklist_display`). MEASURED 2026-10-29 in mutze-studio `29c3e592`:
-    # the session wrote i1's four items in the same Bash call as its first real work, and the
-    # only display was the WORK block at Stop, after the work. A queued message is told the
-    # same sentence for its own file, since every submit's line is built here.
+    # THE LIST IS WRITTEN IN A TOOL CALL OF ITS OWN, FIRST, because that write is what hands
+    # it back to the session to show (`checklist_display`). MEASURED 2026-10-29 in
+    # mutze-studio `29c3e592`: the session wrote i1's four items in the same Bash call as its
+    # first real work, and the only display was the WORK block at Stop, after the work. A
+    # queued message is told the same sentence for its own file, since every submit's line
+    # is built here.
     return (checklist_head(p, untitled)
             + " and its \"items\" start empty. Each separate "
             "ask is one item, {\"ask\": <in the user's words>, "
             "\"status\": \"open\"}, written in a tool call of its own before any other tool "
-            "call, and that write shows the list to the user; statuses are updated as the "
-            "work goes, and an ask found along the way is added. A finished ask is \"done\", or "
+            "call, and the session then shows the list in its reply before working; statuses "
+            "are updated as the work goes, and an ask found along the way is added. A finished ask is \"done\", or "
             "\"answered\" when the work was answering it; one the user withdrew or sent by "
             "mistake is \"dropped\". Give the issue a short \"title\" of a few words; an item "
             "that continues an earlier open issue carries \"issue\": <its id> and is added "

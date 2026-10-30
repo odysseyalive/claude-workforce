@@ -574,6 +574,34 @@ closing report file, is written by the orchestrating session and never delegated
 only. The user settings file is assumed to take the same path, not measured. Windows not measured.
 Written by `wf-timezone` (`timezone` skill), which is the only shipped writer of `env.TZ`.
 
+### Fact 28 — a `PostToolUse` `systemMessage` is recorded but not shown on the screen ✅ MEASURED
+
+**Measured 2026-10-29 on Claude Code 2.1.312** (`~/.claude/sessions/*.json` `version`), Linux, two
+interactive main sessions on this host. The asks-checklist display (`wf-turn-budget`
+`checklist_shown`, a2640cb) returned `{"systemMessage": "WORK LIST …"}` on the session's write of its
+list, and in both sessions the transcript recorded it as an `attachment` row of type
+`hook_system_message`, `hookEvent: "PostToolUse"`, while the person at the terminal saw nothing:
+
+- mutze-studio `29c3e592` (`~/.claude/projects/-home-francis-lab-mutze-studio/29c3e592-2018-49dc-9f6f-88508017d8ff.jsonl`):
+  rows 580 and 621, `"WORK LIST  i7  Verify workforce 1.82.0"`, at `2026-10-30T04:02:25Z` and
+  `04:04:13Z`. That session's producer reported seeing neither.
+- claude-workforce `e1d85496` (`~/.claude/projects/-home-francis-lab-claude-workforce/e1d85496-1e8e-4ee4-98fb-db7712c66243.jsonl`):
+  rows 1540 (i12, `04:02:41Z`) and 1585 (i13, `04:04:15Z`); the display memo
+  (`wf-asks-shown.<sid>.json`) holds i13's digest, written 21:04:15 local. The user said nothing
+  appeared in the terminal.
+
+**The carrier that replaces it.** The 2.1.312 binary's `PostToolUse` branch of the hook-output reader
+returns `{...Un(e,"PostToolUse",n), …}`, and `Un` reads `hookSpecificOutput.additionalContext`; a
+`hookEventName` other than the event's own is dropped (`hookSpecificOutput_event_mismatch`). So the
+display now goes to the session as `additionalContext` with one instruction, to show the list as the
+first text of its reply before its next tool call (`wf-task-tag` `SHOW_LIST`), and the
+`systemMessage` is no longer sent: its rendering on another host or surface is not measured, and a
+second copy is not shown to do no harm.
+
+**Conditions:** two main sessions, one host, one version, the terminal client. Whether a
+`systemMessage` from any other event renders is not covered, and nothing may block on this fact.
+The screen half is the user's observation, not a capture.
+
 ---
 
 ## DOCUMENTED — not yet measured. Do not build blocking checks on these.
