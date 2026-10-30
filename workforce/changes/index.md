@@ -8,6 +8,7 @@
 
 | Version | Date | Surface | Org | Change |
 |---|---|---|---|---|
+| 1.83.0 | 2026-10-30 | docs | no | (pending — message lands on the next regeneration) |
 | 1.82.2 | 2026-10-29 | changes, scripts, installer | no | Release 1.82.2: a follow-up joins the issue it names, even after that issue closed |
 | 1.82.1 | 2026-10-29 | changes, scripts, installer, platform | no | Release 1.82.1: the Work list is shown where the user can see it |
 | 1.82.0 | 2026-10-29 | audit, changes, hooks, scripts, installer | no | Release 1.82.0: the Work list tracks what sessions actually do, and jobs go to employees by default |
