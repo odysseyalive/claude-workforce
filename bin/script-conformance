@@ -406,7 +406,7 @@ def _run_in(tree, script, spec):
         if _bad:
             return False, "; ".join(_bad)
         _sp = subprocess.run([sys.executable, os.path.join(BIN, _step["script"])],
-                             input=_step.get("stdin_raw") or "", text=True,
+                             input=_sub_tree(_step.get("stdin_raw") or "", tree), text=True,
                              capture_output=True, env=env, cwd=tree, timeout=CASE_TIMEOUT)
         if _sp.returncode != 0:
             return False, (f"before[{_i}] {_step['script']} exit {_sp.returncode}: "
@@ -423,10 +423,15 @@ def _run_in(tree, script, spec):
         _procs = [subprocess.Popen(_cargs, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                    stderr=subprocess.STDOUT, text=True, env=env, cwd=tree)
                   for _ in range(int(spec["concurrent"]))]
-        _outs = [pr.communicate(spec.get("stdin_raw") or "") for pr in _procs]
+        _outs = [pr.communicate(_sub_tree(spec.get("stdin_raw") or "", tree))
+                 for pr in _procs]
         p = subprocess.CompletedProcess(_cargs, _procs[0].returncode, _outs[0][0], "")
     elif "stdin_file" in spec or "stdin_raw" in spec:
+        # `${TREE}` IN A PAYLOAD, added 2026-10-29 for the checklist display: a `PostToolUse`
+        # names the file it wrote by ABSOLUTE path, and the copy's path is not known in advance.
         payload = spec.get("stdin_raw")
+        if payload is not None:
+            payload = _sub_tree(payload, tree)
         if payload is None:
             payload = json.dumps({"tool_input": {"file_path": os.path.join(tree, spec["stdin_file"])}})
         p = subprocess.run([sys.executable, script], input=payload, text=True,

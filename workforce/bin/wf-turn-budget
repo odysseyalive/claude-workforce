@@ -1047,6 +1047,29 @@ def guard_spawn(payload):
     return 0
 
 
+# THE ASKS CHECKLIST, SHOWN TO THE USER WHEN THE MAIN SESSION WRITES IT (`wf-task-tag`'s
+# `checklist_display`, which holds the reason and the rules). IT RIDES THIS HOOK because this
+# hook already runs on every tool call: a registration of its own on `Write|Edit|Bash` would
+# start a second Python process on most calls of every session, and loading `wf-task-tag`
+# costs the +35 to +115 ms measured above `_task_tag`. Here a call that does not name the
+# checklist costs two string tests on fields already parsed, and only a call that names it
+# loads the sibling. `CHECKLIST_PREFIX` there is the literal restated below.
+CHECKLIST_PREFIX = "wf-asks."
+
+
+def checklist_shown(payload):
+    """Print the checklist display for this main-thread call when there is one. Always 0."""
+    ti = payload.get("tool_input")
+    if not isinstance(ti, dict) or not any(
+            isinstance(ti.get(k), str) and CHECKLIST_PREFIX in ti[k]
+            for k in ("file_path", "command")):
+        return 0
+    text = _task_tag().checklist_display(payload)
+    if text:
+        sys.stdout.write(json.dumps({"systemMessage": text}) + "\n")
+    return 0
+
+
 def main():
     try:
         payload = json.loads(sys.stdin.read() or "{}")
@@ -1062,11 +1085,15 @@ def main():
         return guard_spawn(payload)
 
     # ── THE FAST PATH: no file is touched in the main thread ─────────────────
-    # `agent_id` absent means the main thread (MEASURED 2026-10-12). `agent_type` absent
+    # `agent_id` absent means the main thread (MEASURED 2026-10-12), where the only work is
+    # the checklist display, and a call that does not name the list touches no file there
+    # either (`checklist_shown`). `agent_type` absent
     # with `agent_id` present means a `type: "agent"` hook's own agent, which has no
     # handbook and no cap — also measured, and not predicted by the design.
     agent_id = payload.get("agent_id")
     agent_type = payload.get("agent_type")
+    if agent_id is None:
+        return checklist_shown(payload)
     if not bare(agent_id) or not bare(agent_type):
         return 0
 

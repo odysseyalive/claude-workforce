@@ -12366,5 +12366,202 @@
       "want": [
           "It holds {\\\"prompt\\\", \\\"items\\\", \\\"carried\\\"} and its"
       ]
+  },
+  "checklist-display-shows-the-list-when-it-is-written": {
+      "_why": "THE LIST IS SHOWN BEFORE THE WORK. MEASURED 2026-10-29 in mutze-studio `29c3e592`: the session wrote i1's four items in the same Bash call as its first real work and the only display was the Stop-time WORK block, after the work. Now the main session's `Write` of its own asks checklist, with items, returns a `systemMessage` listing the issue, its title and each item with its status. The payload carries no `scratchpad_dir`, as a real `PostToolUse` does not; the path is taken from the call and confirmed against the tag. Fails on the old code, which says nothing on a main-thread call.",
+      "before": [
+          {
+              "script": "wf-task-tag",
+              "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"prompt\": \"so we had a catastrophe, the Nvidia eGPU died mid render and the studio has to pick a replacement\"}"
+          },
+          {
+              "path_from": 0,
+              "path_rx": "/[^\\s\"]*wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+              "write": "{\"title\": \"eGPU replacement research\", \"items\": [{\"ask\": \"pick a replacement eGPU\", \"status\": \"open\"}, {\"ask\": \"say whether the housing fits Thunderbolt 3\", \"status\": \"open\"}]}"
+          }
+      ],
+      "exit": 0,
+      "not": [
+          "Traceback",
+          "additionalContext"
+      ],
+      "script": "wf-turn-budget",
+      "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"tool_name\": \"Write\", \"tool_input\": {\"file_path\": \"${TREE}/wf-asks.s1.i1.json\"}, \"tool_response\": {}}",
+      "want": [
+          "{\"systemMessage\": \"WORK LIST",
+          "WORK LIST  i1  eGPU replacement research",
+          "\\n  open  pick a replacement eGPU",
+          "  open  say whether the housing fits Thunderbolt 3"
+      ]
+  },
+  "checklist-display-same-list-twice-shows-once": {
+      "_why": "SHOWN ONCE PER CHANGE. The same list written a second time, unchanged, prints nothing: the first display is remembered beside the tag (`wf-asks-shown.<sid>.json`).",
+      "before": [
+          {
+              "script": "wf-task-tag",
+              "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"prompt\": \"so we had a catastrophe, the Nvidia eGPU died mid render and the studio has to pick a replacement\"}"
+          },
+          {
+              "path_from": 0,
+              "path_rx": "/[^\\s\"]*wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+              "write": "{\"title\": \"eGPU replacement research\", \"items\": [{\"ask\": \"pick a replacement eGPU\", \"status\": \"open\"}, {\"ask\": \"say whether the housing fits Thunderbolt 3\", \"status\": \"open\"}]}"
+          },
+          {
+              "script": "wf-turn-budget",
+              "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"tool_name\": \"Write\", \"tool_input\": {\"file_path\": \"${TREE}/wf-asks.s1.i1.json\"}, \"tool_response\": {}}"
+          }
+      ],
+      "exit": 0,
+      "not": [
+          "Traceback",
+          "WORK LIST",
+          "systemMessage"
+      ],
+      "script": "wf-turn-budget",
+      "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"tool_name\": \"Write\", \"tool_input\": {\"file_path\": \"${TREE}/wf-asks.s1.i1.json\"}, \"tool_response\": {}}"
+  },
+  "checklist-display-a-changed-status-shows-again": {
+      "_why": "A CHANGE IS SHOWN. After the first display, the session marks one item done; the next write of the list shows it again with the new status.",
+      "before": [
+          {
+              "script": "wf-task-tag",
+              "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"prompt\": \"so we had a catastrophe, the Nvidia eGPU died mid render and the studio has to pick a replacement\"}"
+          },
+          {
+              "path_from": 0,
+              "path_rx": "/[^\\s\"]*wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+              "write": "{\"title\": \"eGPU replacement research\", \"items\": [{\"ask\": \"pick a replacement eGPU\", \"status\": \"open\"}, {\"ask\": \"say whether the housing fits Thunderbolt 3\", \"status\": \"open\"}]}"
+          },
+          {
+              "script": "wf-turn-budget",
+              "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"tool_name\": \"Write\", \"tool_input\": {\"file_path\": \"${TREE}/wf-asks.s1.i1.json\"}, \"tool_response\": {}}"
+          },
+          {
+              "path_from": 0,
+              "path_rx": "/[^\\s\"]*wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+              "write": "{\"title\": \"eGPU replacement research\", \"items\": [{\"ask\": \"pick a replacement eGPU\", \"status\": \"done\"}, {\"ask\": \"say whether the housing fits Thunderbolt 3\", \"status\": \"open\"}]}"
+          }
+      ],
+      "exit": 0,
+      "not": [
+          "Traceback"
+      ],
+      "script": "wf-turn-budget",
+      "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"tool_name\": \"Bash\", \"tool_input\": {\"command\": \"python3 -c 'pass' && cat ${TREE}/wf-asks.s1.i1.json\"}, \"tool_response\": {}}",
+      "want": [
+          "  done  pick a replacement eGPU"
+      ]
+  },
+  "checklist-display-unrelated-call-is-silent": {
+      "_why": "NEVER ON AN UNRELATED CALL. With a written list on disk, a Bash call that does not name it prints nothing and loads nothing.",
+      "before": [
+          {
+              "script": "wf-task-tag",
+              "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"prompt\": \"so we had a catastrophe, the Nvidia eGPU died mid render and the studio has to pick a replacement\"}"
+          },
+          {
+              "path_from": 0,
+              "path_rx": "/[^\\s\"]*wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+              "write": "{\"title\": \"eGPU replacement research\", \"items\": [{\"ask\": \"pick a replacement eGPU\", \"status\": \"open\"}, {\"ask\": \"say whether the housing fits Thunderbolt 3\", \"status\": \"open\"}]}"
+          }
+      ],
+      "exit": 0,
+      "not": [
+          "Traceback",
+          "WORK LIST",
+          "systemMessage"
+      ],
+      "script": "wf-turn-budget",
+      "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"tool_name\": \"Bash\", \"tool_input\": {\"command\": \"ls -la ${TREE} && nvidia-smi\"}, \"tool_response\": {}}"
+  },
+  "checklist-display-malformed-list-exits-0": {
+      "_why": "A FILE THE SESSION BROKE IS NOT A FAILED TOOL CALL. The checklist holds text that is not JSON; the hook exits 0 and prints nothing.",
+      "before": [
+          {
+              "script": "wf-task-tag",
+              "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"prompt\": \"so we had a catastrophe, the Nvidia eGPU died mid render and the studio has to pick a replacement\"}"
+          },
+          {
+              "path_from": 0,
+              "path_rx": "/[^\\s\"]*wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+              "write": "{\"items\": [{\"ask\": \"pick a"
+          }
+      ],
+      "exit": 0,
+      "not": [
+          "Traceback",
+          "WORK LIST",
+          "systemMessage"
+      ],
+      "script": "wf-turn-budget",
+      "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"tool_name\": \"Write\", \"tool_input\": {\"file_path\": \"${TREE}/wf-asks.s1.i1.json\"}, \"tool_response\": {}}"
+  },
+  "checklist-display-another-sessions-list-is-silent": {
+      "_why": "ONLY THIS SESSION'S LIST. A path named like a checklist but carrying another session's id, or one no record of this session's tag names, prints nothing.",
+      "before": [
+          {
+              "script": "wf-task-tag",
+              "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"prompt\": \"so we had a catastrophe, the Nvidia eGPU died mid render and the studio has to pick a replacement\"}"
+          },
+          {
+              "path_from": 0,
+              "path_rx": "/[^\\s\"]*wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+              "write": "{\"title\": \"eGPU replacement research\", \"items\": [{\"ask\": \"pick a replacement eGPU\", \"status\": \"open\"}, {\"ask\": \"say whether the housing fits Thunderbolt 3\", \"status\": \"open\"}]}"
+          }
+      ],
+      "exit": 0,
+      "not": [
+          "Traceback",
+          "WORK LIST",
+          "systemMessage"
+      ],
+      "script": "wf-turn-budget",
+      "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"tool_name\": \"Bash\", \"tool_input\": {\"command\": \"cat ${TREE}/wf-asks.s2.i1.json ${TREE}/wf-asks.s1.i9.json\"}, \"tool_response\": {}}"
+  },
+  "checklist-display-queued-message-keeps-its-own-list": {
+      "_why": "THE RUNNING TURN'S LIST IS SHOWN AFTER A QUEUED SUBMIT. Submit 1, then message 2 is queued and its submit fires mid-turn, then turn 1 writes its list to the path submit 1 told it. That file is now named by the tag's `earlier` record, not its newest, and it is still shown as i1. Submit 2's line carries the same written-first sentence for its own file.",
+      "before": [
+          {
+              "script": "wf-task-tag",
+              "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"prompt\": \"so we had a catastrophe, the Nvidia eGPU died mid render and the studio has to pick a replacement\"}"
+          },
+          {
+              "script": "wf-task-tag",
+              "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"prompt\": \"the egpu housing would need to be backwards compatible with the Thunderbolt 3 port on this machine\"}"
+          },
+          {
+              "path_from": 0,
+              "path_rx": "/[^\\s\"]*wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+              "write": "{\"title\": \"eGPU replacement research\", \"items\": [{\"ask\": \"pick a replacement eGPU\", \"status\": \"open\"}, {\"ask\": \"say whether the housing fits Thunderbolt 3\", \"status\": \"open\"}]}"
+          }
+      ],
+      "exit": 0,
+      "not": [
+          "Traceback"
+      ],
+      "script": "wf-turn-budget",
+      "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"tool_name\": \"Write\", \"tool_input\": {\"file_path\": \"${TREE}/wf-asks.s1.i1.json\"}, \"tool_response\": {}}",
+      "want": [
+          "WORK LIST  i1  eGPU replacement research"
+      ]
+  },
+  "checklist-line-asks-for-the-list-first": {
+      "_why": "THE ORDER IS IN THE LINE. The checklist sentence says the list is written in a tool call of its own before any other tool call, and that the write shows it to the user. A queued message's submit builds its line in the same place, for its own file.",
+      "before": [
+          {
+              "script": "wf-task-tag",
+              "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"prompt\": \"so we had a catastrophe, the Nvidia eGPU died mid render and the studio has to pick a replacement\"}"
+          }
+      ],
+      "exit": 0,
+      "not": [
+          "Traceback"
+      ],
+      "script": "wf-task-tag",
+      "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"prompt\": \"the egpu housing would need to be backwards compatible with the Thunderbolt 3 port on this machine\"}",
+      "want": [
+          "wf-asks.s1.i2.json",
+          "written in a tool call of its own before any other tool call, and that write shows the list to the user"
+      ]
   }
 }
