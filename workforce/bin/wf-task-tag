@@ -1658,6 +1658,10 @@ def note_intentions(led, issue_id, texts):
 ISSUE_ID = re.compile(r"(?<![\w-])(i\d{1,4})(?![\w-])")
 TITLE_MAX = 60
 TASK_MAX = 200
+# THE EXCERPT THAT STANDS IN FOR A MISSING TITLE on a Work row. It is the user's or a peer's
+# words, so it is several paragraphs as often as not: flattened to one line before it is cut,
+# or the row breaks across the screen and the cut counts blank lines as words.
+EXCERPT_MAX = 120
 
 
 def plain_text(value, limit):
@@ -2211,7 +2215,7 @@ def judge_ledger(payload, led):
             for a in issue_agents(iss):
                 if a.get("state") == "handoff":
                     a["state"] = "returned"
-        rows.append((iss.get("id"), verdict, why, (iss.get("prompt") or "")[:120], iss))
+        rows.append((iss.get("id"), verdict, why, plain_text(iss.get("prompt"), EXCERPT_MAX), iss))
     return rows
 
 

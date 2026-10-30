@@ -3020,9 +3020,10 @@ def ledger_verdict(payload, decided):
         word = "PROCESSING" if verdict == "hold" else verdict.upper()
         # STATUS AND TITLE, NOTHING ELSE (user, 2026-10-14: "We don't need to say one item's
         # done or three agents returned ... The title just needs to go there."). The excerpt
-        # of the user's own words follows; it stands in for a title the session never wrote.
-        # `why` is not printed — the session reads the open items from its carried list.
-        out.append(f"  {iid}  {word}  {title + '  ' if title else ''}[{ask}]")
+        # of the user's own words stands in for a title the session never wrote, so it is
+        # printed only when there is none. `why` is not printed — the session reads the open
+        # items from its carried list.
+        out.append(f"  {iid}  {word}  {title or '[' + ask + ']'}")
         # THE VERDICT ALONE IS NOT ENOUGH FOR THE TWO THAT ASK FOR SOMETHING. Every other
         # verdict is a status; these two are an instruction, and an instruction the reader
         # has to infer is one the reader infers wrong — which here means starting the work

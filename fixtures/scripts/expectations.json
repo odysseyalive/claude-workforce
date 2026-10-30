@@ -12360,6 +12360,55 @@
           }
       }
   },
+  "issues-row-with-a-title-prints-no-excerpt": {
+      "_why": "A WORK ROW IS STATUS AND TITLE, NOTHING ELSE (user, 2026-10-14). The excerpt of the user's words stands in for a title the session never wrote, so once the session writes one the bracket goes. The user's screen on 2026-10-29 showed both, title then bracket, and the bracket ran on for 120 characters of the prompt. Fails on the code that appended the bracket after every title: its row read `i1  KICKBACK  Crash cause  [A process crashed ...]`.",
+      "before": [
+          {
+              "script": "wf-task-tag",
+              "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"A process crashed on this Omarchy machine and I want to know why. What systemd-coredump recorded: process python3.13, PID 59295, signal SIGABRT.\"}"
+          },
+          {
+              "write": "{\"title\": \"Crash cause\", \"items\": [{\"ask\": \"find why python3.13 PID 59295 aborted\", \"status\": \"done\"}, {\"ask\": \"say whether it will recur\", \"status\": \"open\"}]}",
+              "path_from": 0,
+              "path_rx": "wf-asks\\.[A-Za-z0-9_.-]+?\\.json"
+          }
+      ],
+      "env": {
+          "WF_BLIND_SAMPLE": "0"
+      },
+      "exit": 0,
+      "not": [
+          "Traceback",
+          "Crash cause  [",
+          "[A process crashed"
+      ],
+      "script": "wf-widen",
+      "stdin_raw": "{\"hook_event_name\": \"Stop\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"transcript_path\": \"t1.jsonl\", \"last_assistant_message\": \"No core dump survived for PID 59295; the journal shows ComfyUI aborting on a CUDA error.\"}",
+      "want": [
+          "i1  KICKBACK  Crash cause"
+      ]
+  },
+  "issues-row-excerpt-is-one-line": {
+      "_why": "THE EXCERPT IS ONE LINE. A peer's request is several paragraphs, and the row that stands in for a missing title printed its first 120 characters with their newlines, so on the user's screen (2026-10-29) one Work row ran across three lines and the next row's id landed mid-paragraph. The prompt is flattened to one line, whitespace collapsed, and then cut to `EXCERPT_MAX`, so the cut counts words and not the blank lines between them. Fails on the code that cut the raw prompt: its row broke after `half-checked.`.",
+      "before": [
+          {
+              "script": "wf-task-tag",
+              "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"<cross-session-message from=\\\"uds:/run/user/1000/cc-socks/14456.sock\\\" from-name=\\\"mutze-dev\\\" from-mode=\\\"prompting\\\">\\n1.82.0 check from mutze-studio (session 29c3e592): 1 passes, 2 fails, 3 and 4 are only half-checked.\\n\\n1. Stale entries: the Work list kept i4 after it closed.\\n2. Install notice: it opened an issue of its own.\\n</cross-session-message>\"}"
+          }
+      ],
+      "env": {
+          "WF_BLIND_SAMPLE": "0"
+      },
+      "exit": 0,
+      "not": [
+          "Traceback"
+      ],
+      "script": "wf-widen",
+      "stdin_raw": "{\"hook_event_name\": \"Stop\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"transcript_path\": \"t1.jsonl\", \"last_assistant_message\": \"Noted: mutze-studio reports 1 passing and 2 failing.\"}",
+      "want": [
+          "i1  TRACKED  [1.82.0 check from mutze-studio (session 29c3e592): 1 passes, 2 fails, 3 and 4 are only half-checked. 1. Stale entries: t]"
+      ]
+  },
   "issues-notice-opened-issue-heals-at-next-message": {
       "_why": "AN ISSUE AN IDLE NOTICE OPENED, UNDER A RELEASE WHOSE `INJECTED` DID NOT MATCH IT, CLOSES AT THE NEXT MESSAGE even though it holds an item, when that item only restates the notice. i1 is `/home/francis/Work` `4e1b090a` i6's shape: the hook's fallback, open, set to the notice text. i2 is the same notice with an item the session wrote whose ask is the notice text. Both are closed and their items marked `superseded`. THE NEGATIVE IS i3: a notice opened it, but the session wrote a real ask under it, so it stays open with its item open and stays in the index. The new message's own issue is i4.",
       "after": {
