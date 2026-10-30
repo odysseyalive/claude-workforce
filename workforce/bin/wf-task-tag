@@ -1560,13 +1560,20 @@ def track_message(led, issue_id, written):
     its enqueue, before the running turn's Stop (`earlier_records`), and that Stop now tracks
     the earlier message's issue. Superseding every other issue would close the queued one
     before its own turn began; it is the later message, so nothing has replaced it yet.
+
+    A PEER SESSION'S REQUEST (`peer`) SUPERSEDES NOTHING EITHER. It opens an issue like a
+    user's message, but another session speaking is not the user moving on: in odyssey-alive
+    `de3efe49` (2026-10-30) wf-dev's two replies would each have retired the user's tracked
+    issue. Its own fallback is retired by the next message the user sends, as any is.
     """
     target = None
+    peer = any(issue_id and iss.get("id") == issue_id and isinstance(iss.get("peer"), dict)
+               for iss in open_issues(led))
     for iss in open_issues(led):
         if issue_id and iss.get("id") == issue_id:
             target = iss
             continue
-        if target is not None:
+        if target is not None or peer:
             continue
         for item in issue_items(iss):
             if item.get("fallback") is True and not item_done(item):

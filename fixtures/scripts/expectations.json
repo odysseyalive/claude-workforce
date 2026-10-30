@@ -12145,7 +12145,7 @@
       ]
   },
   "issues-queued-message-peer-turn-keeps-its-own-record": {
-      "_why": "THE WALK BACK TO THE TURN'S OWN ROW STOPS AT THE TURN BEFORE. A peer session's message opens its turn with an `isMeta` user row (901 of 901 \"Another Claude session sent a message\" rows over 200 transcripts, measured 2026-10-29), and that row's text is not the bare tag the submit saw, so it matches no record. The walk passes it, as it passes a skill's loaded text, and must then stop at the previous turn's `stop_hook_summary` / `turn_duration` rows. Without that stop it reaches message 1's typed row, picks message 1's record, and the peer turn is blocked as an `incident` claim. Passes on the one-slot code too, which only ever read the newest record: this pins that the new selection never reaches into an earlier turn. SINCE 2026-10-30 THE PEER MESSAGE OPENS i2 (`peer_request`), so i2 is the tracked one and i1, the user's message before it, is retired by it as any later message retires a fallback; the walk is unchanged.",
+      "_why": "THE WALK BACK TO THE TURN'S OWN ROW STOPS AT THE TURN BEFORE. A peer session's message opens its turn with an `isMeta` user row (901 of 901 \"Another Claude session sent a message\" rows over 200 transcripts, measured 2026-10-29), and that row's text is not the bare tag the submit saw, so it matches no record. The walk passes it, as it passes a skill's loaded text, and must then stop at the previous turn's `stop_hook_summary` / `turn_duration` rows. Without that stop it reaches message 1's typed row, picks message 1's record, and the peer turn is blocked as an `incident` claim. Passes on the one-slot code too, which only ever read the newest record: this pins that the new selection never reaches into an earlier turn. SINCE 2026-10-30 THE PEER MESSAGE OPENS i2 (`peer_request`), and both are tracked: a peer speaking is not the user moving on, so i1, the user's message before it, is not retired (`track_message`); the walk is unchanged.",
       "before": [
           {
               "script": "wf-task-tag",
@@ -12173,6 +12173,7 @@
       "stdin_raw": "{\"hook_event_name\": \"Stop\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"transcript_path\": \"t3.jsonl\", \"last_assistant_message\": \"Noted: mutze-dev confirms the allocator.\"}",
       "want": [
           "WIDEN  not scored",
+          "i1  TRACKED",
           "i2  TRACKED  [From the mutze-studio session"
       ]
   },
