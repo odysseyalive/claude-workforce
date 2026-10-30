@@ -956,13 +956,22 @@ def refresh_index(payload, led):
     if not isinstance(sessions, dict):
         sessions = {}
     sid = session_component(payload)
-    prune_dead_rows(d, sessions, sid)
+    # THE REGISTRY IS READ ONLY WHEN ANOTHER SESSION IS LISTED, since only its rows need it.
+    prune_dead_rows(d, sessions, sid,
+                    live_sessions(sid) if any(k != sid for k in sessions) else None)
     rows = []
     for iss in open_issues(led):
         rows.append({"id": iss.get("id"),
                      # THE ASK IN SHORT, so the index is readable without opening the
                      # ledger. The full prompt stays in the session's own file.
                      "ask": (iss.get("prompt") or "")[:120],
+                     # THE HOOK'S FALLBACK IS COUNTED, deliberately. It is the only record
+                     # of a message the session never itemized, and the index is read by
+                     # somebody who cannot see the session's file: leaving it out would show
+                     # `items_open: 0, agents_running: 0` for `/agenda today` two hours into
+                     # its work, the shape of a finished issue. A follow-up that only adds
+                     # context is not hidden here; it folds into its issue (`absorb_items`,
+                     # and the checklist line in `start_checklist` that asks for the fold).
                      "items_open": len([x for x in issue_items(iss)
                                         if not item_done(x)]),
                      "agents_running": len([a for a in issue_agents(iss)
@@ -974,7 +983,65 @@ def refresh_index(payload, led):
     write_json_atomic(p, {"sessions": sessions})
 
 
-def prune_dead_rows(d, sessions, sid):
+# THE HARNESS'S LIVE-SESSION REGISTRY: `<config>/sessions/<pid>.json`, one record per running
+# session, carrying `pid`, `sessionId`, `procStart` and `cwd`. HARNESS STATE, MEASURED on this
+# host on 2026-10-29: three sessions running, each with a record, and each record's
+# `procStart` equal to field 22 of `/proc/<pid>/stat` for its pid. The directory also holds
+# `<pid>.<hash>.key` files, which are not records. The cap bounds a directory somebody else
+# filled; a real one holds one record per open terminal.
+SESSIONS_DIR = "sessions"
+MAX_SESSION_RECORDS = 64
+
+
+def _proc_start(pid):
+    """Field 22 of `/proc/<pid>/stat` (start time, in clock ticks since boot), or None when
+    the process does not exist or the file cannot be read. Counted after the LAST `)`,
+    because field 2 is the command name in parentheses and a name can hold spaces."""
+    try:
+        with open(f"/proc/{pid}/stat", encoding="utf-8", errors="replace") as fh:
+            raw = fh.read()
+    except OSError:
+        return None
+    rest = raw[raw.rfind(")") + 2:].split()
+    return rest[19] if len(rest) > 19 else None
+
+
+def live_sessions(sid):
+    """The ids of the sessions the harness's registry shows running, or None when it cannot
+    say (`SESSIONS_DIR` above).
+
+    A RECORD IS LIVE when its `pid` is a running process and, when it names a `procStart`,
+    that process started then — a pid reused after the session exited is a different process.
+    Liveness is read from `/proc` and nowhere else: no signal is ever sent, so a pid this file
+    did not choose is never acted on, and a host without `/proc` gets None.
+
+    NONE ALSO WHEN THE REGISTRY DOES NOT LIST `sid`. The session writing the index is running
+    by definition, so a registry with no live record for it was read from the wrong config
+    directory or across a pid namespace, and nothing it says about other sessions is
+    believed. Every None leaves the index exactly as it was before this registry was read.
+    """
+    if not os.path.isfile("/proc/self/stat"):
+        return None
+    d = os.path.join(os.environ.get("CLAUDE_CONFIG_DIR") or os.path.expanduser("~/.claude"),
+                     SESSIONS_DIR)
+    try:
+        names = sorted(n for n in os.listdir(d) if n.endswith(".json"))[:MAX_SESSION_RECORDS]
+    except OSError:
+        return None
+    live = set()
+    for n in names:
+        rec = read_json_nofollow(os.path.join(d, n)) or {}
+        pid, key = rec.get("pid"), rec.get("sessionId")
+        if type(pid) is not int or pid <= 0 or not bare_name(key):
+            continue
+        started = _proc_start(pid)
+        want = rec.get("procStart")
+        if started is not None and (want is None or str(want) == started):
+            live.add(key)
+    return live if sid in live else None
+
+
+def prune_dead_rows(d, sessions, sid, live=None):
     """Drop from OTHER sessions' index rows every issue their own file shows `stale`.
 
     A SESSION THAT NEVER RUNS AGAIN NEVER REACHES `heal_empty`: `/home/francis/Work`
@@ -987,24 +1054,39 @@ def prune_dead_rows(d, sessions, sid):
     `items_open: 1`, the notice as its fallback, so its `ask`, the prompt's first 120
     characters, is what `INJECTED` is asked about. The file still decides.
 
-    READ-ONLY, and only for a row showing an issue at zero and zero or an injected ask, so the
-    cost is paid once per dead row. The other session's file is never written — it may be
-    live, and its own next submit heals it. A key that is not one filename component, or a
-    file this account cannot read as its own, leaves its row exactly as it was.
+    A SESSION THE REGISTRY SHOWS GONE (`live`, from `live_sessions`) has its finished issues
+    dropped too, though their agents still read `running`. MEASURED 2026-10-29 in
+    mutze-studio: `0555de28`, last written 2026-10-18, its transcript and agent meta files no
+    longer on disk, was listed with eight issues whose every item was done and whose agents
+    read `running` (i53 had eight). `agents_finished` and `agents_stopped` run only in the
+    owning session, and a subagent cannot outlive the session that spawned it, so for a
+    session not in the registry every `running` entry is over (`over_when_dead`). Its file is
+    read whatever its rows show, because a row cannot tell a fallback from a written item.
+    `live` None — no registry, an unreadable one, or one that does not list the writer —
+    leaves every row as the two rules above alone would.
+
+    READ-ONLY, and for a live session only for a row showing an issue at zero and zero or an
+    injected ask, so the cost is paid once per dead row; for a dead one, once per dead session
+    still listed. The other session's file is never written — it may be live, and its own
+    next save rewrites its own row from that file, so a resumed session gets back every row
+    this dropped. A key that is not one filename component, or a file this account cannot
+    read as its own, leaves its row exactly as it was.
     """
     for key, row in list(sessions.items()):
         rows = row.get("open") if isinstance(row, dict) else None
         if key == sid or not isinstance(rows, list) or not bare_name(key):
             continue
-        if not any(isinstance(r, dict)
-                   and ((r.get("items_open") == 0 and r.get("agents_running") == 0)
-                        or INJECTED.search(str(r.get("ask") or "")))
-                   for r in rows):
+        dead = live is not None and key not in live
+        if not dead and not any(isinstance(r, dict)
+                                and ((r.get("items_open") == 0 and r.get("agents_running") == 0)
+                                     or INJECTED.search(str(r.get("ask") or "")))
+                                for r in rows):
             continue
         other = read_json_nofollow(os.path.join(d, f"{key}.json"))
         if not isinstance(other, dict) or not isinstance(other.get("issues"), list):
             continue
-        empty = {i.get("id") for i in other["issues"] if stale(i)}
+        empty = {i.get("id") for i in other["issues"]
+                 if stale(i) or (dead and over_when_dead(i))}
         kept = [r for r in rows if not (isinstance(r, dict) and r.get("id") in empty)]
         if kept:
             row["open"] = kept
@@ -1150,6 +1232,26 @@ def stale(iss):
     return stale_empty(iss) or stale_notice(iss)
 
 
+def over_when_dead(iss):
+    """Whether an open issue of a session that is NOT RUNNING holds nothing left to finish:
+    what `judge_issue` makes of it with every `running` agent counted as over, read off a
+    copy so the other session's record is never changed.
+
+    `closed` IS THE VERDICT THAT DROPS, so the handoff rule is `judge_issue`'s own: an agent
+    cut at its turn cap keeps the issue listed while a written item is open or none was
+    written, and does not once every written item is finished. A written item still open
+    (`kickback`) keeps it listed, since that is unfinished work on record.
+
+    `tracked` DROPS TOO. It is a message the session never itemized, held only by the hook's
+    fallback, which is never evidence of undone work, and which `track_message` retires at
+    the next user message's Stop. A session that is not running has no next message; if it is
+    resumed, its own save lists the issue again from its file.
+    """
+    over = dict(iss, agents=[dict(a, state="returned") if a.get("state") == "running" else a
+                             for a in issue_agents(iss)])
+    return judge_issue(over)[0] in ("closed", "tracked")
+
+
 def heal_empty(led):
     """Close every open issue that is `stale`, its open items `superseded`. How many.
 
@@ -1292,13 +1394,17 @@ def untitled_issues(led, skip=None):
     for a title, so i9 printed as an excerpt on every Stop with no way to get one. `skip` is
     this message's own issue, which its `"title"` field already covers.
 
-    ONLY AN ISSUE THE ISSUES LINE SHOWS. One judged `open` (nothing recorded against it) or
-    `closed` (closes at the next Stop) is never printed, so asking for its title is noise.
+    ONLY AN ISSUE THE ISSUES LINE KEEPS SHOWING. One judged `open` (nothing recorded against
+    it) is never printed, and one judged `closed` closes at the next Stop. One judged
+    `tracked` holds only the hook's fallback, which `track_message` retires at the next user
+    message's Stop. MEASURED 2026-10-29 in mutze-studio `29c3e592`: "No title yet on i2, i3"
+    was on every message for two queued follow-ups in that state. Asking any of the three
+    for a title is noise.
     """
     return [i.get("id") for i in open_issues(led)
             if bare_name(i.get("id")) and i.get("id") != skip
             and not plain_text(i.get("title"), TITLE_MAX)
-            and judge_issue(i)[0] not in ("open", "closed")]
+            and judge_issue(i)[0] not in ("open", "closed", "tracked")]
 
 
 def absorb_titles(led, titles):
@@ -2089,8 +2195,11 @@ def opens_issue(prompt):
 # sentences are now said in two places — and a second COPY of either one in this file is the
 # copy that drifts, as well as the thing that would make `bin/check`'s grep for the carried
 # words vacuous: breaking one copy would no longer break the pin.
+# THE KEY SET NAMES `"titles"` WHEN THE TITLES LINE IS SAID (`checklist_head`). MEASURED
+# 2026-10-29 in mutze-studio `29c3e592`: with the head listing three keys, the session read
+# `"titles"` as outside the file's schema and never wrote it.
 CHECKLIST_HEAD = ("Asks checklist for this message: %s. It holds "
-                  "{\"prompt\", \"items\", \"carried\"}")
+                  "{\"prompt\", \"items\", \"carried\"%s}")
 # THE CARRIED LIST IS ONE SENTENCE HOWEVER LONG IT IS: the rows live in the file, so the
 # prompt pays for the pointer and not for the items.
 CARRIED_LINE = ("\"carried\" holds %d still-open item(s) from this session's earlier "
@@ -2261,7 +2370,7 @@ def start_checklist(payload, prev=None, earlier=()):
         return "", None
     # Stated as facts about the file, never as an out-of-band command (see the note above
     # the injection in `main`).
-    return (CHECKLIST_HEAD % p
+    return (checklist_head(p, untitled)
             + " and its \"items\" start empty. Each separate "
             "ask is one item, {\"ask\": <in the user's words>, "
             "\"status\": \"open\"}, written before the work starts; statuses are updated as the "
@@ -2269,7 +2378,9 @@ def start_checklist(payload, prev=None, earlier=()):
             "\"answered\" when the work was answering it; one the user withdrew or sent by "
             "mistake is \"dropped\". Give the issue a short \"title\" of a few words; an item "
             "that continues an earlier open issue carries \"issue\": <its id> and is added "
-            "there. The reply gives each item its "
+            "there. A message that only adds context to an earlier open issue gets one item "
+            "stating that context, with \"issue\": <that id> and \"status\": \"answered\", "
+            "and so opens no issue of its own. The reply gives each item its "
             "own section. At Stop the widening agent checks the list and the reply against the "
             "message."
             + (f" These items belong to issue {issue_id} in this project's issue ledger, "
@@ -2277,6 +2388,12 @@ def start_checklist(payload, prev=None, earlier=()):
                "beside them; an agent spawned now is linked to that issue and its result is "
                "recorded there." if issue_id else "")
             + earlier_lines(carried, untitled)), record
+
+
+def checklist_head(p, untitled):
+    """`CHECKLIST_HEAD` for the file at `p`, its key set naming `"titles"` exactly when
+    `earlier_lines` will say the titles line. One builder for both checklist variants."""
+    return CHECKLIST_HEAD % (p, ", \"titles\"" if untitled else "")
 
 
 def earlier_lines(carried, untitled):
@@ -2322,7 +2439,7 @@ def carry_only_checklist(p, carried, untitled):
     # put in front of a juror — so harness text has no reason to be in either copy.
     if not write_json_atomic(p, {"prompt": "", "items": [], "carried": carried}):
         return "", None
-    return (CHECKLIST_HEAD % p
+    return (checklist_head(p, untitled)
             + " and its \"items\" stay empty, because this message makes no asks of its "
             "own." + earlier_lines(carried, untitled),
             {"prompt": "", "ended": False, "issue": None, "carry_only": True})

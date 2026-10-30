@@ -12177,5 +12177,194 @@
       "want": [
           "issue i1"
       ]
+  },
+  "issues-dead-session-finished-issues-leave-the-index": {
+      "_why": "A DEAD SESSION'S FINISHED ISSUES LEAVE THE INDEX THOUGH ITS AGENTS STILL READ `running`. MEASURED 2026-10-29 in mutze-studio: `0555de28`, last written 2026-10-18 and with no transcript left, was listed with i39, i41, i43, i44, i50, i51, i53 and i66, every item done and agents `running` (i53 has 8), because `agents_finished` only runs in the owning session and that session is gone. A subagent cannot outlive its session, so when the harness's live-session registry (`<config>/sessions/<pid>.json`) has no live record for a session, its `running` agents are over. dead1 copies those shapes: i53 (three done items, eight running agents), i50 (no items, agents running and returned), i44 (all done, one `handoff` agent: `judge_issue` closes it, so it drops), and i70, a message the dead session never itemized (fallback only). THE NEGATIVES: dead1's i61 and i18 still hold an item the session wrote as open, so they stay; live1 has a live record (pid 1, no `procStart`), so its done issue with a running agent stays; reused1's only record names pid 1 with a `procStart` pid 1 does not have, which is a reused pid, so reused1 is dead and its i11 drops. dead1's own file is never written.",
+      "after": {
+          ".claude/workforce/issues/dead1.json": {
+              "want": [
+                  "\"agent_id\": \"a53r7\", \"agent_type\": \"comfyui-programmer\", \"state\": \"running\""
+              ]
+          },
+          ".claude/workforce/issues/index.json": {
+              "not": [
+                  "Okay, something else that I'd like to mention",
+                  "that way the art director can do sketches",
+                  "I would also like to hire a writer's assistant",
+                  "one more thing before you go",
+                  "\"reused1\""
+              ],
+              "want": [
+                  "So hopefully there is an easy way to have marker points",
+                  "That way we could make use of period intsruments",
+                  "okay, are things still running?",
+                  "\"s1\""
+              ]
+          }
+      },
+      "env": {
+          "CLAUDE_CONFIG_DIR": "${TREE}/cfg"
+      },
+      "exit": 0,
+      "not": [
+          "Traceback"
+      ],
+      "script": "wf-task-tag",
+      "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"so we had a catastrophe, the Nvidia eGPU died mid render and the studio has to pick a replacement\"}",
+      "want": [
+          "issue i1"
+      ]
+  },
+  "issues-dead-session-no-registry-leaves-rows": {
+      "_why": "NO LIVE-SESSION REGISTRY, NO LIVENESS VERDICT: the same index and files as `issues-dead-session-finished-issues-leave-the-index`, with `CLAUDE_CONFIG_DIR` naming a directory that has no `sessions/`. Every row other than the writer's own is left exactly as it was, i53 with its eight running agents included, because nothing says dead1 is gone.",
+      "after": {
+          ".claude/workforce/issues/index.json": {
+              "want": [
+                  "Okay, something else that I'd like to mention",
+                  "that way the art director can do sketches",
+                  "I would also like to hire a writer's assistant",
+                  "one more thing before you go",
+                  "\"reused1\"",
+                  "\"live1\""
+              ]
+          }
+      },
+      "env": {
+          "CLAUDE_CONFIG_DIR": "${TREE}/cfg"
+      },
+      "exit": 0,
+      "not": [
+          "Traceback"
+      ],
+      "script": "wf-task-tag",
+      "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"so we had a catastrophe, the Nvidia eGPU died mid render and the studio has to pick a replacement\"}",
+      "want": [
+          "issue i1"
+      ]
+  },
+  "issues-dead-session-registry-without-writer-leaves-rows": {
+      "_why": "A REGISTRY THAT DOES NOT LIST THE WRITING SESSION IS NOT THIS SESSION'S REGISTRY. The session writing the index is alive by definition, so a registry with no live record for it was read from the wrong config directory or another pid namespace, and every verdict it gives is suspect. The registry here lists only live1; s1 is writing. Every row stays as it was.",
+      "after": {
+          ".claude/workforce/issues/index.json": {
+              "want": [
+                  "Okay, something else that I'd like to mention",
+                  "I would also like to hire a writer's assistant",
+                  "\"reused1\""
+              ]
+          }
+      },
+      "env": {
+          "CLAUDE_CONFIG_DIR": "${TREE}/cfg"
+      },
+      "exit": 0,
+      "not": [
+          "Traceback"
+      ],
+      "script": "wf-task-tag",
+      "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"so we had a catastrophe, the Nvidia eGPU died mid render and the studio has to pick a replacement\"}",
+      "want": [
+          "issue i1"
+      ]
+  },
+  "issues-dead-session-resumed-rewrites-its-own-row": {
+      "_why": "A PRUNED SESSION THAT IS RESUMED GETS ITS ROW BACK FROM ITS OWN FILE at its next submit, because a session's own save always rewrites its own row and the prune never touched its file. Here dead1's i53 was dropped from the index while dead1 was gone; dead1 is now live in the registry and submits, and its row lists i53 again with the eight agents its own file still shows `running`. Those settle at dead1's own Stop through `agents_finished` and the harness meta files, which this hook does not change.",
+      "after": {
+          ".claude/workforce/issues/index.json": {
+              "want": [
+                  "\"id\": \"i53\"",
+                  "\"agents_running\": 8",
+                  "\"id\": \"i62\""
+              ]
+          }
+      },
+      "env": {
+          "CLAUDE_CONFIG_DIR": "${TREE}/cfg"
+      },
+      "exit": 0,
+      "not": [
+          "Traceback"
+      ],
+      "script": "wf-task-tag",
+      "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"dead1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"so we had a catastrophe, the Nvidia eGPU died mid render and the studio has to pick a replacement\"}",
+      "want": [
+          "issue i62"
+      ]
+  },
+  "issues-context-only-message-folds-into-its-issue": {
+      "_why": "A MESSAGE THAT ONLY ADDS CONTEXT TO AN EARLIER ISSUE FOLDS INTO IT. MEASURED 2026-10-29 in mutze-studio `29c3e592`: i2 and i3 were queued follow-ups adding context to i1, the session left their `items` empty, and each sat in the index as its own issue with the hook's open fallback (`items_open 1`). `absorb_items` already folds a message whose every item carries `\"issue\": <earlier open id>`; what was missing is the checklist line telling the session to write that item. Here submit 3's line says it, and the shape it asks for \u2014 one item stating the context, `\"issue\": \"i1\"`, `\"answered\"` \u2014 written to i2's own file folds i2: `merged`, closed, its context on i1, and out of the index. Fails on the old line, which never names a context-only message; the fold itself passes on old code too.",
+      "after": {
+          ".claude/workforce/issues/index.json": {
+              "not": [
+                  "By looking at this project"
+              ],
+              "want": [
+                  "\"id\": \"i1\"",
+                  "\"id\": \"i3\""
+              ]
+          },
+          ".claude/workforce/issues/s1.json": {
+              "want": [
+                  "\"merged\": true",
+                  "{\"ask\": \"context: the project's workload is why the eGPU matters\", \"status\": \"answered\"}"
+              ]
+          }
+      },
+      "before": [
+          {
+              "script": "wf-task-tag",
+              "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"so we had a catastrophe, the Nvidia eGPU died mid render and the studio has to pick a replacement\"}"
+          },
+          {
+              "path_from": 0,
+              "path_rx": "wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+              "write": "{\"title\": \"eGPU replacement research\", \"items\": [{\"ask\": \"pick a replacement eGPU\", \"status\": \"open\"}]}"
+          },
+          {
+              "script": "wf-task-tag",
+              "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"By looking at this project, you can see what we're running here, which is why the eGPU matters so much\"}"
+          },
+          {
+              "path_from": 2,
+              "path_rx": "wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+              "write": "{\"items\": [{\"ask\": \"context: the project's workload is why the eGPU matters\", \"status\": \"answered\", \"issue\": \"i1\"}]}"
+          }
+      ],
+      "exit": 0,
+      "not": [
+          "Traceback"
+      ],
+      "script": "wf-task-tag",
+      "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"the egpu housing would need to be backwards compatible with the Thunderbolt 3 port on this machine\"}",
+      "want": [
+          "A message that only adds context to an earlier open issue gets one item stating that context"
+      ]
+  },
+  "issues-untitled-tracked-issue-is-not-asked-for-a-title": {
+      "_why": "A `tracked` ISSUE IS NOT ASKED FOR A TITLE, and the head names `\"titles\"` when it is asked for one. MEASURED 2026-10-29 in mutze-studio `29c3e592`: \"No title yet on i2, i3\" was on every message, though i2 and i3 held only the hook's fallback and are retired at the next user message's Stop (`track_message`). The peer session also read `\"titles\"` as outside the file's schema, because the head said the file holds `{\"prompt\", \"items\", \"carried\"}`. Here i1 holds an open item the session wrote and no title, so it is still named; i2 and i3 are `tracked` and are not. Fails on the old code, which names all three and leaves `\"titles\"` out of the head.",
+      "exit": 0,
+      "not": [
+          "Traceback",
+          "No title yet on i1, i2"
+      ],
+      "script": "wf-task-tag",
+      "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"while you are working on this, please reach out to mutze-dev with the crash log you found\"}",
+      "want": [
+          "No title yet on i1:",
+          "It holds {\\\"prompt\\\", \\\"items\\\", \\\"carried\\\", \\\"titles\\\"}"
+      ]
+  },
+  "issues-titled-issues-leave-titles-out-of-the-head": {
+      "_why": "THE NEGATIVE HALF OF `issues-untitled-tracked-issue-is-not-asked-for-a-title`: with every open issue titled there is no titles line, and the head names only the three keys the hook writes.",
+      "exit": 0,
+      "not": [
+          "Traceback",
+          "\\\"titles\\\"",
+          "No title yet"
+      ],
+      "script": "wf-task-tag",
+      "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"while you are working on this, please reach out to mutze-dev with the crash log you found\"}",
+      "want": [
+          "It holds {\\\"prompt\\\", \\\"items\\\", \\\"carried\\\"} and its"
+      ]
   }
 }
