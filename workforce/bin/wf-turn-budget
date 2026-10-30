@@ -311,6 +311,16 @@ BUDGET_MARK = (os.path.commonprefix([WARN_MARK, FINAL_MARK])
 HANDBACK_TOOL = "SubagentHandback"
 HANDBACK_MARK = "handed-back"
 
+# AND A RUN ALSO ENDS WHEN THE AGENT ENDS ITS TURN WITHOUT A CALL: the assistant row's
+# `stop_reason` is `end_turn`. MEASURED on 2.1.314 with a `maxTurns: 3` probe
+# (`measurements/2026-10-30-turn-allowance-after-mid-run-rows.md`): an agent that replied
+# `WAITING` and stopped was woken by its background task's notification and then made three
+# more calls before the cap cut it, five turns against a cap of three; an agent woken the
+# same way by a parent's `SendMessage` ran on likewise. So a prompt row after an `end_turn`
+# is a new allowance, exactly as after a hand-back. A run the harness CUT ends on a tool
+# call, never on `end_turn`, and its resume is still licensed only by the notice.
+END_TURN = "end_turn"
+
 
 # ── a job started in the last fifth of the budget ─────────────────────────────
 # MEASURED 2026-10-22, mutze-studio run `org-20261022T115924Z-necklacescale`: an IC took
@@ -527,8 +537,9 @@ def count_turns(path, offset, needles=(), pending=False):
     `thinking` is not a turn, and a row holding three `tool_use` blocks is one turn, which
     is the whole reason this counts rows instead of calls.
 
-    A ROUND BOUNDARY IS A PROMPT ROW THAT FOLLOWS A DELIVERED NOTICE OR A HAND-BACK, and
-    both halves of that are load-bearing. (The hand-back half: `HANDBACK_TOOL`.) A
+    A ROUND BOUNDARY IS A PROMPT ROW THAT FOLLOWS A DELIVERED NOTICE OR THE END OF A RUN, and
+    both halves of that are load-bearing. (A run ends on a hand-back, `HANDBACK_TOOL`, or on
+    an `end_turn`, `END_TURN`.) A
     `SendMessage` resume appends a user row carrying TEXT, where
     every ordinary user row in a subagent's transcript carries a `tool_result`; that row is
     where the harness's new turn allowance begins, and it is the only thing on this host
@@ -581,25 +592,30 @@ def count_turns(path, offset, needles=(), pending=False):
     if cut < 0:
         return dict(unread, turns=0, seen=seen)
     turns = writes = rounds = start = 0
+    ended = False                             # the agent ended its turn (`END_TURN`)
     for raw in chunk[:cut + 1].splitlines():
-        if b'"tool_use"' in raw:              # cheap reject before any parse
+        if b'"tool_use"' in raw or b'"end_turn"' in raw:   # cheap reject before any parse
             try:
                 row = json.loads(raw.decode("utf-8", "replace"))
             except ValueError:
                 continue
-            if row.get("type") != "assistant":
+            if row.get("type") == "assistant":
+                message = row.get("message")
+                message = message if isinstance(message, dict) else {}
+                content = message.get("content")
+                calls = [b for b in content if isinstance(b, dict)
+                         and b.get("type") == "tool_use"] if isinstance(content, list) else []
+                if calls:
+                    turns += 1
+                    writes += sum(1 for b in calls if b.get("name") in WRITE_TOOLS)
+                    ended = False
+                    if any(b.get("name") == HANDBACK_TOOL for b in calls):
+                        pending = True        # the run ended here (`HANDBACK_TOOL`)
+                elif message.get("stop_reason") == END_TURN:
+                    ended = True
                 continue
-            content = (row.get("message") or {}).get("content")
-            if not isinstance(content, list):
-                continue
-            calls = [b for b in content
-                     if isinstance(b, dict) and b.get("type") == "tool_use"]
-            if calls:
-                turns += 1
-                writes += sum(1 for b in calls if b.get("name") in WRITE_TOOLS)
-                if any(b.get("name") == HANDBACK_TOOL for b in calls):
-                    pending = True            # the run ended here (`HANDBACK_TOOL`)
-            continue
+            # A USER ROW THAT MERELY QUOTES ONE OF THOSE WORDS falls through to the prompt
+            # test below rather than being dropped as an assistant row it is not.
         if BUDGET_MARK in raw:
             # THIS HOOK'S OWN INJECTION, arriving back as an attachment. Not a turn, not a
             # prompt, and the one thing on the transcript that says the round is ending —
@@ -612,7 +628,7 @@ def count_turns(path, offset, needles=(), pending=False):
         # whole of the `tool_result` refusal: a resume message that quotes the words
         # `tool_result` is read as one of them and the backstop answers, where a parse
         # that looked past it could read a tool result as a new allowance.
-        if not pending or b'"tool_result"' in raw or b'"user"' not in raw:
+        if not (pending or ended) or b'"tool_result"' in raw or b'"user"' not in raw:
             continue
         try:
             row = json.loads(raw.decode("utf-8", "replace"))
@@ -625,8 +641,16 @@ def count_turns(path, offset, needles=(), pending=False):
         # row (all 457 skill loads on this machine carry it, no parent message does), and
         # `turnCompanion` says it belongs to the current turn (the 142 mid-run image rows).
         # Read as prompts, either one opened a round mid-run after a notice.
+        #
+        # AND A ROW THE HOST WRITES TO KEEP THE SAME RUN GOING IS NOT ONE EITHER: a meta row
+        # with no `origin`. MEASURED on 2.1.314 (`measurements/2026-10-30-turn-allowance-
+        # after-mid-run-rows.md`): `Stop hook feedback:` and `[handback-send-enforce]` both
+        # arrive that way, and an agent at its cap got ZERO turns after either. A parent's
+        # message and a task notification carry `origin` (399 of 399 coordinator rows on
+        # this machine) and each opened a fresh allowance.
         if (row.get("type") != "user" or row.get("sourceToolUseID")
-                or row.get("turnCompanion")):
+                or row.get("turnCompanion")
+                or (row.get("isMeta") and not row.get("origin"))):
             continue
         content = (row.get("message") or {}).get("content")
         if isinstance(content, str):
@@ -645,7 +669,7 @@ def count_turns(path, offset, needles=(), pending=False):
             continue
         rounds += 1
         start = turns
-        pending = False
+        pending = ended = False
     return {"turns": turns, "off": offset + cut + 1, "seen": seen, "writes": writes,
             "rounds": rounds, "round_start": start}
 

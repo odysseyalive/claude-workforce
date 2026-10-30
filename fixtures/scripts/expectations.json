@@ -13634,5 +13634,99 @@
         "absent": true
       }
     }
+  },
+  "turn-budget-stop-hook-feedback-is-not-a-fresh-allowance": {
+    "_why": "A STOP HOOK'S BLOCK KEEPS THE SAME RUN GOING, AND THE HARNESS GIVES IT NO NEW TURNS. MEASURED on Claude Code 2.1.314 (`measurements/2026-10-30-turn-allowance-after-mid-run-rows.md`): a `maxTurns: 3` probe made two calls, replied DONE (turn 3), and a `SubagentStop` hook blocked it; the host wrote `Stop hook feedback: ...` as a meta user row with no `origin`, and the agent got ZERO further turns -- the parent was told it stopped at its 3-turn limit. So after a delivered notice this row must not open an allowance. Here both notices went out in round 0, the agent ends its turn on turn 6, a hook's feedback arrives, and it works on to turn 8: still round 0, and no resume is recorded. On the previous release the pending notice let the feedback row open round 1 at turn 6.",
+    "script": "wf-turn-budget",
+    "env": {
+      "TMPDIR": "${TREE}/tmp"
+    },
+    "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"transcript_path\": \"s1.jsonl\", \"tool_name\": \"Bash\", \"tool_input\": {}, \"agent_id\": \"a1\", \"agent_type\": \"eng-coder\"}",
+    "exit": 0,
+    "not": [
+      "Traceback"
+    ],
+    "after": {
+      "tmp/wf-turn-budget/s1/a1/count.json": {
+        "want": [
+          "\"turns\": 8",
+          "\"round\": 0",
+          "\"round_start\": 0"
+        ]
+      },
+      "tmp/wf-turn-budget/s1/a1/resumed-after-fired-final": {
+        "absent": true
+      }
+    }
+  },
+  "turn-budget-handback-send-enforce-is-not-a-fresh-allowance": {
+    "_why": "THE HARNESS'S OWN NUDGE TO DELIVER IS THE SAME RUN, NOT A NEW ONE. MEASURED on 2.1.314 (`measurements/2026-10-30-turn-allowance-after-mid-run-rows.md`), auto mode, `maxTurns: 3`: the probe made two calls and ended its turn with plain text `OK` instead of `SubagentHandback`; the host wrote `[handback-send-enforce] Your report has not been delivered ...` as a meta user row with no `origin`, and the agent got ZERO further turns -- \"stopped at its 3-turn limit\", no report delivered. Same tree as the stop-hook row with only the injected text changed.",
+    "script": "wf-turn-budget",
+    "env": {
+      "TMPDIR": "${TREE}/tmp"
+    },
+    "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"transcript_path\": \"s1.jsonl\", \"tool_name\": \"Bash\", \"tool_input\": {}, \"agent_id\": \"a1\", \"agent_type\": \"eng-coder\"}",
+    "exit": 0,
+    "not": [
+      "Traceback"
+    ],
+    "after": {
+      "tmp/wf-turn-budget/s1/a1/count.json": {
+        "want": [
+          "\"turns\": 8",
+          "\"round\": 0",
+          "\"round_start\": 0"
+        ]
+      },
+      "tmp/wf-turn-budget/s1/a1/resumed-after-fired-final": {
+        "absent": true
+      }
+    }
+  },
+  "turn-budget-task-notification-after-end-turn-is-a-fresh-allowance": {
+    "_why": "A BACKGROUND TASK'S NOTIFICATION WAKES A STOPPED AGENT WITH A FRESH ALLOWANCE. MEASURED on 2.1.314 (`measurements/2026-10-30-turn-allowance-after-mid-run-rows.md`), `maxTurns: 3`: the probe launched `sleep 15 && echo bg-done` in the background (turn 1), replied WAITING with `stop_reason: end_turn` (turn 2), and when the host wrote the `[SYSTEM NOTIFICATION ...` row (`origin.kind: task-notification`) it made exactly three more calls before the cap cut it -- five turns against a cap of three. No notice and no hand-back preceded it, so the previous release read none of it as a boundary, counted turn 8 of round 0 and told an agent with a fresh allowance RETURN NOW. The `end_turn` row is what licenses the prompt after it.",
+    "script": "wf-turn-budget",
+    "env": {
+      "TMPDIR": "${TREE}/tmp"
+    },
+    "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"transcript_path\": \"s1.jsonl\", \"tool_name\": \"Bash\", \"tool_input\": {}, \"agent_id\": \"a1\", \"agent_type\": \"eng-coder\"}",
+    "exit": 0,
+    "not": [
+      "Traceback",
+      "additionalContext",
+      "RETURN NOW"
+    ],
+    "after": {
+      "tmp/wf-turn-budget/s1/a1/count.json": {
+        "want": [
+          "\"turns\": 8",
+          "\"round\": 1",
+          "\"round_start\": 6"
+        ]
+      }
+    }
+  },
+  "turn-budget-parent-message-after-end-turn-is-a-fresh-allowance": {
+    "_why": "THE SAME FOR A PARENT'S `SendMessage` TO AN AGENT THAT ENDED ITS TURN WITHOUT A HAND-BACK, which is every agent on a host where `SubagentHandback` is not offered (a `claude -p` session outside auto mode has no such tool). MEASURED on 2.1.314 (`measurements/2026-10-30-turn-allowance-after-mid-run-rows.md`): after the notification run above, five coordinator messages each reached the probe after an `end_turn` and each was followed by more calls, eleven turns in all against a cap of three.",
+    "script": "wf-turn-budget",
+    "env": {
+      "TMPDIR": "${TREE}/tmp"
+    },
+    "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"transcript_path\": \"s1.jsonl\", \"tool_name\": \"Bash\", \"tool_input\": {}, \"agent_id\": \"a1\", \"agent_type\": \"eng-coder\"}",
+    "exit": 0,
+    "not": [
+      "Traceback",
+      "additionalContext",
+      "RETURN NOW"
+    ],
+    "after": {
+      "tmp/wf-turn-budget/s1/a1/count.json": {
+        "want": [
+          "\"turns\": 8",
+          "\"round\": 1",
+          "\"round_start\": 6"
+        ]
+      }
+    }
   }
 }
