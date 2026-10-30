@@ -12630,7 +12630,94 @@
       "script": "wf-task-tag",
       "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"the egpu housing would need to be backwards compatible with the Thunderbolt 3 port on this machine\"}",
       "want": [
-          "A message that only adds context to an earlier open issue gets one item stating that context"
+          "A message that only adds context to an earlier issue gets one item stating that context"
+      ]
+  },
+  "issues-answered-continuation-of-a-closed-issue-lands-and-it-stays-closed": {
+      "_why": "A FINISHED CONTINUATION OF A CLOSED ISSUE LANDS ON IT, AND IT STAYS CLOSED. MEASURED 2026-10-29 in mutze-studio `29c3e592` on 1.82.1: i8 only added context to i7, which was already closed, and its checklist held the one item the checklist line asks for, `\"issue\": \"i7\"`, `\"answered\"`. `absorb_items` built its targets from open issues alone, so the item stayed on i8, i8 closed as an issue of its own holding it, and i7 kept its original four. Here i1 is seeded closed, i2's file holds `\"issue\": \"i1\"`, `\"answered\"`, and submit 3 absorbs it: the item is on i1 after its two, i1 is still `closed`, i2 is folded (`merged`, `items: []`), and neither is in the index. The line now says a continuation names an earlier issue, open or closed. Fails on 23daf3f, which leaves the item on i2 and folds nothing.",
+      "after": {
+          ".claude/workforce/issues/index.json": {
+              "not": [
+                  "\"id\": \"i1\"",
+                  "\"id\": \"i2\""
+              ],
+              "want": [
+                  "\"id\": \"i3\""
+              ]
+          },
+          ".claude/workforce/issues/s1.json": {
+              "once": [
+                  "\"merged\": true"
+              ],
+              "want": [
+                  "\"prompt\": \"Workforce 1.82.0 is installed, please check the two Work list fixes and reply to wf-dev with what you see\", \"state\": \"closed\", \"items\": [{\"ask\": \"index.json no longer lists the dead sessions\", \"status\": \"answered\"}, {\"ask\": \"the list shows to the producer right away\", \"status\": \"answered\"}, {\"ask\": \"context: wf-dev found why the list never showed on screen\", \"status\": \"answered\"}]",
+                  "\"prompt\": \"Your check 2 found a real bug: the hook fired, but Claude Code records that message without showing it on screen\", \"state\": \"closed\", \"items\": [], \"agents\": [], \"merged\": true"
+              ]
+          }
+      },
+      "before": [
+          {
+              "script": "wf-task-tag",
+              "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"Your check 2 found a real bug: the hook fired, but Claude Code records that message without showing it on screen\"}"
+          },
+          {
+              "path_from": 0,
+              "path_rx": "wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+              "write": "{\"items\": [{\"ask\": \"context: wf-dev found why the list never showed on screen\", \"status\": \"answered\", \"issue\": \"i1\"}]}"
+          }
+      ],
+      "exit": 0,
+      "not": [
+          "Traceback"
+      ],
+      "script": "wf-task-tag",
+      "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"the next thing is to look at the eGPU benchmark numbers the studio sent over this morning\"}",
+      "want": [
+          "A message that only adds context to an earlier issue gets one item stating that context",
+          "an item that continues an earlier issue, open or closed, carries"
+      ]
+  },
+  "issues-open-continuation-of-a-closed-issue-reopens-it": {
+      "_why": "AN UNFINISHED CONTINUATION OF A CLOSED ISSUE LANDS ON IT AND REOPENS IT, because new work arrived on it. The case beside `issues-answered-continuation-of-a-closed-issue-lands-and-it-stays-closed`, from the same measurement (mutze-studio `29c3e592`, i8 continuing closed i7), with the item left `open`: i1 is `open` again with the item after its two, i2 is folded (`merged`, `items: []`), the index lists i1 with its one open item, and submit 3 carries that item back as an earlier issue's open row so a later turn can finish it. Fails on 23daf3f, which leaves the item on i2, keeps i1 closed and folds nothing.",
+      "after": {
+          ".claude/workforce/issues/index.json": {
+              "not": [
+                  "\"id\": \"i2\""
+              ],
+              "want": [
+                  "\"id\": \"i1\", \"ask\": \"Workforce 1.82.0 is installed, please check the two Work list fixes and reply to wf-dev with what you see\", \"items_open\": 1, \"agents_running\": 0",
+                  "\"id\": \"i3\""
+              ]
+          },
+          ".claude/workforce/issues/s1.json": {
+              "once": [
+                  "\"merged\": true"
+              ],
+              "want": [
+                  "\"prompt\": \"Workforce 1.82.0 is installed, please check the two Work list fixes and reply to wf-dev with what you see\", \"state\": \"open\", \"items\": [{\"ask\": \"index.json no longer lists the dead sessions\", \"status\": \"answered\"}, {\"ask\": \"the list shows to the producer right away\", \"status\": \"answered\"}, {\"ask\": \"re-check that the Work list shows on screen once the fix lands\", \"status\": \"open\"}]",
+                  "\"prompt\": \"Your check 2 found a real bug: the hook fired, but Claude Code records that message without showing it on screen\", \"state\": \"closed\", \"items\": [], \"agents\": [], \"merged\": true"
+              ]
+          }
+      },
+      "before": [
+          {
+              "script": "wf-task-tag",
+              "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"Your check 2 found a real bug: the hook fired, but Claude Code records that message without showing it on screen\"}"
+          },
+          {
+              "path_from": 0,
+              "path_rx": "wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+              "write": "{\"items\": [{\"ask\": \"re-check that the Work list shows on screen once the fix lands\", \"status\": \"open\", \"issue\": \"i1\"}]}"
+          }
+      ],
+      "exit": 0,
+      "not": [
+          "Traceback"
+      ],
+      "script": "wf-task-tag",
+      "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"the next thing is to look at the eGPU benchmark numbers the studio sent over this morning\"}",
+      "want": [
+          "holds 1 still-open item(s) from this session's earlier issues"
       ]
   },
   "issues-untitled-tracked-issue-is-not-asked-for-a-title": {

@@ -1360,15 +1360,27 @@ def absorb_items(led, issue_id, items, title=""):
                 if isinstance(i, dict) and i.get("id") == issue_id), None)
     if own is None:
         return
-    # A CONTINUATION JOINS ITS ISSUE. An item the session tagged `"issue": "<open id>"`
+    # A CONTINUATION JOINS ITS ISSUE. An item the session tagged `"issue": "<earlier id>"`
     # belongs to that earlier issue, so it lands there, merged by its wording so a re-absorb
     # never duplicates it. The session decides what continues what; nothing here infers it.
-    opened = {i.get("id"): i for i in open_issues(led) if i is not own}
+    #
+    # OPEN OR CLOSED. MEASURED 2026-10-29 in mutze-studio `29c3e592` on 1.82.1: i8 only added
+    # context to i7, which was already closed, and wrote the one `"issue": "i7"`, `"answered"`
+    # item the checklist line asks for; with open issues alone as targets the item stayed on
+    # i8, which closed as an issue of its own. A moved item not yet finished REOPENS a closed
+    # target, since new work arrived on it; finished ones leave it closed. `absorb_carried`
+    # still ignores a closed issue: a carried row is the hook's own hand-out coming back, a
+    # continuation is the session naming where its item belongs.
+    #
+    # NEVER ONTO A FOLDED ISSUE (`merged`). It holds nothing and was never an issue of its own,
+    # so an item naming one stays on this message, as it did when only open issues were named.
+    targets = {i.get("id"): i for i in led.get("issues", [])
+               if isinstance(i, dict) and i is not own and not i.get("merged")}
     mine, moved = [], 0
     for it in items:
         row = {"ask": it["ask"],
                "status": it["status"] if isinstance(it.get("status"), str) else "open"}
-        dest = opened.get(it.get("issue")) if isinstance(it.get("issue"), str) else None
+        dest = targets.get(it.get("issue")) if isinstance(it.get("issue"), str) else None
         if dest is None:
             mine.append(row)
             continue
@@ -1379,6 +1391,8 @@ def absorb_items(led, issue_id, items, title=""):
             have.append(row)
         else:
             same["status"] = row["status"]
+        if dest.get("state") == "closed" and not item_done(row):
+            dest["state"] = "open"
     if title:
         own["title"] = title
     if moved and not mine and not any(a.get("state") == "running" for a in issue_agents(own)):
@@ -2557,8 +2571,8 @@ def start_checklist(payload, prev=None, earlier=()):
             "are updated as the work goes, and an ask found along the way is added. A finished ask is \"done\", or "
             "\"answered\" when the work was answering it; one the user withdrew or sent by "
             "mistake is \"dropped\". Give the issue a short \"title\" of a few words; an item "
-            "that continues an earlier open issue carries \"issue\": <its id> and is added "
-            "there. A message that only adds context to an earlier open issue gets one item "
+            "that continues an earlier issue, open or closed, carries \"issue\": <its id> and "
+            "is added there. A message that only adds context to an earlier issue gets one item "
             "stating that context, with \"issue\": <that id> and \"status\": \"answered\", "
             "and so opens no issue of its own. The reply gives each item its "
             "own section. At Stop the widening agent checks the list and the reply against the "
