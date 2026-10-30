@@ -1549,20 +1549,15 @@ def house_write(root, st):
     authorise a deletion.
     """
     dest, body = st["dest"], st["body"]
-    run = ""
-    try:
-        with open(os.path.join(root, ".claude", "workforce", ".current-run"),
-                  encoding="utf-8", errors="replace") as fh:
-            run = (fh.read().strip().splitlines() or [""])[0].strip()
-    except OSError:
-        pass
     # THE RUN ID GOES INSIDE AN HTML COMMENT, so it is constrained to what a run id is
     # rather than trusted to be one. A `.current-run` holding `x -->` would close the
     # provenance comment early and put the rest of the line into the rendered document —
     # the same output-encoding class as any other untrusted value written into markup,
-    # reached here through a file any process on the machine can write.
-    if not re.fullmatch(r"[A-Za-z0-9._-]{1,80}", run or ""):
-        run = ""
+    # reached here through a file any process on the machine can write. The constraint,
+    # and the choice between a stale pointer and the newer run Step 0.01 made, are
+    # `wf-upstream.current_run`'s: this file read the pointer alone and stamped
+    # `audit-20260911T152332Z` into a run that was `audit-20261029T184052Z` (DEF-Q-24 (c)).
+    run = _UPSTREAM.current_run(root)
     prov = ("<!-- origin: workforce | modifiable: true | source: references/evaluators.md "
             "§ House rules dominate | propagated: %s%s -->"
             % (time.strftime("%Y-%m-%d", time.gmtime()), " run %s" % run if run else ""))
@@ -1927,6 +1922,9 @@ _CENSUS = _sibling("wf-census")
 # `retire_seed_pin` and the `--migrate` display both need it, and a third copy of the line
 # format would be the drift this import exists to prevent.
 _SEED = _sibling("wf-seed")
+# The current run id, read from the script that owns the resolver. `house_write` stamps it, and
+# a second reader of `.current-run` here is a second answer to one question, free to drift.
+_UPSTREAM = _sibling("wf-upstream")
 NOT_READERS = _CENSUS.SACRED_SCRATCH
 # And the record FILES, by the same owner's rule: a queue, a manifest or a scan output
 # quotes paths and reads none of them. Read from `wf-census` rather than restated here for

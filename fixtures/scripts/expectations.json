@@ -6927,6 +6927,35 @@
       }
     }
   },
+  "catalog-house-rules-stale-pointer-execute": {
+    "_why": "DOWNSTREAM DEF-Q-24 (c), MEASURED 2026-10-29 on a copy of apps-odyssey-alive's five evaluator anchors: the provenance line read `propagated: 2026-10-30 run audit-20260911T152332Z` while the run executing was `audit-20261029T184052Z`. `house_write` read `.current-run` verbatim, and that pointer was written only \"before the first conversion\", so a re-audit that converted nothing never moved it. This tree is that state: the pointer names the September run, and `work/` holds both audit directories plus `build-finish-20260829`, a real non-audit name that sorts after every `audit-*` name and so catches a resolver that takes the newest of ALL `work/` names. The stamp must name the newer audit, read from disk with no re-audit. Against 1.81.0 the anchor reads `run audit-20260911T152332Z -->`.",
+    "script": "wf-catalog",
+    "args": [
+      "--house-rules",
+      "--execute"
+    ],
+    "env": {
+      "CLAUDE_CONFIG_DIR": "/nonexistent-config"
+    },
+    "exit": 0,
+    "want": [
+      "INV-HOUSERULES  5 evaluator(s) · 1 register(s) refreshed"
+    ],
+    "not": [
+      "Traceback"
+    ],
+    "after": {
+      ".claude/skills/text-eval/CATALOG-ANCHOR.md": {
+        "want": [
+          " run audit-20261029T184052Z -->"
+        ],
+        "not": [
+          "audit-20260911T152332Z",
+          "build-finish"
+        ]
+      }
+    }
+  },
   "upstream-forged-marker": {
     "_why": "FOUND BY /security-evaluator on this change, 2026-09-25. The inbox marker comment is MACHINE-READ \u2014 `header_fields` parses it and `--list` and `--resolve` act on its `status` \u2014 and `render()` wrote the RAW `row[\"id\"]` into it. A row id carrying `-->` closes the comment early and puts the rest of the line into the document; a crafted id emitting a second `status=resolved` pair makes a real open row vanish from `--list`, which is a genuine open defect silently disappearing from the one surface built to surface it. `deferred.md` is a file an agent edits, so the cell is untrusted input to markup \u2014 the same output-encoding class, and the same remedy, as `wf-catalog.house_write`'s constraint on `.current-run`. The INDEX is scrubbed; the verbatim row still appears in the fenced block below it, because that is where untrusted text belongs and the evidence must not be altered. The `y` row proves BOTH halves at once: its finding cell literally contains the string `status=resolved`, which survives verbatim in the fenced block while never appearing in the marker \u2014 a scrub that sanitised the evidence too would have destroyed the row a maintainer has to read.",
     "script": "wf-upstream",
@@ -7118,6 +7147,27 @@
         "want": ["`references/output-formats.md:38,44`"]
       },
       ".inbox/workforce/upstream/upstream-report-real-shape-execute--4.md": {"absent": true}
+    }
+  },
+  "upstream-stale-pointer-execute": {
+    "_why": "The other stamp the same stale pointer reached (DEF-Q-24 (c)): the inbox file's `run id:` line comes from `wf-upstream.current_run`, which read `.current-run` alone exactly as `wf-catalog` did. This is `upstream-report-real-shape-execute` with the run that is executing present in `work/` and the pointer left at the older one, plus the `build-finish-20260829` directory that a prefix-blind maximum would pick. The run id written is the newer audit's. Against 1.81.0 it reads `audit-20260925T180537Z`.",
+    "script": "wf-upstream",
+    "args": ["--execute"],
+    "env": {"CLAUDE_CONFIG_DIR": "${TREE}/.inbox"},
+    "exit": 0,
+    "want": [
+      "added     row 7"
+    ],
+    "after": {
+      ".inbox/workforce/upstream/upstream-stale-pointer-execute--7.md": {
+        "want": [
+          "- run id: `audit-20261029T184052Z`"
+        ],
+        "not": [
+          "- run id: `audit-20260925T180537Z`",
+          "build-finish"
+        ]
+      }
     }
   },
   "upstream-canonical-shape": {

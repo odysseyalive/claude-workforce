@@ -152,6 +152,11 @@ Root:                 <the resolved project root — an ABSOLUTE path>
 Subject:              <what the run will read, when the REQUEST narrows it>
 ```
 
+**Write the run id to `.claude/workforce/.current-run` in the same step, every run** — one line,
+overwriting what is there. It is the pointer `sweep` and the shipped stamps read. Written only at the
+first conversion, it was left naming an older run by every re-audit that converted nothing
+(DEF-Q-24 (c), `procedures/audit.md` § Step 6).
+
 **Then print it to the user before the first write.** A run that resolves a root the user did not
 intend has spent their whole session before they can see it, and the resolved root is one line.
 

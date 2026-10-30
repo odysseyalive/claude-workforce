@@ -466,16 +466,43 @@ def citations(row):
     return out
 
 
+# ASCII digits, never `\d`: `\d` admits every Unicode decimal digit, which sorts above `9` and
+# would let a planted `work/` name win the comparison and reach the markup un-constrained.
+AUDIT_RUN_RX = re.compile(r"audit-[0-9]{8}T[0-9]{6}Z")
+
+
 def current_run(root):
     """The run id this project is inside, or ''. Constrained to what a run id is rather than
-    trusted to be one — it is written into the inbox file and into an HTML comment there."""
+    trusted to be one — it is written into the inbox file and into an HTML comment there.
+
+    THE ONE RESOLVER, read by `wf-catalog` (the house-rules provenance stamp) and `wf-conform`
+    (the undo-tree search) as well as here. `.current-run` ALONE WENT STALE: through 1.81.0 it
+    was written "before the first conversion", so a re-audit that converted nothing never moved it.
+    MEASURED 2026-10-29 on a copy of apps-odyssey-alive (downstream DEF-Q-24 (c)): the pointer
+    still held `audit-20260911T152332Z` and the stamp named it, while the run executing was
+    `audit-20261029T184052Z`, whose `work/` directory Step 0.01 had already made. Audit ids sort
+    by time, so the newer of the pointer and the newest `work/audit-*` directory is the run; only
+    names of that exact shape are compared, because `work/` also holds `amend-*` and `build-*`
+    directories that sort after or before by prefix, not by date. A pointer of any other shape
+    cannot be dated against them and is returned as written, which is what this did before.
+    """
     try:
         with open(os.path.join(root, ".claude", "workforce", ".current-run"),
                   encoding="utf-8", errors="replace") as fh:
             run = (fh.read().strip().splitlines() or [""])[0].strip()
     except OSError:
-        return ""
-    return run if re.fullmatch(r"[A-Za-z0-9._-]{1,80}", run or "") else ""
+        run = ""
+    if not re.fullmatch(r"[A-Za-z0-9._-]{1,80}", run or "") or run in (".", ".."):
+        run = ""
+    work = os.path.join(root, ".claude", "workforce", "work")
+    try:
+        dirs = [n for n in os.listdir(work)
+                if AUDIT_RUN_RX.fullmatch(n) and os.path.isdir(os.path.join(work, n))]
+    except OSError:
+        dirs = []
+    if dirs and (not run or AUDIT_RUN_RX.fullmatch(run)):
+        return max(dirs + [run])
+    return run
 
 
 def installed_version():

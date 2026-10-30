@@ -2021,18 +2021,24 @@ first writing gate. Re-taking it here would archive a tree this run has been mod
 Assert it succeeded (or that its state is `declined` / `no-content`) before the first conversion; never
 run it again.
 
-**Step 6 writes two run-scoped artifacts that had readers and no writer**, both found 2026-08-03 by
-the producer check in `bin/check`:
+**Two run-scoped artifacts had readers and no writer**, both found 2026-08-03 by the producer check in
+`bin/check`:
 
-| Artifact | Read by | Written here |
+| Artifact | Read by | Written |
 |---|---|---|
-| `.claude/workforce/.current-run` | `sweep.md` step 1, to resume a deferred deletion | the run id, one line, before the first conversion |
-| `.claude/workforce/personnel/index.md` | `ledger`, `defect.md` step 5c, every `EMP` surface | regenerated from the filesystem after the last record is written |
+| `.claude/workforce/.current-run` | `sweep.md` step 1, to resume a deferred deletion; `wf-catalog`, `wf-upstream`, `wf-conform` through `wf-upstream.current_run` | the run id, one line, at `references/audit-setup.md` § Step 0.01 alongside `RUN-ORDER.md`, every run |
+| `.claude/workforce/personnel/index.md` | `ledger`, `defect.md` step 5c, every `EMP` surface | here, regenerated from the filesystem after the last record is written |
 
 *`sweep` opened with "Read `.claude/workforce/.current-run`" and **no procedure created it**. The file
 existed in the one real project because that run happened to write it, so the gap was invisible in
 practice and total in the specification: a fresh org would have had a resumable sweep pointed at a file
 that was never made. The index had the same shape — named by three readers, produced by none.*
+
+*`.current-run` was then written "before the first conversion", so a re-audit that converted nothing
+left it naming an older run, and the house-rules stamp carried that id. MEASURED 2026-10-29 on
+apps-odyssey-alive (DEF-Q-24 (c)): `run audit-20260911T152332Z` stamped by `audit-20261029T184052Z`.
+`wf-upstream.current_run` now takes the newer of the pointer and the newest `work/audit-*` directory,
+so a pointer an older release left stale reads correctly without a re-audit.*
 
 **Pre-execution assertion:** every budget question demonstrably rendered this run. If one did
 not, fail **by name** — never a generic error.

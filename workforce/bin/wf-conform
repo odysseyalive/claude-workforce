@@ -1697,7 +1697,7 @@ def undo_tree(root, staging, name, recorded):
 
       1  the path its T8 row wrote down (truncated to the `tree/` component, so a row
          naming a file inside the tree still resolves the tree)
-      2  `work/<run-id>/staging/<name>/tree` under the run `.current-run` names
+      2  `work/<run-id>/staging/<name>/tree` under the current run (`wf-upstream.current_run`)
       3  the same path under every other run directory, newest name last
       4  `staging/<name>/tree`, the mid-run home it was moved out of
 
@@ -1731,13 +1731,11 @@ def undo_tree(root, staging, name, recorded):
             _cand(os.path.join(root, rel, "tree"))
     if recorded is not None:
         work = os.path.join(root, ".claude", "workforce", "work")
-        cur = os.path.join(root, ".claude", "workforce", ".current-run")
-        try:
-            run = (open(cur, encoding="utf-8", errors="replace").read().strip()
-                   .splitlines() or [""])[0].strip()
-        except OSError:
-            run = ""      # unreadable is not a finding here; the enumeration below covers it
-        if run and "/" not in run and run not in (".", ".."):
+        # The current run is `wf-upstream.current_run`'s answer, never a second read of the
+        # pointer: `.current-run` alone went stale on a re-audit that converted nothing
+        # (DEF-Q-24 (c)). '' is not a finding here; the enumeration below covers it.
+        run = _load_sibling("wf-upstream").current_run(root)
+        if run:
             _cand(os.path.join(work, run, "staging", name, "tree"))
         if os.path.isdir(work):
             for run in sorted(os.listdir(work)):
