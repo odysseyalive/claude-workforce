@@ -8,7 +8,7 @@
 
 | Version | Date | Surface | Org | Change |
 |---|---|---|---|---|
-| 1.83.2 | 2026-10-30 | docs | no | (pending — message lands on the next regeneration) |
+| 1.83.2 | 2026-10-30 | changes, scripts, installer | no | Release 1.83.2: the turn budget matches what the harness measurably grants |
 | 1.83.1 | 2026-10-30 | changes, scripts, installer | no | Release 1.83.1: a resumed agent starts its new order with a fresh allowance |
 | 1.83.0 | 2026-10-30 | audit, verify, update, changes, hooks, scripts, installer, platform | no | Release 1.83.0: the installer pre-allows its own update command |
 | 1.82.2 | 2026-10-29 | changes, scripts, installer | no | Release 1.82.2: a follow-up joins the issue it names, even after that issue closed |
