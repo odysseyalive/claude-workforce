@@ -12563,5 +12563,69 @@
           "wf-asks.s1.i2.json",
           "written in a tool call of its own before any other tool call, and that write shows the list to the user"
       ]
+  },
+  "dispatch-line-org-project": {
+      "_why": "THE DEFAULT DISPATCH. The user, relayed from mutze-studio on 2026-10-29: \"I should[n't] have to run audit or invoke the org skill to make that work out of the box.\" In `29c3e592` i1 to i6 were all worked inline with 27 employees on disk. A message that opens an issue in a project whose `.claude/workforce/org-chart.md` carries workforce's marker gets one line: a job goes to the employee whose description fits, as a background plain subagent, linked to the issue. No Lead in the chart, so no Lead clause. Fails on the old code.",
+      "exit": 0,
+      "not": [
+          "Traceback",
+          "names Leads, so the job goes to the lowest node whose scope covers it"
+      ],
+      "script": "wf-task-tag",
+      "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"So we had a catastrophe. It looks like our Nvidia eGPU died mid render, so research a replacement that fits this machine\"}",
+      "want": [
+          "This project has a workforce org. A job in this message goes to the employee whose description fits",
+          "linked to issue i1",
+          "background plain subagent"
+      ]
+  },
+  "dispatch-line-org-with-leads": {
+      "_why": "THE DEFAULT DISPATCH. The user, relayed from mutze-studio on 2026-10-29: \"I should[n't] have to run audit or invoke the org skill to make that work out of the box.\" In `29c3e592` i1 to i6 were all worked inline with 27 employees on disk. The chart names a Lead (`(T2)`), so the line adds the chain-of-command rule in rung 3's terms: the one IC whose scope covers the job, or that department's Lead.",
+      "exit": 0,
+      "not": [
+          "Traceback"
+      ],
+      "script": "wf-task-tag",
+      "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"So we had a catastrophe. It looks like our Nvidia eGPU died mid render, so research a replacement that fits this machine\"}",
+      "want": [
+          "This project has a workforce org. A job in this message goes to the employee whose description fits",
+          "names Leads, so the job goes to the lowest node whose scope covers it"
+      ]
+  },
+  "dispatch-line-third-party-agents-only": {
+      "_why": "AGENT FILES ARE NOT AN ORG. `.claude/agents/` holds a plugin's agent and there is no workforce chart, so the message gets no dispatch line.",
+      "exit": 0,
+      "not": [
+          "Traceback",
+          "This project has a workforce org. A job in this message goes to the employee whose description fits"
+      ],
+      "script": "wf-task-tag",
+      "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"So we had a catastrophe. It looks like our Nvidia eGPU died mid render, so research a replacement that fits this machine\"}",
+      "want": [
+          "issue i1"
+      ]
+  },
+  "dispatch-line-no-org": {
+      "_why": "NO ORG, NO LINE: a project with neither a chart nor agents.",
+      "exit": 0,
+      "not": [
+          "Traceback",
+          "This project has a workforce org. A job in this message goes to the employee whose description fits"
+      ],
+      "script": "wf-task-tag",
+      "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"So we had a catastrophe. It looks like our Nvidia eGPU died mid render, so research a replacement that fits this machine\"}",
+      "want": [
+          "issue i1"
+      ]
+  },
+  "dispatch-line-short-message": {
+      "_why": "A MESSAGE THAT OPENS NO ISSUE GETS NO LINE, org or not: \"commit it\" is under the word gate.",
+      "exit": 0,
+      "not": [
+          "Traceback",
+          "This project has a workforce org. A job in this message goes to the employee whose description fits"
+      ],
+      "script": "wf-task-tag",
+      "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"commit it\"}"
   }
 }
