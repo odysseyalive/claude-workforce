@@ -13353,5 +13353,286 @@
         ]
       }
     }
+  },
+  "turn-budget-handback-call-gets-no-notice": {
+    "_why": "A HAND-BACK IS THE LAST CALL OF A RUN, SO A NOTICE ON IT IS READ BY THE NEXT ONE. MEASURED 2026-10-30, odyssey-alive session `be539307`, design-evaluator `a4cc76dc67d9761e0`, cap 40: its 38th call was `SubagentHandback` with a FAIL report, and this hook's `PostToolUse` for that call was the one that crossed the final threshold (count 37, one row behind). \"RETURN NOW ... Three turns left\" landed after the report had gone, the parent resumed the agent with a NEW order, and the agent obeyed the stale notice: it wrote HANDOFF.md on its first call and handed back without starting the work. This tree is that call at cap 10: seven turns in the transcript (the final threshold), and the call being reported is the hand-back. Nothing is said, no `fired-final` is claimed, and the agent is NOT marked `handoff` -- it just delivered.",
+    "script": "wf-turn-budget",
+    "env": {
+      "TMPDIR": "${TREE}/tmp"
+    },
+    "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"transcript_path\": \"s1.jsonl\", \"tool_name\": \"SubagentHandback\", \"tool_input\": {}, \"agent_id\": \"a1\", \"agent_type\": \"eng-coder\"}",
+    "exit": 0,
+    "not": [
+      "Traceback",
+      "additionalContext",
+      "RETURN NOW"
+    ],
+    "after": {
+      ".claude/workforce/issues/s1.json": {
+        "want": [
+          "\"state\": \"running\""
+        ],
+        "not": [
+          "handoff"
+        ]
+      },
+      "tmp/wf-turn-budget/s1/a1/fired-final": {
+        "absent": true
+      },
+      "tmp/wf-turn-budget/s1/a1/handed-back": {
+        "want": []
+      },
+      "tmp/wf-turn-budget/s1/a1/count.json": {
+        "want": [
+          "\"turns\": 7"
+        ]
+      }
+    }
+  },
+  "turn-budget-resume-after-handback-is-a-fresh-allowance": {
+    "_why": "THE OTHER HALF OF THE SAME FIX, and without it the first half only moves the stale notice one call later. With no notice claimed on the hand-back, nothing licensed the next prompt row as a new allowance (`count_turns` read a prompt as a round boundary only after a delivered notice), so the resumed agent's first call counted turn 8 of round 0 and drew a fresh RETURN NOW on a new order. The harness gives a resumed agent a fresh allowance: the measured design-evaluator ran 52 turns and business-analyst `aab6052464b402b32` ran 60, each against a cap of 40. So a `SubagentHandback` row closes the round exactly as a delivered notice does, and the prompt after it opens round 1 at turn 7. No marker exists in this tree, which is the state the first half leaves.",
+    "script": "wf-turn-budget",
+    "env": {
+      "TMPDIR": "${TREE}/tmp"
+    },
+    "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"transcript_path\": \"s1.jsonl\", \"tool_name\": \"Bash\", \"tool_input\": {}, \"agent_id\": \"a1\", \"agent_type\": \"eng-coder\"}",
+    "exit": 0,
+    "not": [
+      "Traceback",
+      "additionalContext",
+      "RETURN NOW",
+      "8 of 10"
+    ],
+    "after": {
+      "tmp/wf-turn-budget/s1/a1/count.json": {
+        "want": [
+          "\"turns\": 8",
+          "\"round\": 1",
+          "\"round_start\": 7"
+        ]
+      },
+      ".claude/workforce/issues/s1.json": {
+        "not": [
+          "handoff"
+        ]
+      }
+    }
+  },
+  "turn-budget-mid-run-message-is-not-a-fresh-allowance": {
+    "_why": "THE BOUND ON THE FRESH ALLOWANCE. A parent message that reaches a WORKING agent is not a resume, and an agent the harness genuinely cut still needs a deliberate resume to get new turns -- the hand-back row is what licenses the next prompt, never any prompt. Here a coordinator's correction arrives after turn 4 with no hand-back and no notice before it, and the agent keeps working to turn 7 of a cap of 10: the final notice fires on schedule and the round does not move.",
+    "script": "wf-turn-budget",
+    "env": {
+      "TMPDIR": "${TREE}/tmp"
+    },
+    "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"transcript_path\": \"s1.jsonl\", \"tool_name\": \"Bash\", \"tool_input\": {}, \"agent_id\": \"a1\", \"agent_type\": \"eng-coder\"}",
+    "exit": 0,
+    "want": [
+      "\"additionalContext\"",
+      "7 of 10",
+      "RETURN NOW"
+    ],
+    "not": [
+      "Traceback"
+    ],
+    "after": {
+      "tmp/wf-turn-budget/s1/a1/count.json": {
+        "want": [
+          "\"round\": 0",
+          "\"round_start\": 0"
+        ]
+      }
+    }
+  },
+  "spawn-guard-agent-that-handed-back-pass-is-not-held": {
+    "_why": "THE ROLE WAS HELD AGAINST AN AGENT THAT HAD FINISHED. MEASURED 2026-10-30, odyssey-alive session `be539307`: business-analyst `aab6052464b402b32` (cap 40) took the final notice on turn 37, which marked it `handoff`, then wrote its report and handed back `PASS` on turn 39. Its order spelled the report `.../business-analyst/OUTPUT.md`, which `order_output` cannot resolve, so the stop could not see the delivery; it re-stamped the mark (ledger `handoff_at` 16:49:15Z, the stop's own second), and at 16:55:36Z the spawn guard refused a fresh business-analyst for the next order. This is that sequence at cap 10: a `handoff` mark from the notice, a counter at turn 9 (past the final threshold of 7), an order whose report path is elided, and a transcript ending on a `SubagentHandback` whose verdict is PASS. The `before` step is the SubagentStop; the row is the spawn that was refused. A harness cut ends on a tool call and never on a hand-back, so the verdict decides: the agent came back, the mark is retired, and the spawn is allowed.",
+    "script": "wf-turn-budget",
+    "env": {
+      "WF_BLIND_SAMPLE": "0"
+    },
+    "subst": [
+      ".claude/workforce/issues/s1.json"
+    ],
+    "before": [
+      {
+        "script": "wf-widen",
+        "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"agent_transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"hook_event_name\": \"SubagentStop\", \"session_id\": \"s1\", \"agent_id\": \"a1\", \"agent_type\": \"eng-coder\"}",
+        "not": [
+          "Traceback"
+        ]
+      }
+    ],
+    "stdin_raw": "{\"hook_event_name\": \"PreToolUse\", \"session_id\": \"s1\", \"transcript_path\": \"s1.jsonl\", \"tool_name\": \"Agent\", \"tool_input\": {\"subagent_type\": \"eng-coder\", \"description\": \"seed round 2\", \"prompt\": \"Run id r2.\"}}",
+    "exit": 0,
+    "after": {
+      ".claude/workforce/issues/s1.json": {
+        "want": [
+          "\"agent_id\": \"a1\", \"agent_type\": \"eng-coder\", \"state\": \"returned\""
+        ],
+        "not": [
+          "\"state\": \"handoff\""
+        ]
+      }
+    },
+    "not": [
+      "Traceback",
+      "deny",
+      "hit its turn cap"
+    ]
+  },
+  "spawn-guard-agent-that-handed-back-handoff-is-held": {
+    "_why": "THE OTHER DIRECTION OF THE SAME RULE. An agent that obeyed the notice hands back `HANDOFF <path>` and asks to be resumed (K8, `org.md` rung 12b), so its mark survives its own stop and a fresh spawn of its role is refused with the resume line. Same tree as `spawn-guard-agent-that-handed-back-pass-is-not-held`, with only the verdict changed.",
+    "script": "wf-turn-budget",
+    "env": {
+      "WF_BLIND_SAMPLE": "0"
+    },
+    "subst": [
+      ".claude/workforce/issues/s1.json"
+    ],
+    "before": [
+      {
+        "script": "wf-widen",
+        "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"agent_transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"hook_event_name\": \"SubagentStop\", \"session_id\": \"s1\", \"agent_id\": \"a1\", \"agent_type\": \"eng-coder\"}",
+        "not": [
+          "Traceback"
+        ]
+      }
+    ],
+    "stdin_raw": "{\"hook_event_name\": \"PreToolUse\", \"session_id\": \"s1\", \"transcript_path\": \"s1.jsonl\", \"tool_name\": \"Agent\", \"tool_input\": {\"subagent_type\": \"eng-coder\", \"description\": \"seed round 2\", \"prompt\": \"Run id r2.\"}}",
+    "exit": 0,
+    "after": {
+      ".claude/workforce/issues/s1.json": {
+        "want": [
+          "\"agent_id\": \"a1\", \"agent_type\": \"eng-coder\", \"state\": \"handoff\""
+        ],
+        "not": [
+          "\"state\": \"returned\""
+        ]
+      }
+    },
+    "want": [
+      "\"permissionDecision\": \"deny\"",
+      "RESUME a1 with SendMessage"
+    ],
+    "not": [
+      "Traceback"
+    ]
+  },
+  "widen-subagent-handback-with-report-in-worktree-perf-says-so": {
+    "_why": "THE RECORD SAID WHAT A CAP USUALLY MEANS, NOT WHAT HAPPENED. MEASURED 2026-10-30, odyssey-alive `aaa255aa923b9fd7f` (engineering-site, cap 40, spawned into a worktree): the agent wrote its report at the order's path inside its worktree, was refused the copy into the main checkout, and handed back `PASS` naming the worktree copy. The PERF filed on its stop said \"stopped at turn 40 of 40 ... the work it did is not recoverable from the file\". Both halves were readable at the stop: the transcript ends on a hand-back, and every row's `cwd` names the worktree, where the report sits at the same relative path. This tree is that stop: counter at 10 of 10, nothing at the named path, a complete report at the same path under `wt/`, rows carrying `cwd` `wt`. A record is still filed (ENVIRONMENT; the report is not where the order's reader looks), and it now says the agent handed back on its own and where the report is.",
+    "script": "wf-widen",
+    "env": {
+      "WF_BLIND_SAMPLE": "0"
+    },
+    "subst": [
+      "t.jsonl"
+    ],
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"agent_transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"hook_event_name\": \"SubagentStop\", \"session_id\": \"s1\", \"agent_id\": \"a1\", \"agent_type\": \"eng-coder\"}",
+    "exit": 0,
+    "want": [
+      "handed back on its own at turn 10 of 10 (round 1)",
+      "A complete one is at wt/.claude/workforce/work/perf-run/eng-coder/OUTPUT.md",
+      "PERF filed at .claude/workforce/personnel/PERF-perf-run-eng-coder-turn-cap.md"
+    ],
+    "not": [
+      "Traceback",
+      "turn cap — eng-coder stopped",
+      "\"decision\": \"block\""
+    ],
+    "after": {
+      ".claude/workforce/personnel/PERF-perf-run-eng-coder-turn-cap.md": {
+        "want": [
+          "**Attribution:** **ENVIRONMENT**",
+          "was not cut at its cap",
+          "`wt/.claude/workforce/work/perf-run/eng-coder/OUTPUT.md`",
+          "ran in a working tree of its own"
+        ],
+        "not": [
+          "not recoverable from the file",
+          "turn 10 of its cap of 10"
+        ]
+      }
+    }
+  },
+  "turn-budget-handback-row-read-on-its-own-call-still-opens-a-round": {
+    "_why": "THE SAME RESUME WHEN THE HAND-BACK ROW IS ALREADY IN THE FILE AT THE HAND-BACK CALL. The host batches appends on a 100 ms timer, so the row can land either side of that call's read. When it lands before, that read consumes it, finds no prompt after it, and stores nothing that says the run ended -- so the next call starts past the row with no notice marker to license the prompt, and the resume runs on in round 0. This tree is the state that read leaves: the counter seeded at turn 7 with `off` past the hand-back row, and the `handed-back` claim the hand-back call now makes. Without the claim, or without `final_pending` reading it, the prompt is skipped and call 8 draws RETURN NOW.",
+    "script": "wf-turn-budget",
+    "env": {
+      "TMPDIR": "${TREE}/tmp"
+    },
+    "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"transcript_path\": \"s1.jsonl\", \"tool_name\": \"Bash\", \"tool_input\": {}, \"agent_id\": \"a1\", \"agent_type\": \"eng-coder\"}",
+    "exit": 0,
+    "not": [
+      "Traceback",
+      "additionalContext",
+      "RETURN NOW",
+      "8 of 10"
+    ],
+    "after": {
+      "tmp/wf-turn-budget/s1/a1/count.json": {
+        "want": [
+          "\"turns\": 8",
+          "\"round\": 1",
+          "\"round_start\": 7"
+        ]
+      },
+      ".claude/workforce/issues/s1.json": {
+        "not": [
+          "handoff"
+        ]
+      },
+      "tmp/wf-turn-budget/s1/a1/handed-back": {
+        "want": []
+      }
+    }
+  },
+  "turn-budget-skill-load-after-a-notice-is-not-a-resume": {
+    "_why": "A SKILL'S BODY IS NOT A PARENT'S MESSAGE. When an agent calls the `Skill` tool, the host writes the skill's text into the agent's transcript as a USER row with text and no `tool_result` -- the shape `count_turns` reads as a resume prompt once a notice has gone out. MEASURED 2026-10-30, odyssey-alive `a4cc76dc67d9761e0` row 41 (`Base directory for this skill: .../personnel-ledger`): the row carries `sourceToolUseID` (the Skill call that produced it) and `turnCompanion: true`, and over every subagent transcript on this machine all 457 skill-load rows carry `sourceToolUseID` while no parent message does. Here the final notice went out at turn 7 (both markers claimed), the agent loads a skill on turn 8 and works on to turn 9. That is one allowance: the counter must stay in round 0, and no resume may be recorded. On HEAD the skill row opened round 1 at turn 8, so the agent's real cap arrived with the hook believing it had a fresh allowance, and `mark_running` flipped a cut agent back to `running` mid-run.",
+    "script": "wf-turn-budget",
+    "env": {
+      "TMPDIR": "${TREE}/tmp"
+    },
+    "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"transcript_path\": \"s1.jsonl\", \"tool_name\": \"Bash\", \"tool_input\": {}, \"agent_id\": \"a1\", \"agent_type\": \"eng-coder\"}",
+    "exit": 0,
+    "not": [
+      "Traceback",
+      "additionalContext"
+    ],
+    "after": {
+      "tmp/wf-turn-budget/s1/a1/count.json": {
+        "want": [
+          "\"turns\": 9",
+          "\"round\": 0",
+          "\"round_start\": 0"
+        ]
+      },
+      "tmp/wf-turn-budget/s1/a1/resumed-after-fired-final": {
+        "absent": true
+      }
+    }
+  },
+  "turn-budget-image-companion-after-a-notice-is-not-a-resume": {
+    "_why": "THE SAME CLASS WITHOUT THE TOOL ID. An image the agent reads arrives as a separate user text row, `[Image: original WxH, ...]`, marked `turnCompanion: true` and carrying no `sourceToolUseID` (142 such rows mid-run across this machine's subagent transcripts). It belongs to the turn in progress like the skill body does, so after a notice it must not open an allowance either.",
+    "script": "wf-turn-budget",
+    "env": {
+      "TMPDIR": "${TREE}/tmp"
+    },
+    "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"transcript_path\": \"s1.jsonl\", \"tool_name\": \"Bash\", \"tool_input\": {}, \"agent_id\": \"a1\", \"agent_type\": \"eng-coder\"}",
+    "exit": 0,
+    "not": [
+      "Traceback",
+      "additionalContext"
+    ],
+    "after": {
+      "tmp/wf-turn-budget/s1/a1/count.json": {
+        "want": [
+          "\"turns\": 9",
+          "\"round\": 0",
+          "\"round_start\": 0"
+        ]
+      },
+      "tmp/wf-turn-budget/s1/a1/resumed-after-fired-final": {
+        "absent": true
+      }
+    }
   }
 }

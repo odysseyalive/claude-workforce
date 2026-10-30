@@ -1741,11 +1741,51 @@ def cap_perf(payload, path, ask, capped):
     root = os.environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd") or ""
     store = perf_store(root)
     owed = in_project(payload, path)
+    # THE RECORD SAYS WHAT THE STOP CAN READ, NOT WHAT A CAP USUALLY MEANS. MEASURED
+    # 2026-10-30, odyssey-alive `aaa255aa923b9fd7f`: the record said "stopped at turn 40 of
+    # 40 … the work it did is not recoverable", about an agent that handed back `PASS` on
+    # its own and whose report sat at the same path in its worktree. Two facts tell those
+    # apart, and both are read here: whether the run ended on a hand-back (`came_back`), and
+    # whether the report exists in the agent's own working tree (`report_elsewhere`).
+    returned = came_back(payload)
+    twin = report_elsewhere(payload, path, stop_report(payload)[1])
+    there = in_project(payload, twin) if twin else ""
+    if returned:
+        head = (f"WIDEN  no report — {agent} handed back on its own at turn {turns} of "
+                f"{cap} (round {rounds}), after its final budget notice, with no report at "
+                f"{owed}. ")
+        produced = (f"Nothing at that path. The agent was not cut at its cap: it handed back "
+                    f"on its own at turn {turns} of {cap}, on turn allowance {rounds}, after "
+                    f"its final budget notice.")
+    else:
+        head = (f"WIDEN  turn cap — {agent} stopped at turn {turns} of {cap} (round "
+                f"{rounds}) with no report at {owed}. ")
+        produced = (f"Nothing at that path. The agent stopped at turn {turns} of its cap of "
+                    f"{cap}, on turn allowance {rounds}"
+                    + ("." if twin else ", so the run ended without the artifact and the "
+                       "work it did is not recoverable from the file."))
+    if twin:
+        head += f"A complete one is at {there}, in the agent's own working tree. "
+        produced += (f" A complete report is at `{there}`: the same path inside the "
+                     f"agent's own working tree, which is not the checkout the order named.")
+        why = ("The order named the report by a path in this checkout, and the agent ran in a "
+               "working tree of its own. Writing to the named path wrote inside that tree, so "
+               "following the instruction put the report where the order's reader does not "
+               "look.")
+    elif returned:
+        why = ("The reporting contract names the artifact, and the final budget notice asks "
+               "for it before anything else, but nothing in the text stops a run from "
+               "handing back without it — which is what happened here.")
+    else:
+        why = ("The reporting contract names the artifact and asks for it incrementally, but "
+               "nothing in\nthe text makes the first write happen before the work does, and "
+               "nothing in it bounds the\nwork to the turns the cap allows. A run can "
+               "therefore follow every instruction it was\ngiven and still be cut before the "
+               "report exists — which is what happened here.")
     # THE LINE SAYS WHICH OF THE TWO HAPPENED. A stop that reports a record it could not
     # write is worse than one that reports nothing: the next reader goes looking for a
     # file that is not there and concludes the cap hit was never seen.
-    note = (f"WIDEN  turn cap — {agent} stopped at turn {turns} of {cap} (round {rounds}) "
-            f"with no report at {owed}. "
+    note = (head
             + (f"PERF filed at {os.path.join(PERF_STORE, name)}" if store
                else f"no PERF written to {PERF_STORE} — a link is on the way to it"))
     if not store:
@@ -1787,18 +1827,13 @@ A report at `{owed}`, carrying the `REQUEST (verbatim):` block, a criterion → 
 table with every exit criterion marked MET or UNMET, and an `## Exceptions` list.
 
 ## What Was Produced
-Nothing at that path. The agent stopped at turn {turns} of its cap of {cap}, on turn
-allowance {rounds}, so the run ended without the artifact and the work it did is not
-recoverable from the file.
+{produced}
 
 ## The Instruction That Produced It
 {quoted}
 
 ## Why That Instruction Permitted This Outcome
-The reporting contract names the artifact and asks for it incrementally, but nothing in
-the text makes the first write happen before the work does, and nothing in it bounds the
-work to the turns the cap allows. A run can therefore follow every instruction it was
-given and still be cut before the report exists — which is what happened here.
+{why}
 
 ## Attribution Determination
 - [ ] The text permits the observed outcome                        → DOCUMENT
@@ -1871,6 +1906,92 @@ def report_delivered(payload):
         return True
     body = read_report(path)
     return body is not None and not OUTPUT_UNMET_RX.search(body)
+
+
+# THE VERDICT AN EMPLOYEE RETURNS WHEN IT WANTS TO BE RESUMED, which `wf-turn-budget`'s notices
+# ask for by name: "Return `HANDOFF <path to your OUTPUT.md>`". Any other first word is a
+# finished run's verdict. Case-blind, because the error it can make is to keep a mark one stop
+# too long, which is the recoverable direction (`agent_returned`).
+HANDOFF_VERDICT_RX = re.compile(r"\W*HANDOFF\b", re.I)
+_STOP_TAIL = []
+
+
+def stop_tail(payload):
+    """`(hand-back message or None, the agent's working directory or "")` for this stop.
+
+    BOTH COME OFF THE STOPPING AGENT'S OWN TRANSCRIPT, read once. The message is the
+    `message` of a `SubagentHandback` call in the LAST assistant row, and None when that row
+    carries none: a run the harness cut ends on an ordinary tool call. The directory is the
+    newest row's `cwd`, which the host writes on every row; for an agent spawned into a
+    worktree it is the worktree (MEASURED 2026-10-30, `aaa255aa923b9fd7f`: every row carries
+    `.claude/worktrees/agent-aaa255aa923b9fd7f`), where `CLAUDE_PROJECT_DIR` names the main
+    checkout.
+    """
+    if not _STOP_TAIL:
+        lines = TL._read_lines(TL.reply_transcript(payload)) or []
+        msg = None
+        for b in TL.last_assistant_blocks(lines):
+            inp = b.get("input") if b.get("type") == "tool_use" and \
+                b.get("name") == _turn_budget().HANDBACK_TOOL else None
+            if isinstance(inp, dict) and isinstance(inp.get("message"), str):
+                msg = inp["message"]
+        cwd = ""
+        for line in reversed(lines):
+            if '"cwd"' not in line:
+                continue
+            try:
+                row = json.loads(line)
+            except ValueError:
+                continue
+            got = row.get("cwd") if isinstance(row, dict) else None
+            if isinstance(got, str) and got:
+                cwd = got
+                break
+        _STOP_TAIL.append((msg, cwd))
+    return _STOP_TAIL[0]
+
+
+def came_back(payload):
+    """True when this stop is a hand-back whose verdict is not `HANDOFF` — a finished run.
+
+    A CUT CAN NEVER LOOK LIKE THIS: the harness ends a capped run on a tool call and the
+    run returns nothing (`wf-turn-budget`'s header, the measured defect). So an agent whose
+    last call handed back a verdict came back on its own, whatever its counter says.
+    """
+    msg = stop_tail(payload)[0]
+    return bool(msg and msg.strip()) and not HANDOFF_VERDICT_RX.match(msg)
+
+
+def report_elsewhere(payload, path, marks):
+    """The order's report at the same project path inside the agent's OWN working tree, when
+    that tree is not the project and the report there is complete. Else None.
+
+    MEASURED 2026-10-30, odyssey-alive `aaa255aa923b9fd7f`: an engineering-site agent ran in
+    a worktree, wrote its report at the order's path inside it, and was refused the copy into
+    the main checkout. The stop found nothing at the named path and recorded "stopped at turn
+    40 of 40", while the report sat one directory over and the agent had named it.
+
+    ONLY THE SAME RELATIVE PATH, never a path read out of the agent's reply: the order
+    decided the name, `order_output` already contained it in the project, and the twin is
+    contained in the agent's directory the same way, `realpath` on both sides.
+    """
+    where = stop_tail(payload)[1]
+    root = os.environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd")
+    if not where or not os.path.isabs(where) or not isinstance(root, str) or not root:
+        return None
+    root, where = os.path.realpath(root), os.path.realpath(where)
+    try:
+        rel = os.path.relpath(path, root)
+    except ValueError:                       # different drives on Windows
+        return None
+    if where == root or rel.startswith(os.pardir):
+        return None
+    twin = os.path.realpath(os.path.join(where, rel))
+    # THE PATH IS QUOTED into a record and the stop line, so a name that could break out of
+    # a code span or a line is not one this says out loud.
+    if not twin.startswith(where + os.sep) or any(c in twin for c in "`\r\n"):
+        return None
+    return twin if order_report(twin, marks) == "ok" else None
 
 
 def order_expectation(payload):
@@ -2953,10 +3074,22 @@ def ledger_verdict(payload, decided):
         # finished. `None` is NOT that answer: a counter nobody could read says nothing
         # about whether the agent was cut, and an unknown keeps the mark, which is the
         # recoverable direction (`agent_returned`).
+        #
+        # AND A HAND-BACK PAST THE THRESHOLD IS NOT A CUT. `cap_stop` reads the counter, and
+        # an agent that took its final notice and then FINISHED stops past `final_at` too.
+        # MEASURED 2026-10-30, odyssey-alive session `be539307`: business-analyst
+        # `aab6052464b402b32` took the notice on turn 37, wrote its report and handed back
+        # `PASS` on turn 39. Its order spelled the report `.../business-analyst/OUTPUT.md`,
+        # which `order_output` cannot resolve, so `delivered` was False, this stop re-marked
+        # it `handoff` (stamped 16:49:15Z), and six minutes later the spawn guard refused a
+        # fresh business-analyst for an agent that had finished. A harness cut ends on a tool
+        # call and never on a hand-back, so the hand-back's own verdict decides
+        # (`came_back`); one that says `HANDOFF` is asking to be resumed and keeps the mark.
         stopped = cap_stop(payload)
-        if not delivered and stopped:
+        cut = stopped != () and not came_back(payload)
+        if not delivered and stopped and cut:
             TT.agent_handoff(payload, led)
-        if TT.agent_returned(payload, led, judgment, delivered, cut=stopped != ()):
+        if TT.agent_returned(payload, led, judgment, delivered, cut=cut):
             TT.save_ledger(payload, led)
         return "", ""
     # THE CARRIED STATUSES LAND BEFORE THE JUDGMENT. This turn's checklist carries the still-

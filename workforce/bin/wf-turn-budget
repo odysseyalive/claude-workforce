@@ -193,7 +193,7 @@ def final_pending(home, state, cap):
         return False
     k = turn_round(state, cap)[1] - 1
     return any(os.path.exists(os.path.join(home, keyed(m, k)))
-               for m in ("fired-final", "fired-warn"))
+               for m in ("fired-final", "fired-warn", HANDBACK_MARK))
 
 
 # ── the continuation brief's shape ───────────────────────────────────────────
@@ -290,6 +290,26 @@ FINAL_MARK = FINAL_TEXT.split("{turns}")[0]
 # exists for.
 BUDGET_MARK = (os.path.commonprefix([WARN_MARK, FINAL_MARK])
                or FINAL_MARK).encode("ascii", "ignore").rstrip()
+
+# ── the call that ends a run ─────────────────────────────────────────────────
+# A HAND-BACK IS THE LAST CALL OF A RUN, SO A NOTICE ON IT IS READ BY THE NEXT ONE. MEASURED
+# 2026-10-30, odyssey-alive session `be539307`, design-evaluator `a4cc76dc67d9761e0`, cap 40:
+# run 1 handed back a FAIL report with `SubagentHandback` on its 38th call, and this hook's
+# `PostToolUse` for THAT call was the one that crossed `final_at` (count 37, one row behind).
+# The final notice landed after the report had already gone. The parent then resumed the
+# agent with a NEW order, and the newest budget text in its context was "RETURN NOW … Three
+# turns left", from a run that was over. It obeyed: wrote HANDOFF.md on its first call and
+# handed back without starting the work. The counter itself had the right answer (round 1
+# opened at 38); the agent was reading a notice from the previous run.
+#
+# SO THIS CALL GETS NO NOTICE AND NO MARK, and the row that carries it is a round boundary
+# just like a delivered notice: the harness gives a resumed agent a fresh allowance (that
+# agent ran 52 turns against a cap of 40, and `aab6052464b402b32` ran 60), so the next prompt
+# row after a hand-back starts one. A message that arrives mid-run, with no hand-back before
+# it, still opens nothing; a run the harness CUT has no hand-back row, and its resume is
+# licensed by the notice as before.
+HANDBACK_TOOL = "SubagentHandback"
+HANDBACK_MARK = "handed-back"
 
 
 # ── a job started in the last fifth of the budget ─────────────────────────────
@@ -507,8 +527,9 @@ def count_turns(path, offset, needles=(), pending=False):
     `thinking` is not a turn, and a row holding three `tool_use` blocks is one turn, which
     is the whole reason this counts rows instead of calls.
 
-    A ROUND BOUNDARY IS A PROMPT ROW THAT FOLLOWS A DELIVERED NOTICE, and both halves of
-    that are load-bearing. A `SendMessage` resume appends a user row carrying TEXT, where
+    A ROUND BOUNDARY IS A PROMPT ROW THAT FOLLOWS A DELIVERED NOTICE OR A HAND-BACK, and
+    both halves of that are load-bearing. (The hand-back half: `HANDBACK_TOOL`.) A
+    `SendMessage` resume appends a user row carrying TEXT, where
     every ordinary user row in a subagent's transcript carries a `tool_result`; that row is
     where the harness's new turn allowance begins, and it is the only thing on this host
     that marks the end of the previous one. `pending` is the second half: a prompt row is
@@ -576,6 +597,8 @@ def count_turns(path, offset, needles=(), pending=False):
             if calls:
                 turns += 1
                 writes += sum(1 for b in calls if b.get("name") in WRITE_TOOLS)
+                if any(b.get("name") == HANDBACK_TOOL for b in calls):
+                    pending = True            # the run ended here (`HANDBACK_TOOL`)
             continue
         if BUDGET_MARK in raw:
             # THIS HOOK'S OWN INJECTION, arriving back as an attachment. Not a turn, not a
@@ -595,7 +618,15 @@ def count_turns(path, offset, needles=(), pending=False):
             row = json.loads(raw.decode("utf-8", "replace"))
         except ValueError:
             continue
-        if row.get("type") != "user":
+        # A ROW THE HOST ATTACHED TO THE TURN IN PROGRESS IS NOT A PROMPT. Calling `Skill`
+        # writes the skill's body as a user text row (MEASURED 2026-10-30, odyssey-alive
+        # `a4cc76dc67d9761e0` row 41), and reading an image writes `[Image: original …]` the
+        # same way. The host marks both: `sourceToolUseID` names the call that produced the
+        # row (all 457 skill loads on this machine carry it, no parent message does), and
+        # `turnCompanion` says it belongs to the current turn (the 142 mid-run image rows).
+        # Read as prompts, either one opened a round mid-run after a notice.
+        if (row.get("type") != "user" or row.get("sourceToolUseID")
+                or row.get("turnCompanion")):
             continue
         content = (row.get("message") or {}).get("content")
         if isinstance(content, str):
@@ -1183,7 +1214,16 @@ def main():
     # its final notice at the anchor plus 7 whatever the anchor is — turn 15 for a round
     # that ended at 8, and turn 157 for one that ended on the nose at 80.
     cut_now = False
-    if in_round >= final_at(cap):
+    if payload.get("tool_name") == HANDBACK_TOOL:
+        # THE RUN IS OVER, so nothing is said into it and nothing is claimed: a notice here
+        # is read by the NEXT run as its own (`HANDBACK_TOOL`), and a `handoff` mark here
+        # would hold the role against an agent that just delivered. The round this call
+        # ends is closed by the hand-back row itself, in `count_turns` — and by this claim
+        # when that row is already in the file this call read, since the read that consumed
+        # it stores no `pending` for the prompt row that comes after (`final_pending`).
+        if path:
+            claim(path, keyed(HANDBACK_MARK, round_))
+    elif in_round >= final_at(cap):
         once("fired-warn", WARN_MARK, round_)      # spend the quieter one unspoken
         if once("fired-final", FINAL_MARK, round_):
             # THE MARK BEFORE THE TEXT. The injection is what the agent acts on, and the
