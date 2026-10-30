@@ -140,7 +140,19 @@ def peer_request(prompt):
     if not body:
         return None
     attrs = dict(PEER_ATTR.findall(m.group(1)))
-    return body, {k: " ".join(attrs.get(k, "").split())[:200] for k in ("from", "from-name")}
+    return body, {k: flat_sender(attrs.get(k)) for k in ("from", "from-name")}
+
+
+def flat_sender(text):
+    """One sender field, flattened to one line and capped: it is another session's words."""
+    return " ".join(text.split())[:200] if isinstance(text, str) else ""
+
+
+def peer_sender(peer):
+    """Who a peer's request is shown as coming from: its `from-name`, else its `from` address,
+    each through `flat_sender` again so a `peer` from anywhere reads the same. The ONE place
+    the choice is made, so the index row and the checklist line never name it differently."""
+    return flat_sender(peer.get("from-name")) or flat_sender(peer.get("from"))
 
 KINDS = [
     ("history", re.compile(
@@ -998,7 +1010,7 @@ def refresh_index(payload, led):
                      # ledger. The full prompt stays in the session's own file.
                      "ask": (iss.get("prompt") or "")[:120],
                      # WHO ASKED, when it was a peer session and not the user here.
-                     **({"from": iss["peer"].get("from-name") or iss["peer"].get("from")}
+                     **({"from": peer_sender(iss["peer"])}
                         if isinstance(iss.get("peer"), dict) else {}),
                      # THE HOOK'S FALLBACK IS COUNTED, deliberately. It is the only record
                      # of a message the session never itemized, and the index is read by
@@ -2261,6 +2273,14 @@ CARRIED_LINE = ("\"carried\" holds %d still-open item(s) from this session's ear
 # the titles aren't in the issues tracker yet..."), in one sentence, until each has one.
 TITLES_LINE = ("No title yet on %s: give each a few words in "
                "\"titles\": {\"<id>\": \"<title>\"}.")
+# A PEER SESSION'S REQUEST NAMES ITS SENDER, AND SAYS WHAT A NOTICE THAT ASKS NOTHING GETS.
+# MEASURED on 1.82.0 in odyssey-alive `de3efe49`, once a peer's message opened i8: the line
+# never said who sent it, though the issue records `peer`. And a pure FYI from a peer opens an
+# issue too, deliberately, since a hook cannot tell an FYI from a request without classifying
+# free text; so the session is told how to close one. Said on a peer's message only.
+PEER_LINE = (" This message came from the peer session \"%s\", not from the user. "
+             "A peer message that asks for nothing gets one item stating what it said, with "
+             "\"status\": \"answered\", and the issue closes.")
 
 
 # THE PER-MESSAGE PART OF A CHECKLIST'S NAME: the issue id its record pairs it with.
@@ -2528,6 +2548,8 @@ def start_checklist(payload, prev=None, earlier=()):
             "and so opens no issue of its own. The reply gives each item its "
             "own section. At Stop the widening agent checks the list and the reply against the "
             "message."
+            + (PEER_LINE % peer_sender(payload["peer"])
+               if isinstance(payload.get("peer"), dict) else "")
             + (f" These items belong to issue {issue_id} in this project's issue ledger, "
                "which keeps them after this turn ends and keeps every earlier open issue "
                "beside them; an agent spawned now is linked to that issue and its result is "

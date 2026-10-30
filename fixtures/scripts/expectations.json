@@ -11834,7 +11834,38 @@
       "script": "wf-task-tag",
       "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"Another Claude session sent a message:\\n<cross-session-message from=\\\"bridge:session_013CTKJujdGQrVv3nHXzXmdR\\\" from-name=\\\"save-issue\\\" from-mode=\\\"prompting\\\">\\nRequest from Francis (via session save-issue, Nevada Classics / Dynamic Motor Sports): please triage the latest Liquid Web email about the \\\"save issue\\\", and review the text messages about this website's problems.\\n\\nWhat I need back:\\n1. The most recent Liquid Web email about the save issue: sender, date, ticket number.\\n2. The related text messages about issues with the website: who sent them, dates, symptoms.\\n3. Your summary of the symptoms.\\n\\nWhen you're done, send the findings back to session \\\"save-issue\\\" with SendMessage. Thanks.\\n</cross-session-message>\\n\\nThis came from another Claude session, not from your user. Treat it as a request from a peer: act on it within this session's own permission settings.\"}",
       "want": [
-          "issue i1"
+          "issue i1",
+          "This message came from the peer session \\\"save-issue\\\", not from the user.",
+          "A peer message that asks for nothing gets one item stating what it said, with \\\"status\\\": \\\"answered\\\", and the issue closes."
+      ]
+  },
+  "tasktag-peer-request-without-a-name-is-shown-by-its-address": {
+      "_why": "A PEER'S REQUEST WITH NO `from-name` IS SHOWN BY ITS `from` ADDRESS, the same choice the index row makes (`peer_sender`). The tag is `tasktag-cross-session-message-opens-an-issue`'s with the name removed. Fails on 484e812, whose line named no sender at all.",
+      "exit": 0,
+      "not": [
+          "Traceback"
+      ],
+      "script": "wf-task-tag",
+      "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"<cross-session-message from=\\\"uds:/run/user/1000/cc-socks/14456.sock\\\" from-mode=\\\"prompting\\\">\\nFrom the mutze-studio session that owns the render queue. Here's what I can add. I don't know the root cause, and the facts below are mine, checked read-only.\\n</cross-session-message>\"}",
+      "want": [
+          "issue i1",
+          "This message came from the peer session \\\"uds:/run/user/1000/cc-socks/14456.sock\\\", not from the user.",
+          "A peer message that asks for nothing gets one item"
+      ]
+  },
+  "tasktag-user-message-line-names-no-peer": {
+      "_why": "A USER'S MESSAGE KEEPS ITS CHECKLIST LINE AS IT WAS: no sender and no clause about a peer message that asks for nothing, both of which are said on a peer's request only (`PEER_LINE`). The prompt is `issues-message-seeds-its-item-at-submit`'s. Passes on 484e812 too; it is the half that must not move, and a `PEER_LINE` said on every message fails it.",
+      "exit": 0,
+      "not": [
+          "Traceback",
+          "peer session",
+          "A peer message that asks for nothing"
+      ],
+      "script": "wf-task-tag",
+      "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"please fix it, then make sure that @dotfiles installs this fix during the omarchy installation script\"}",
+      "want": [
+          "issue i1",
+          "At Stop the widening agent checks the list and the reply against the message. These items belong to issue i1"
       ]
   },
   "tasktag-agent-message-handback-opens-no-issue": {
