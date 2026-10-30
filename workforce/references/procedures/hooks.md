@@ -376,8 +376,10 @@ nothing to restore from if the sweep took it.
 wf-settings-apply --root <tree> [--scope user] --unwire-defaults --execute
 ```
 
-It reverses **exactly** what `--wire-defaults` wrote — including registrations and an output style
-written by a release BEFORE the simplification. Nothing selects a style any more, and this is
+It reverses **exactly** what `--wire-defaults` wrote — including registrations, the update-command
+allow rule when the scope's record names it (`update.md` § What the installer does besides fetching;
+an audit grant in the same record is left), and an output style written by a release BEFORE the
+simplification. Nothing selects a style any more, and this is
 deliberately still able to un-select one: six settings files on the author's own workstation carried
 `outputStyle: "Plain Speak"` when it was removed, and a reversal deleted alongside the setter would
 have stranded every one of them (`wf-settings-apply` § no output style is selected any more). A registration goes only when its event, matcher

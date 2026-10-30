@@ -2243,6 +2243,11 @@ lists would guarantee within one release. **It selects no output style.** This s
 by the installer — so the step named a write the producer had stopped performing. `--unwire-defaults`
 still CLEARS a style selected by an older release, which is the half that had to survive.
 
+**The same call allows the update command** for a project that holds its own install: one exact
+`Bash(...)` rule for update.md step 4's `--project` cell in `.claude/settings.local.json`, recorded
+and reversible like the rest (`update.md` § What the installer does besides fetching). A project
+with no `.claude/skills/workforce` gets none.
+
 **The same call removes what a retired release left behind, first.** Before it wires anything it runs
 `heal` over the project's settings files: a workforce row whose script the distribution retired, whose
 file is missing and whose install is present and whole, is removed and recorded in

@@ -6,6 +6,7 @@
     wf-settings-apply --root <tree> --execute --wire-hook <name>
     wf-settings-apply --root <tree> --execute --heal   (remove rows whose script was retired)
     wf-settings-apply           --execute --automode   (writes ~/.claude/settings.json, user scope)
+    wf-settings-apply --root <tree> [--scope user] [--execute] --installer-rule
 
 WHY THIS EXISTS. Every settings-file mutation a workforce audit needs — the Step 0.8
 permission ADDITION, the hook-wiring the CLAUDE.md evacuation depends on — can be
@@ -36,6 +37,10 @@ audit-setup.md` § 856 said this producer "could be built"; it is built.
                         (`heal_git_hooks`): the retired pin guard wired `core.hooksPath`
                         at a directory in the repository rather than a settings row, and
                         nothing removed it from a project that already had it.
+    --installer-rule    allow the ONE exact update command for the scope (INSTALLER_RULES),
+                        so `/workforce update` runs the installer without a prompt.
+                        `--wire-defaults` performs the same write; without `--execute`
+                        this is the report `verify` reads.
     --automode          write autoMode.environment/allow into ~/.claude/settings.json
                         so the classifier stops refusing routine workforce maintenance.
                         User scope is deliberate: the classifier reads autoMode ONLY
@@ -398,6 +403,28 @@ AUTOMODE_ALLOW = (
     "project's own .claude/ tree and recorded in .claude/workforce/.settings-owned.json."
 )
 
+# THE UPDATE COMMAND, PRE-ALLOWED, ONE EXACT RULE PER SCOPE. `/workforce update` runs one
+# of these two commands (update.md step 4, the Linux / macOS column), and in default
+# permission mode the Bash tool denies it: "Quoted text in this command can't be checked
+# before it runs". So the session handed the command back to the user to paste, on every
+# update. These rules allow exactly that command and nothing wider: never `Bash(bash -c:*)`
+# or `Bash(curl:*)`, because a prefix rule was not measured and would allow any script
+# from anywhere (platform.md fact 29). Each string is the update.md cell byte for byte; an
+# exact rule stops matching at the first differing byte, so a `cd <root> &&` prefix or a
+# changed URL makes it inert. `bin/script-conformance` substitutes the cells out of
+# update.md into the `installer-rule-*` fixtures, so the two cannot drift apart unseen.
+#
+# EACH SCOPE GETS ITS OWN COMMAND, NOT BOTH. update.md step 2 never runs a cell for a scope
+# the census found empty, so the cell that runs is always one whose installer ran, and that
+# installer wrote that cell's rule. Granting `-- --project` at user scope would let any
+# session vendor a copy into any directory unprompted, which nobody asked for.
+INSTALLER_RULES = {
+    "user": 'Bash(bash -c "$(curl -fsSL https://raw.githubusercontent.com/odysseyalive/'
+            'claude-workforce/main/install)" -- --user)',
+    "project": 'Bash(bash -c "$(curl -fsSL https://raw.githubusercontent.com/odysseyalive/'
+               'claude-workforce/main/install)" -- --project)',
+}
+
 
 def read(path):
     try:
@@ -432,8 +459,11 @@ def has_workforce_keys(data):
         return False
     perms = data.get("permissions")
     allow = perms.get("allow") if isinstance(perms, dict) else []
+    # The update-command rule is not a marker: written into settings.local.json on its own,
+    # it would flip this resolver away from a committed settings.json that holds the org.
     if isinstance(allow, list) and any(
-        isinstance(e, str) and (e == "Agent" or e.startswith("Bash(")) for e in allow
+        isinstance(e, str) and (e == "Agent" or e.startswith("Bash("))
+        and e not in INSTALLER_RULES.values() for e in allow
     ):
         return True
     hooks = data.get("hooks")
@@ -1054,6 +1084,7 @@ def do_wire_defaults(root, scope, execute):
     rc = prune_dead_hooks(root, scope, execute)
     if scope == "user":
         rc = max(rc, clear_retired_style(root, execute))
+    rc = max(rc, do_installer_rule(root, scope, execute))
     for name in DEFAULT_HOOKS:
         rc = max(rc, do_wire_hook(root, name, execute, scope=scope, quiet=True))
     report_duplicate_firing(root)
@@ -1061,6 +1092,140 @@ def do_wire_defaults(root, scope, execute):
         print("  apply with: --execute   (run it yourself via `!` if the classifier "
               "refused the agent's write)")
     return rc
+
+
+def installer_rule_target(root, scope):
+    """(settings file, install dir) for `scope`'s installer rule.
+
+    PROJECT SCOPE IS ALWAYS settings.local.json, never the resolver's pick. The installer's
+    own settings pass writes that file, and a rule that lets this machine run a fetched
+    script unprompted is this user's trust decision, not one to commit for every clone of
+    the repository through a shared settings.json."""
+    if scope == "user":
+        return user_settings_path(), os.path.join(config_root(), "skills", "workforce")
+    return (os.path.join(root, ".claude", "settings.local.json"),
+            os.path.join(root, ".claude", "skills", "workforce"))
+
+
+def _rules_in(paths, key):
+    """Every string in permissions.<key> across `paths`."""
+    seen = set()
+    for spath in paths:
+        data, _ = load(spath)
+        perms = data.get("permissions") if isinstance(data, dict) else None
+        rules = perms.get(key) if isinstance(perms, dict) else None
+        if isinstance(rules, list):
+            seen.update(e for e in rules if isinstance(e, str))
+    return seen
+
+
+def do_installer_rule(root, scope, execute):
+    """Allow the ONE update command for `scope`, exactly (INSTALLER_RULES).
+
+    Called by `--wire-defaults`, so the installer and `audit` both write it, and run alone
+    without `--execute` it is the read-only report `verify` prints. Idempotent, additive,
+    recorded in the scope's `.settings-owned.json` § permissions_allow_added BEFORE the edit,
+    re-read after it, and reversed by `--unwire-defaults`.
+
+    Written only where that scope's install exists: update.md step 2 never runs the cell for
+    an empty scope, so a rule there would pre-allow a command no update issues."""
+    rule = INSTALLER_RULES[scope]
+    spath, install_dir = installer_rule_target(root, scope)
+    print(f"UPDATE RULE  {spath}          <- {scope} scope")
+    if os.name == "nt":
+        # install.ps1 calls --wire-defaults too. This rule is the bash cell, inert on
+        # Windows, and the PowerShell cell's rule form is unmeasured (platform.md fact 29).
+        print("  . skipped on Windows: the PowerShell update command's permission-rule form "
+              "is not measured, and the bash rule would match nothing here")
+        return 0
+    if not os.path.isdir(install_dir):
+        print(f"  . no {scope} install at {install_dir} — update never runs this scope's "
+              "command here, so no rule")
+        return 0
+    # In force means in any file the harness reads for this scope. User scope is read for
+    # every project, so only its own file counts; a project reads all three.
+    paths = [spath] if scope == "user" else union_settings_paths(root)
+    for key in ("deny", "ask"):
+        if rule in _rules_in(paths, key):
+            print(f"  . {rule}  is in permissions.{key} — your rule, left alone and not "
+                  "overridden")
+            return 0
+    if rule in _rules_in(paths, "allow"):
+        print(f"  . {rule}  already allowed — NOOP")
+        return 0
+    if not execute:
+        print(f"  ~ {rule}  ABSENT — would add (update will prompt to run the installer)")
+        return 0
+
+    data, err = load(spath)
+    if err:
+        print(f"  ! {rule}  NOT WRITTEN — {err}")
+        return 1
+    if not isinstance(data, dict):
+        data = {}
+    perms = data.setdefault("permissions", {})
+    allow = perms.setdefault("allow", []) if isinstance(perms, dict) else None
+    if not isinstance(allow, list):
+        print(f"  ! {rule}  NOT WRITTEN — {spath} permissions.allow is not a list; refusing")
+        return 1
+    # Reversal FIRST, as every writer here does: a record whose edit never landed is a
+    # NOOP to reverse; an edit nobody recorded is one `--unwire-defaults` cannot find.
+    try:
+        owned_path, owned = load_owned(root, scope)
+        added = owned.setdefault("permissions_allow_added", [])
+        if not isinstance(added, list):
+            added = owned["permissions_allow_added"] = []
+        if rule not in added:
+            added.append(rule)
+        dump(owned_path, owned)
+        allow.append(rule)
+        dump(spath, data)
+    except OSError as exc:
+        print(f"  ! {rule}  NOT WRITTEN — {exc.__class__.__name__}: {exc}")
+        return 1
+    back, _ = load(spath)
+    perms = back.get("permissions") if isinstance(back, dict) else None
+    ba = perms.get("allow") if isinstance(perms, dict) else None
+    if not (isinstance(ba, list) and ba.count(rule) == 1):
+        print(f"wf-settings-apply: UPDATE RULE UNVERIFIED — re-read of {spath} did not find "
+              "it exactly once", file=sys.stderr)
+        return 1
+    print(f"  + {rule}  added")
+    print(f"  verified on disk: present once in {spath}")
+    return 0
+
+
+def undo_installer_rule(root, scope, execute):
+    """`--unwire-defaults`'s half for the update rule: remove it only when the record names
+    it, so a rule the user added by hand survives. Audit's own grants in the same record are
+    not this writer's and are left."""
+    rule = INSTALLER_RULES[scope]
+    spath, _ = installer_rule_target(root, scope)
+    owned_path, owned = load_owned(root, scope)
+    added = owned.get("permissions_allow_added")
+    if not (isinstance(added, list) and rule in added):
+        return 0
+    data, err = load(spath)
+    if err:
+        print(f"wf-settings-apply: {err}", file=sys.stderr)
+        return 1
+    perms = data.get("permissions") if isinstance(data, dict) else None
+    allow = perms.get("allow") if isinstance(perms, dict) else None
+    present = isinstance(allow, list) and rule in allow
+    mark = "-" if execute else "~"
+    print(f"  {mark if present else '.'} {rule}  "
+          f"{('removed' if execute else 'would remove') if present else 'already absent — NOOP'}")
+    if not execute:
+        return 0
+    if present:
+        perms["allow"] = [e for e in allow if e != rule]
+        dump(spath, data)
+    owned["permissions_allow_added"] = [e for e in added if e != rule]
+    dump(owned_path, owned)
+    if rule in _rules_in([spath], "allow"):
+        print(f"wf-settings-apply: re-read of {spath} still holds {rule}", file=sys.stderr)
+        return 1
+    return 0
 
 
 def prune_dead_hooks(root, scope, execute):
@@ -2609,9 +2774,16 @@ def do_unwire_defaults(root, scope, execute):
     print(f"UNWIRE {spath}          <- resolved, not assumed")
     print(f"  record: {owned_path}")
 
+    # The update rule first, and the record re-read after it: this function writes the
+    # record back below, and a copy read before the rule left it would put it back.
+    had_rule = INSTALLER_RULES[scope] in (owned.get("permissions_allow_added") or [])
+    rule_rc = undo_installer_rule(root, scope, execute)
+    owned_path, owned = load_owned(root, scope)
     recorded = owned.get("hooks_added") or []
     has_style = "output_style_set" in owned
     if not recorded and not has_style:
+        if had_rule:
+            return rule_rc
         print("  . the record names nothing — workforce owns no setting here. "
               "Removing nothing.")
         return 0
@@ -2622,7 +2794,7 @@ def do_unwire_defaults(root, scope, execute):
         return 1
     if not isinstance(data, dict):
         print(f"  . {spath} holds no object — nothing to remove.")
-        return 0
+        return rule_rc
 
     removed, absent = [], []
     hooks = data.get("hooks")
@@ -2690,7 +2862,7 @@ def do_unwire_defaults(root, scope, execute):
     if not execute:
         print("  apply with: --execute   (run it yourself via `!` if the classifier "
               "refused the agent's write)")
-        return 0
+        return rule_rc
 
     dump(spath, data)
     # The record is cleared ONLY for what was actually reversed, so a second run is a
@@ -2707,7 +2879,7 @@ def do_unwire_defaults(root, scope, execute):
         return 1
     print(f"  verified on disk: outputStyle = {back.get('outputStyle')!r}, "
           f"{len(recorded)} recorded registration(s) processed")
-    return 0
+    return rule_rc
 
 
 def do_wire_hook(root, name, execute, scope="project", quiet=False):
@@ -3026,21 +3198,25 @@ def main(argv=None):
                     help="reverse exactly what --wire-defaults wrote, per the record")
     ap.add_argument("--heal", action="store_true",
                     help="remove project rows whose workforce script was retired (see heal())")
+    ap.add_argument("--installer-rule", action="store_true",
+                    help="allow the exact update command for --scope (INSTALLER_RULES); "
+                         "without --execute, report whether it is in force")
     ap.add_argument("--scope", choices=("project", "user"), default="project",
                     help="which settings file to write (user scope needs no --root)")
     args = ap.parse_args(argv)
 
     modes = [bool(args.grants), bool(args.wire_hook), bool(args.automode),
              bool(args.wire_defaults),
-             bool(args.unwire_defaults), bool(args.heal)]
+             bool(args.unwire_defaults), bool(args.heal), bool(args.installer_rule)]
     if sum(modes) != 1:
         print("wf-settings-apply: pick exactly one of --grants, --wire-hook, "
-              "--automode, --wire-defaults, --unwire-defaults, --heal.",
+              "--automode, --wire-defaults, --unwire-defaults, --heal, --installer-rule.",
               file=sys.stderr)
         return 2
     if args.scope == "user" and (args.grants or args.wire_hook or args.heal):
-        print("wf-settings-apply: --scope user applies to --wire-defaults and "
-              "--unwire-defaults only. The heal never writes a user-scope file.",
+        print("wf-settings-apply: --scope user applies to --wire-defaults, "
+              "--unwire-defaults and --installer-rule only. The heal never writes a "
+              "user-scope file.",
               file=sys.stderr)
         return 2
 
@@ -3070,6 +3246,8 @@ def main(argv=None):
         return do_unwire_defaults(root, args.scope, args.execute)
     if args.heal:
         return do_heal(root, args.execute)
+    if args.installer_rule:
+        return do_installer_rule(root, args.scope, args.execute)
     return do_automode(args.execute)
 
 

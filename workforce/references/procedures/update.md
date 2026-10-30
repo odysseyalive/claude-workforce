@@ -124,6 +124,16 @@ locations have been looked at.
    from the project root. Run it from anywhere else and it installs a third copy somewhere new, which
    is the failure step 1 exists to prevent.
 
+   **Run the cell as one Bash call, byte for byte, with nothing before or after it.** The installer
+   pre-allows each Linux / macOS cell as an exact `Bash(...)` rule for its own scope
+   (`wf-settings-apply` `INSTALLER_RULES`, § What the installer does besides fetching), so the call
+   runs without a prompt. An exact rule stops matching at the first differing byte: a `cd <root> &&`
+   prefix, a `2>&1`, a pipe or a reworded URL turns it back into a denied call. If the shell is not
+   at the project root, `cd` there in a call of its own first. **Hand the command back for the user
+   to run with `!` only when this call was actually denied**, which is expected once on a machine
+   whose install predates the rule (that update is the one that writes it) and on Windows, where
+   the PowerShell cell has no rule; say which.
+
 5. **Confirm no project state was touched.** `.claude/workforce/**` must be byte-identical before and
    after. If it is not, that is a bug in the manifest or the installer, not an acceptable outcome.
 
@@ -185,6 +195,16 @@ locations have been looked at.
 Running the real installer means its **settings pass runs too**: it writes
 `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` and adds the org's tools to `permissions.allow`, at
 `~/.claude/settings.json` for a personal install and `.claude/settings.local.json` for a project one.
+
+**It also allows the next update's command.** Its `--wire-defaults` call adds one exact rule to
+`permissions.allow`, the step 4 cell for the scope it installed and no other: `Bash(<the personal
+cell>)` in `~/.claude/settings.json` (under `$CLAUDE_CONFIG_DIR` when set), `Bash(<the project
+cell>)` in the project's `.claude/settings.local.json`, never its shared `settings.json`. Default
+permission mode denies the command without it (`platform.md` fact 29). No prefix or wildcard rule
+is written, so nothing but this exact command from this exact URL is allowed. The rule is recorded
+in that scope's `.settings-owned.json` § `permissions_allow_added`, and `wf-settings-apply
+--unwire-defaults` removes it. A rule already present, or one the user put in `permissions.deny` or
+`permissions.ask`, is left alone. `--no-wire` skips it; on Windows it is skipped and says so.
 
 **This is a feature of updating this way, not a side effect to suppress.** The delegation contract is
 part of the release; a release that changes it would otherwise land as a skill that expects a setting

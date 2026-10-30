@@ -81,6 +81,31 @@ def _sub_version(arg):
     return arg.replace("${VERSION}", _m.group(1)) if _m else arg
 
 
+# `${UPDATE_CELL:user}` / `${UPDATE_CELL:project}` IS THE COMMAND update.md STEP 4 TELLS A
+# SESSION TO RUN, read out of its Linux / macOS cell at run time. wf-settings-apply's
+# INSTALLER_RULES pre-allows that command as an EXACT rule, which stops matching at the
+# first byte the two disagree on, and nothing else compares them. A `want` that spells the
+# rule through this substitution fails the `installer-rule-*` rows the moment either side
+# changes alone. A row the procedure no longer has substitutes a sentinel no output holds.
+_UPDATE_CELL_ROW = {"user": "personal", "project": "project"}
+
+
+def _sub_update_cells(s):
+    if "${UPDATE_CELL:" not in str(s):
+        return s
+    try:
+        with open(os.path.join(ROOT, "workforce", "references", "procedures", "update.md"),
+                  encoding="utf-8") as fh:
+            text = fh.read()
+    except OSError:
+        text = ""
+    for scope, row in _UPDATE_CELL_ROW.items():
+        m = re.search(r"^\s*\| \*\*%s\*\* \| `([^`]+)` \|" % row, text, re.M)
+        s = s.replace("${UPDATE_CELL:%s}" % scope,
+                      m.group(1) if m else "<update.md step 4 has no %s cell>" % row)
+    return s
+
+
 def _sub_tree(arg, tree):
     """Replace `${TREE}` with the copied fixture tree's absolute path.
 
@@ -468,10 +493,12 @@ def _run_in(tree, script, spec):
     elif p.returncode != spec["exit"]:
         problems.append(f"exit {p.returncode}, expected {spec['exit']}")
     for s in spec.get("want", []):
+        s = _sub_update_cells(s)
         if s not in out:
             problems.append(f"missing {s!r}")
     for _key in NEGATIVE_KEYS:
         for s in spec.get(_key, []):
+            s = _sub_update_cells(s)
             if s in out:
                 problems.append(f"present but forbidden: {s!r}")
 

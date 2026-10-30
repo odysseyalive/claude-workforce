@@ -13024,5 +13024,334 @@
       ],
       "script": "wf-task-tag",
       "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"commit it\"}"
+  },
+  "installer-rule-user": {
+    "_why": "THE UPDATE COMMAND IS PRE-ALLOWED AT USER SCOPE, EXACTLY. `/workforce update` runs update.md step 4's cell and default mode denied it (`Quoted text in this command can't be checked before it runs`, platform.md fact 29), so every update handed the command back to the user. The rule is spelled here through `${UPDATE_CELL:user}`, read out of update.md at run time, so a change to either INSTALLER_RULES or the cell alone fails this row. Additive: the user's own rules and keys survive, and the `--project` rule is NOT written at user scope.",
+    "script": "wf-settings-apply",
+    "args": [
+      "--scope",
+      "user",
+      "--installer-rule",
+      "--execute"
+    ],
+    "env": {
+      "CLAUDE_CONFIG_DIR": "${TREE}/cfg"
+    },
+    "exit": 0,
+    "want": [
+      "Bash(${UPDATE_CELL:user})  added",
+      "verified on disk: present once"
+    ],
+    "not": [
+      "-- --project",
+      "Traceback"
+    ],
+    "after": {
+      "cfg/settings.json": {
+        "once": [
+          "-- --user)"
+        ],
+        "want": [
+          "Bash(npm test:*)",
+          "\"theme\": \"dark\"",
+          "\"Agent\""
+        ],
+        "not": [
+          "-- --project"
+        ]
+      },
+      "cfg/workforce/.settings-owned.json": {
+        "once": [
+          "-- --user)"
+        ]
+      }
+    }
+  },
+  "installer-rule-project": {
+    "_why": "PROJECT SCOPE WRITES settings.local.json, NEVER THE SHARED settings.json, even when settings.json is the file the resolver would pick for hooks (it carries `Agent`). A rule that lets this machine run a fetched script unprompted is this user's trust decision and must not be committed for every clone. The rule is the `--project` cell and only that.",
+    "script": "wf-settings-apply",
+    "args": [
+      "--installer-rule",
+      "--execute"
+    ],
+    "exit": 0,
+    "want": [
+      "Bash(${UPDATE_CELL:project})  added",
+      "settings.local.json"
+    ],
+    "not": [
+      "-- --user",
+      "Traceback"
+    ],
+    "after": {
+      ".claude/settings.local.json": {
+        "once": [
+          "-- --project)"
+        ]
+      },
+      ".claude/settings.json": {
+        "not": [
+          "curl"
+        ]
+      },
+      ".claude/workforce/.settings-owned.json": {
+        "once": [
+          "-- --project)"
+        ]
+      }
+    }
+  },
+  "installer-rule-collapsed-user": {
+    "_why": "THE CASE THAT PROMPTED THE ASK: the project root IS $HOME (`/home/admin`), so `<root>/.claude` and the personal config root are one directory (`scopes_collapse`). The `--user` install writes the `--user` rule into that directory's settings.json, which is user scope and therefore in force for the session at $HOME that runs the update.",
+    "script": "wf-settings-apply",
+    "args": [
+      "--scope",
+      "user",
+      "--installer-rule",
+      "--execute"
+    ],
+    "env": {
+      "HOME": "${TREE}",
+      "CLAUDE_CONFIG_DIR": null
+    },
+    "exit": 0,
+    "want": [
+      "Bash(${UPDATE_CELL:user})  added",
+      "<- user scope"
+    ],
+    "not": [
+      "-- --project",
+      "Traceback"
+    ],
+    "after": {
+      ".claude/settings.json": {
+        "once": [
+          "-- --user)"
+        ],
+        "want": [
+          "\"SendMessage\""
+        ]
+      },
+      ".claude/workforce/.settings-owned.json": {
+        "once": [
+          "-- --user)"
+        ]
+      }
+    }
+  },
+  "installer-rule-collapsed-project": {
+    "_why": "THE SAME COLLAPSED TREE AT PROJECT SCOPE, after the user-scope rule landed. Both scopes share one directory and one reversal record. The `--project` rule goes beside it into settings.local.json, the `--user` rule already in settings.json is neither duplicated nor moved, and the shared record ends with each rule exactly once.",
+    "script": "wf-settings-apply",
+    "args": [
+      "--installer-rule",
+      "--execute"
+    ],
+    "env": {
+      "HOME": "${TREE}",
+      "CLAUDE_CONFIG_DIR": null
+    },
+    "exit": 0,
+    "want": [
+      "Bash(${UPDATE_CELL:project})  added"
+    ],
+    "not": [
+      "Traceback"
+    ],
+    "after": {
+      ".claude/settings.local.json": {
+        "once": [
+          "-- --project)"
+        ],
+        "not": [
+          "-- --user"
+        ]
+      },
+      ".claude/settings.json": {
+        "once": [
+          "-- --user)"
+        ],
+        "not": [
+          "-- --project"
+        ]
+      },
+      ".claude/workforce/.settings-owned.json": {
+        "once": [
+          "-- --user)",
+          "-- --project)"
+        ]
+      }
+    }
+  },
+  "installer-rule-noop": {
+    "_why": "IDEMPOTENT: a second install finds the rule and writes nothing, so the file never collects a second copy.",
+    "script": "wf-settings-apply",
+    "args": [
+      "--scope",
+      "user",
+      "--installer-rule",
+      "--execute"
+    ],
+    "env": {
+      "CLAUDE_CONFIG_DIR": "${TREE}/cfg"
+    },
+    "exit": 0,
+    "want": [
+      "Bash(${UPDATE_CELL:user})  already allowed — NOOP"
+    ],
+    "not": [
+      "added",
+      "verified on disk"
+    ],
+    "after": {
+      "cfg/settings.json": {
+        "once": [
+          "-- --user)"
+        ]
+      },
+      "cfg/workforce/.settings-owned.json": {
+        "absent": true
+      }
+    }
+  },
+  "installer-rule-deny": {
+    "_why": "A USER WHO DENIED THE COMMAND KEEPS THE DENIAL. Adding an allow beside it would be inert (deny wins) and would read as the user's consent. Reported and left alone.",
+    "script": "wf-settings-apply",
+    "args": [
+      "--scope",
+      "user",
+      "--installer-rule",
+      "--execute"
+    ],
+    "env": {
+      "CLAUDE_CONFIG_DIR": "${TREE}/cfg"
+    },
+    "exit": 0,
+    "want": [
+      "is in permissions.deny — your rule, left alone"
+    ],
+    "not": [
+      "added"
+    ],
+    "after": {
+      "cfg/settings.json": {
+        "not": [
+          "\"allow\""
+        ]
+      }
+    }
+  },
+  "installer-rule-no-install": {
+    "_why": "NO PROJECT INSTALL, NO PROJECT RULE. update.md step 2 never runs the `--project` cell where the census found no project copy, so an audit of a project that uses only a personal install must not pre-allow vendoring a copy into it.",
+    "script": "wf-settings-apply",
+    "args": [
+      "--installer-rule",
+      "--execute"
+    ],
+    "exit": 0,
+    "want": [
+      "no project install at",
+      "so no rule"
+    ],
+    "not": [
+      "added"
+    ],
+    "after": {
+      ".claude/settings.local.json": {
+        "absent": true
+      }
+    }
+  },
+  "installer-rule-unwire": {
+    "_why": "A PATH IN NEEDS A PATH OUT (enforcement.md § Three paths). `--unwire-defaults` removes the update rule because the record names it, and leaves everything else: `Agent` is recorded too but is an audit grant `--wire-defaults` did not write, and `Bash(npm test:*)` is the user's.",
+    "script": "wf-settings-apply",
+    "args": [
+      "--scope",
+      "user",
+      "--unwire-defaults",
+      "--execute"
+    ],
+    "env": {
+      "CLAUDE_CONFIG_DIR": "${TREE}/cfg"
+    },
+    "exit": 0,
+    "want": [
+      "- Bash(${UPDATE_CELL:user})  removed"
+    ],
+    "not": [
+      "Traceback"
+    ],
+    "after": {
+      "cfg/settings.json": {
+        "not": [
+          "-- --user)"
+        ],
+        "want": [
+          "\"Agent\"",
+          "Bash(npm test:*)"
+        ]
+      },
+      "cfg/workforce/.settings-owned.json": {
+        "not": [
+          "-- --user)"
+        ],
+        "want": [
+          "\"Agent\""
+        ]
+      }
+    }
+  },
+  "installer-rule-unwire-user-added": {
+    "_why": "THE SAME RULE TYPED BY THE USER IS THE USER'S. The record does not name it, so `--unwire-defaults` does not remove it.",
+    "script": "wf-settings-apply",
+    "args": [
+      "--scope",
+      "user",
+      "--unwire-defaults",
+      "--execute"
+    ],
+    "env": {
+      "CLAUDE_CONFIG_DIR": "${TREE}/cfg"
+    },
+    "exit": 0,
+    "want": [
+      "the record names nothing"
+    ],
+    "not": [
+      "removed"
+    ],
+    "after": {
+      "cfg/settings.json": {
+        "once": [
+          "-- --user)"
+        ]
+      }
+    }
+  },
+  "installer-rule-wire-defaults": {
+    "_why": "`--wire-defaults` CARRIES THE RULE, so the installer (both installers call it) and `audit` Step 6-H write it with no second call site to forget. Display mode: reported absent, nothing written.",
+    "script": "wf-settings-apply",
+    "args": [
+      "--scope",
+      "user",
+      "--wire-defaults"
+    ],
+    "env": {
+      "CLAUDE_CONFIG_DIR": "${TREE}/cfg"
+    },
+    "exit": 0,
+    "want": [
+      "~ Bash(${UPDATE_CELL:user})  ABSENT — would add"
+    ],
+    "not": [
+      "Traceback",
+      "verified on disk"
+    ],
+    "after": {
+      "cfg/settings.json": {
+        "not": [
+          "curl"
+        ]
+      }
+    }
   }
 }

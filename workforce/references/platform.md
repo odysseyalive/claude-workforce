@@ -602,6 +602,20 @@ second copy is not shown to do no harm.
 `systemMessage` from any other event renders is not covered, and nothing may block on this fact.
 The screen half is the user's observation, not a capture.
 
+### Fact 29 — default mode denies the update command, and an exact `Bash(...)` rule allows it ✅ MEASURED
+
+**Measured 2026-10-30 on Claude Code 2.1.314**, Linux, `claude -p --settings <file>`, main session.
+Evidence: `measurements/2026-10-30-installer-bash-allow-rule.md`. The probe was update.md step 4's
+`-- --user` command pointed at a 404 URL.
+
+- Default mode, no rule: DENIED, "Quoted text in this command can't be checked before it runs".
+- Default mode, `Bash(<that exact command>)` in `permissions.allow`: RAN.
+- Auto mode, no rule: RAN, so auto mode needs no `autoMode` entry for it.
+
+`wf-settings-apply` `INSTALLER_RULES` writes the two exact rules (`update.md` § What the installer
+does besides fetching). **Conditions:** non-interactive main session, one host, one version. Prefix
+rules (`Bash(bash -c:*)`), the PowerShell cell and Windows were not measured, so none is written.
+
 ---
 
 ## DOCUMENTED — not yet measured. Do not build blocking checks on these.

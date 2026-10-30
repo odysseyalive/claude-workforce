@@ -142,7 +142,8 @@ while [ $# -gt 0 ]; do
             echo "With no flag, existing installs are found and updated in place."
             echo "A first-time install asks where to go."
             echo
-            echo "  --no-wire         install the hooks without registering them"
+            echo "  --no-wire         install the hooks without registering them, and without"
+            echo "                    pre-allowing the update command (/workforce update will prompt)"
             echo "  --user            force the personal install"
             echo "  --project         force ./.claude/skills/workforce"
             echo "  --config-dir DIR  install the personal copy into DIR instead of ~/.claude"
@@ -1040,16 +1041,23 @@ if changed:
     # the same idempotent NOOP-if-present write, recorded in `.settings-owned.json`, so
     # `disband` reverses exactly these and nothing else. `--no-wire` opts out.
     #
+    # THE SAME CALL PRE-ALLOWS THE UPDATE COMMAND. `--wire-defaults` also writes this
+    # scope's one exact `Bash(...)` allow rule for update.md step 4's command
+    # (wf-settings-apply INSTALLER_RULES, the one copy of the string), so the next
+    # `/workforce update` runs this installer without handing it back to be pasted. It is
+    # never pasted into the settings pass above: a second copy of the string is the copy
+    # that drifts from the cell, and an exact rule that drifts by one byte allows nothing.
+    #
     # NEVER FATAL. A wiring failure must not fail an install whose files all landed:
     # `verify` reports an unwired hook, and an install that aborts here leaves a tree
     # that is complete and looks broken.
     if [ "$WANTS_WIRE" = "no" ]; then
-        echo "  Skipping hook wiring and the retired output-style clear (--no-wire)."
+        echo "  Skipping hook wiring, the update-command rule and the retired output-style clear (--no-wire)."
     elif ! command -v python3 &>/dev/null; then
         echo "  Warning: python3 not found; hooks are installed but NOT wired."
         echo "  Wire them later with: /workforce hooks --execute"
     else
-        echo "Wiring hooks and clearing any retired output-style selection..."
+        echo "Wiring hooks, allowing the update command, and clearing any retired output-style selection..."
         # THE EXIT STATUS IS THE APPLIER'S, NOT sed's. `cmd | sed … || warn` tested sed,
         # which always succeeds, so a wiring run that crashed before wiring anything
         # printed a traceback, skipped the warning, and the install said it was complete

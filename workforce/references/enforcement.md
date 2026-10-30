@@ -282,7 +282,8 @@ step; that is the entire reason it survived.*
 ```
 
 The USER-scope record, `${CLAUDE_CONFIG_DIR:-~/.claude}/workforce/.settings-owned.json`, holds the
-same `hooks_added` for user-scope wiring and, written by `wf-timezone` only,
+same `hooks_added` for user-scope wiring, `permissions_allow_added` for the update-command rule
+(`wf-settings-apply` `INSTALLER_RULES`), and, written by `wf-timezone` only,
 `"env_added": {"TZ": "America/New_York"}` plus `"env_object_added": true` when that write created the
 `env` object. `wf-timezone clear` is its reversal.
 

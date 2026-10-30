@@ -870,6 +870,9 @@ function Install-ClaudeWorkforce {
             $py = if (Get-Command python -ErrorAction SilentlyContinue) { 'python' } else { 'python3' }
             $applier = Join-Path $skillDir 'bin/wf-settings-apply'
             Write-Host 'Wiring hooks and clearing any retired output-style selection...'
+            # --wire-defaults also writes the update-command allow rule on Linux and macOS.
+            # Here it prints that it skipped it: the rule is the bash cell, inert on
+            # Windows, and the PowerShell cell's rule form is unmeasured (platform.md fact 29).
             $wireArgs = if ($scope -eq 'user') {
                 @($applier, '--scope', 'user', '--wire-defaults', '--execute')
             } else {
