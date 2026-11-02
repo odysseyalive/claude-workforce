@@ -13002,6 +13002,63 @@
           "issue i1"
       ]
   },
+  "partition-line-below-threshold": {
+      "_why": "BELOW `PARTITION_MIN` THE BACKLOG IS NOT WORTH A SENTENCE. Two carried items from i1 and a new message: the carried line is said and the partition line is not, because two open items are too few for grouping them to pay for itself.",
+      "exit": 0,
+      "not": [
+          "Traceback",
+          "they are partitioned rather than worked one after another"
+      ],
+      "script": "wf-task-tag",
+      "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"Also set up the setup script for brand new pods and the always-on versus on-demand modes\"}",
+      "want": [
+          "issue i2",
+          "holds 2 still-open item(s)"
+      ]
+  },
+  "partition-line-at-threshold-no-org": {
+      "_why": "THE MEASURED CASE, runpod-claude-gateway `89bbc493`, 2026-11-02: about twelve asks touching disjoint files were worked one at a time in the main thread, i1 to i10 with `agents: 0`, in a project with NO org chart, so `DISPATCH_LINE` was never said and nothing spoke to the backlog. At `PARTITION_MIN` carried items the line says to group them by the files they touch and send the disjoint groups to parallel background subagents now. No org here, so no dispatch line: the partition line stands on its own. Fails on the old code.",
+      "exit": 0,
+      "not": [
+          "Traceback",
+          "This project has a workforce org. A job in this message goes to the employee whose description fits"
+      ],
+      "script": "wf-task-tag",
+      "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"Also set up the setup script for brand new pods and the always-on versus on-demand modes\"}",
+      "want": [
+          "holds 3 still-open item(s)",
+          "With this many items open they are partitioned rather than worked one after another: grouped by the files or areas they touch, the groups that share no file go to parallel background subagents now, each told which files it owns and to stay out of the rest, or each in its own worktree when they edit the same checkout; only groups that overlap wait, one small item can be done inline, and an item an agent already holds stays with it."
+      ]
+  },
+  "partition-line-with-org": {
+      "_why": "WITH AN ORG THE TWO LINES COMPOSE. The partition line says how the open items are split; `DISPATCH_LINE` still says who takes a job. Both are said, and neither restates the other.",
+      "exit": 0,
+      "not": [
+          "Traceback"
+      ],
+      "script": "wf-task-tag",
+      "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"Also set up the setup script for brand new pods and the always-on versus on-demand modes\"}",
+      "want": [
+          "they are partitioned rather than worked one after another",
+          "This project has a workforce org. A job in this message goes to the employee whose description fits",
+          "linked to issue i2"
+      ]
+  },
+  "partition-line-handback-turn": {
+      "_why": "THE HAND-BACK TURN HEARS IT TOO. An injected hand-back opens no issue and goes through `carry_only_checklist`, and it is the turn on which the session is free again with the backlog still open: in the measured session that is where the next item was started inline. So `earlier_lines` says the partition line on both checklist variants, and the line's last clause keeps an item an agent already holds with that agent.",
+      "exit": 0,
+      "not": [
+          "Traceback",
+          "Each separate ask is one item"
+      ],
+      "script": "wf-task-tag",
+      "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"Another Claude session sent a message:\\n<agent-message from=\\\"a6141809c0a65003e\\\">\\n[Subagent hand-back] The installer is written. The text below is the final report of a subagent this session delegated to.\\n</agent-message>\"}",
+      "want": [
+          "stay empty, because this message makes no asks of its own",
+          "they are partitioned rather than worked one after another",
+          "an item an agent already holds stays with it"
+      ]
+  },
   "dispatch-line-no-org": {
       "_why": "NO ORG, NO LINE: a project with neither a chart nor agents.",
       "exit": 0,

@@ -2287,6 +2287,27 @@ CARRIED_LINE = ("\"carried\" holds %d still-open item(s) from this session's ear
                 "\"dropped\" when this turn finishes or withdraws it and leave the rest as "
                 "they are; only a carried row's status is read back, onto the issue it "
                 "names, and that issue closes once its items are all finished.")
+# SEVERAL OPEN ITEMS ARE PARTITIONED, NOT QUEUED. MEASURED 2026-11-02 in runpod-claude-gateway
+# `89bbc493`: the user sent about twelve asks while a turn ran (installers, README and images,
+# Docker packaging, setup and update commands), they touched disjoint files, and the session
+# worked them one at a time in the main thread. i1 to i10 hold `agents: 0`; only i11 has
+# agents, opened by the user asking "you're taking on each one of these items individually and
+# stacking them instead of actually sectioning them off into different agents". That project
+# has no org chart, so `DISPATCH_LINE` was never said, and nothing said anything about the
+# BACKLOG: `CARRIED_LINE` asks only that statuses be updated.
+#
+# THE COUNT IS THE CARRIED ROWS, because they are the open items this hook knows at submit
+# time; this message's own asks are not written yet. Said with or without an org, on both
+# checklist variants (`earlier_lines`), so the hand-back turn that frees the session hears it
+# too. Who each subagent is stays `DISPATCH_LINE`'s to say where there is an org.
+# ADVISORY, NEVER A GATE, for the reason the checklist display gives (ef16aca).
+PARTITION_MIN = 3
+PARTITION_LINE = ("With this many items open they are partitioned rather than worked one "
+                  "after another: grouped by the files or areas they touch, the groups that "
+                  "share no file go to parallel background subagents now, each told which "
+                  "files it owns and to stay out of the rest, or each in its own worktree when "
+                  "they edit the same checkout; only groups that overlap wait, one small item "
+                  "can be done inline, and an item an agent already holds stays with it.")
 # EVERY VARIANT NAMES THE OPEN ISSUES WITH NO TITLE (user, 2026-10-14: "so I noticed that
 # the titles aren't in the issues tracker yet..."), in one sentence, until each has one.
 TITLES_LINE = ("No title yet on %s: give each a few words in "
@@ -2643,6 +2664,7 @@ def earlier_lines(carried, untitled):
     """The sentences about this session's EARLIER issues, each said only when it has something
     to name, and each with its leading space. One builder for both checklist variants."""
     return ((" " + CARRIED_LINE % len(carried) if carried else "")
+            + (" " + PARTITION_LINE if len(carried) >= PARTITION_MIN else "")
             + (" " + TITLES_LINE % ", ".join(untitled) if untitled else ""))
 
 
