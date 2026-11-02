@@ -2297,9 +2297,11 @@ CARRIED_LINE = ("\"carried\" holds %d still-open item(s) from this session's ear
 # BACKLOG: `CARRIED_LINE` asks only that statuses be updated.
 #
 # THE COUNT IS THE CARRIED ROWS, because they are the open items this hook knows at submit
-# time; this message's own asks are not written yet. Said with or without an org, on both
-# checklist variants (`earlier_lines`), so the hand-back turn that frees the session hears it
-# too. Who each subagent is stays `DISPATCH_LINE`'s to say where there is an org.
+# time; this message's own asks are not written yet, so the display says it once they are
+# (`PARTITION_SAID`), unless this submit already did (the record's `partition`). Said with or
+# without an org, on both checklist variants (`earlier_lines`), so the hand-back turn that
+# frees the session hears it too. Who each subagent is stays `DISPATCH_LINE`'s to say where
+# there is an org.
 # ADVISORY, NEVER A GATE, for the reason the checklist display gives (ef16aca).
 PARTITION_MIN = 3
 PARTITION_LINE = ("With this many items open they are partitioned rather than worked one "
@@ -2363,11 +2365,21 @@ CHECKLIST_NAMED = re.compile(r"(/[^\s'\"`<>|;&()]*/)?(wf-asks\.[A-Za-z0-9_.-]{1,
 # the user, in the reply it is about to write and before it does anything else.
 SHOW_LIST = ("Show the user this work list now, as the first text of your reply and before "
              "your next tool call:\n")
+# THE MEMO KEY THAT HOLDS WHICH LISTS THE DISPLAY HAS ALREADY LED WITH `PARTITION_LINE`.
+# MEASURED 2026-11-02 in runpod-claude-gateway `89bbc493`: i1 was ONE message carrying 16 asks,
+# with nothing carried at its submit, so the submit's count was zero and `earlier_lines` said
+# nothing. The display is the first moment the asks are on disk, and it fires before the work,
+# so it says the line there. Not a list name (those start `wf-asks.`), so it cannot collide.
+# A list whose submit already said it is skipped through the record's `partition`, and a list
+# shown again after a status change is skipped through this key: once per message either way.
+PARTITION_SAID = "partition_said"
 
 
 def checklist_display(payload):
     """`SHOW_LIST` and the list, for a PostToolUse to hand the session when this call wrote
     this session's asks checklist with items that differ from the last ones shown, or "".
+    Led once per message by `PARTITION_LINE` when the list's open items reach the count
+    (`PARTITION_SAID`).
 
     THE LIST IS SHOWN BEFORE THE WORK, which nothing did. MEASURED 2026-10-29 in
     mutze-studio `29c3e592`: the only display of a list was the WORK block at Stop, after
@@ -2403,12 +2415,13 @@ def checklist_display(payload):
                 continue
             shown = _show_checklist(payload, d, m.group(2), sid)
             if shown:
-                return SHOW_LIST + shown
+                return shown
     return ""
 
 
 def _show_checklist(payload, d, name, sid):
-    """`checklist_display` for one named file in directory `d`, or ""."""
+    """`checklist_display` for one named file in directory `d`, or "": `SHOW_LIST` and the
+    list, led by `PARTITION_LINE` when the list is the one that first reaches the count."""
     at = dict(payload, scratchpad_dir=d)
     tag = read_json_nofollow(tag_path(at))
     if not isinstance(tag, dict):
@@ -2437,10 +2450,23 @@ def _show_checklist(payload, d, name, sid):
         return ""
     # ONE ENTRY PER LIST THE TAG STILL CARRIES, so the memo never outgrows the records.
     names = {os.path.basename(checklist_path(at, r)) for r in records if isinstance(r, dict)}
+    said = memo.get(PARTITION_SAID)
+    said = ([n for n in said if isinstance(n, str) and n in names]
+            if isinstance(said, list) else [])
     memo = {k: v for k, v in memo.items() if k in names and isinstance(v, str)}
     memo[name] = digest
+    # `PARTITION_LINE` ONCE PER LIST, AND NOT AT ALL WHEN THE SUBMIT ALREADY SAID IT. The open
+    # count is this list's items plus its carried rows, so the one message that carries many
+    # asks of its own is covered too (`PARTITION_SAID`).
+    lead = ""
+    if (not rec.get("partition") and name not in said
+            and sum(not item_done(r) for r in items + carried_items(cl)) >= PARTITION_MIN):
+        said.append(name)
+        lead = PARTITION_LINE + " "
+    if said:
+        memo[PARTITION_SAID] = said
     write_json_atomic(memo_path, memo)
-    return text
+    return lead + SHOW_LIST + text
 
 
 def previous_checklist(payload, tag=None):
@@ -2571,6 +2597,9 @@ def start_checklist(payload, prev=None, earlier=()):
         record["key"] = issue_id
     if isinstance(payload.get("peer"), dict):
         record["peer"] = payload["peer"]
+    # THE SUBMIT SAID `PARTITION_LINE` (`earlier_lines`), so the display does not say it again.
+    if len(carried) >= PARTITION_MIN:
+        record["partition"] = True
     p = checklist_path(payload, record)
     if not write_json_atomic(p, {"prompt": prompt[:2000], "items": [],
                                  "carried": carried}):

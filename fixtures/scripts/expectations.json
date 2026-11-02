@@ -13059,6 +13059,151 @@
           "an item an agent already holds stays with it"
       ]
   },
+  "partition-display-below-threshold": {
+      "_why": "BELOW `PARTITION_MIN` ON THE DISPLAY PATH. A message whose own list holds two open asks, with nothing carried: the list is shown and the partition line is not.",
+      "before": [
+          {
+              "script": "wf-task-tag",
+              "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"prompt\": \"I want a RunPod gateway with installers, a README with images, Docker packaging and setup commands\"}"
+          },
+          {
+              "path_from": 0,
+              "path_rx": "/[^\\s\"]*wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+              "write": "{\"title\": \"RunPod gateway\", \"items\": [{\"ask\": \"write the cross-platform installer\", \"status\": \"open\"}, {\"ask\": \"add the README with images\", \"status\": \"open\"}]}"
+          }
+      ],
+      "exit": 0,
+      "not": [
+          "Traceback",
+          "With this many items open they are partitioned rather than worked one after another"
+      ],
+      "script": "wf-turn-budget",
+      "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"tool_name\": \"Write\", \"tool_input\": {\"file_path\": \"${TREE}/wf-asks.s1.i1.json\"}, \"tool_response\": {}}",
+      "want": [
+          "\"additionalContext\": \"Show the user this work list now",
+          "WORK LIST  i1  RunPod gateway"
+      ]
+  },
+  "partition-display-at-threshold": {
+      "_why": "THE ONE MESSAGE THAT CARRIES MANY ASKS, MEASURED 2026-11-02 in runpod-claude-gateway `89bbc493`: i1 was one message with 16 asks and nothing carried at its submit, so the submit said no partition line and the asks were worked one at a time. The display is the first moment the asks are on disk and it fires before the work, so a list whose open items reach `PARTITION_MIN` is led by the partition line, ahead of the instruction to show the list. Fails on 89c606c's hook.",
+      "before": [
+          {
+              "script": "wf-task-tag",
+              "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"prompt\": \"I want a RunPod gateway with installers, a README with images, Docker packaging and setup commands\"}",
+              "not": [
+                  "With this many items open they are partitioned rather than worked one after another"
+              ]
+          },
+          {
+              "path_from": 0,
+              "path_rx": "/[^\\s\"]*wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+              "write": "{\"title\": \"RunPod gateway\", \"items\": [{\"ask\": \"write the cross-platform installer\", \"status\": \"open\"}, {\"ask\": \"add the README with images\", \"status\": \"open\"}, {\"ask\": \"package it in Docker\", \"status\": \"open\"}]}"
+          }
+      ],
+      "exit": 0,
+      "not": [
+          "Traceback"
+      ],
+      "script": "wf-turn-budget",
+      "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"tool_name\": \"Write\", \"tool_input\": {\"file_path\": \"${TREE}/wf-asks.s1.i1.json\"}, \"tool_response\": {}}",
+      "want": [
+          "\"additionalContext\": \"With this many items open they are partitioned rather than worked one after another",
+          "stays with it. Show the user this work list now",
+          "WORK LIST  i1  RunPod gateway"
+      ]
+  },
+  "partition-display-said-once-per-list": {
+      "_why": "ONCE PER MESSAGE, NOT ONCE PER DISPLAY. The display re-shows a list whenever a status changes, and the partition line is not re-said with it: the first display of four open asks leads with it, and the same list written again with one ask in progress is shown without it (`PARTITION_SAID` in the shown memo).",
+      "before": [
+          {
+              "script": "wf-task-tag",
+              "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"prompt\": \"I want a RunPod gateway with installers, a README with images, Docker packaging and setup commands\"}"
+          },
+          {
+              "path_from": 0,
+              "path_rx": "/[^\\s\"]*wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+              "write": "{\"title\": \"RunPod gateway\", \"items\": [{\"ask\": \"write the cross-platform installer\", \"status\": \"open\"}, {\"ask\": \"add the README with images\", \"status\": \"open\"}, {\"ask\": \"package it in Docker\", \"status\": \"open\"}, {\"ask\": \"add the setup and update commands\", \"status\": \"open\"}]}"
+          },
+          {
+              "script": "wf-turn-budget",
+              "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"tool_name\": \"Write\", \"tool_input\": {\"file_path\": \"${TREE}/wf-asks.s1.i1.json\"}, \"tool_response\": {}}",
+              "want": [
+                  "With this many items open they are partitioned rather than worked one after another"
+              ]
+          },
+          {
+              "path_from": 0,
+              "path_rx": "/[^\\s\"]*wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+              "write": "{\"title\": \"RunPod gateway\", \"items\": [{\"ask\": \"write the cross-platform installer\", \"status\": \"in progress\"}, {\"ask\": \"add the README with images\", \"status\": \"open\"}, {\"ask\": \"package it in Docker\", \"status\": \"open\"}, {\"ask\": \"add the setup and update commands\", \"status\": \"open\"}]}"
+          }
+      ],
+      "exit": 0,
+      "not": [
+          "Traceback",
+          "With this many items open they are partitioned rather than worked one after another"
+      ],
+      "script": "wf-turn-budget",
+      "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"tool_name\": \"Write\", \"tool_input\": {\"file_path\": \"${TREE}/wf-asks.s1.i1.json\"}, \"tool_response\": {}}",
+      "want": [
+          "\"additionalContext\": \"Show the user this work list now",
+          "  in progress  write the cross-platform installer"
+      ]
+  },
+  "partition-display-submit-already-said": {
+      "_why": "NOT TWICE IN ONE TURN. Three items were carried at this submit, so `earlier_lines` already said the partition line and the record is marked `partition`; the display of this message's own list, with those carried rows and one ask (four open), shows the list and does not say the line again.",
+      "before": [
+          {
+              "script": "wf-task-tag",
+              "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"prompt\": \"Also set up the setup script for brand new pods and the always-on versus on-demand modes\"}",
+              "want": [
+                  "With this many items open they are partitioned rather than worked one after another"
+              ]
+          },
+          {
+              "path_from": 0,
+              "path_rx": "/[^\\s\"]*wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+              "write": "{\"title\": \"Pod setup\", \"items\": [{\"ask\": \"set up the setup script for brand new pods\", \"status\": \"open\"}], \"carried\": [{\"issue\": \"i1\", \"ask\": \"package the gateway as a Docker image\", \"status\": \"open\"}, {\"issue\": \"i1\", \"ask\": \"write the cross-platform installer\", \"status\": \"open\"}, {\"issue\": \"i1\", \"ask\": \"add the README screenshots\", \"status\": \"open\"}]}"
+          }
+      ],
+      "exit": 0,
+      "not": [
+          "Traceback",
+          "With this many items open they are partitioned rather than worked one after another"
+      ],
+      "script": "wf-turn-budget",
+      "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"tool_name\": \"Write\", \"tool_input\": {\"file_path\": \"${TREE}/wf-asks.s1.i2.json\"}, \"tool_response\": {}}",
+      "want": [
+          "\"additionalContext\": \"Show the user this work list now",
+          "WORK LIST  i2  Pod setup"
+      ]
+  },
+  "partition-display-counts-carried-rows": {
+      "_why": "THE DISPLAY'S COUNT IS THE LIST'S OPEN ITEMS PLUS ITS CARRIED OPEN ROWS. Two carried rows were below the threshold at submit, so the submit said nothing; the session's list adds one ask of its own, which makes three open, and the display leads with the partition line. A carried row marked done does not count, which is why the third carried-shaped row here is `done` and the total is still exactly three.",
+      "before": [
+          {
+              "script": "wf-task-tag",
+              "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"prompt\": \"Also set up the setup script for brand new pods and the always-on versus on-demand modes\"}",
+              "not": [
+                  "With this many items open they are partitioned rather than worked one after another"
+              ]
+          },
+          {
+              "path_from": 0,
+              "path_rx": "/[^\\s\"]*wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+              "write": "{\"title\": \"Pod setup\", \"items\": [{\"ask\": \"set up the setup script for brand new pods\", \"status\": \"open\"}], \"carried\": [{\"issue\": \"i1\", \"ask\": \"package the gateway as a Docker image\", \"status\": \"open\"}, {\"issue\": \"i1\", \"ask\": \"write the cross-platform installer\", \"status\": \"open\"}, {\"issue\": \"i1\", \"ask\": \"add the README screenshots\", \"status\": \"done\"}]}"
+          }
+      ],
+      "exit": 0,
+      "not": [
+          "Traceback"
+      ],
+      "script": "wf-turn-budget",
+      "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"tool_name\": \"Write\", \"tool_input\": {\"file_path\": \"${TREE}/wf-asks.s1.i2.json\"}, \"tool_response\": {}}",
+      "want": [
+          "\"additionalContext\": \"With this many items open they are partitioned rather than worked one after another",
+          "WORK LIST  i2  Pod setup"
+      ]
+  },
   "dispatch-line-no-org": {
       "_why": "NO ORG, NO LINE: a project with neither a chart nor agents.",
       "exit": 0,
