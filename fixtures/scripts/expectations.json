@@ -10931,6 +10931,54 @@
           }
       }
   },
+  "model-lanes-lineup": {
+      "_why": "THE LINEUP IS THE PROJECT'S WHEN IT HAS ONE. An audited project's own selections are what a new agent or skill is pinned to, its source is named, and a blank Advisor model cell is a declined advisor rather than the shipped default. User request 2026-11-05: the proper model selections happen for people building skills and agents before an audit.",
+      "script": "wf-model-lanes",
+      "args": [
+          "--lineup"
+      ],
+      "exit": 0,
+      "want": [
+          "Model lineup, from .claude/workforce/org-config.md:",
+          "  creative-visual  claude-fable-5-1 · high",
+          "  code             claude-opus-5-5 · high",
+          "  advisor          (none recorded)"
+      ],
+      "not": [
+          "shipped org-config.template.md",
+          "INV-LANES",
+          "Traceback"
+      ]
+  },
+  "code-origin-lineup": {
+      "_why": "BEFORE ANY AUDIT, AN AGENT DEFINITION GETS THE SHIPPED DEFAULTS. The edit hook reaches every project with no org; on a `.claude/agents/*.md` write in a project with no org-config.md it shows the template's lineup, and the creative-visual and advisor defaults are Opus 5.5, not the Ultra-tier frontier model the audit still recommends. User decision 2026-11-05. Not a git repository, so the origin report is absent and the lineup alone is emitted.",
+      "script": "wf-code-origin",
+      "stdin_raw": "{\"tool_name\": \"Write\", \"cwd\": \"${TREE}\", \"tool_input\": {\"file_path\": \".claude/agents/designer.md\", \"content\": \"x\"}}",
+      "exit": 0,
+      "want": [
+          "hookSpecificOutput",
+          "Model lineup, from the shipped org-config.template.md (no project org-config.md):",
+          "creative-visual  claude-opus-5-5 \\u00b7 medium",
+          "advisor          claude-opus-5-5",
+          "Pick the lane whose work this file does"
+      ],
+      "not": [
+          "claude-fable-5-1",
+          "Where the code in",
+          "Traceback"
+      ]
+  },
+  "code-origin-lineup-quiet": {
+      "_why": "ONLY A DEFINITION GETS THE LINEUP. A reference file inside a skill sits one directory from a SKILL.md and pins no model, so the hook stays silent on it exactly as it does on any other file outside a repository.",
+      "script": "wf-code-origin",
+      "stdin_raw": "{\"tool_name\": \"Write\", \"cwd\": \"${TREE}\", \"tool_input\": {\"file_path\": \".claude/skills/poster/references/palette.md\", \"content\": \"x\"}}",
+      "exit": 0,
+      "not": [
+          "hookSpecificOutput",
+          "Model lineup",
+          "Traceback"
+      ]
+  },
   "model-lanes-unresolved": {
       "_why": "A LINEUP IT CANNOT READ STRIPS NOTHING. An org-config with no lane table and no budget receipt resolves every lane to nothing, and a blank read as `inherit` would delete the pin from every file in the project. The file is reported UNRESOLVED, left byte-for-byte, and the run exits 1.",
       "script": "wf-model-lanes",

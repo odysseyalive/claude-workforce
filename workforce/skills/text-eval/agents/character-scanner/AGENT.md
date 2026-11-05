@@ -6,6 +6,7 @@ tools: Read, Bash
 disallowedTools: Agent
 context: none
 model: claude-opus-4-6
+effort: medium
 ---
 
 # Character Scanner Agent

@@ -2049,7 +2049,7 @@ not, fail **by name** — never a generic error.
 Budget Receipt
 | Lane / Tier          | Model  | Effort | Source                   |
 | analytical / Lead    | <id>   | medium | asked this run           |
-| analytical / IC      | <id>   | medium | recommended default (first run) |
+| analytical / IC      | <id>   | medium | shipped default (first run) |
 | creative-text        | <id>   | medium | asked this run           |
 | creative-visual      | <id>   | medium | asked this run           |
 | code                 | <id>   | medium | blank -> analytical      |
@@ -2064,11 +2064,12 @@ Lane assignment (per employee)
 | ops-runner         | ops         | analytical | unclassified - fell to the baseline    |
 ```
 
-**A recommended default and a user's active choice must never render alike.** A first-run object that
-resolved to its lane's recommendation (`audit-setup.md` § Step 0.4a / § Step 0.4b) carries the
+**A shipped default and a user's active choice must never render alike.** A first-run object that
+resolved to its lane's shipped default (`audit-setup.md` § Step 0.4a / § Step 0.4b) carries the
 first-run Source shown in the receipt above; if the user changed it, it carries `asked this run`
-instead. A value that arrived as the recommendation nobody chose must never look like one chosen
-deliberately.
+instead. A value that arrived as the default nobody chose must never look like one chosen
+deliberately. *The Source read `recommended default (first run)` until 2026-11-05, when the shipped
+default and the recommendation became two models on creative-visual and the advisor.*
 
 **The pool is read from the shipped template, never from the project config.** The four statics behind
 the receipt come from `org-config.template.md` § Model statics only. If this project's `org-config.md`

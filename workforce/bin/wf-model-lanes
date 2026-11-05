@@ -5,6 +5,8 @@
     wf-model-lanes --root <tree> --judge PATH LANE WHY …  plan with these lane judgments applied
     wf-model-lanes --root <tree> [--judge …] --execute    record the judgments, rewrite what drifted
     wf-model-lanes --root <tree> --check                  verify: read-only, exit 1 on any drift
+    wf-model-lanes --root <tree> --lineup                 print each lane's model and effort, the
+                                                          advisor, and the file they come from
 
 WHY THIS EXISTS. A `model:` line was rewritten only when a budget cell changed
 (`procedures/model-map.md` § Model Rewrite), and a re-audit offers the recorded value as the
@@ -32,12 +34,18 @@ main session makes it (`procedures/audit.md` Step 2), applying the floor rules i
   apply      only the `model:` and `effort:` lines that differ, written THROUGH a symlink with
              `open(path, "w")` (SKILL.md Atomic-or-Absent rule 3) and verified by re-reading
 
+THE LINEUP BEFORE ANY AUDIT. User request 2026-11-05: "the proper model selections happen for
+people building skills and agents prior to even running an audit". `--lineup` prints the lineup
+`resolve` reads — the project's `org-config.md`, else the shipped template's defaults — with the
+work each lane is for, and needs no `.claude/` under the root. `wf-code-origin` imports
+`lineup_lines` and shows the same lines before an edit to an agent or skill definition.
+
 A SHIPPED FILE IS REPORTED, NEVER WRITTEN. `update` overwrites anything under the workforce skill
 and any path `.installed-external` records, so a rewrite there is undone by the next install; the
 distribution's own pins are held to the template's lane picks at release instead. A symlink that
 resolves outside the project is reported the same way: that file belongs to somebody else.
 
-EXIT  0  the plan printed, or every write verified
+EXIT  0  the plan or the lineup printed, or every write verified
       1  --check found drift; or --execute left a file unjudged or unresolved, a write failed
          to verify, or a symlink was lost or retargeted
       2  usage: no `.claude/` under the root, no lineup to resolve, an unknown lane, or a
@@ -61,6 +69,17 @@ TEMPLATE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__
 # The five employee-bearing lanes of `org-config.template.md` § The four lanes, spelled as
 # one argv token each. The analytical lane carries the tier split, so it is two tokens.
 LANES = ("analytical-lead", "analytical-ic", "creative-text", "creative-visual", "code")
+# What each lane is for, in the words of that section's table and the budget questions'
+# wording, so a reader of `--lineup` can pick a lane without opening the template.
+LANE_WORK = {
+    "analytical-lead": "agents that coordinate: hand work out and check what comes back",
+    "analytical-ic": "agents that do the work: research, review, ops, anything not creative or code",
+    "creative-text": "writing and copy: prose, docs, voice, translation",
+    "creative-visual": "graphics, visual design, frontend design, image generation",
+    "code": "writing, testing and refactoring software",
+}
+ADVISOR_WORK = "the main session's second opinion; no agent runs on it"
+ADVISOR_RX = re.compile(r"\badvisorModel\s*:\s*`?([A-Za-z0-9][\w.\[\]-]*)")
 RUNGS = ("max", "xhigh", "high", "medium", "low")
 KEY_RX = re.compile(r"^([A-Za-z_][\w-]*)\s*:(.*)$")
 MODEL_RX = re.compile(r"^[A-Za-z0-9][\w.\[\]-]*$")
@@ -196,17 +215,74 @@ def parse_lineup(text):
     return lanes, overrides
 
 
-def load_lineup(root):
-    """`(lanes, overrides, source label)`, or None when neither file can be read."""
-    for path, label in ((os.path.join(root, CONFIG_REL), CONFIG_REL),
-                        (TEMPLATE, "the shipped org-config.template.md (no project org-config.md)")):
+def parse_advisor(text):
+    """The advisor model an org-config records, or None.
+
+    TOLERANT BY MEASUREMENT, like `parse_lineup`. Live configs spell it three ways: the
+    template's `| Advisor model | `id` |`, a budget receipt's `| advisor | main session | `id` |
+    n/a |`, and a prose `advisorModel: id`. In a table only a backticked cell is a model, because
+    the lane table's `| **Advisor** | the main session's advisor … | no |` names none. A blank
+    `Advisor model` cell is a declined advisor, and reads as None.
+    """
+    for raw in text.splitlines():
+        line = raw.strip()
+        if line.startswith("|") and line.endswith("|"):
+            cells = [c.strip() for c in line.strip("|").split("|")]
+            key = cells[0].replace("`", "").replace("*", "").strip().lower()
+            if key == "advisor model":
+                return _model_cell(cells[1]) if len(cells) > 1 and "`" in cells[1] else None
+            if key == "advisor":
+                found = [_model_cell(c) for c in cells[1:] if "`" in c]
+                if any(found):
+                    return next(m for m in found if m)
+            continue
+        m = ADVISOR_RX.search(line)
+        if m:
+            return m.group(1)
+    return None
+
+
+def lineup_source(root):
+    """`(text, source label)` of the file the lineup is read from, or None when neither can be
+    read. A `root` of None reads the shipped template alone: a user-scope definition runs in
+    every project, so no one project's `org-config.md` governs it."""
+    places = [] if root is None else [(os.path.join(root, CONFIG_REL), CONFIG_REL)]
+    places.append((TEMPLATE, "the shipped org-config.template.md (no project org-config.md)"))
+    for path, label in places:
         try:
             with open(path, encoding="utf-8") as fh:
-                lanes, overrides = parse_lineup(fh.read())
+                return fh.read(), label
         except (OSError, UnicodeDecodeError):
             continue
-        return lanes, overrides, label
     return None
+
+
+def load_lineup(root):
+    """`(lanes, overrides, source label)`, or None when neither file can be read."""
+    src = lineup_source(root)
+    if src is None:
+        return None
+    lanes, overrides = parse_lineup(src[0])
+    return lanes, overrides, src[1]
+
+
+def lineup_lines(root):
+    """The lineup as lines — each lane's model and effort and the work it is for, then the
+    advisor — or None when no lineup can be read. `--lineup` prints these and `wf-code-origin`
+    imports this function, so the lineup a definition's author sees and the one the audit
+    reconciles against are one reading."""
+    src = lineup_source(root)
+    if src is None:
+        return None
+    text, label = src
+    lanes, _overrides = parse_lineup(text)
+    out = [f"Model lineup, from {label}:"]
+    for lane in LANES:
+        c = lanes[lane]
+        pin = f"{c['model'] or '(none selected)'} · {c['effort'] or '(none selected)'}"
+        out.append(f"  {lane:<16} {pin:<24}  {LANE_WORK[lane]}")
+    out.append(f"  {'advisor':<16} {parse_advisor(text) or '(none recorded)':<24}  {ADVISOR_WORK}")
+    return out
 
 
 def resolve(lane, name, tier, lanes, overrides):
@@ -407,11 +483,23 @@ def main():
                     % ", ".join(LANES))
     ap.add_argument("--execute", action="store_true", help="write the record and the rewrites")
     ap.add_argument("--check", action="store_true", help="read-only; exit 1 on any drift")
+    ap.add_argument("--lineup", action="store_true",
+                    help="print each lane's model and effort and the advisor; read-only")
     args = ap.parse_args()
     if args.check and (args.execute or args.judge):
         ap.error("--check is read-only; it takes neither --execute nor --judge")
+    if args.lineup and (args.check or args.execute or args.judge):
+        ap.error("--lineup only prints; it takes no other mode")
 
     root = os.path.abspath(args.root)
+    if args.lineup:
+        lines = lineup_lines(root)
+        if lines is None:
+            print(f"wf-model-lanes: no lineup — neither {CONFIG_REL} nor {TEMPLATE} is readable",
+                  file=sys.stderr)
+            return 2
+        print("\n".join(lines))
+        return 0
     if not os.path.isdir(os.path.join(root, ".claude")):
         print(f"wf-model-lanes: no .claude under {root}", file=sys.stderr)
         return 2

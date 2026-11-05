@@ -5,6 +5,7 @@ persona: "Codebase gardener who walks the tree pulling what nothing calls anymor
 tools: Read, Bash
 disallowedTools: Agent
 model: claude-opus-5-5
+effort: high
 ---
 
 # Dead-Code Gardener (L2 — post-write)

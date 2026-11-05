@@ -34,7 +34,7 @@ stale copy is exactly how a re-audited project once proposed the pre-`claude-son
 
 | # | Model ID | Context | Max output | Notes |
 |---|---|---|---|---|
-| 1 | `claude-fable-5-1` | 1M | 128K | the most capable model, priced above the Opus tier ($10/$50); sees what it judges. **Recommended for creative-visual** (graphics & frontend design); the session advisor's pick too (§ Session advisor) |
+| 1 | `claude-fable-5-1` | 1M | 128K | the most capable model, priced above the Opus tier ($10/$50); sees what it judges. **Recommended for creative-visual** (graphics & frontend design); the session advisor's pick too (§ Session advisor). Recommended, never the shipped default: it needs an Ultra-tier account |
 | 2 | `claude-opus-4-8` | 1M | 128K | the Opus tier one generation back ($5/$25). **Recommended for analytical Lead** (agents that coordinate) and **Recommended for analytical IC** (agents that do the work) |
 | 3 | `claude-opus-4-6` | 1M | 128K | the Opus tier two generations back ($5/$25). **Recommended for creative-text** (writing & copy) |
 | 4 | `claude-opus-5-5` | 1M | 128K | the current Opus, and the cheapest row in this pool ($4/$20); commits and drives. **Recommended for code** |
@@ -77,11 +77,27 @@ to surface it destroys that ranking for every object that shares the pool — an
 all four lane objects (the advisor draws from it too, and takes the pick row 1 names for it, § Session
 advisor).
 
+**A recommendation is not a default either.** The DEFAULT is the model a lane runs before anyone has
+answered the budget: the cell in § The four lanes (the advisor's in § Session advisor). It is what a
+project that has never been audited runs on, what `wf-model-lanes --lineup` reports to anyone writing an
+agent or skill there, and what the budget marks `(default)` on a first run. The RECOMMENDATION is the
+Notes-column label above. The two name the same model on every lane except creative-visual. There, and
+on the session advisor, `claude-fable-5-1` is recommended and the shipped default is `claude-opus-5-5`.
+The frontier model needs an Ultra-tier account, and a default has to run on every account `install`
+reaches, so the frontier model is recommended but is not the default.
+A project whose account has it takes it in one click at the audit.
+
+*User decision, 2026-11-05: "not everybody is going to have an Anthropic Ultra account. So I can't have
+Fable as a default for the Workforce system, but I still want it to be the default recommended for the
+advisor and visual work … for the default models used for any project that hasn't been audited I would
+change in that default model from Fable to Opus 5.5." And: "This would allow the proper model selections
+to happen for people building skills and agents prior to even running an audit."*
+
 *The per-lane recommendations were reviewed against published third-party benchmarks (SWE-bench,
 Terminal-Bench, and the Anthropic model reference) on 2026-08-17, and again against the Anthropic model
 reference on 2026-09-02, when `claude-fable-5-1` shipped. That review moved **creative-visual** and the
 **session advisor** onto `claude-fable-5-1` (the most capable widely released model, and the one whose
-lower effort rungs are documented to match or beat prior models' higher ones), where both still sit. `claude-opus-4-6` stays the creative-text pick.*
+lower effort rungs are documented to match or beat prior models' higher ones), where both recommendations still sit. Since 2026-11-05 neither is the shipped default (*A recommendation is not a default either*, above). `claude-opus-4-6` stays the creative-text pick.*
 
 ***The 2026-09-05 revision is a user decision, not a benchmark re-read, and is recorded as one.** It set
 three picks by directive — advisor `claude-fable-5-1`, code `claude-opus-5`, analytical Lead
@@ -148,9 +164,9 @@ only be a rung already offered or one that does not exist.
 **Both creative lanes recommend `medium` deliberately, so generative work does not start at high token
 cost.** Because the recommended rung is the forced first-run default (INV-BUDGET), that recommendation is
 the cost lever: `medium` is a deliberate floor a re-audit must not silently ratchet upward, and neither
-creative lane is ever recommended `high`, `xhigh`, or `max`. For `creative-visual`, whose model
-`claude-fable-5-1` spans the full ladder (`platform.md` fact 12c), the higher rungs are opt-in cost the
-user chooses, never the starting point. `code` spans the same full ladder on `claude-opus-5-5` (fact 12c
+creative lane is ever recommended `high`, `xhigh`, or `max`. For `creative-visual`, whose shipped
+default `claude-opus-5-5` and recommended `claude-fable-5-1` both span the full ladder (`platform.md`
+fact 12c), the higher rungs are opt-in cost the user chooses, never the starting point. `code` spans the same full ladder on `claude-opus-5-5` (fact 12c
 again) and starts at `high` for the reason § Code gives.
 
 **Why these rungs are the cost-effective ones for this pool (the receipt).** Read 2026-09-02 from the
@@ -172,8 +188,8 @@ advisor). Re-read the curves when the pool changes; they are per-model and per-w
 
 **Availability is not uniform, and the budget offers only rungs the lane's selected model supports.**
 Three that bite with this pool: `claude-opus-4-6` (the creative-text pick) has no `xhigh` — its ladder
-is `max`/`high`/`medium`/`low`; `claude-fable-5-1` (creative-visual) and `claude-opus-5-5` (code) each
-accept all five rungs, but the budget offers the four nearest each lane's recommendation: for
+is `max`/`high`/`medium`/`low`; `claude-opus-5-5` (code, and creative-visual's shipped default) and
+`claude-fable-5-1` (creative-visual's recommendation) each accept all five rungs, but the budget offers the four nearest each lane's recommendation: for
 creative-visual's `medium` that is `xhigh`/`high`/`medium`/`low`, dropping the far `max` end; for code's
 `high` it is `max`/`xhigh`/`high`/`medium`, dropping `low` (`references/platform.md` fact 12c, DOCUMENTED
 and unverified); and
@@ -327,7 +343,7 @@ model reasons about but cannot do. For a **domain-overseeing Lead** the default 
 seat PLUS a domain-model critic IC beneath it (option 2): the Lead keeps the steerable seat for the
 reason above and homes the seeing in a `creative-visual` or `code` critic. Only when the org is too
 small to carry that critic is the Lead itself repinned onto the domain lane (option 1, the small-org
-exception, recorded with its reason). **This does not claim `claude-fable-5-1` orchestrates as well as
+exception, recorded with its reason). **This does not claim a creative-visual model orchestrates as well as
 the analytical seat — that is unmeasured;** the point is the reverse — that a routing Lead should
 not be moved onto a producer model to buy a seeing ability it can delegate to a critic.
 
@@ -342,16 +358,19 @@ runs on `creative-text`; graphics, visual design, frontend design, and image gen
 | Creative-text effort | medium |
 | Departments on creative-text | |
 
-| Creative-visual model | `claude-fable-5-1` |
+| Creative-visual model | `claude-opus-5-5` |
 |---|---|
 | Creative-visual effort | medium |
 | Departments on creative-visual | |
 
-creative-visual runs `claude-fable-5-1`, the most capable model, row 1 of the pool and recommended for
-this lane in § Model statics (the sole home of the annotation the budget question reads). It is offered
-where the cost order puts it, marked `(recommended)` in place like every other lane's pick — and it
-carries that mark on a re-audit too, beside whatever the project recorded (§ Session advisor states the
-same separation for the advisor). This lane's pick sat outside the pool until 2026-09-02 and led the
+creative-visual ships on `claude-opus-5-5`, the cell above, and is RECOMMENDED `claude-fable-5-1`, the
+most capable model and row 1 of the pool (§ Model statics, the sole home of the annotation the budget
+question reads). The two differ on purpose: the frontier model needs an Ultra-tier account, and the cell
+above is what every project that has never been audited runs on, so it must be a model every account can
+call (§ Model statics, *A recommendation is not a default either*; user decision 2026-11-05). On a first
+run the budget marks `claude-opus-5-5` `(default)` and `claude-fable-5-1` `(recommended)`, each where the
+cost order puts it. Fable carries its mark on a re-audit too, beside whatever the project recorded
+(§ Session advisor states the same separation for the advisor). This lane's pick sat outside the pool until 2026-09-02 and led the
 slate as the one sanctioned exception (§ Model statics); the frontier model heads the table now, so the
 exception is unused. creative-text stays on `claude-opus-4-6`.
 
@@ -412,19 +431,22 @@ for any employee on code — an IC on this lane runs `high`, not the IC row's `m
 
 The advisor model runs alongside the main session only — it does not reach spawned employees, which is
 why it has no effort setting: nothing spawns at an effort level it controls. **Its recommendation is the
-pool row whose Notes cell names the session advisor** (§ Model statics, row 1 as shipped: the same pick
-as creative-visual, and the one seat where the frontier model is recommended over the code lane's
-`claude-opus-5-5`, because the advisor is a second opinion on the main session's own reasoning and that is
-where capability pays), marked `(recommended)` in place in the cost order and the default on a
-first run exactly as a lane's recommendation is; on a re-audit the recorded `advisorModel` is the
-`(current)` option instead (`audit-setup.md` § Step 0.2, and § What "pre-selected" means on screen for
+pool row whose Notes cell names the session advisor** (§ Model statics, row 1 as shipped: the same
+recommendation as creative-visual, and the one seat where the frontier model is recommended over the code
+lane's `claude-opus-5-5`, because the advisor is a second opinion on the main session's own reasoning and
+that is where capability pays), marked `(recommended)` in place in the cost order. **Its first-run default
+is the cell below, not the recommendation** — `claude-opus-5-5` as shipped, for the account reason
+§ Model statics gives (user decision 2026-11-05), marked `(default)` exactly as a lane's shipped default
+is; on a re-audit the recorded `advisorModel` is the `(current)` option instead (`audit-setup.md` § Step 0.2, and § What "pre-selected" means on screen for
 a recorded model the pool no longer carries). Its object carries a blank field where the user types **none** to
 decline one; **`none` removes the `advisorModel` key from `.claude/settings.json` (or
 `.claude/settings.local.json`, whichever carried it) entirely** — it is never written as an empty string
 or a sentinel value. The cell below is the shipped default; an instantiated copy records what was chosen,
-and blank there means the user declined one.
+and blank there means the user declined one. **`install` and `update` never write the shipped default into
+anyone's settings:** an absent `advisorModel` key is how a declined advisor is recorded, so writing one
+would overwrite that choice. The default reaches settings only as the audit's answer.
 
-| Advisor model | `claude-fable-5-1` |
+| Advisor model | `claude-opus-5-5` |
 |---|---|
 
 ### Lane assignment is total, and its residual is reported

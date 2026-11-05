@@ -32,9 +32,16 @@ user's note, and it classifies every unmarked commit.
 MOSTLY-AI PROJECTS. Where the human layer is nearly empty, the context says so: the
 user's own words — directives, notes, requests — are that project's human precedent.
 
+THE MODEL LINEUP, AT THE EDIT THAT PICKS A MODEL. User request 2026-11-05: "the
+proper model selections happen for people building skills and agents prior to even
+running an audit". An edit to an agent or skill definition also gets the project's
+lineup — each lane's model and effort and the work it is for — from `wf-model-lanes`,
+whose `lineup_lines` the audit reconciles against, so the two cannot disagree. It needs
+no git: a user-scope agent lives outside any repository. Every other path gets nothing.
+
 FAIL-OPEN AND SILENT ON NO SIGNAL. Always exits 0, never denies, never asks. Not a
-git repository, git missing, a timeout, a binary file: no output. A new file gets the
-human-created files beside it instead of a blame.
+git repository, git missing, a timeout, a binary file: no origin report. A new file gets
+the human-created files beside it instead of a blame.
 """
 import json
 import os
@@ -46,6 +53,11 @@ AI_MARK = re.compile(r"Co-Authored-By:\s*Claude|Claude-Session:|Generated with \
                      re.IGNORECASE)
 NOTE = ".claude/code-origin.json"
 TIMEOUT = 4
+# The definitions a `model:` line lives in — the set `wf-model-lanes.candidates` reads,
+# at any depth, so a source tree that ships skills is covered as well as a `.claude/`.
+AGENT_DEF = re.compile(r"^(.*)/\.claude/agents/(?:.+/)?[^/]+\.md$")
+SKILL_DEF = re.compile(r"^(.*)/skills/[^/]+/(?:SKILL\.md|agents/[^/]+/AGENT\.md)$")
+USER_DEF = re.compile(r"^(?:agents/(?:.+/)?[^/]+\.md|skills/[^/]+/(?:SKILL\.md|agents/[^/]+/AGENT\.md))$")
 
 
 def git(root, *args):
@@ -165,6 +177,64 @@ def mostly_ai_hint():
             "words: directives, notes, and requests.")
 
 
+def definition_root(path, cwd):
+    """`(True, root)` when `path` defines an agent or a skill, else `(False, None)`.
+
+    `root` is the project whose `org-config.md` governs the lineup: the directory holding
+    the definition's `.claude/`, or for a skill outside any `.claude/` the session's
+    project. A user-scope definition gets None — it runs in every project, so no one
+    project's lineup governs it and the shipped template's does.
+    """
+    p = path.replace(os.sep, "/")
+    cfg = os.path.abspath(os.environ.get("CLAUDE_CONFIG_DIR")
+                          or os.path.join(os.path.expanduser("~"), ".claude"))
+    cfg = cfg.replace(os.sep, "/").rstrip("/") + "/"
+    if p.startswith(cfg):
+        return (True, None) if USER_DEF.match(p[len(cfg):]) else (False, None)
+    m = AGENT_DEF.match(p)
+    if m:
+        return True, m.group(1) or "/"
+    m = SKILL_DEF.match(p)
+    if m:
+        base = m.group(1)
+        return True, (base[:-len("/.claude")] or "/") if base.endswith("/.claude") else cwd
+    return False, None
+
+
+def _sibling(name):
+    """A sibling shipped script, imported by path, leaving no bytecode in the shipped `bin/`
+    (`wf-catalog._sibling`, the same loader)."""
+    import importlib.machinery
+    import importlib.util
+    prev = sys.dont_write_bytecode
+    sys.dont_write_bytecode = True
+    try:
+        mod_name = name.replace("-", "_")
+        loader = importlib.machinery.SourceFileLoader(
+            mod_name, os.path.join(os.path.dirname(os.path.abspath(__file__)), name))
+        mod = importlib.util.module_from_spec(importlib.util.spec_from_loader(mod_name, loader))
+        loader.exec_module(mod)
+        return mod
+    finally:
+        sys.dont_write_bytecode = prev
+
+
+def describe_lineup(path, cwd):
+    is_def, root = definition_root(path, cwd)
+    if not is_def:
+        return None
+    # FAIL-OPEN BY CONSTRUCTION: a sibling that will not load or a template it cannot
+    # parse costs the lineup, never the origin report and never the edit.
+    try:
+        lines = _sibling("wf-model-lanes").lineup_lines(root)
+    except Exception:
+        return None
+    if not lines:
+        return None
+    return "\n".join(lines + ["Pick the lane whose work this file does and set its `model:` and "
+                              "`effort:` to that lane's values."])
+
+
 def main():
     try:
         payload = json.loads(sys.stdin.read() or "{}")
@@ -177,6 +247,10 @@ def main():
     try:
         cwd = payload.get("cwd") or os.getcwd()
         path = os.path.abspath(os.path.join(cwd, path))
+    except (OSError, ValueError):
+        return 0
+    texts = []
+    try:
         root = git(os.path.dirname(path) if os.path.isdir(os.path.dirname(path)) else cwd,
                    "rev-parse", "--show-toplevel").strip()
         origins = commit_origins(root)
@@ -184,9 +258,12 @@ def main():
         tracked = subprocess.run(["git", "-C", root, "ls-files", "--error-unmatch", "--", rel],
                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                  timeout=TIMEOUT).returncode == 0
-        text = describe_file(root, rel, origins) if tracked else describe_new(root, rel, origins)
+        texts.append(describe_file(root, rel, origins) if tracked
+                     else describe_new(root, rel, origins))
     except (OSError, ValueError, subprocess.SubprocessError):
-        return 0
+        pass
+    texts.append(describe_lineup(path, cwd))
+    text = "\n\n".join(t for t in texts if t)
     if text:
         print(json.dumps({"hookSpecificOutput": {
             "hookEventName": "PreToolUse",

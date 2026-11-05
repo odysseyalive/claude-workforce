@@ -5,6 +5,7 @@ persona: "Staff engineer who reads the whiteboard sketch before a line is typed 
 tools: Read, Bash
 disallowedTools: Agent
 model: claude-opus-5-5
+effort: high
 ---
 
 # Code Design Advisor (L1 — pre-write)

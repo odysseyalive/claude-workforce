@@ -104,8 +104,9 @@ keeping the current value costs **one click**, and an in-pool current value **ne
 | The object's resolved default is… | Rendered as |
 |---|---|
 | a recorded value that is in the offered set (a re-audit) | that option, labelled `(current)`, **where the cost order already puts it** |
-| the lane's recommendation, with nothing recorded (a first run) | that option, labelled `(recommended)`, where the cost order puts it |
-| both at once | one option, labelled `(current · recommended)` |
+| the lane's shipped default, with nothing recorded (a first run), and it is also the recommendation | that option, labelled `(recommended)`, where the cost order puts it |
+| the lane's shipped default, with nothing recorded (a first run), and the recommendation is another model (creative-visual and the advisor, as shipped) | two options: the default labelled `(default)` and the recommendation labelled `(recommended)`, each where the cost order puts it |
+| a recorded value that is also the recommendation | one option, labelled `(current · recommended)` |
 | a recorded value **outside** the pool (e.g. an advisor still on a model the pool has since replaced) | an extra option **placed LAST**, after the cost-ranked pool, labelled `(current — not in the pool)`; to fit the four-option cap, drop the cheapest pool row that is not the recommendation |
 
 **The out-of-pool current goes last, not first.** Leading with it breaks the cost ranking every object
@@ -367,8 +368,10 @@ one-click `(current)` option (§ What "pre-selected" means on screen):
 
 It offers the same model pool as the model budget, in the same cost order, and **takes as its
 recommendation the pool row whose Notes cell names the session advisor** (`org-config.template.md`
-§ Model statics, row 1 as shipped, the same pick as creative-visual), marked `(recommended)` in
-place on a first run; a recorded `advisorModel` is the `(current)` option instead (Step 0.3), placed last
+§ Model statics, row 1 as shipped, the same recommendation as creative-visual), marked `(recommended)`
+in place. On a first run its default is the shipped cell in `org-config.template.md` § Session advisor,
+marked `(default)` — `claude-opus-5-5` as shipped, which is not the recommendation (§ Step 0.4a); a
+recorded `advisorModel` is the `(current)` option instead (Step 0.3), placed last
 if the pool no longer carries it. Typing
 **none** in the blank field removes the `advisorModel` key from settings
 entirely (§ Step 0.4a; `org-config.template.md` § Session advisor) — it is never written as an empty or
@@ -700,13 +703,25 @@ model reads as recommended — that is a change to the question the user sees, a
 
 **On a first run there is no recorded value, and the default is still deterministic.**
 Resolve each object's default in priority order: (1) the value in this project's `org-config.md` when one
-is present — a re-audit; ELSE (2) the lane's recommended model (§ Model statics, Notes column). There is
-no third fallback —
-**a first run defaults to the recommendation** —
-never the first or most-expensive static, and never unset, so the recommendation is the forced budget
+is present — a re-audit; ELSE (2) the lane's **shipped default**, its cell in `org-config.template.md`
+§ The four lanes (the advisor's in § Session advisor). There is no third fallback —
+**a first run defaults to the shipped default** —
+never the first or most-expensive static, and never unset, so the shipped default is the forced budget
 selection unless the user overrides it, identically on every project. This is a VALUE default and is
-orthogonal to list POSITION: it does not reorder the options and does not promote the recommended
-static to the first position; the ordering rule above — position never moves to surface a pick — STANDS.
+orthogonal to list POSITION: it does not reorder the options and does not promote the default or the
+recommended static to the first position; the ordering rule above — position never moves to surface a
+pick — STANDS.
+
+**The shipped default and the recommendation are two things, and on two objects they differ.** The
+recommendation is the Notes-column label (§ Model statics); the shipped default is what a project that has
+never been audited already runs on. They name the same model on every lane except creative-visual, and
+there and on the advisor `claude-fable-5-1` is recommended while `claude-opus-5-5` is the default,
+because the frontier model needs an Ultra-tier account (`org-config.template.md` § Model statics,
+*A recommendation is not a default either*). Each of those objects shows both labels on a first run
+(§ What "pre-selected" means on screen). *Until 2026-11-05 this rule read "a first run defaults to the
+recommendation"; the two were one model on every object then. User decision that day: Fable stays "the
+default recommended for the advisor and visual work", and a project that has not been audited runs Opus
+5.5.*
 
 **The advisor object lives on the backup call** (§ Step 0.2), its `(current)` option read from
 `advisorModel` in project settings (Step 0.3). Choosing a model writes `advisorModel`;

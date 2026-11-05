@@ -36,9 +36,10 @@ in its message and asked in that order, advisor last** (`audit-setup.md` § Rend
   each marking its recommended rung `(recommended)` (`audit-setup.md` § Step 0.4b) and offering only rungs
   the lane's selected model supports — at most four, because `AskUserQuestion` caps options at four.
 - **Advisor — 1 object:** `advisorModel` from settings is its `(current)` option on a re-audit (`audit-setup.md` § What "pre-selected" means on screen); same model pool,
-  and on a first run its default is the recommendation — the pool row whose Notes cell names the
-  session advisor (`org-config.template.md` § Model statics), marked `(recommended)` in place in the cost
-  order like any lane's. Its **blank field is where the user types `none` to remove the `advisorModel` key
+  marking `(recommended)` the pool row whose Notes cell names the session advisor
+  (`org-config.template.md` § Model statics) in place in the cost order like any lane's; on a first run
+  its default is the shipped cell in § Session advisor, marked `(default)`, which as shipped is not the
+  recommendation (`audit-setup.md` § Step 0.4a). Its **blank field is where the user types `none` to remove the `advisorModel` key
   entirely**. It rides its own call because `model-map` has no backup/consent call for it to sit on (in a
   full `audit` it is the second of the backup call's three objects, `audit-setup.md` § Step 0.2), and because
   every budget call is already at its object cap.
@@ -124,8 +125,8 @@ Print the resolved table with the **source of every value**:
 | Advisor                | <id>  |        | asked this run            |
 ```
 
-**Every level that resolved a value appears by name** — including `recommended default (first run)`,
-the Source of an object that resolved to its lane's recommendation on a first run
+**Every level that resolved a value appears by name** — including `shipped default (first run)`,
+the Source of an object that resolved to its lane's shipped default on a first run
 (`references/audit-setup.md` § Step 0.4a / § Step 0.4b), distinct from `asked this run` when the user
 changed it. `employee override (pinned)` and `analytical default` must
 never render alike: a pin is a standing exception, and one left behind after the org moved is invisible

@@ -13,7 +13,7 @@ Budget
 | analytical / Lead | <id>    | medium | unchanged, pre-selected |
 | analytical / IC   | <id>    | medium | unchanged, pre-selected |
 | creative-text     | <id>    | medium | lane override           |
-| creative-visual   | <id>    | medium | recommended default (first run) |
+| creative-visual   | <id>    | medium | shipped default (first run) |
 | code              | <id>    | medium | blank -> analytical     |
 | advisor           | <id>    | --      | unchanged, pre-selected |
 
@@ -30,7 +30,7 @@ Health    fix ratio 0.31 ↓ · improvements 14/mo (4 deletions) · 1 two-live p
 ```
 
 **The Payroll block leads**, and every row names where its value came from — `asked this run` /
-`unchanged, pre-selected` / `recommended default (first run)` / `analytical default` / `lane override` / `blank -> analytical`. A setup question that was skipped
+`unchanged, pre-selected` / `shipped default (first run)` / `analytical default` / `lane override` / `blank -> analytical`. A setup question that was skipped
 and one that was answered must never look the same, which is the failure this receipt exists to make
 impossible.
 
