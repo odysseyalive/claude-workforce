@@ -363,6 +363,13 @@ must be able to invoke X — so its `## Procedure` grants that invocation and it
 is NOT two-canonical-texts drift — Sources = identity+channel, Procedure = exercised step; they
 reference the same skill for different purposes.
 
+**One channel is exempt from the Procedure step, by name: `Skill(records-code-map)`**, the
+map-before-you-search line `handbook-templates.md` § Sources gives every IC. The code map is a
+navigation instrument, generated on every call and never stored, not a store of the role's truth; the
+Sources section's own search-every-source clause exercises it before any search. So it needs no
+numbered step, and `wf-conform` does not report it as a dead pointer (odyssey-alive upstream inbox
+row 30, 2026-10-16). Every other `Skill(X)` is held to the rule above.
+
 ### The project ledger is a type-2 source on every producing craft
 
 **Every producing craft is wired to the project ledger as a type-2 source**, `consult` mode

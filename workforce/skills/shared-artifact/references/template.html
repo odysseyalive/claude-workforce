@@ -253,21 +253,33 @@ figcaption { font-size: 13px; color: var(--muted); margin-top: 8px; }
   </main>
 </div>
 
-<script>
-/* The contents rail highlights the section in view. The page is fully readable without
-   this, so a browser with no IntersectionObserver loses the highlight and nothing else. */
+<script id="rail-highlight">
+/* The contents rail highlights the section being read: the last section whose top has
+   passed a line 30% down the window, or the last section once the page is scrolled to the
+   bottom. A clicked entry is highlighted at once and kept while the page scrolls to it.
+   Not an IntersectionObserver band: a clicked target scrolls ABOVE any band and never
+   enters it, which left the previous entry lit (off by one, reported by mutze-studio
+   2026-11-04). The page is fully readable without this script. */
 (() => {
   const links = [...document.querySelectorAll('nav.toc a')];
-  const byId = new Map(links.map(a => [a.getAttribute('href').slice(1), a]));
-  if (!('IntersectionObserver' in window)) return;
-  const io = new IntersectionObserver(entries => {
-    entries.forEach(e => {
-      if (e.isIntersecting) {
-        links.forEach(a => a.classList.remove('on'));
-        const a = byId.get(e.target.id); if (a) a.classList.add('on');
-      }
-    });
-  }, { rootMargin: '-20% 0px -70% 0px' });
-  document.querySelectorAll('main section[id]').forEach(s => io.observe(s));
+  const sections = links.map(a => document.getElementById(a.getAttribute('href').slice(1))).filter(Boolean);
+  if (!sections.length) return;
+  const mark = id => links.forEach(a => a.classList.toggle('on', a.getAttribute('href') === '#' + id));
+  let ticking = false, lockUntil = 0;
+  const update = () => {
+    ticking = false;
+    if (Date.now() < lockUntil) return;
+    const line = window.innerHeight * 0.3;
+    let current = sections[0];
+    for (const s of sections) { if (s.getBoundingClientRect().top <= line) current = s; }
+    const doc = document.documentElement;
+    if (window.innerHeight + window.scrollY >= doc.scrollHeight - 4) current = sections[sections.length - 1];
+    mark(current.id);
+  };
+  const onScroll = () => { if (!ticking) { ticking = true; requestAnimationFrame(update); } };
+  window.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('resize', onScroll);
+  links.forEach(a => a.addEventListener('click', () => { lockUntil = Date.now() + 1200; mark(a.getAttribute('href').slice(1)); }));
+  update();
 })();
 </script>

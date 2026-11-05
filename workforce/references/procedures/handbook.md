@@ -255,7 +255,9 @@ actually consumes, each carrying its own evidence line, none invented.
 
 A Sources entry naming `Skill(X)` means the `## Procedure` grants that invocation and the tool grant
 includes `Skill`: Sources says WHERE the truth is and HOW to reach it; the Procedure exercises the
-reach. This is the identity+channel / exercised-step split, not two canonical texts.
+reach. This is the identity+channel / exercised-step split, not two canonical texts. The one
+exception is the code-map line below, `Skill(records-code-map)`: it needs no Procedure step
+(`org-design.md` § The access channel is part of every entry).
 
 **Every employee that reads code gets the map line `handbook-templates.md` § Sources carries** —
 `wf-map --topic` before a search, `wf-map <file>` before a read, `wf-map --tests <file>` before a

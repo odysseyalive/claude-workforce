@@ -100,7 +100,9 @@ take `text-wrap: balance`, uppercase labels take `letter-spacing: .09–.14em`.
 A sticky contents rail on the left, one reading column on the right. Under 900px it becomes
 one column, the rail turns into a static `auto-fill` grid at the top, and the side gutter
 drops to 16px. **The content is fully readable with JavaScript off**; the rail's
-IntersectionObserver only adds the current-section highlight.
+scroll script only adds the current-section highlight. It marks the last section whose top has
+passed 30% down the window, never an IntersectionObserver band: a clicked target lands above any
+band and the previous entry stays lit.
 
 Group the rail's entries under short uppercase labels once the list is long enough that a
 reader has to hunt in it.

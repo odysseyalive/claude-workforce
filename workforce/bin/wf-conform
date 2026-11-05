@@ -167,6 +167,27 @@ MCP_SLUG_RX = re.compile(r"\b([a-z0-9][a-z0-9-]*-mcp)\b")
 # store is named by its GATEWAY SKILL — `Skill(<data-skill>)` — never by the raw
 # file, because naming the file invites an agent to bypass the gateway.
 SOURCES_SKILL_RX = re.compile(r"\bSkill\(\s*([^()\s]+)\s*\)")
+# THE MAP-BEFORE-YOU-SEARCH CHANNEL IS EXEMPT FROM THE DEAD-POINTER ROW, AND IT IS THE
+# ONLY ONE. `handbook-templates.md` § Sources (since 1.78.0) gives every IC the line
+# `Skill(records-code-map)` — map before you search — with no `## Procedure` step, and
+# the dead-pointer row read the template's own line as a defect in every handbook that
+# applied it faithfully. FILED 2026-10-16 against 1.79.0 (odyssey-alive upstream inbox,
+# row 30): 17 new advisories across 21 handbooks. MEASURED 2026-11-04 on 1.83.2: 18
+# such rows on odyssey-alive, every one of them the template line.
+#
+# The access-channel rule exists so a role's TRUTH is actually reached through the
+# gateway that holds it (`org-design.md` § The access channel). The code map holds no
+# truth of the role's: it is generated from the files on every call and never stored,
+# a navigation instrument rather than a store. The Sources section's own "search every
+# source above" clause is what exercises it, before any search, not at one numbered
+# step, so demanding a step would add a line to every handbook and prove nothing.
+#
+# Exempted HERE rather than by a template step so every existing org heals on its next
+# `update` with no re-audit. NARROW BY NAME: a set of one, matched exactly. Every other
+# `Skill(X)` in Sources still needs its Procedure to reach for it, and the fixture
+# `conform-sources-code-map-exempt` carries both halves in one handbook so a widening
+# of this set fails it.
+NAVIGATION_SOURCE_SKILLS = frozenset({"records-code-map"})
 # A server named only to FORBID it is not a dependency. `procedure-for-procedures.md`
 # requires guardrails to carry a literal NEVER / MUST NOT / STOP, so keying off that
 # vocabulary is reading the project's own grammar rather than guessing at intent.
@@ -953,6 +974,9 @@ def check_handbook(path, body, res, ceiling, floors=None):
                 # `Skill(<data-skill>)` is the template's own unfilled slot. Reporting
                 # a placeholder as a dead pointer is noise, not a finding.
                 if "<" in _sk or ">" in _sk:
+                    continue
+                # The code map is navigation, not a store: NAVIGATION_SOURCE_SKILLS.
+                if _sk in NAVIGATION_SOURCE_SKILLS:
                     continue
                 if re.search(r"(?<![\w-])" + re.escape(_sk) + r"(?![\w-])", _proc):
                     continue
