@@ -8,6 +8,7 @@
 
 | Version | Date | Surface | Org | Change |
 |---|---|---|---|---|
+| 1.83.3 | 2026-11-04 | handbook, changes, scripts | no | Release 1.83.3: wf-conform stops flagging the code map as a dead source, and the artifact rail lights the right section |
 | 1.83.2 | 2026-10-30 | changes, scripts, installer | no | Release 1.83.2: the turn budget matches what the harness measurably grants |
 | 1.83.1 | 2026-10-30 | changes, scripts, installer | no | Release 1.83.1: a resumed agent starts its new order with a fresh allowance |
 | 1.83.0 | 2026-10-30 | audit, verify, update, changes, hooks, scripts, installer, platform | no | Release 1.83.0: the installer pre-allows its own update command |
