@@ -8,6 +8,7 @@
 
 | Version | Date | Surface | Org | Change |
 |---|---|---|---|---|
+| 1.85.2 | 2026-11-08 | changes, scripts, installer | no | Release 1.85.2: a project with no org still hands a job to a background subagent |
 | 1.85.1 | 2026-11-07 | changes, scripts, installer | no | Release 1.85.1: open items a session drops from its list come back, and a late close in an older list reaches the ledger |
 | 1.85.0 | 2026-11-07 | changes, hooks, scripts, installer | no | Release 1.85.0: the work list shows every open issue, a turn that ignores the partition line is told so, and the widen jury judges the turn it belongs to |
 | 1.84.0 | 2026-11-05 | audit, verify, changes, scripts, installer | **yes** | Release 1.84.0: projects that were never audited get a model for each kind of work — visual work and the advisor default to Opus 5.5, Fable stays recommended, and agent and skill edits see the lineup |
