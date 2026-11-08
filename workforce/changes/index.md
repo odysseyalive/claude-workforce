@@ -8,6 +8,7 @@
 
 | Version | Date | Surface | Org | Change |
 |---|---|---|---|---|
+| 1.85.0 | 2026-11-07 | changes, hooks, scripts, installer | no | Release 1.85.0: the work list shows every open issue, a turn that ignores the partition line is told so, and the widen jury judges the turn it belongs to |
 | 1.84.0 | 2026-11-05 | audit, verify, changes, scripts, installer | **yes** | Release 1.84.0: projects that were never audited get a model for each kind of work — visual work and the advisor default to Opus 5.5, Fable stays recommended, and agent and skill edits see the lineup |
 | 1.83.3 | 2026-11-04 | handbook, changes, scripts | no | Release 1.83.3: wf-conform stops flagging the code map as a dead source, and the artifact rail lights the right section |
 | 1.83.2 | 2026-10-30 | changes, scripts, installer | no | Release 1.83.2: the turn budget matches what the harness measurably grants |
