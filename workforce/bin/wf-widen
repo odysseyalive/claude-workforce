@@ -3282,6 +3282,10 @@ def ledger_verdict(payload, decided):
     if (isinstance(record, dict) and not record.get("carry_only") and record.get("issue")
             and not record.get("ended") and reply is not None):
         TT.absorb_items(led, record.get("issue"), TT.checklist_items(cl), TT.checklist_title(cl))
+    # AND THE MARKS THE SESSION WROTE INTO AN EARLIER MESSAGE'S LIST after that turn's Stop,
+    # forward moves only (`TT.late_marks`): after this turn's own list, so a late file can
+    # finish an item and never reopen one.
+    TT.late_marks(payload, led)
     TT.agents_stopped(led, payload.get("transcript_path"))
     TT.agents_finished(led, payload)
     if (isinstance(record, dict) and not record.get("carry_only") and not record.get("ended")

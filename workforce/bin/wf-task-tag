@@ -1527,6 +1527,11 @@ def absorb_carried(led, rows):
     An item is found by the ask CUT TO `CARRY_ASK`, the same cut `carry_forward` made on the
     way out, so the two ends agree on long asks. A row carrying no status, or one naming an
     item nobody can find, changes nothing.
+
+    AND A FINISHED ITEM IS NEVER REOPENED BY A ROW. `carry_forward` hands out open items only,
+    so a carried row saying "open" against a finished item is a row older than the mark that
+    finished it — another message's list closing it late (`late_marks`), or rows the hook put
+    back (`restore_carried`). Moves among unfinished statuses still land.
     """
     landed = 0
     for row in rows:
@@ -1541,10 +1546,89 @@ def absorb_carried(led, rows):
                 # A ROW THE SESSION LEFT ALONE IS NOT A WRITE. The count is what decides
                 # whether the ledger is saved, so counting an unchanged status would save
                 # the file on every message that carries anything.
-                if item["ask"][:CARRY_ASK] == row["ask"] and item.get("status") != want:
+                if (item["ask"][:CARRY_ASK] == row["ask"] and item.get("status") != want
+                        and (item_done({"status": want}) or not item_done(item))):
                     item["status"] = want
                     landed += 1
             break
+    return landed
+
+
+# THE MOST PER-MESSAGE LISTS ONE STOP RE-READS for marks written after their own turn ended,
+# newest message first (`late_marks`). The scratchpad keeps a list until a later submit
+# removes it, and one whose record aged out of the tag (`EARLIER_MAX`) is never removed, so
+# the directory's count is not this hook's to trust. Each list read costs a walk of the
+# ledger's open items.
+LATE_MAX = 32
+
+
+def late_marks(payload, led):
+    """Copy every FORWARD move the session wrote into this session's per-message lists onto
+    the ledger: an item open there and finished in a list. How many landed.
+
+    THE DEFECT THIS CLOSES, MEASURED 2026-11-07 in tmux-revive `ca202cd9`: the session finished
+    i31's and i33's asks by setting "done" in `wf-asks.<sid>.i31.json` and `.i33.json`, the
+    lists of the messages that opened them, after those messages' Stops had absorbed them.
+    Nothing reads a list again after its own turn, so the ledger kept both issues open while
+    the work was done and committed. Telling the session to use the carried rows instead is
+    the rule it already ignored; reading where it did write is the fix.
+
+    FORWARD ONLY, AND ONLY ONTO WHAT IS THERE, which is `absorb_carried`'s contract with one
+    more rule. An item already finished is never touched, so a stale list cannot reopen it; a
+    status that is not finished is ignored, so a list cannot hold an item open either. Nothing
+    is appended, and a closed issue is never written (`open_issues`). Each item lands on the
+    issue `absorb_items` put it on: the one its `"issue"` names when that issue is in the
+    ledger and not folded, else the message's own, which the file's key names. Carried rows
+    name their issue themselves.
+
+    THE SESSION'S FILES ONLY. The name must be exactly `checklist_path`'s for a keyed record
+    of this session (`wf-asks.<state component>.i<N>.json`, or the bare one), in the
+    directory `checklist_path` uses, and every read is `read_json_nofollow`: no link, and a
+    regular file this account owns. `open_elsewhere` reads queued lists by the same rules.
+
+    AND A NAME IS CHECKED AS A REGULAR FILE OF THIS ACCOUNT BEFORE IT IS OPENED, because this
+    is the one reader here that takes its names from a listing. `read_json_nofollow` cannot
+    refuse a FIFO (its `os.open` blocks first), and with no scratchpad the directory is
+    `TMPDIR` or `/tmp`, where another account can make a FIFO under any name it lists: one
+    planted name would hang every Stop. A sticky directory stops that account replacing a
+    file of ours after the check.
+    """
+    issues = {i.get("id"): i for i in open_issues(led)}
+    if not issues:
+        return 0
+    bare = checklist_path(payload)
+    d, lead = os.path.dirname(bare), os.path.basename(bare)[:-len(".json")] + "."
+    uid = getattr(os, "getuid", lambda: None)()
+    keys = []
+    try:
+        with os.scandir(d) as entries:
+            for e in entries:
+                k = e.name[len(lead):-len(".json")]
+                if (e.name.startswith(lead) and e.name.endswith(".json")
+                        and CHECKLIST_KEY.fullmatch(k) and e.is_file(follow_symlinks=False)
+                        and (uid is None or e.stat(follow_symlinks=False).st_uid == uid)):
+                    keys.append(int(k[1:]))
+    except OSError:
+        return 0
+    keys.sort(reverse=True)
+    known = {i.get("id"): i for i in led.get("issues", []) if isinstance(i, dict)}
+    landed = 0
+    for key in [f"i{k}" for k in keys[:LATE_MAX]] + [None]:
+        cl = read_json_nofollow(os.path.join(d, f"{lead}{key}.json") if key else bare)
+        marks = [(r["issue"], r) for r in carried_items(cl)]
+        for it in checklist_items(cl) if key else ():
+            tag = it.get("issue") if isinstance(it.get("issue"), str) else None
+            home = known.get(tag) if tag != key else None
+            marks.append((tag if home is not None and not home.get("merged") else key, it))
+        for iid, row in marks:
+            iss = issues.get(iid)
+            if iss is None or not item_done(row):
+                continue
+            want = row["status"].strip()[:40]
+            for item in issue_items(iss):
+                if item["ask"][:CARRY_ASK] == row["ask"][:CARRY_ASK] and not item_done(item):
+                    item["status"] = want
+                    landed += 1
     return landed
 
 
@@ -2440,9 +2524,10 @@ def _show_checklist(payload, d, name, sid):
     if rec is None:
         return ""
     cl = read_json_nofollow(os.path.join(d, name))
+    restored = restore_carried(at, os.path.join(d, name), rec, cl)
     items = checklist_items(cl)[:DISPLAY_MAX]
     if not items:
-        return ""
+        return RESTORED % restored if restored else ""
     iid = rec.get("issue") if bare_name(rec.get("issue")) else ""
     title = checklist_title(cl)
     lines = ["WORK LIST  " + "  ".join(x for x in (iid, title) if x)]
@@ -2459,8 +2544,9 @@ def _show_checklist(payload, d, name, sid):
     digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
     memo_path = os.path.join(d, SHOWN_NAME % sid)
     memo = read_json_nofollow(memo_path) or {}
+    said_restore = RESTORED % restored if restored else ""
     if memo.get(name) == digest:
-        return ""
+        return said_restore
     # ONE ENTRY PER LIST THE TAG STILL CARRIES, so the memo never outgrows the records.
     names = {os.path.basename(checklist_path(at, r)) for r in records if isinstance(r, dict)}
     said = memo.get(PARTITION_SAID)
@@ -2480,7 +2566,49 @@ def _show_checklist(payload, d, name, sid):
     if said:
         memo[PARTITION_SAID] = said
     write_json_atomic(memo_path, memo)
-    return lead + SHOW_LIST + text
+    return (said_restore + "\n" if said_restore else "") + lead + SHOW_LIST + text
+
+
+# WHAT THE SESSION IS TOLD WHEN ITS WRITE DROPPED CARRIED ROWS AND THE HOOK PUT THEM BACK.
+RESTORED = ("This list's \"carried\" rows were missing, and %d are back in the file: an "
+            "earlier issue's item is finished by marking its carried row, never by removing it.")
+
+
+def restore_carried(at, path, rec, cl):
+    """Put back every carried row the session's write dropped from the list at `path`. How
+    many went back.
+
+    THE DEFECT THIS CLOSES, MEASURED 2026-11-07 in tmux-revive `ca202cd9`: on every message the
+    session rewrote its list whole with `"carried": []`, so the rows the hook had put there
+    were gone and nothing could close i26's, i31's, i33's or i35's open items. An emptied list
+    never closed anything (`absorb_carried` writes only rows that exist); it only lost the
+    one place a later turn can finish them. So the rows come back while the turn can use them.
+
+    THE ROWS ARE `carry_forward`'s, built from the ledger NOW, and only an issue OLDER than the
+    list's own message: a newer message's items are on its own list, not this one. A row the
+    session kept, with whatever status it gave it, stays as written; only a missing row is
+    added, so nothing here changes a mark. Written through `write_json_atomic` onto the name
+    `_show_checklist` already confirmed is this session's.
+    """
+    if not isinstance(cl, dict):
+        return 0
+    own = rec.get("issue") if bare_name(rec.get("issue")) else None
+    led = load_ledger(at)
+    kept = carried_items(cl)
+    have = {(r["issue"], r["ask"][:CARRY_ASK]) for r in kept}
+    back = [r for r in carry_forward(led, skip=own)
+            if (r["issue"], r["ask"][:CARRY_ASK]) not in have
+            and (own is None or issue_number(r["issue"]) < issue_number(own))]
+    back = back[:max(0, MAX_CARRIED - len(kept))]
+    if not back:
+        return 0
+    cl["carried"] = kept + back
+    return len(back) if write_json_atomic(path, cl) else 0
+
+
+def issue_number(iid):
+    """The number in an issue id (`i31` is 31), or -1 for an id `add_issue` never makes."""
+    return int(iid[1:]) if isinstance(iid, str) and CHECKLIST_KEY.fullmatch(iid) else -1
 
 
 # THE REST OF THE SESSION'S OPEN WORK, SHOWN UNDER THE LIST JUST WRITTEN. MEASURED 2026-11-07

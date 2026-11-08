@@ -9585,6 +9585,123 @@
       "issue i1"
     ]
   },
+  "issues-late-mark-in-an-earlier-list-closes-its-item": {
+      "_why": "MEASURED 2026-11-07 in tmux-revive `ca202cd9`: the session finished i31's and i33's asks by writing \"done\" into `wf-asks.<sid>.i31.json` and `.i33.json`, the lists of the messages that opened them, after those messages' turns had ended. Nothing read a list again after its own turn, so the ledger kept both issues open with the work committed. The Stop now re-reads this session's per-message lists and lands every forward move (`late_marks`): here i1's two asks are marked done only in i1's list, recreated after message 2's submit removed it, and i1 closes on message 2's Stop. Fails on 1.85.0's hook, which kicks i1 back with both items open.",
+      "before": [
+          {
+              "script": "wf-task-tag",
+              "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"prompt\": \"The mountain graphics needs a bit more work. Also, they cause the display to jump a bit when the animation happens.\"}"
+          },
+          {
+              "path_from": 0,
+              "path_rx": "/[^\\s\"]*wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+              "write": "{\"title\": \"Mountain art and display jump\", \"items\": [{\"ask\": \"The mountain graphics needs a bit more work\", \"status\": \"open\"}, {\"ask\": \"they cause the display to jump\", \"status\": \"open\"}], \"carried\": []}"
+          },
+          {
+              "script": "wf-task-tag",
+              "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"prompt\": \"another thing we need to figure out is why on tt-dev it opens up a new tmux session when I restart it\"}"
+          },
+          {
+              "path_from": 2,
+              "path_rx": "/[^\\s\"]*wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+              "write": "{\"title\": \"New session on each tmux start\", \"items\": [{\"ask\": \"why tt-dev opens a new tmux session on restart\", \"status\": \"open\"}], \"carried\": []}"
+          },
+          {
+              "path_from": 0,
+              "path_rx": "/[^\\s\"]*wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+              "write": "{\"title\": \"Mountain art and display jump\", \"items\": [{\"ask\": \"The mountain graphics needs a bit more work\", \"status\": \"done\"}, {\"ask\": \"they cause the display to jump\", \"status\": \"answered\"}], \"carried\": []}"
+          }
+      ],
+      "env": {
+          "WF_BLIND_SAMPLE": "0"
+      },
+      "exit": 0,
+      "not": [
+          "Traceback",
+          "i1  "
+      ],
+      "script": "wf-widen",
+      "stdin_raw": "{\"hook_event_name\": \"Stop\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"transcript_path\": \"t.jsonl\", \"last_assistant_message\": \"tt-dev opens a new session because the wrapper never looks for one to attach.\"}",
+      "want": [
+          "WORK",
+          "i2  KICKBACK  New session on each tmux start"
+      ],
+      "after": {
+          ".claude/workforce/issues/s1.json": {
+              "want": [
+                  "{\"ask\": \"The mountain graphics needs a bit more work\", \"status\": \"done\"}",
+                  "{\"ask\": \"they cause the display to jump\", \"status\": \"answered\"}"
+              ]
+          }
+      }
+  },
+  "issues-late-list-never-reopens-an-item": {
+      "_why": "THE OTHER HALF OF `late_marks`, and of `absorb_carried`: only a forward move counts. A list read late is older than the ledger, so a row in it saying \"open\" against an item already done is stale, never a reopen. Here i1's first ask is finished late in i1's list and lands at Stop 2; then i1's list is rewritten with that ask \"open\" again and message 2's list carries the same ask as \"open\", and Stop 3 keeps it done. Fails with either guard removed: `late_marks` copying any status, or `absorb_carried` writing a carried row over a finished item.",
+      "before": [
+          {
+              "script": "wf-task-tag",
+              "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"prompt\": \"The mountain graphics needs a bit more work. Also, they cause the display to jump a bit when the animation happens.\"}"
+          },
+          {
+              "path_from": 0,
+              "path_rx": "/[^\\s\"]*wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+              "write": "{\"title\": \"Mountain art and display jump\", \"items\": [{\"ask\": \"The mountain graphics needs a bit more work\", \"status\": \"open\"}, {\"ask\": \"they cause the display to jump\", \"status\": \"open\"}], \"carried\": []}"
+          },
+          {
+              "script": "wf-task-tag",
+              "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"prompt\": \"another thing we need to figure out is why on tt-dev it opens up a new tmux session when I restart it\"}"
+          },
+          {
+              "path_from": 2,
+              "path_rx": "/[^\\s\"]*wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+              "write": "{\"title\": \"New session on each tmux start\", \"items\": [{\"ask\": \"why tt-dev opens a new tmux session on restart\", \"status\": \"open\"}], \"carried\": []}"
+          },
+          {
+              "path_from": 0,
+              "path_rx": "/[^\\s\"]*wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+              "write": "{\"title\": \"Mountain art and display jump\", \"items\": [{\"ask\": \"The mountain graphics needs a bit more work\", \"status\": \"done\"}, {\"ask\": \"they cause the display to jump\", \"status\": \"open\"}], \"carried\": []}"
+          },
+          {
+              "script": "wf-widen",
+              "stdin_raw": "{\"hook_event_name\": \"Stop\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"transcript_path\": \"t.jsonl\", \"last_assistant_message\": \"The mountains are redrawn.\"}",
+              "want": [
+                  "i1  KICKBACK"
+              ]
+          },
+          {
+              "path_from": 0,
+              "path_rx": "/[^\\s\"]*wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+              "write": "{\"items\": [{\"ask\": \"The mountain graphics needs a bit more work\", \"status\": \"open\"}]}"
+          },
+          {
+              "path_from": 2,
+              "path_rx": "/[^\\s\"]*wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+              "write": "{\"title\": \"New session on each tmux start\", \"items\": [{\"ask\": \"why tt-dev opens a new tmux session on restart\", \"status\": \"open\"}], \"carried\": [{\"issue\": \"i1\", \"ask\": \"The mountain graphics needs a bit more work\", \"status\": \"open\"}, {\"issue\": \"i1\", \"ask\": \"they cause the display to jump\", \"status\": \"open\"}]}"
+          }
+      ],
+      "env": {
+          "WF_BLIND_SAMPLE": "0"
+      },
+      "exit": 0,
+      "not": [
+          "Traceback"
+      ],
+      "script": "wf-widen",
+      "stdin_raw": "{\"hook_event_name\": \"Stop\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"transcript_path\": \"t.jsonl\", \"last_assistant_message\": \"Still on the tmux question.\"}",
+      "want": [
+          "i1  KICKBACK"
+      ],
+      "after": {
+          ".claude/workforce/issues/s1.json": {
+              "want": [
+                  "{\"ask\": \"The mountain graphics needs a bit more work\", \"status\": \"done\"}"
+              ],
+              "not": [
+                  "{\"ask\": \"The mountain graphics needs a bit more work\", \"status\": \"open\"}"
+              ]
+          }
+      }
+  },
   "issues-ledger-refuses-a-planted-link": {
     "_why": "THE LEDGER LIVES IN A REPOSITORY, so its path is predictable and its directory is shared -- which is exactly the condition a planted symlink needs (CWE-59). A link is planted at the ledger's own name, `issues/s1.json`, aiming at `victim.json`. BOTH HALVES OF THE REFUSAL ARE ASSERTED. The READ is `O_NOFOLLOW`, so the hook does not read the victim's bytes in as this session's issues -- `DO NOT WRITE OR READ THROUGH THE LINK.` is forbidden in the ledger it writes. The WRITE creates its temporary name `O_CREAT|O_EXCL|O_NOFOLLOW` and then RENAMES over `s1.json`: rename acts on the name, so the link is replaced and its target is never opened, which `victim.json` unchanged is the proof of. A real issue in its place is the proof the refusal did not also break the feature. The pattern is `wf-turn-budget`'s (3c7431c), deliberately not a second design.",
     "after": {
@@ -13994,6 +14111,46 @@
         ]
       }
     }
+  },
+  "work-list-restores-dropped-carried-rows": {
+      "_why": "MEASURED 2026-11-07 in tmux-revive `ca202cd9`: on each new message the session rewrote its list whole with `\"carried\": []`, which threw away the rows the hook put there, so no later turn could finish i26's, i31's, i33's or i35's earlier asks. An emptied list never closes anything; it loses the one place they are finished. The display now puts the missing rows back in the file (`restore_carried`) and says so in one line. Fails on 1.85.0's hook, which leaves `\"carried\": []` on disk and says nothing.",
+      "before": [
+          {
+              "script": "wf-task-tag",
+              "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"prompt\": \"The mountain graphics needs a bit more work. Also, they cause the display to jump a bit when the animation happens.\"}"
+          },
+          {
+              "path_from": 0,
+              "path_rx": "/[^\\s\"]*wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+              "write": "{\"title\": \"Mountain art and display jump\", \"items\": [{\"ask\": \"The mountain graphics needs a bit more work\", \"status\": \"open\"}, {\"ask\": \"they cause the display to jump\", \"status\": \"open\"}], \"carried\": []}"
+          },
+          {
+              "script": "wf-task-tag",
+              "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"prompt\": \"another thing we need to figure out is why on tt-dev it opens up a new tmux session when I restart it\"}"
+          },
+          {
+              "path_from": 2,
+              "path_rx": "/[^\\s\"]*wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+              "write": "{\"title\": \"New session on each tmux start\", \"items\": [{\"ask\": \"why tt-dev opens a new tmux session on restart\", \"status\": \"open\"}], \"carried\": []}"
+          }
+      ],
+      "exit": 0,
+      "not": [
+          "Traceback"
+      ],
+      "script": "wf-turn-budget",
+      "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"tool_name\": \"Write\", \"tool_input\": {\"file_path\": \"${TREE}/wf-asks.s1.i2.json\"}, \"tool_response\": {}}",
+      "want": [
+          "This list's \\\"carried\\\" rows were missing, and 2 are back in the file",
+          "WORK LIST  i2  New session on each tmux start"
+      ],
+      "after": {
+          "wf-asks.s1.i2.json": {
+              "want": [
+                  "\"carried\": [{\"issue\": \"i1\", \"ask\": \"The mountain graphics needs a bit more work\", \"status\": \"open\"}, {\"issue\": \"i1\", \"ask\": \"they cause the display to jump\", \"status\": \"open\"}]"
+              ]
+          }
+      }
   },
   "work-list-shows-earlier-open-issues": {
       "_why": "MEASURED 2026-11-07 in tmux-revive `ca202cd9`: i31, i32 and i33 were all open and every WORK LIST showed only its own message's items; the session had also written `\"carried\": []` over the rows the hook put in each file. The display now lists every other open item, from the ledger, grouped by issue under its own list. Fails on 1.84.0's hook, which shows i2's two items alone.",
