@@ -13147,7 +13147,9 @@
       "exit": 0,
       "not": [
           "Traceback",
-          "names Leads, so the job goes to the lowest node whose scope covers it"
+          "names Leads, so the job goes to the lowest node whose scope covers it",
+          "This project has no workforce org",
+          "general-purpose"
       ],
       "script": "wf-task-tag",
       "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"So we had a catastrophe. It looks like our Nvidia eGPU died mid render, so research a replacement that fits this machine\"}",
@@ -13161,7 +13163,8 @@
       "_why": "THE DEFAULT DISPATCH. The user, relayed from mutze-studio on 2026-10-29: \"I should[n't] have to run audit or invoke the org skill to make that work out of the box.\" In `29c3e592` i1 to i6 were all worked inline with 27 employees on disk. The chart names a Lead (`(T2)`), so the line adds the chain-of-command rule in rung 3's terms: the one IC whose scope covers the job, or that department's Lead.",
       "exit": 0,
       "not": [
-          "Traceback"
+          "Traceback",
+          "This project has no workforce org"
       ],
       "script": "wf-task-tag",
       "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"So we had a catastrophe. It looks like our Nvidia eGPU died mid render, so research a replacement that fits this machine\"}",
@@ -13171,7 +13174,7 @@
       ]
   },
   "dispatch-line-third-party-agents-only": {
-      "_why": "AGENT FILES ARE NOT AN ORG. `.claude/agents/` holds a plugin's agent and there is no workforce chart, so the message gets no dispatch line.",
+      "_why": "AGENT FILES ARE NOT AN ORG. `.claude/agents/` holds a plugin's agent and there is no workforce chart, so the message gets the no-org dispatch line, never the org one: the job still goes to a background `general-purpose` subagent linked to the issue.",
       "exit": 0,
       "not": [
           "Traceback",
@@ -13180,7 +13183,9 @@
       "script": "wf-task-tag",
       "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"So we had a catastrophe. It looks like our Nvidia eGPU died mid render, so research a replacement that fits this machine\"}",
       "want": [
-          "issue i1"
+          "issue i1",
+          "This project has no workforce org, which changes who takes a job and not whether one is handed off. A job in this message goes to a background plain `general-purpose` subagent",
+          "linked to issue i1"
       ]
   },
   "partition-line-below-threshold": {
@@ -13198,7 +13203,7 @@
       ]
   },
   "partition-line-at-threshold-no-org": {
-      "_why": "THE MEASURED CASE, runpod-claude-gateway `89bbc493`, 2026-11-02: about twelve asks touching disjoint files were worked one at a time in the main thread, i1 to i10 with `agents: 0`, in a project with NO org chart, so `DISPATCH_LINE` was never said and nothing spoke to the backlog. At `PARTITION_MIN` carried items the line says to group them by the files they touch and send the disjoint groups to parallel background subagents now. No org here, so no dispatch line: the partition line stands on its own. Fails on the old code.",
+      "_why": "THE MEASURED CASE, runpod-claude-gateway `89bbc493`, 2026-11-02: about twelve asks touching disjoint files were worked one at a time in the main thread, i1 to i10 with `agents: 0`, in a project with NO org chart, so `DISPATCH_LINE` was never said and nothing spoke to the backlog. At `PARTITION_MIN` carried items the line says to group them by the files they touch and send the disjoint groups to parallel background subagents now. No org here, so the dispatch line is the no-org one (`DISPATCH_NO_ORG`, a `general-purpose` subagent) and it composes with the partition line exactly as the org one does. Fails on the old code.",
       "exit": 0,
       "not": [
           "Traceback",
@@ -13207,6 +13212,8 @@
       "script": "wf-task-tag",
       "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"Also set up the setup script for brand new pods and the always-on versus on-demand modes\"}",
       "want": [
+          "This project has no workforce org, which changes who takes a job and not whether one is handed off",
+          "linked to issue i2",
           "holds 3 still-open item(s)",
           "With this many items open they are partitioned rather than worked one after another: grouped by the files or areas they touch, the groups that share no file go to parallel background subagents now, each told which files it owns and to stay out of the rest, or each in its own worktree when they edit the same checkout; only groups that overlap wait, one small item can be done inline, and an item an agent already holds stays with it."
       ]
@@ -13230,7 +13237,8 @@
       "exit": 0,
       "not": [
           "Traceback",
-          "Each separate ask is one item"
+          "Each separate ask is one item",
+          "This project has no workforce org"
       ],
       "script": "wf-task-tag",
       "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"Another Claude session sent a message:\\n<agent-message from=\\\"a6141809c0a65003e\\\">\\n[Subagent hand-back] The installer is written. The text below is the final report of a subagent this session delegated to.\\n</agent-message>\"}",
@@ -13386,7 +13394,7 @@
       ]
   },
   "dispatch-line-no-org": {
-      "_why": "NO ORG, NO LINE: a project with neither a chart nor agents.",
+      "_why": "NO ORG STILL DISPATCHES. MEASURED 2026-11-08 in tmux-revive `2dca2a45`, a project that never ran audit: i1 was diagnosed, edited, tested and installed in the main thread with `agents: []`, because with no chart the dispatch line was not said at all. A project with neither a chart nor agents now gets `DISPATCH_NO_ORG`: the job goes to a background plain `general-purpose` subagent linked to the issue, with the org line's inline clause word for word. Fails on the old code.",
       "exit": 0,
       "not": [
           "Traceback",
@@ -13395,15 +13403,18 @@
       "script": "wf-task-tag",
       "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"So we had a catastrophe. It looks like our Nvidia eGPU died mid render, so research a replacement that fits this machine\"}",
       "want": [
-          "issue i1"
+          "issue i1",
+          "This project has no workforce org, which changes who takes a job and not whether one is handed off. A job in this message goes to a background plain `general-purpose` subagent, spawned so this session stays free for the next message; the spawn is linked to issue i1 and the Work list tracks it until it hands back.",
+          "Work inline only when the answer is already in hand or the job is a few tool calls: data in hand that answers the question is itself the answer."
       ]
   },
   "dispatch-line-short-message": {
-      "_why": "A MESSAGE THAT OPENS NO ISSUE GETS NO LINE, org or not: \"commit it\" is under the word gate.",
+      "_why": "A MESSAGE THAT OPENS NO ISSUE GETS NO LINE, org or not: \"commit it\" is under the word gate, so neither the org nor the no-org dispatch line is said.",
       "exit": 0,
       "not": [
           "Traceback",
-          "This project has a workforce org. A job in this message goes to the employee whose description fits"
+          "This project has a workforce org. A job in this message goes to the employee whose description fits",
+          "This project has no workforce org"
       ],
       "script": "wf-task-tag",
       "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"commit it\"}"
