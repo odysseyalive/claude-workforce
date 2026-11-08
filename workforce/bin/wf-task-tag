@@ -2310,6 +2310,13 @@ PARTITION_LINE = ("With this many items open they are partitioned rather than wo
                   "files it owns and to stay out of the rest, or each in its own worktree when "
                   "they edit the same checkout; only groups that overlap wait, one small item "
                   "can be done inline, and an item an agent already holds stays with it.")
+# THE LAST TURN IGNORED THE PARTITION LINE, said back to the model at the next submit, ahead
+# of the line itself. `wf-widen.worked_inline` decides it at Stop and leaves the mark under
+# `INLINE_KEY` on the ledger; the Stop after this one rewrites or clears it. MEASURED
+# 2026-11-07 in tmux-revive `ca202cd9`: the line alone was ignored on eight messages.
+INLINE_KEY = "inline"
+INLINE_LINE = ("The last turn worked %d open items across %s in this thread and spawned no "
+               "subagent, which is what the next sentence rules out.")
 # EVERY VARIANT NAMES THE OPEN ISSUES WITH NO TITLE (user, 2026-10-14: "so I noticed that
 # the titles aren't in the issues tracker yet..."), in one sentence, until each has one.
 TITLES_LINE = ("No title yet on %s: give each a few words in "
@@ -2442,6 +2449,12 @@ def _show_checklist(payload, d, name, sid):
     for it in items:
         st = plain_text(it.get("status"), 40) or "open"
         lines.append(f"  {st}  {plain_text(it['ask'], CARRY_ASK)}")
+    others = open_elsewhere(at, d, rec, cl, records)
+    if others:
+        lines.append(ALSO_OPEN)
+    for oid, otitle, rows in others:
+        lines.append("  " + "  ".join(x for x in (oid, otitle) if x))
+        lines += [f"    {st}  {ask}" for st, ask in rows]
     text = "\n".join(lines)
     digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
     memo_path = os.path.join(d, SHOWN_NAME % sid)
@@ -2456,17 +2469,69 @@ def _show_checklist(payload, d, name, sid):
     memo = {k: v for k, v in memo.items() if k in names and isinstance(v, str)}
     memo[name] = digest
     # `PARTITION_LINE` ONCE PER LIST, AND NOT AT ALL WHEN THE SUBMIT ALREADY SAID IT. The open
-    # count is this list's items plus its carried rows, so the one message that carries many
-    # asks of its own is covered too (`PARTITION_SAID`).
+    # count is this list's items plus every other open item shown under it, so the one
+    # message that carries many asks of its own is covered too (`PARTITION_SAID`).
     lead = ""
     if (not rec.get("partition") and name not in said
-            and sum(not item_done(r) for r in items + carried_items(cl)) >= PARTITION_MIN):
+            and sum(not item_done(r) for r in items) + sum(len(r) for _, _, r in others)
+            >= PARTITION_MIN):
         said.append(name)
         lead = PARTITION_LINE + " "
     if said:
         memo[PARTITION_SAID] = said
     write_json_atomic(memo_path, memo)
     return lead + SHOW_LIST + text
+
+
+# THE REST OF THE SESSION'S OPEN WORK, SHOWN UNDER THE LIST JUST WRITTEN. MEASURED 2026-11-07
+# in tmux-revive `ca202cd9`: i31, i32 and i33 were sent while i31's turn ran, all three were
+# open, and each display listed its own message alone. The user: "I'm also not seeing a list
+# of work items to denote that you are tracking each of these asks separately."
+ALSO_OPEN = "STILL OPEN FROM EARLIER MESSAGES"
+
+
+def open_elsewhere(at, d, rec, cl, records):
+    """The session's open items outside the list `rec` names, grouped by issue in issue
+    order: `[(id, title, [(status, ask)])]`, at most `DISPLAY_MAX` items in all.
+
+    THE LEDGER IS THE SOURCE, NOT THE FILE'S `carried` ROWS. The session rewrites the file,
+    and in `ca202cd9` it wrote `"carried": []` into every list, so the rows the hook had put
+    there were gone before anything showed them. The file's carried statuses still win over
+    the ledger's, because they are this turn's marks and land at its Stop; with no ledger,
+    the file's rows are all there is. A queued message's own list, still on disk under a
+    record the tag carries, stands in for its issue, whose ledger item is only the hook's
+    fallback until that turn's Stop absorbs the list."""
+    own = rec.get("issue")
+    led = load_ledger(at)
+    titles = {i.get("id"): plain_text(i.get("title"), TITLE_MAX) for i in open_issues(led)}
+    marks = {(r["issue"], r["ask"][:CARRY_ASK]): r.get("status") for r in carried_items(cl)}
+    live = {}
+    for r in records:
+        rid = r.get("issue") if isinstance(r, dict) and r is not rec else None
+        if not bare_name(rid) or rid == own:
+            continue
+        other = read_json_nofollow(os.path.join(d, os.path.basename(checklist_path(at, r))))
+        its = checklist_items(other)
+        if its:
+            live[rid] = its
+            titles[rid] = titles.get(rid) or checklist_title(other)
+    rows = [(r["issue"], marks.get((r["issue"], r["ask"][:CARRY_ASK])) or r.get("status"),
+             r["ask"])
+            for r in (carry_forward(led, skip=own) if open_issues(led) else carried_items(cl))
+            if r["issue"] not in live]
+    rows += [(it["issue"] if bare_name(it.get("issue")) else rid, it.get("status"), it["ask"])
+             for rid, its in live.items() for it in its]
+    groups, seen, n = {}, set(), 0
+    for gid, st, ask in rows:
+        st = plain_text(st, 40) or "open"
+        key = (gid, ask[:CARRY_ASK])
+        if item_done({"status": st}) or key in seen or n >= DISPLAY_MAX:
+            continue
+        seen.add(key)
+        n += 1
+        groups.setdefault(gid, []).append((st, plain_text(ask, CARRY_ASK)))
+    order = sorted(groups, key=lambda g: (len(g), g))
+    return [(g, titles.get(g) or "", groups[g]) for g in order]
 
 
 def previous_checklist(payload, tag=None):
@@ -2551,9 +2616,10 @@ def start_checklist(payload, prev=None, earlier=()):
     # issue finished during a turn closes on that turn's Stop; this is the half that holds
     # when no Stop fired.
     issue_id = None
-    carried, untitled = [], []
+    carried, untitled, inline = [], [], None
     try:
         led = load_ledger(payload)
+        inline = led.get(INLINE_KEY)
         cl = read_json_nofollow(p) or {}
         landed = absorb_carried(led, carried_items(cl))
         landed += absorb_titles(led, checklist_titles(cl))
@@ -2588,7 +2654,7 @@ def start_checklist(payload, prev=None, earlier=()):
     # when this session has earlier open items — see `carry_only_checklist`, which is where
     # the measured hand-back case is written down.
     if not opens_issue(prompt):
-        return carry_only_checklist(bare, carried, untitled)
+        return carry_only_checklist(bare, carried, untitled, inline)
     # `issue` PAIRS THE LIST WITH THE ISSUE IT BELONGS TO, and it is what the next
     # message's absorb reads. Without it the items would have no issue to land on. `key`
     # names this message's own file (`checklist_path`).
@@ -2633,7 +2699,7 @@ def start_checklist(payload, prev=None, earlier=()):
                "which keeps them after this turn ends and keeps every earlier open issue "
                "beside them; an agent spawned now is linked to that issue and its result is "
                "recorded there." if issue_id else "")
-            + earlier_lines(carried, untitled)
+            + earlier_lines(carried, untitled, inline)
             + (dispatch_line(payload, issue_id) if issue_id else "")), record
 
 
@@ -2689,15 +2755,28 @@ def checklist_head(p, untitled):
     return CHECKLIST_HEAD % (p, ", \"titles\"" if untitled else "")
 
 
-def earlier_lines(carried, untitled):
+def earlier_lines(carried, untitled, inline=None):
     """The sentences about this session's EARLIER issues, each said only when it has something
-    to name, and each with its leading space. One builder for both checklist variants."""
+    to name, and each with its leading space. One builder for both checklist variants.
+    `inline` is the ledger's `INLINE_KEY` mark, said only ahead of the partition line."""
+    said = len(carried) >= PARTITION_MIN
     return ((" " + CARRIED_LINE % len(carried) if carried else "")
-            + (" " + PARTITION_LINE if len(carried) >= PARTITION_MIN else "")
+            + (" " + inline_line(inline) if said and inline_line(inline) else "")
+            + (" " + PARTITION_LINE if said else "")
             + (" " + TITLES_LINE % ", ".join(untitled) if untitled else ""))
 
 
-def carry_only_checklist(p, carried, untitled):
+def inline_line(mark):
+    """`INLINE_LINE` for a ledger mark `wf-widen` wrote, or "" for anything else: the ledger
+    is a file in the project, so its shape is checked before a word of it is said."""
+    n = mark.get("items") if isinstance(mark, dict) else None
+    if type(n) is not int or not 0 < n <= MAX_ISSUES * MAX_CARRIED:
+        return ""
+    ids = [i for i in mark.get("issues") or [] if bare_name(i)][:MAX_CARRIED]
+    return INLINE_LINE % (mark["items"], ", ".join(ids)) if ids else ""
+
+
+def carry_only_checklist(p, carried, untitled, inline=None):
     """The file and the line a message that opens no asks of its own still gets, when this
     session has earlier issues with open items or no title. `("", None)` when it has neither.
 
@@ -2735,7 +2814,7 @@ def carry_only_checklist(p, carried, untitled):
         return "", None
     return (checklist_head(p, untitled)
             + " and its \"items\" stay empty, because this message makes no asks of its "
-            "own." + earlier_lines(carried, untitled),
+            "own." + earlier_lines(carried, untitled, inline),
             {"prompt": "", "ended": False, "issue": None, "carry_only": True})
 
 

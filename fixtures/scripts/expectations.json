@@ -13994,5 +13994,239 @@
         ]
       }
     }
+  },
+  "work-list-shows-earlier-open-issues": {
+      "_why": "MEASURED 2026-11-07 in tmux-revive `ca202cd9`: i31, i32 and i33 were all open and every WORK LIST showed only its own message's items; the session had also written `\"carried\": []` over the rows the hook put in each file. The display now lists every other open item, from the ledger, grouped by issue under its own list. Fails on 1.84.0's hook, which shows i2's two items alone.",
+      "before": [
+          {
+              "script": "wf-task-tag",
+              "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"prompt\": \"The mountain graphics needs a bit more work. Also, they cause the display to jump a bit when the animation happens.\"}"
+          },
+          {
+              "path_from": 0,
+              "path_rx": "/[^\\s\"]*wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+              "write": "{\"title\": \"Mountain art and display jump\", \"items\": [{\"ask\": \"The mountain graphics needs a bit more work\", \"status\": \"open\"}, {\"ask\": \"they cause the display to jump\", \"status\": \"open\"}], \"carried\": []}"
+          },
+          {
+              "script": "wf-task-tag",
+              "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"prompt\": \"another thing we need to figure out is why on tt-dev it opens up a new tmux session when I restart it\"}"
+          },
+          {
+              "path_from": 2,
+              "path_rx": "/[^\\s\"]*wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+              "write": "{\"title\": \"New session on each tmux start\", \"items\": [{\"ask\": \"why tt-dev opens a new tmux session on restart\", \"status\": \"open\"}], \"carried\": []}"
+          }
+      ],
+      "exit": 0,
+      "not": [
+          "Traceback"
+      ],
+      "script": "wf-turn-budget",
+      "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"tool_name\": \"Write\", \"tool_input\": {\"file_path\": \"${TREE}/wf-asks.s1.i2.json\"}, \"tool_response\": {}}",
+      "want": [
+          "WORK LIST  i2  New session on each tmux start",
+          "STILL OPEN FROM EARLIER MESSAGES\\n  i1  Mountain art and display jump\\n    open  The mountain graphics needs a bit more work\\n    open  they cause the display to jump"
+      ]
+  },
+  "widen-bash-input-turn-names-no-ask": {
+      "_why": "MEASURED 2026-11-07 in tmux-revive `ca202cd9`: a turn opened by the user's own `! tmux-revive update` fires no UserPromptSubmit, so the tag still held the previous message and three Stops judged the update reply against \"escape should close the window\" and the tt-dev pane question. The turn's typed row is `<bash-input>`/`<bash-stdout>`, so the Stop now names no ask: with the blind sample forced on, nothing is sampled and no flag is written. Fails on 1.84.0's hook, which writes the earlier message into the flag.",
+      "before": [
+          {
+              "script": "wf-task-tag",
+              "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"escape should close the popup window that lists the remote hosts in the panel please\"}"
+          }
+      ],
+      "env": {
+          "WF_BLIND_SAMPLE": "1"
+      },
+      "exit": 0,
+      "not": [
+          "Traceback",
+          "blind-sampled"
+      ],
+      "script": "wf-widen",
+      "stdin_raw": "{\"hook_event_name\": \"Stop\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"transcript_path\": \"t1.jsonl\", \"last_assistant_message\": \"We ran the update; the installer no longer stacks blank lines (b3f26cf).\"}",
+      "want": [
+          "WIDEN  not scored"
+      ],
+      "after": {
+          "wf-widen-flag.s1.json": {
+              "absent": true
+          }
+      }
+  },
+  "widen-flag-carries-said-earlier": {
+      "_why": "MEASURED 2026-11-07 in tmux-revive `ca202cd9`: the turn opened by the M back-out ask fixed it and said \"Committed as 5d76de2\" mid-turn, then ended on the security agents it launched; the juror saw only that last message and voted no on work the turn had done. The flag now carries the turn's earlier text as `said_earlier`, apart from the conclusion. Fails on 1.84.0's hook, whose flag has no such field.",
+      "before": [
+          {
+              "script": "wf-task-tag",
+              "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"also when select M for message, we need an easy way to back out of the message\"}"
+          }
+      ],
+      "env": {
+          "WF_BLIND_SAMPLE": "1"
+      },
+      "exit": 0,
+      "not": [
+          "Traceback"
+      ],
+      "script": "wf-widen",
+      "stdin_raw": "{\"hook_event_name\": \"Stop\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"transcript_path\": \"t1.jsonl\", \"last_assistant_message\": \"The three fix agents are running, each in its own set of files.\"}",
+      "want": [
+          "blind-sampled"
+      ],
+      "after": {
+          "wf-widen-flag.s1.json": {
+              "want": [
+                  "\"said_earlier\": [\"Committed as `5d76de2`: Esc or Ctrl-C now backs out of M."
+              ],
+              "not": [
+                  "\"said_earlier\": [\"The three fix agents"
+              ]
+          }
+      }
+  },
+  "widen-inline-despite-partition": {
+      "_why": "MEASURED 2026-11-07 in tmux-revive `ca202cd9`: the partition line was said on eight messages and ignored every time, and nothing after it looked. Three open items the session wrote, on two issues, and a turn that edited a file and called no Agent: the Stop's WORK block says INLINE and the ledger keeps the mark for the next submit. Fails on 1.84.0's hook.",
+      "env": {
+          "WF_BLIND_SAMPLE": "0"
+      },
+      "exit": 0,
+      "script": "wf-widen",
+      "stdin_raw": "{\"hook_event_name\": \"Stop\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"transcript_path\": \"t1.jsonl\", \"last_assistant_message\": \"Done with the mountains.\"}",
+      "want": [
+          "i1  KICKBACK  Mountain art",
+          "INLINE  3 open items across i1, i2 were worked in this thread"
+      ],
+      "not": [
+          "Traceback"
+      ],
+      "after": {
+          ".claude/workforce/issues/s1.json": {
+              "want": [
+                  "\"inline\": {\"items\": 3, \"issues\": [\"i1\", \"i2\"]}"
+              ]
+          }
+      }
+  },
+  "widen-inline-not-said-when-an-agent-was-spawned": {
+      "_why": "THE CONTROL for `widen-inline-despite-partition`: the same backlog, but the turn spawned an Agent, so it partitioned and nothing is said and no mark is left.",
+      "env": {
+          "WF_BLIND_SAMPLE": "0"
+      },
+      "exit": 0,
+      "script": "wf-widen",
+      "stdin_raw": "{\"hook_event_name\": \"Stop\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"transcript_path\": \"t1.jsonl\", \"last_assistant_message\": \"Done with the mountains.\"}",
+      "want": [
+          "i1  KICKBACK  Mountain art"
+      ],
+      "not": [
+          "Traceback",
+          "INLINE"
+      ],
+      "after": {
+          ".claude/workforce/issues/s1.json": {
+              "not": [
+                  "\"inline\""
+              ]
+          }
+      }
+  },
+  "task-tag-says-inline-at-next-submit": {
+      "_why": "THE MODEL-FACING HALF of `widen-inline-despite-partition`: the Stop's mark on the ledger is said back at the next submit, ahead of the partition line, which is the moment the next dispatch can be made. A mark naming nothing safe is said as nothing.",
+      "exit": 0,
+      "not": [
+          "Traceback"
+      ],
+      "script": "wf-task-tag",
+      "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"also the circuit board art flickers when the panel redraws, can you take a look at that one too\"}",
+      "want": [
+          "The last turn worked 3 open items across i1, i2 in this thread and spawned no subagent, which is what the next sentence rules out. With this many items open they are partitioned"
+      ]
+  },
+  "widen-inline-stale-mark-cleared-with-no-open-issue": {
+      "_why": "A STALE `inline` MARK IS CLEARED ON THE PATH WITH NO OPEN ISSUE. Every issue is closed, so `judge_ledger` returns no rows; the mark an earlier Stop left must still go, or the next submit says a backlog that no longer exists. Fails when the pop sits after the no-rows return.",
+      "env": {
+          "WF_BLIND_SAMPLE": "0"
+      },
+      "exit": 0,
+      "not": [
+          "Traceback",
+          "INLINE"
+      ],
+      "script": "wf-widen",
+      "stdin_raw": "{\"hook_event_name\": \"Stop\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"transcript_path\": \"t1.jsonl\", \"last_assistant_message\": \"All done.\"}",
+      "after": {
+          ".claude/workforce/issues/s1.json": {
+              "not": [
+                  "\"inline\""
+              ],
+              "want": [
+                  "\"id\": \"i1\""
+              ]
+          }
+      }
+  },
+  "widen-said-earlier-stops-at-the-turns-own-message": {
+      "_why": "THE TURN BOUND IS THE TYPED USER ROW, NOT ONLY A `stop_hook_summary`. The previous turn here was interrupted (Esc), so it wrote no end row; its \"Committed as `abc1234`\" must not reach `said_earlier`, while this turn's own \"Committed as `5d76de2`\" must. Fails on a walk bounded by `TURN_END` alone.",
+      "before": [
+          {
+              "script": "wf-task-tag",
+              "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"also when select M for message, we need an easy way to back out of the message\"}"
+          }
+      ],
+      "env": {
+          "WF_BLIND_SAMPLE": "1"
+      },
+      "exit": 0,
+      "not": [
+          "Traceback"
+      ],
+      "script": "wf-widen",
+      "stdin_raw": "{\"hook_event_name\": \"Stop\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"transcript_path\": \"t1.jsonl\", \"last_assistant_message\": \"The three fix agents are running, each in its own set of files.\"}",
+      "want": [
+          "blind-sampled"
+      ],
+      "after": {
+          "wf-widen-flag.s1.json": {
+              "want": [
+                  "\"said_earlier\": [\"Committed as `5d76de2`"
+              ],
+              "not": [
+                  "abc1234"
+              ]
+          }
+      }
+  },
+  "widen-inline-checklist-edit-is-not-work": {
+      "_why": "THE SESSION'S OWN BOOKKEEPING IS NOT WORK. The turn's only Bash write is a `sed -i` on its checklist file, segment by segment beside a read, so the backlog was not worked inline and nothing is said. Fails when a command that names the checklist anywhere is classified whole, or when it is not excluded at all.",
+      "env": {
+          "WF_BLIND_SAMPLE": "0"
+      },
+      "exit": 0,
+      "not": [
+          "Traceback",
+          "INLINE"
+      ],
+      "script": "wf-widen",
+      "stdin_raw": "{\"hook_event_name\": \"Stop\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"transcript_path\": \"t1.jsonl\", \"last_assistant_message\": \"Marked the list.\"}",
+      "want": [
+          "i1  KICKBACK  Mountain art"
+      ]
+  },
+  "widen-inline-real-write-beside-a-checklist-edit": {
+      "_why": "L3, THE OTHER HALF of `widen-inline-checklist-edit-is-not-work`: one Bash command both marks the checklist and removes a real file. Classified by segment, the `rm` is work, so the backlog was worked inline and INLINE is said. Fails when a command naming the checklist anywhere is not counted at all.",
+      "env": {
+          "WF_BLIND_SAMPLE": "0"
+      },
+      "exit": 0,
+      "not": [
+          "Traceback"
+      ],
+      "script": "wf-widen",
+      "stdin_raw": "{\"hook_event_name\": \"Stop\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"transcript_path\": \"t1.jsonl\", \"last_assistant_message\": \"Cleared the old frames.\"}",
+      "want": [
+          "INLINE  3 open items across i1, i2 were worked in this thread"
+      ]
   }
 }

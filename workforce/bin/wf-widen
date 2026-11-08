@@ -117,8 +117,8 @@ def widen_flag(payload):
     The split is the architecture. THIS hook is deterministic, free, and decides
     WHETHER a sense went unopened. It cannot open one — a command hook has no model and
     cannot read a repository, search the web, or hold an opinion. So it writes down what
-    it found and a `type: "agent"` hook picks it up, spawns a reader with Read and Bash
-    and none of this turn's context, and actually opens the channel.
+    it found and a `type: "agent"` hook picks it up, spawns a reader with Read, Grep
+    and Glob and none of this turn's context, and actually opens the channel.
 
     Cheap decides, expensive acts. An agent hook that ran its own analysis on every
     `Stop` would spend a subagent per turn to conclude "nothing to do" in the ~90% case;
@@ -155,21 +155,9 @@ def peer_sent(payload, peer):
     if not isinstance(to, str) or not to:
         return []
     sent = []
-    for line in reversed(TL._read_lines(TL.reply_transcript(payload)) or []):
-        try:
-            row = json.loads(line)
-        except ValueError:
-            continue
-        if not isinstance(row, dict):
-            continue
-        if row.get("type") == "system" and row.get("subtype") in TURN_END:
-            break
+    for row in turn_rows(TL.reply_transcript(payload)):
         c = (row.get("message") or {}).get("content") if isinstance(
             row.get("message"), dict) else None
-        if row.get("type") == "user" and not row.get("isMeta") and not (
-                isinstance(c, list) and any(isinstance(b, dict) and b.get("type") == "tool_result"
-                                            for b in c)):
-            break
         if row.get("type") != "assistant" or not isinstance(c, list):
             continue
         for b in reversed(c):
@@ -187,6 +175,45 @@ def conclusion_for(payload, reply, peer):
     name = (peer.get("from-name") or peer.get("from")) if isinstance(peer, dict) else ""
     parts += [f"[sent to {name} by SendMessage]\n{m[:4000]}" for m in peer_sent(payload, peer)]
     return "\n\n".join(p for p in parts if p)
+
+
+# WHAT THE TURN SAID BEFORE ITS LAST MESSAGE, KEPT APART FROM THE CONCLUSION. MEASURED
+# 2026-11-07 in tmux-revive `ca202cd9`: the turn opened by "when select M for message, we
+# need an easy way to back out" fixed it, said "Committed as `5d76de2`" mid-turn, then took
+# three hand-backs and a queued message and ended on the security agents it launched. The
+# conclusion is only that last message, so the juror voted no on an ask the turn had done.
+# Joined INTO the conclusion it would bury the last word (`TL.confirmed_reply` says why), so
+# it is a field of its own: the newest blocks, oldest first, each cut.
+SAID_EARLIER_MAX = 6
+SAID_EARLIER_CHARS = 500
+
+
+def said_earlier(payload, reply):
+    """The turn's text blocks before its final reply, oldest first; [] when there are none.
+
+    ONLY THE NEWEST TEXT ROW IS COMPARED WITH THE REPLY, since that row is the reply; an
+    earlier "Done." stays though the reply contains the word. An empty reply drops nothing.
+    Control characters are stripped as `TT.plain_text` strips them, line breaks kept."""
+    want = " ".join((reply or "").split())
+    out, newest = [], True
+    for row in turn_rows(TL.reply_transcript(payload)):
+        msg = row.get("message") if row.get("type") == "assistant" else None
+        c = msg.get("content") if isinstance(msg, dict) else None
+        texts = [b["text"] for b in (c if isinstance(c, list) else [])
+                 if isinstance(b, dict) and b.get("type") == "text"
+                 and isinstance(b.get("text"), str) and b["text"].strip()]
+        if not texts:
+            continue
+        if newest:
+            newest = False
+            texts = [t for t in texts if not want or " ".join(t.split()) not in want]
+        out += [_CONTROL.sub("", t.strip())[:SAID_EARLIER_CHARS] for t in reversed(texts)]
+        if len(out) >= SAID_EARLIER_MAX:
+            break
+    return out[:SAID_EARLIER_MAX][::-1]
+
+
+_CONTROL = re.compile(r"[\x00-\x09\x0b-\x1f\x7f-\x9f]")
 
 
 def raise_flag(payload, why, rows, counts, unopened, applicable,
@@ -237,6 +264,7 @@ def raise_flag(payload, why, rows, counts, unopened, applicable,
                      "enumerating": counts[2], "outside": counts[3],
                      "ran": counts[4]},
         "conclusion": conclusion_for(payload, reply, (_tag or {}).get("peer")),
+        "said_earlier": said_earlier(payload, reply),
         # PASSED IN, NEVER DERIVED FROM `why`. Deriving it listed every
         # APPLICABLE sense as unopened, which on a sampled turn is every sense
         # the ask needed — including ones the turn opened 24 times.
@@ -291,9 +319,15 @@ def answered_record(payload, tag):
     a `SubagentStop` (an agent's slot holds no `earlier`), a tag from an older release, no
     transcript, or a user row matching no record — a slash command's row is not the text
     its submit saw.
+
+    NONE FOR A TURN THE USER'S OWN SHELL COMMAND OPENED (`BASH_MODE`). No submit fired for
+    it, so every record in the tag belongs to an earlier message.
     """
     if not isinstance(tag, dict) or payload.get("hook_event_name") != "Stop":
         return tag
+    rows = turn_user_rows(payload.get("transcript_path"))
+    if rows and rows[-1][1] and any(BASH_MODE.match(t) for t in rows[-1][0]):
+        return None
     earlier = earlier_of(tag)
     if not earlier:
         return tag
@@ -306,6 +340,16 @@ def answered_record(payload, tag):
         if typed:
             break
     return tag
+
+
+# A TURN OPENED BY A `!` SHELL COMMAND ANSWERED NO SUBMITTED MESSAGE. MEASURED 2026-11-07 in
+# tmux-revive `ca202cd9`: the user ran `! tmux-revive update`, the transcript took a typed
+# `<bash-input>` row and a `<bash-stdout>` row, the model replied to the output, and no
+# `UserPromptSubmit` fired. The tag still held the previous message, so three Stops judged
+# a reply about the update against "escape should close the window" and against the tt-dev
+# pane question; one was blocked as an unopened `hearing` for an ask it never had. The
+# typed row that opens such a turn starts with one of these tags.
+BASH_MODE = re.compile(r"<bash-(?:input|stdout|stderr)>")
 
 
 def earlier_of(tag):
@@ -337,25 +381,12 @@ def turn_user_rows(path):
         return []
     if path in _TURN_ROWS:
         return _TURN_ROWS[path]
-    out, replied = [], False
-    for line in reversed(TL._read_lines(path) or []):
-        try:
-            row = json.loads(line)
-        except ValueError:
-            continue
-        if not isinstance(row, dict):
-            continue
-        if row.get("type") == "assistant":
-            replied = True
-            continue
-        if not replied:
-            continue
-        if row.get("type") == "system" and row.get("subtype") in TURN_END:
-            break
+    out = []
+    for row in turn_rows(path):
         msg = row.get("message") if row.get("type") == "user" else None
         c = msg.get("content") if isinstance(msg, dict) else None
         if isinstance(c, list):
-            if any(isinstance(b, dict) and b.get("type") == "tool_result" for b in c):
+            if _tool_result(row):
                 continue
             texts = [b["text"] for b in c if isinstance(b, dict)
                      and b.get("type") == "text" and isinstance(b.get("text"), str)]
@@ -364,11 +395,63 @@ def turn_user_rows(path):
             texts = [c]
         else:
             continue
-        typed = not row.get("isMeta")
-        out.append(({" ".join(t[:2000].split()) for t in texts}, typed))
-        if typed:
-            break
+        out.append(({" ".join(t[:2000].split()) for t in texts}, not row.get("isMeta")))
     _TURN_ROWS[path] = out
+    return out
+
+
+_LINES = {}
+
+
+def transcript_lines(path):
+    """`TL._read_lines`, read once per process while the file is unchanged. Keyed by size
+    and mtime as well as path, so a host append landing late (`TL.REPLY_WAIT`) is a new
+    read and never a stale one; the one entry kept is the newest."""
+    try:
+        st = os.stat(path)
+    except (OSError, TypeError, ValueError):
+        return None
+    key = (path, st.st_size, st.st_mtime_ns)
+    if key not in _LINES:
+        _LINES.clear()
+        _LINES[key] = TL._read_lines(path)
+    return _LINES[key]
+
+
+def _tool_result(row):
+    """Whether a transcript row is a tool result, which is a user row and not a message."""
+    msg = row.get("message")
+    c = msg.get("content") if isinstance(msg, dict) else None
+    return isinstance(c, list) and any(isinstance(b, dict) and b.get("type") == "tool_result"
+                                       for b in c)
+
+
+def turn_rows(path):
+    """The stopping turn's rows as parsed objects, newest first, from the last assistant row
+    back to the turn's bound. THE ONE WALK every turn-scoped reader here uses.
+
+    THE BOUND IS THE FIRST OF TWO ROWS: a `TURN_END` row, not yielded, or the typed user row
+    that opened the turn, yielded last. A user row is that row when it is neither `isMeta`
+    nor a tool result. `TURN_END` alone is not enough: an Esc-interrupted turn writes none,
+    and nor does a session's first turn, so a walk bounded by it alone read an earlier
+    turn's work as this one's. Rows after the last assistant row are a message queued while
+    the hooks ran, and are not this turn's."""
+    out, replied = [], False
+    for line in reversed(transcript_lines(path) or []):
+        try:
+            row = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(row, dict):
+            continue
+        replied = replied or row.get("type") == "assistant"
+        if not replied:
+            continue
+        if row.get("type") == "system" and row.get("subtype") in TURN_END:
+            break
+        out.append(row)
+        if row.get("type") == "user" and not row.get("isMeta") and not _tool_result(row):
+            break
     return out
 
 
@@ -2650,9 +2733,10 @@ def hand_checklist_to_jury(payload, record, items):
     flag = widen_flag(payload)
     data = TT.read_json_nofollow(flag)
     if not isinstance(data, dict):
+        reply = TL.confirmed_reply(payload)[0]
         data = {"sampled": True, "ask": {"prompt": "", "senses": []}, "evidence": {},
-                "conclusion": conclusion_for(payload, TL.confirmed_reply(payload)[0],
-                                             record.get("peer")),
+                "conclusion": conclusion_for(payload, reply, record.get("peer")),
+                "said_earlier": said_earlier(payload, reply),
                 "unopened": [],
                 "why": [{"trigger": "ASKS", "sense": "asks",
                          "reason": "the message made several asks; each is checked"}]}
@@ -3000,6 +3084,82 @@ def handoff_action(payload, iss, verdict):
             "\n".join(quotes))
 
 
+# THE PARTITION LINE, CHECKED AFTER THE TURN THAT WAS GIVEN IT. MEASURED 2026-11-07 in
+# tmux-revive `ca202cd9`: `TT.PARTITION_LINE` was said at submit and display on i13, i14,
+# i26, i28, i30, i33, i34 and i35, and the session worked them in its own thread every
+# time; its one fan-out was the security fixes on i20. The user: "you're not making use of
+# any agents and are dealing with all of these issues in one stream ... This is a bug."
+# Nothing after the line looked at what the turn did, so ignoring it cost nothing.
+#
+# THE SIGNAL, ALL FOUR TOGETHER. `TT.PARTITION_MIN` open items the session itself wrote,
+# the line's own count; on at least TWO issues, because separate messages are the one sign
+# of separate areas a hook can read, where three items on one issue may well share a file
+# and be right to wait; on no issue an agent is already working; and a turn that changed
+# files and called no `INLINE_DELEGATES` tool. A turn that only answered is not "worked
+# inline", and the checklist file is the session's bookkeeping, not work.
+#
+# A LINE, NEVER A BLOCK: separate files is still an inference here, and this file's rule is
+# that no blocking surface rests on one (`ledger_verdict`). The line is the user's, under
+# WORK; the mark it leaves on the ledger is the model's, said at the next submit
+# (`TT.INLINE_LINE`), which is the moment the next dispatch can be made.
+INLINE_DELEGATES = ("Agent", "Task", "SendMessage")
+INLINE_SAID = ("  INLINE  %d open items across %s were worked in this thread with no "
+               "subagent, despite the partition line")
+WRITE_TOOLS = ("Edit", "Write", "MultiEdit", "NotebookEdit")
+
+
+_SEGMENT = re.compile(r"&&|\|\||[;|\n]")
+_HEREDOC = re.compile(r"<<-?\s*['\"]?[A-Za-z_]+['\"]?")
+
+
+def bash_writes(cmd):
+    """Whether a Bash command changes the tree, its checklist writes not counted.
+
+    BY SEGMENT, NOT BY COMMAND: a segment naming a checklist file is the session's
+    bookkeeping (`sed -i` on its status, `cat > ...wf-asks.s1.i2.json`), and every other
+    segment is classified by `TL.WRITE_CMD` as before. A heredoc marker is not counted in a
+    command that names a checklist, since it is how that file is fed; a heredoc that writes
+    another file through an interpreter is invisible to `TL.WRITE_CMD` either way."""
+    named = bool(TT.CHECKLIST_NAMED.search(cmd))
+    for seg in _SEGMENT.split(cmd):
+        if TT.CHECKLIST_NAMED.search(seg):
+            continue
+        if TL.WRITE_CMD.search(_HEREDOC.sub("", seg) if named else seg):
+            return True
+    return False
+
+
+def worked_inline(payload, led):
+    """`{"items": n, "issues": [ids]}` when this turn worked a partitionable backlog in the
+    main thread, else None. Reads the ledger after this Stop's own absorb and judgment."""
+    open_by = {}
+    for iss in TT.open_issues(led):
+        if any(a.get("state") == "running" for a in TT.issue_agents(iss)):
+            continue
+        n = sum(not TT.item_done(i) for i in TT.session_items(iss))
+        if n and TT.bare_name(iss.get("id")):
+            open_by[iss["id"]] = n
+    if sum(open_by.values()) < TT.PARTITION_MIN or len(open_by) < 2:
+        return None
+    wrote = False
+    for row in turn_rows(payload.get("transcript_path")):
+        msg = row.get("message") if row.get("type") == "assistant" else None
+        for b in (msg.get("content") if isinstance(msg, dict) else None) or []:
+            if not isinstance(b, dict) or b.get("type") != "tool_use":
+                continue
+            if b.get("name") in INLINE_DELEGATES:
+                return None
+            inp = b.get("input") if isinstance(b.get("input"), dict) else {}
+            if b.get("name") in WRITE_TOOLS:
+                wrote = wrote or TT.CHECKLIST_PREFIX not in str(inp.get("file_path", ""))
+            elif b.get("name") == "Bash":
+                wrote = wrote or bash_writes(str(inp.get("command", "")))
+    if not wrote:
+        return None
+    ids = sorted(open_by, key=lambda i: (len(i), i))
+    return {"items": sum(open_by.values()), "issues": ids}
+
+
 def ledger_verdict(payload, decided):
     """The issue ledger's half of this stop (K2c), as (the block, the agent-written quote).
 
@@ -3135,7 +3295,16 @@ def ledger_verdict(payload, decided):
         noted_on, noted = TT.note_intentions(
             led, record.get("issue") if isinstance(record, dict) else None, capture(reply))
     rows = TT.judge_ledger(payload, led)
+    # Only a Stop whose reply the transcript holds: a side query is mid-turn. THE OLD MARK
+    # GOES ON EVERY PATH, the one with no open issue included, or the next submit would say
+    # a backlog that no longer exists.
+    inline = worked_inline(payload, led) if rows and reply is not None else None
+    stale = led.pop(TT.INLINE_KEY, None) is not None
+    if inline:
+        led[TT.INLINE_KEY] = inline
     if not rows:
+        if stale:
+            TT.save_ledger(payload, led)
         return "", ""
     TT.save_ledger(payload, led)
     out, quotes = [], []
@@ -3170,6 +3339,8 @@ def ledger_verdict(payload, decided):
     # counted in the header. Only this turn's new wordings, so a plan is shown once.
     for text in noted:
         out.append(f"  {noted_on}  noted  {text}")
+    if inline:
+        out.append(INLINE_SAID % (inline["items"], ", ".join(inline["issues"])))
     if not out:
         return "", ""
     # THE COUNT IS OF ISSUES, NOT OF LINES. An issue asking for a resume carries a second
