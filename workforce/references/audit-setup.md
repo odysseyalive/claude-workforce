@@ -715,7 +715,7 @@ pick — STANDS.
 **The shipped default and the recommendation are two things, and on two objects they differ.** The
 recommendation is the Notes-column label (§ Model statics); the shipped default is what a project that has
 never been audited already runs on. They name the same model on every lane except creative-visual, and
-there and on the advisor `claude-fable-5-1` is recommended while `claude-opus-5-5` is the default,
+there and on the advisor `claude-fable-5-2` is recommended while `claude-opus-5-5` is the default,
 because the frontier model needs an Ultra-tier account (`org-config.template.md` § Model statics,
 *A recommendation is not a default either*). Each of those objects shows both labels on a first run
 (§ What "pre-selected" means on screen). *Until 2026-11-05 this rule read "a first run defaults to the

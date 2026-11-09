@@ -14,7 +14,7 @@ An audited project that chose the frontier model for visual work and declined an
 | Creative-text model | `claude-opus-4-6` |
 |---|---|
 | Creative-text effort | medium |
-| Creative-visual model | `claude-fable-5-1` |
+| Creative-visual model | `claude-fable-5-2` |
 | Creative-visual effort | high |
 
 ### Code
