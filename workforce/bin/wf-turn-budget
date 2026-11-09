@@ -1129,6 +1129,21 @@ def checklist_shown(payload):
     return 0
 
 
+# THE USER'S WORDS BEFORE A PAGE IS PUBLISHED OR A QUESTION IS ASKED, on this same
+# `PreToolUse` row (`wf-task-tag.ask_words` holds the reason and the measurement). Context
+# only: it never denies, it reads and never writes the ledger, and it spawns nothing.
+ASK_WORDS_TOOLS = ("Artifact", "AskUserQuestion")
+
+
+def ask_words(payload):
+    """Hand the call the open issue's user words as `additionalContext`. Always 0."""
+    text = _ledger_read(payload, lambda mod, led: mod.ask_words(payload, led))
+    if text:
+        sys.stdout.write(json.dumps({"hookSpecificOutput": {
+            "hookEventName": "PreToolUse", "additionalContext": text}}) + "\n")
+    return 0
+
+
 def main():
     try:
         payload = json.loads(sys.stdin.read() or "{}")
@@ -1141,6 +1156,8 @@ def main():
     # Tested first because the fast path below reads the ABSENCE of `agent_id` as "main
     # thread, nothing to do", and the main thread is exactly where this guard runs.
     if payload.get("hook_event_name") == "PreToolUse":
+        if payload.get("tool_name") in ASK_WORDS_TOOLS:
+            return ask_words(payload)
         return guard_spawn(payload)
 
     # ── THE FAST PATH: no file is touched in the main thread ─────────────────

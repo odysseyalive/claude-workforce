@@ -74,6 +74,7 @@ import os
 import re
 import stat
 import sys
+import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 WF = os.path.dirname(HERE)
@@ -216,6 +217,26 @@ def said_earlier(payload, reply):
 _CONTROL = re.compile(r"[\x00-\x09\x0b-\x1f\x7f-\x9f]")
 
 
+TESTIMONY_MAX = 2000
+
+
+def _ask_prompt(tag):
+    """The user's words the jury tries the turn on: an injected turn's inherited ask
+    (`docket_from`), else the tag's own prompt."""
+    src = (tag or {}).get("docket_from")
+    if isinstance(src, dict) and isinstance(src.get("prompt"), str) and src["prompt"].strip():
+        return src["prompt"]
+    return (tag or {}).get("prompt") or ""
+
+
+def _relayed_note(payload, tag):
+    """The pointed-at message under a label, for a peer's pointer; "" otherwise."""
+    if not isinstance((tag or {}).get("peer"), dict) or (tag or {}).get("docket_from"):
+        return ""
+    body = relayed_body(turn_rows(TL.reply_transcript(payload)), (tag or {}).get("prompt"))
+    return ("\n\n[the message, as this turn read it]\n" + body) if body else ""
+
+
 def raise_flag(payload, why, rows, counts, unopened, applicable,
                sampled=False, reply=""):
     _tag = task_tag(payload)
@@ -237,8 +258,10 @@ def raise_flag(payload, why, rows, counts, unopened, applicable,
     """
     TT.write_json_atomic(widen_flag(payload), {
         "sampled": sampled,
-        "ask": {"prompt": (_tag or {}).get("prompt") or "",
-                "kinds": [h.get("kind") for h in ((_tag or {}).get("hits") or [])],
+        "ask": {"prompt": _ask_prompt(_tag) + _relayed_note(payload, _tag),
+                "kinds": list(dict.fromkeys(
+                    [h.get("kind") for h in ((_tag or {}).get("hits") or [])]
+                    + [t[4:] for t, _s, _r in why if t.startswith("TAG:")])),
                 # HOW MANY THINGS WERE ASKED, so a juror can ask whether each
                 # one was ANSWERED. The COUNT is checked mechanically and for
                 # free by `wf-commitments` on every multi-ask turn — "cheap
@@ -264,6 +287,12 @@ def raise_flag(payload, why, rows, counts, unopened, applicable,
                      "enumerating": counts[2], "outside": counts[3],
                      "ran": counts[4]},
         "conclusion": conclusion_for(payload, reply, (_tag or {}).get("peer")),
+        # THE ROW THAT OPENED THE TURN, when the harness wrote it: a hand-back or a task
+        # notification is what the turn was reacting to, and a juror pointed only at the
+        # assistant rows never read it. Evidence, never instructions; bounded.
+        **({"testimony": _CONTROL.sub("", _tag["prompt"])[:TESTIMONY_MAX]}
+           if isinstance((_tag or {}).get("prompt"), str)
+           and TT.INJECTED.search(_tag["prompt"]) else {}),
         "said_earlier": said_earlier(payload, reply),
         # PASSED IN, NEVER DERIVED FROM `why`. Deriving it listed every
         # APPLICABLE sense as unopened, which on a sampled turn is every sense
@@ -2291,6 +2320,117 @@ def widen_reason(unopened, why, rows, inst, counts):
     return "\n".join(lines)
 
 
+def seating(trips, hits):
+    """(applicable, gate, why, incident) for a turn: every sense its reply's claims and its
+    docket ask for, and the subset whose zero count blocks (`gate`). ONE DEFINITION, read
+    by `widen` and by `bin/replay-seating`, so a replay can never seat differently."""
+    applicable, gate, why, incident = set(), set(), [], False
+    for t in trips:
+        sense, reason = CLAIM_SENSE[t]
+        applicable.add(sense)
+        gate.add(sense)
+        why.append((t, sense, reason))
+    for h in hits:
+        applicable.add(h["sense"])
+        if h["kind"] not in TT.JURY_ONLY:
+            gate.add(h["sense"])
+        why.append(("TAG:" + h["kind"], h["sense"], h["why"]))
+        incident = incident or h["kind"] == "incident"
+    return applicable, gate, why, incident
+
+
+QUEUED = "queued_command"
+
+
+def delivered_midturn(payload):
+    """The texts of messages delivered INTO the stopping turn, each a `queued_command`
+    attachment row inside it (`turn_rows`). A message queued for the next turn has no row
+    here yet, so it is never read as this turn's."""
+    out = []
+    for row in turn_rows(TL.reply_transcript(payload)):
+        a = row.get("attachment") if row.get("type") == "attachment" else None
+        if isinstance(a, dict) and a.get("type") == QUEUED and isinstance(a.get("prompt"), str):
+            out.append(" ".join(a["prompt"][:2000].split()))
+    return out
+
+
+RELAYED_MIN = 12
+
+
+def _result_text(block):
+    c = block.get("content")
+    if isinstance(c, str):
+        return c
+    return "\n".join(b.get("text") for b in c if isinstance(b, dict)
+                     and isinstance(b.get("text"), str)) if isinstance(c, list) else ""
+
+
+def relayed_body(rows, prompt):
+    """What a peer's message said when its envelope only said where to read it, or "".
+
+    `[agent-msg from=cw-dev 22:08Z] Long message, read it by running: agent-say show <id>`
+    carries no ask of its own: the body is in the messenger's store, which this distribution
+    does not read. The turn reads it, and the transcript keeps what came back, so the body is
+    the OUTPUT OF A COMMAND THE MESSAGE SPELLED OUT, run this turn. Matched by the command's
+    own text inside the message, never by a tool's name. `rows` is any walk of the turn."""
+    flat = " ".join((prompt or "").split())
+    calls = set()
+    for row in rows:
+        c = (row.get("message") or {}).get("content") if row.get("type") == "assistant" else None
+        for b in c if isinstance(c, list) else []:
+            cmd = (b.get("input") or {}).get("command") if isinstance(b, dict) and \
+                b.get("type") == "tool_use" and b.get("name") == "Bash" else None
+            if isinstance(cmd, str) and len(cmd.strip()) >= RELAYED_MIN and \
+                    " ".join(cmd.split()) in flat:
+                calls.add(b.get("id"))
+    out = []
+    for row in rows:
+        c = (row.get("message") or {}).get("content") if row.get("type") == "user" else None
+        for b in c if isinstance(c, list) else []:
+            if isinstance(b, dict) and b.get("type") == "tool_result" and \
+                    b.get("tool_use_id") in calls:
+                out.append(_result_text(b))
+    return _CONTROL.sub(" ", "\n".join(t for t in out if t))[:2000]
+
+
+def docket_hits(payload, reply, subagent):
+    """The tag hits this Stop is tried on: its own record's, and the records of messages
+    delivered into the turn while it ran.
+
+    A MESSAGE DELIVERED MID-TURN NEVER GETS A STOP OF ITS OWN, so its tag was read by
+    nothing. MEASURED in `30e77777`: "what went wrong?" (row 1451, `incident`) arrived while
+    the turn opened at 1412 was running; `answered_record` rightly picked 1412's record, and
+    the incident docket was dropped. The records are the tag's `earlier` chain, newer than
+    the one answered; only one whose text is a `queued_command` row in this turn is merged.
+
+    AN INHERITED DOCKET IS DROPPED ON A DECLARED HOLD: a turn waiting on the next batch has
+    no result to judge yet (`declared_hold`)."""
+    tag = own_tag(payload) or {}
+    hits = [h for h in tag.get("hits") or [] if isinstance(h, dict)]
+    # A PEER'S POINTER IS CLASSIFIED FROM THE MESSAGE IT POINTED AT (`relayed_body`).
+    if not hits and isinstance(tag.get("peer"), dict) and not subagent:
+        body = relayed_body(turn_rows(TL.reply_transcript(payload)), tag.get("prompt"))
+        hits = [dict(h, relayed=True) for h in TT.classify(body)] if body else []
+    if not subagent and any(h.get("inherited") for h in hits) and declared_hold(payload, reply):
+        hits = [h for h in hits if not h.get("inherited")]
+    raw = TT.read_json_nofollow(tag_file(payload)) if not subagent else None
+    if isinstance(raw, dict) and payload.get("hook_event_name") == "Stop":
+        texts = delivered_midturn(payload)
+        for rec in [raw] + earlier_of(raw):
+            if rec is tag or rec.get("prompt") == tag.get("prompt"):
+                break
+            p = " ".join((rec.get("prompt") or "").split())
+            if p and any(p in t or t in p for t in texts):
+                hits += [h for h in rec.get("hits") or []
+                         if isinstance(h, dict) and not h.get("inherited")]
+    seen, out = set(), []
+    for h in hits:
+        if isinstance(h.get("kind"), str) and h.get("sense") and h["kind"] not in seen:
+            seen.add(h["kind"])
+            out.append(h)
+    return out
+
+
 def widen(payload):
     # THE LOOP STOP. Set on the second and later firings for one turn; without this a
     # widen that keeps scoring low blocks forever and the session is dead.
@@ -2451,11 +2591,8 @@ def widen(payload):
     if TL.UNIVERSAL.search(TL._QUOTED.sub(lambda m: " " * len(m.group(0)), masked)):
         trips.append("universal")
 
-    applicable, why = set(), []
-    for t in trips:
-        sense, reason = CLAIM_SENSE[t]
-        applicable.add(sense)
-        why.append((t, sense, reason))
+    hits = docket_hits(payload, reply, subagent)
+    applicable, gate, why, incident = seating(trips, hits)
 
     # THE TAG IS ADDITIVE, never a replacement. A turn can trip a claim trigger AND
     # answer a tagged ask, and both senses are then required — taking one would drop
@@ -2464,11 +2601,6 @@ def widen(payload):
     # subagent never inherits the SESSION's ask — scoring its reply against the user's
     # tagged message is the cross-turn case above in miniature — but since 2026-10-12 it has
     # a tag under its own name holding its own work order, and that one is its ask.
-    incident = False
-    for h in (own_tag(payload) or {}).get("hits") or []:
-        applicable.add(h["sense"])
-        why.append(("TAG:" + h["kind"], h["sense"], h["why"]))
-        incident = incident or h["kind"] == "incident"
 
     # A TURN SCORED AGAINST NOTHING DOES NOT GET A PERFECT SCORE. Printing 100/100
     # for a turn that tripped no trigger is a number with nothing under it, and a
@@ -2533,7 +2665,10 @@ def widen(payload):
                           "WIDEN  unclassified ask · blind-sampled for an outside read"}
 
     unopened, rows = senses(counts, applicable)
+    # A SENSE ONLY A `JURY_ONLY` KIND ASKED FOR IS NEVER BLOCKED ON ITS COUNT
+    # (`TT.JURY_ONLY`): the juror judges it, on the always-seated rule below.
     shown = describe(why, rows, unopened)
+    unopened = [u for u in unopened if u in gate]
 
     # THE SAMPLE. Auditing only the turns that fail their own dispatch is the
     # self-scoring bias wearing a different hat: a turn that looks fine is then judged
@@ -2570,6 +2705,15 @@ def widen(payload):
     # dial over passing turns and this is a standing charge on one kind of ask, measured
     # at 1.49% of real prompts.
     if incident and not unopened and not subagent:
+        sampled = True
+    # A TURN WHOSE DOCKET CAME FROM THE USER'S WORDS ALWAYS SEATS ITS JURORS, whether the
+    # words were this message's or inherited from the issue an injected turn serves. User,
+    # 2026-11-09: "all of these issues should have been caught if that system was working."
+    # MEASURED on mutze-studio `30e77777`: the unchecked result claims sat in turns the
+    # 1-in-5 sample skipped or never reached. The sample above now prices only the turns
+    # whose docket came from a claim the REPLY tripped; `WF_BLIND_SAMPLE` still prices the
+    # turns with no docket at all. This is `incident`'s rule, made general.
+    if any(t.startswith("TAG:") for t, _s, _r in why) and not unopened and not subagent:
         sampled = True
 
     if not unopened and not sampled:
@@ -3160,6 +3304,57 @@ def worked_inline(payload, led):
     return {"items": sum(open_by.values()), "issues": ids}
 
 
+# AN AGENT THAT HAS GONE SILENT IS SAID AT THE NEXT STOP, once per silence. MEASURED
+# 2026-11-09 in mutze-studio `0cb6fb41`: a research scout sat about three hours on one
+# `web_fetch` and nothing told the user; they asked. N IS MEASURED, NOT ROUND: over 76,821
+# tool calls in flight across 1,946 agent transcripts on this machine, the 99.99th
+# percentile wait is 602 s (the 10-minute Bash ceiling), 4 waits passed 15 minutes, and the
+# 2 that passed 20 are both measured hangs (220 and 203 minutes on a browser call). AGENT
+# TRANSCRIPTS ONLY: a background shell writes its own log wherever its command sends it,
+# so its task file's age says nothing (`30e77777` `bbn28nvb2`, output in run3.log).
+# It never blocks, and the ledger keeps the transcript time it last reported, so a still-
+# silent agent is not repeated and one that wrote again and stalled again is.
+SILENT_AFTER = 20 * 60
+
+
+def silent_agents(payload, led, now=None):
+    """One `SILENT` line per running agent whose own transcript has not changed for
+    `SILENT_AFTER` and whose harness meta does not say it finished. [] otherwise."""
+    tp = payload.get("transcript_path")
+    paths = agent_transcripts(tp) if isinstance(tp, str) and tp else {}
+    if not paths:
+        return []
+    newest = {}
+    for iss in led.get("issues", []):
+        for a in TT.issue_agents(iss):
+            newest[a["agent_id"]] = (iss, a)
+    now = time.time() if now is None else now
+    # `WF_SILENT_AFTER` (seconds) moves the bound, as `WF_AUDIT_SAMPLE` moves the sample.
+    try:
+        after = int(os.environ.get("WF_SILENT_AFTER") or SILENT_AFTER)
+    except ValueError:
+        after = SILENT_AFTER
+    out = []
+    for aid, (iss, a) in newest.items():
+        path = paths.get(aid)
+        if a.get("state") != "running" or not path or not TT.bare_name(aid):
+            continue
+        try:
+            stamp = int(os.lstat(path).st_mtime)
+        except OSError:
+            continue
+        if now - stamp < after or a.get("silent_said") == stamp:
+            continue
+        if (TT.agent_meta(payload, aid) or {}).get("finished") is True:
+            continue
+        a["silent_said"] = stamp
+        atype = a.get("agent_type") if TT.bare_name(a.get("agent_type")) else "agent"
+        iid = iss.get("id") if TT.CHECKLIST_KEY.fullmatch(str(iss.get("id"))) else "?"
+        out.append(f"  {iid}  SILENT  {atype} {aid} has written nothing for "
+                   f"{int((now - stamp) // 60)} min and has not finished")
+    return out
+
+
 def ledger_verdict(payload, decided):
     """The issue ledger's half of this stop (K2c), as (the block, the agent-written quote).
 
@@ -3288,6 +3483,7 @@ def ledger_verdict(payload, decided):
     TT.late_marks(payload, led)
     TT.agents_stopped(led, payload.get("transcript_path"))
     TT.agents_finished(led, payload)
+    silent = silent_agents(payload, led)
     if (isinstance(record, dict) and not record.get("carry_only") and not record.get("ended")
             and reply is not None):
         TT.track_message(led, record.get("issue"), TT.checklist_items(cl))
@@ -3307,9 +3503,9 @@ def ledger_verdict(payload, decided):
     if inline:
         led[TT.INLINE_KEY] = inline
     if not rows:
-        if stale:
+        if stale or silent:
             TT.save_ledger(payload, led)
-        return "", ""
+        return ("WORK\n" + "\n".join(silent), "") if silent else ("", "")
     TT.save_ledger(payload, led)
     out, quotes = [], []
     for iid, verdict, _why, ask, iss in rows:
@@ -3345,6 +3541,7 @@ def ledger_verdict(payload, decided):
         out.append(f"  {noted_on}  noted  {text}")
     if inline:
         out.append(INLINE_SAID % (inline["items"], ", ".join(inline["issues"])))
+    out += silent
     if not out:
         return "", ""
     # THE COUNT IS OF ISSUES, NOT OF LINES. An issue asking for a resume carries a second

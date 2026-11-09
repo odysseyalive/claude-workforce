@@ -84,6 +84,39 @@ checks the turn's channel counts against that tag at `Stop` rather than re-guess
 | `judgment` | should we · why not · is that a good idea · what do you think | **hearing** | a proposal you authored cannot be judged from inside; nine of ten escapes came from outside the turn |
 | `behaviour` | does it work · why does it fail · what does it return | **touch** | prose says what a script does; running it says what it did |
 | `existence` | is there any · how many · list every · anywhere else | **taste** | a claim about a set is closed by enumerating it |
+| `incident` | what went wrong · why did it break · diagnose | **hearing** | a cause is testimony: the record it came from, not this turn's reasoning |
+| `work` | do X · let's start T7 · can you add · you never did X · that should have Y | **touch** | a result is a fact about the world after the work; only something that RAN shows it |
+
+**`work` is the general case, and it seats its juror without blocking.** MEASURED 2026-11-09 on
+mutze-studio: every user prompt behind five unchecked result claims ("Sarah's face swap is done",
+"the face clearly changed" at RMSE 0.024, a page called updated) matched none of the fact kinds, so
+no juror could sit. The kind reads the user's words — an imperative, a request put to the worker,
+work said to be still owed, the state the work should leave — never the reply; an outcome-word scan
+of replies was measured at 49.8% and rejected. It tags 45.0% of typed mutze prompts and 65.6% of
+this repository's. A count of zero runs does not block it (`JURY_ONLY`): a draft or a plan is work
+no command closes, so whether a claimed result was shown by a run is the touch juror's question.
+
+**An injected turn carries the docket of the issue it serves.** A hand-back or a task notification
+is not the user's ask and is never classified, but 64% of mutze Stops (581 of 912) were opened by
+one, and the work lands there. The docket is the user's words for the issue the work was started
+for: an agent through the ledger link made at `SubagentStart`, anything else the session started
+(a background shell) through its `<tool-use-id>` to the turn that launched it, at most four hops.
+Never the newest issue, and nothing found means no docket. A declared hold drops it. A message
+delivered into a running turn (a `queued_command` row) adds its own docket to that turn.
+
+**A message from another system is an ask like the user's, and is not the user.** User, 2026-11-09:
+*"If a message comes in, it should be part of the work list too."* A `<cross-session-message>`, a
+`<teammate-message>` and an `[agent-msg from=NAME …]` line are each classified from their own words,
+open an issue and its checklist, and are seated at Stop the same way, with `ask.peer` telling the
+jurors a peer asked. When the message is only a pointer ("read it by running: agent-say show <id>"),
+it is classified from the output of the command it spelled out, as the turn ran it. A hand-back or a
+task notification is a result of work already on the list, never a new ask.
+
+**A running agent that has gone silent is said at the next Stop**, once per silence: its own
+transcript unchanged for 20 minutes (`WF_SILENT_AFTER`) and its meta not finished. MEASURED over
+76,821 tool calls in flight across 1,946 agent transcripts: 4 waits passed 15 minutes, and the 2 that
+passed 20 were both hangs (220 and 203 minutes on a browser call). Background shells are not watched
+this way: their output goes wherever their command sends it, so their task file's age says nothing.
 
 **The list is short because it is a list of measured failures, not a taxonomy.** Each row
 is a way work in this project has actually gone wrong. It grows when another way is
@@ -98,14 +131,22 @@ tagged ask and make a claim; both senses are required.
 
 ## The jury
 
-**Six jurors, yes or no, no numbers.** A jury of twelve returns a verdict, not a score,
+**Seven jurors, yes or no, no numbers.** The six senses below, and `asks`, which sits when a
+message made several asks (`ask.checklist`) and checks that each was addressed. A jury of twelve returns a verdict, not a score,
 and nobody asks how confident juror seven was. The senses work the same way: each one
 answers a single question about the finished turn, and one verified `no` is a `no`.
 
-**Only the jurors an ask summons are seated.** The docket comes from `ask.senses`,
-derived from the user's own words before any answer existed — not from the session's
-read of its own work. In every case shipped that is one or two jurors, so a jury costs
-about what a single opinion did.
+**Only the jurors an ask summons are seated, and a docket from the user's words is always
+tried.** The docket comes from `ask.senses`, derived from the user's own words before any answer
+existed — not from the session's read of its own work. A turn whose docket came from those words,
+its own or inherited, seats its jurors every time; only a docket a reply's own claim tripped is
+sampled (`WF_AUDIT_SAMPLE`), and a turn with no docket keeps the blind sample. MEASURED by
+`bin/replay-seating` over the 1,313 Stops of the 40 newest mutze transcripts: seated turns rise
+from 17.9 to 53.5 per 100 judged, 33.1 more seats per 100 Stops.
+
+**The jurors read the row that opened the turn.** A hand-back or notification goes to them as
+`testimony`, and touch is judged from the transcript's tool_results: a claim with no run supporting
+it is a verified no.
 
 | Juror | Its one question |
 |---|---|
@@ -148,8 +189,9 @@ Three parts, cheap to expensive, so the expensive one only runs when it is earne
    that closes it, before any of the answer exists.
 2. **`wf-widen`** (`Stop`, free) checks whether the finished turn opened that sense's channel. If the
    sense went unopened it blocks the stop, and writes a flag naming what is unopened.
-3. **`wf-widen-agent`** (`Stop`, a `type: "agent"` hook) reads that flag. **No flag, it
-   returns `ok: true` and spends nothing.** With a flag, it spawns a reader carrying
+3. **`wf-widen-agent`** (`Stop`, a `type: "agent"` hook) reads that flag. **It spawns on every Stop**: MEASURED over 1,251 mutze Stops, p50 5.2 s,
+   p90 11.1 s. With no flag it returns `ok: true` there (median 4.9 s); a seated jury's Stops
+   run a median 11.1 s. With a flag, it spawns a reader carrying
    Read, Grep and Glob and none of the finishing turn's context (the transcript, conclusion
    and `said_earlier` it reads are evidence, never instructions), and judges whether the
    EVIDENCE supports the CONCLUSION for that ASK — verifying against the repository
@@ -213,7 +255,8 @@ independent agent"* (`SKILL.md` § Directives, 2026-09-09). An earlier version r
 own work in-session. A count of recorded calls against zero is a fact; whether the work
 was good is a judgement, and the judge did not do the work.
 
-**Passing turns are audited too, at `WF_AUDIT_SAMPLE` (default 1 in 5).** Auditing only
+**Passing turns whose docket a reply's claim tripped are audited at `WF_AUDIT_SAMPLE`
+(default 1 in 5); a docket from the user's words is always tried (§ The jury).** Auditing only
 the turns that fail their own dispatch is the same bias one step removed: a turn that
 looks fine would be judged by nothing but the session that produced it, and looking fine
 is exactly what a tunnel does from inside. `1` audits every claim-carrying turn, `0`

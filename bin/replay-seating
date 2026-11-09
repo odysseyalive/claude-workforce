@@ -1,0 +1,257 @@
+#!/usr/bin/env python3
+"""replay-seating — which jurors each Stop in a transcript seats, before and after.
+
+REPORT ONLY. It writes nothing: no tag, no flag, no ledger, no bytecode. The session's
+issue ledger is READ, from the project the transcript's rows name, because an injected
+turn's docket comes from it. The jury itself is not run: this is the seating decision,
+`wf-widen`'s half, never the model's verdict.
+
+  before  `git show HEAD:workforce/bin/wf-task-tag`'s `classify`, and HEAD's seating rule
+          restated below (a tagged turn seated 1 in `WF_AUDIT_SAMPLE`, `incident` always,
+          an untagged one blind-sampled 1 in `WF_BLIND_SAMPLE`).
+  after   the working tree: `classify` with the `work` kind, the inherited docket of an
+          injected turn (`served_ask`), a message delivered mid-turn merged in, and
+          `wf-widen.seating` with the always-seated rule.
+
+Usage
+    bin/replay-seating TRANSCRIPT.jsonl                 # every judged Stop, then totals
+    bin/replay-seating TRANSCRIPT.jsonl --stops 1404,1581
+    bin/replay-seating --summary T1.jsonl T2.jsonl ...  # totals only, over many
+
+A Stop is named by the line number of its `stop_hook_summary` row. A continuation Stop (the
+turn after a `Stop hook feedback` row) is not judged live, so it is listed as such.
+What it cannot see, and says so: `background_tasks` (so a declared hold is not applied),
+and the asks checklist hand-off, which this change does not touch.
+"""
+
+import hashlib
+import importlib.machinery
+import importlib.util
+import json
+import os
+import subprocess
+import sys
+import types
+
+sys.dont_write_bytecode = True
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+BIN = os.path.join(ROOT, "workforce", "bin")
+
+
+def _load(name):
+    path = os.path.join(BIN, name)
+    loader = importlib.machinery.SourceFileLoader(name.replace("-", "_"), path)
+    spec = importlib.util.spec_from_loader(loader.name, loader)
+    mod = importlib.util.module_from_spec(spec)
+    loader.exec_module(mod)
+    return mod
+
+
+def _load_head(name):
+    """`name` as it stands at HEAD, executed from memory: nothing is written."""
+    src = subprocess.run(["git", "-C", ROOT, "show", f"HEAD:workforce/bin/{name}"],
+                         check=True, stdout=subprocess.PIPE).stdout.decode("utf-8")
+    mod = types.ModuleType(name.replace("-", "_") + "_head")
+    mod.__file__ = os.path.join(BIN, name)
+    exec(compile(src, f"HEAD:{name}", "exec"), mod.__dict__)
+    return mod
+
+
+W = _load("wf-widen")
+TT, TL = W.TT, W.TL
+OLD = _load_head("wf-task-tag")
+TURN_END = ('"stop_hook_summary"', '"turn_duration"')
+
+
+def _rows(lines, lo, hi):
+    for i in range(lo, hi):
+        try:
+            yield i, json.loads(lines[i])
+        except ValueError:
+            continue
+
+
+def turn_of(lines, k):
+    """(opener text, opener typed?, reply, mid-turn texts) for the Stop at index `k`."""
+    lo = 0
+    for i in range(k - 1, -1, -1):
+        if any(m in lines[i] for m in TURN_END) and '"type":"system"' in lines[i]:
+            lo = i + 1
+            break
+    opener, typed, reply, mid, rows = None, False, "", [], []
+    for i, row in _rows(lines, lo, k):
+        rows.append(row)
+        if row.get("type") == "user":
+            text = TT._row_text(row)
+            if not text or text.lstrip().startswith("<system-reminder>"):
+                continue
+            if not row.get("isMeta"):
+                opener, typed = text, True
+            elif not typed and opener is None:
+                opener = text
+        elif row.get("type") == "attachment":
+            a = row.get("attachment") or {}
+            if a.get("type") == "queued_command" and isinstance(a.get("prompt"), str):
+                mid.append(a["prompt"])
+        elif row.get("type") == "assistant":
+            c = (row.get("message") or {}).get("content")
+            t = [b.get("text") for b in c or [] if isinstance(b, dict)
+                 and b.get("type") == "text" and b.get("text")] if isinstance(c, list) else []
+            if t:
+                reply = t[-1]
+    return opener, typed, reply, mid, rows
+
+
+def ask_of(text):
+    peer = TT.peer_request(text or "")
+    return peer[0] if peer else (text or "")
+
+
+def counts_at(path, lines, k):
+    real = TL._read_lines
+    TL._read_lines = lambda _p: lines[:k]
+    try:
+        return TL.turn_counts({"transcript_path": path})
+    finally:
+        TL._read_lines = real
+
+
+def trips_of(reply):
+    masked = TL.mask_code(reply or "")
+    trips = []
+    if TL.ABSENCE.search(masked):
+        trips.append("absence")
+    if TL.UNIVERSAL.search(TL._QUOTED.sub(lambda m: " " * len(m.group(0)), masked)):
+        trips.append("universal")
+    return trips
+
+
+def _rate(name, default):
+    try:
+        return int(os.environ.get(name) or default)
+    except ValueError:
+        return default
+
+
+def decide(applicable, gate, counts, reply, ask, tagged, incident):
+    """Seats as (outcome, jurors). Shared shape for both sides."""
+    if not applicable:
+        blind = _rate("WF_BLIND_SAMPLE", 20)
+        rate = max(1, blind // 4) if counts[5] else blind
+        if blind > 0 and ask.strip() and reply and \
+                hashlib.sha256(reply.encode("utf-8")).digest()[1] % rate == 0:
+            return "blind", ["smell", "intuition"]
+        return "none", []
+    unopened = W.senses(counts, applicable)[0]
+    unopened = [u for u in unopened if u in gate]
+    if unopened:
+        return "block", sorted(applicable)
+    rate = _rate("WF_AUDIT_SAMPLE", 5)
+    sampled = rate > 0 and hashlib.sha256(reply.encode("utf-8")).digest()[0] % rate == 0
+    if incident or tagged:
+        sampled = True
+    return ("seated", sorted(applicable)) if sampled else ("none", [])
+
+
+def before(opener, reply, counts):
+    ask = ask_of(opener)
+    hits = OLD.classify(ask)
+    trips = trips_of(reply)
+    applicable = {W.CLAIM_SENSE[t][0] for t in trips} | {h["sense"] for h in hits}
+    incident = any(h["kind"] == "incident" for h in hits)
+    out = decide(applicable, applicable, counts, reply, ask, False, incident)
+    return out, [h["kind"] for h in hits]
+
+
+def after(payload, led, lines, k, opener, reply, mid, counts, rows):
+    ask = ask_of(opener)
+    hits, via = TT.classify(ask), ""
+    if not hits and TT.peer_request(opener or ""):
+        body = W.relayed_body(rows, ask)
+        if body:
+            hits = [dict(h, relayed=True) for h in TT.classify(body)]
+            via = "message read this turn"
+    if not hits and opener and TT.INJECTED.search(opener):
+        served = TT.served_ask(payload, led, opener, lines[:k])
+        if served:
+            hits = [dict(h, inherited=True) for h in TT.classify(served["prompt"])]
+            via = f"{served.get('issue') or '-'} via {served['via']}"
+            ask = served["prompt"]
+    for text in mid:
+        if not TT.INJECTED.search(text):
+            hits += [h for h in TT.classify(ask_of(text))
+                     if h["kind"] not in {x["kind"] for x in hits}]
+    applicable, gate, why, incident = W.seating(trips_of(reply), hits)
+    tagged = any(t.startswith("TAG:") for t, _s, _r in why)
+    out = decide(applicable, gate, counts, reply, ask, tagged, incident)
+    return out, [h["kind"] for h in hits], via
+
+
+def replay(path, want=None, quiet=False):
+    with open(path, "rb") as fh:
+        lines = fh.read().decode("utf-8", "replace").splitlines()
+    sid = os.path.basename(path)[:-len(".jsonl")]
+    cwd = next((r.get("cwd") for _i, r in _rows(lines, 0, min(len(lines), 200))
+                if isinstance(r.get("cwd"), str)), None)
+    payload = {"session_id": sid, "transcript_path": path, "cwd": cwd}
+    led = TT.load_ledger(payload) if cwd else {"issues": []}
+    tot = {"stops": 0, "judged": 0, "before": 0, "after": 0, "injected": 0}
+    for k, line in enumerate(lines):
+        if '"stop_hook_summary"' not in line:
+            continue
+        tot["stops"] += 1
+        n = k + 1
+        opener, typed, reply, mid, rows = turn_of(lines, k)
+        # A CONTINUATION has no opener of its own: the feedback row that restarted it was
+        # written before the previous Stop's summary row.
+        cont = not opener or opener.lstrip().startswith("Stop hook feedback")
+        if opener and TT.INJECTED.search(opener) and not cont:
+            tot["injected"] += 1
+        if want and n not in want:
+            continue
+        if cont or not reply:
+            if not quiet:
+                print(f"{n:>6}  {'continuation' if cont else 'no reply'} — not judged")
+            continue
+        tot["judged"] += 1
+        counts = counts_at(path, lines, k) or (0, [], 0, 0, 0, 0, None)
+        (b, bj), bk = before(opener, reply, counts)
+        (a, aj), ak, via = after(payload, led, lines, k, opener, reply, mid, counts, rows)
+        tot["before"] += b != "none"
+        tot["after"] += a != "none"
+        if not quiet:
+            head = " ".join((opener or "").split())[:60]
+            print(f"{n:>6}  before {b:<6} {'/'.join(bj) or '-':<22} kinds {','.join(bk) or '-':<14}"
+                  f" | after {a:<6} {'/'.join(aj) or '-':<22} kinds {','.join(ak) or '-'}"
+                  f"{'  [' + via + ']' if via else ''}\n        opened by: {head}")
+    return tot
+
+
+def main(argv):
+    summary = "--summary" in argv
+    argv = [a for a in argv if a != "--summary"]
+    want = None
+    if "--stops" in argv:
+        i = argv.index("--stops")
+        want = {int(x) for x in argv[i + 1].split(",") if x.strip()}
+        del argv[i:i + 2]
+    if not argv:
+        print(__doc__)
+        return 2
+    grand = {"stops": 0, "judged": 0, "before": 0, "after": 0, "injected": 0}
+    for path in argv:
+        tot = replay(path, want, quiet=summary)
+        for key in grand:
+            grand[key] += tot[key]
+    s, j = grand["stops"], grand["judged"] or 1
+    print(f"\n{len(argv)} transcript(s), {s} Stops, {grand['injected']} opened by injected "
+          f"text, {grand['judged']} judged")
+    print(f"seated before {grand['before']} ({100 * grand['before'] / j:.1f} per 100 judged)"
+          f" · after {grand['after']} ({100 * grand['after'] / j:.1f} per 100 judged)"
+          f" · added {grand['after'] - grand['before']} "
+          f"({100 * (grand['after'] - grand['before']) / (s or 1):.1f} per 100 Stops)")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

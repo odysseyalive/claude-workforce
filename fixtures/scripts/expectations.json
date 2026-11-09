@@ -4609,7 +4609,7 @@
     },
     "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"agent_transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"hook_event_name\": \"SubagentStop\", \"last_assistant_message\": \"Nine hooks are wired into the settings file.\", \"agent_id\": \"a1\", \"agent_type\": \"engineering-coder\"}",
     "want": [
-      "existence claim",
+      "existence + work claim",
       "taste NOT OPENED"
     ],
     "not": [
@@ -4642,7 +4642,7 @@
     },
     "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"agent_transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"hook_event_name\": \"SubagentStop\", \"last_assistant_message\": \"Nine hooks are wired into the settings file.\", \"agent_id\": \"a1\", \"agent_type\": \"engineering-coder\"}",
     "want": [
-      "existence claim",
+      "existence + work claim",
       "taste NOT OPENED"
     ],
     "not": [
@@ -14792,5 +14792,178 @@
       "want": [
           "INLINE  3 open items across i1, i2 were worked in this thread"
       ]
+  },
+  "widen-silent-agent-is-said-once": {
+      "_why": "ITEM 9, MEASURED 2026-11-09 in mutze-studio `0cb6fb41`: a research scout sat about three hours on one `web_fetch` and the user had to ask. A running agent whose own transcript has not changed for `WF_SILENT_AFTER` (here 0, so the fixture does not depend on file ages) and whose harness meta does not say `finished` is named at the Stop, once: the ledger keeps the transcript time it reported, and the `after` step's second Stop says nothing. `a8` is `running` in the ledger but its meta says `finished: true`, so it is settled and never called silent.",
+      "script": "wf-widen",
+      "exit": 0,
+      "env": {
+          "WF_BLIND_SAMPLE": "0",
+          "WF_SILENT_AFTER": "0"
+      },
+      "stdin_raw": "{\"transcript_path\": \"s1.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"session_id\": \"s1\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"The scout is still researching.\"}",
+      "want": [
+          "SILENT  research-scout a9a9a9a9a9a9a9a9a has written nothing for"
+      ],
+      "not": [
+          "a8a8a8a8a8a8a8a8a has written",
+          "Traceback"
+      ],
+      "after": {
+          ".claude/workforce/issues/s1.json": {
+              "want": [
+                  "\"silent_said\""
+              ]
+          }
+      }
+  },
+  "widen-silent-agent-is-said-once-not-twice": {
+      "_why": "THE SAME SILENCE IS SAID ONCE. The first Stop (a `before` step) names the scout; this second Stop over the unchanged transcript does not, because the ledger holds the time it already reported.",
+      "script": "wf-widen",
+      "exit": 0,
+      "env": {
+          "WF_BLIND_SAMPLE": "0",
+          "WF_SILENT_AFTER": "0"
+      },
+      "before": [
+          {
+              "script": "wf-widen",
+              "stdin_raw": "{\"transcript_path\": \"s1.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"session_id\": \"s1\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"The scout is still researching.\"}",
+              "want": [
+                  "SILENT  research-scout"
+              ]
+          }
+      ],
+      "stdin_raw": "{\"transcript_path\": \"s1.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"session_id\": \"s1\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"The scout is still researching.\"}",
+      "not": [
+          "SILENT",
+          "Traceback"
+      ]
+  },
+  "task-tag-shell-notification-inherits-the-launching-ask": {
+      "_why": "AN INJECTED TURN CARRIES THE DOCKET OF THE ISSUE IT SERVES. MEASURED 2026-11-09 in mutze-studio `30e77777` row 1507: a background SHELL's notification (`b0mtvnqof`, not an agent id) opened the turn that called the face swap changed at RMSE 0.024, and it carried no docket. The notification's `<tool-use-id>` leads to the turn that launched the shell; that turn's typed message is i2's prompt, a `work` ask, so the tag holds `work` marked `inherited` and `docket_from` names i2. The tag's own `prompt` stays the notification.",
+      "script": "wf-task-tag",
+      "exit": 0,
+      "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"transcript_path\": \"s1.jsonl\", \"prompt\": \"<task-notification>\\n<task-id>b0mtvnqof</task-id>\\n<tool-use-id>toolu_01Launch</tool-use-id>\\n<status>completed</status>\\n<summary>Background command \\\"start a pod\\\" completed (exit code 0)</summary>\\n</task-notification>\"}",
+      "want": [
+          "carries the work of the user's ask on issue i2",
+          "closed by TOUCH"
+      ],
+      "after": {
+          "wf-task-tag.s1.json": {
+              "want": [
+                  "\"kind\": \"work\"",
+                  "\"inherited\": true",
+                  "\"docket_from\": {\"issue\": \"i2\"",
+                  "\"via\": \"task b0mtvnqof\"",
+                  "\"prompt\": \"<task-notification>"
+              ]
+          }
+      }
+  },
+  "widen-inherited-work-docket-is-seated-not-blocked": {
+      "_why": "A DOCKET FROM THE USER'S WORDS IS ALWAYS TRIED, AND `work` NEVER BLOCKS ON A ZERO COUNT. The turn ran nothing and claimed a result; `work` is `JURY_ONLY`, so it is not blocked for touch 0 \u2014 the touch juror is seated on every such turn instead, not one in five (`WF_AUDIT_SAMPLE` is 0 here, so only the always-seated rule can raise this flag). The flag's `ask.prompt` is the user's inherited words and the notification goes to the juror as `testimony`.",
+      "script": "wf-widen",
+      "exit": 0,
+      "env": {
+          "WF_BLIND_SAMPLE": "0",
+          "WF_AUDIT_SAMPLE": "0"
+      },
+      "stdin_raw": "{\"transcript_path\": \"s1.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"session_id\": \"s1\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"The face clearly changed: the brows and eyes now come from devana-09.\"}",
+      "want": [
+          "work claim",
+          "sampled for audit"
+      ],
+      "not": [
+          "\"decision\": \"block\"",
+          "not scored"
+      ],
+      "after": {
+          "wf-widen-flag.s1.json": {
+              "want": [
+                  "\"prompt\": \"That body should have the face from",
+                  "\"senses\": [\"touch\"]",
+                  "\"testimony\": \"<task-notification>"
+              ]
+          }
+      }
+  },
+  "widen-midturn-message-docket-is-merged": {
+      "_why": "A MESSAGE DELIVERED INTO A RUNNING TURN NEVER GETS A STOP OF ITS OWN. MEASURED in `30e77777`: \"what went wrong?\" (row 1451, `incident`) arrived as a `queued_command` row while the turn opened at 1412 ran, and its docket was read by nothing. The turn answers the typed message's record, and the delivered message's record is merged in, so hearing is required too \u2014 and this turn opened none, so it blocks on hearing, as an incident turn always has.",
+      "script": "wf-widen",
+      "exit": 0,
+      "env": {
+          "WF_BLIND_SAMPLE": "0"
+      },
+      "stdin_raw": "{\"transcript_path\": \"s1.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"session_id\": \"s1\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"Redone. The first run used the same picture twice.\"}",
+      "want": [
+          "work + incident claim",
+          "hearing NOT OPENED"
+      ]
+  },
+  "turn-budget-artifact-call-gets-the-users-words": {
+      "_why": "THE USER'S WORDS BEFORE A PAGE IS PUBLISHED. MEASURED in `30e77777` (item 3): the swap page was called updated while the page the user meant was not. On `PreToolUse` for `Artifact` the hook hands the call the words of the issue THIS turn's tag names (i4), never the newest open issue (i5). Context only: no deny, no write.",
+      "script": "wf-turn-budget",
+      "exit": 0,
+      "stdin_raw": "{\"hook_event_name\": \"PreToolUse\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"transcript_path\": \"s1.jsonl\", \"tool_name\": \"Artifact\", \"tool_input\": {\"action\": \"publish\"}}",
+      "want": [
+          "The user's own words for the work this Artifact call serves (issue i4)",
+          "you didn't update the sharable artifact",
+          "additionalContext"
+      ],
+      "not": [
+          "something newer",
+          "permissionDecision"
+      ]
+  },
+  "task-tag-agent-msg-is-a-peer-ask": {
+      "_why": "A MESSAGE FROM ANOTHER SYSTEM IS AN ASK LIKE ANY OTHER (user, 2026-11-09: \"If a message comes in, it should be part of the work list too\"). The `[agent-msg from=NAME \u2026]` envelope a peer's messenger types into the prompt is read like `<cross-session-message>`: the ask is the text after the header, the sender rides along as `peer`, the message opens an issue and its asks checklist, and the checklist says it came from a peer and not from the user. The pointer itself names no work, so its docket waits for the body (`wf-widen.relayed_body`).",
+      "script": "wf-task-tag",
+      "exit": 0,
+      "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"transcript_path\": \"s1.jsonl\", \"prompt\": \"[agent-msg from=cw-dev 22:10Z] Long message, read it by running: agent-say show 20261109221006-4103202. To answer, run the shell command: agent-say --from ms-dev cw-dev \\\"<reply>\\\"\"}",
+      "want": [
+          "came from the peer session \\\"cw-dev\\\", not from the user"
+      ],
+      "after": {
+          "wf-task-tag.s1.json": {
+              "want": [
+                  "\"peer\": {\"from\": \"cw-dev\", \"from-name\": \"cw-dev\"}",
+                  "\"prompt\": \"Long message, read it by running"
+              ]
+          },
+          ".claude/workforce/issues/s1.json": {
+              "want": [
+                  "\"peer\": {\"from\": \"cw-dev\"",
+                  "\"id\": \"i1\""
+              ]
+          }
+      }
+  },
+  "widen-peer-pointer-is-tried-on-the-message-it-names": {
+      "_why": "ITEM 12, MEASURED 2026-11-09 in `30e77777`: after four peer messages the session told the user \"the third run is still on the pod\" while `gpu.py ensure` had been REFUSED six times. A peer's pointer names no work; the message it points at does, and the turn read it with the command the pointer spelled out. That output is classified like any ask, here `work`, so the touch juror sits (`WF_AUDIT_SAMPLE` 0: only the always-seated rule can raise this flag), the flag carries the message under a label, and `ask.peer` tells the juror a peer asked, not the user.",
+      "script": "wf-widen",
+      "exit": 0,
+      "env": {
+          "WF_BLIND_SAMPLE": "0",
+          "WF_AUDIT_SAMPLE": "0"
+      },
+      "stdin_raw": "{\"transcript_path\": \"s1.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"session_id\": \"s1\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"The third run is still on the pod. I'll measure it before I show it to you.\"}",
+      "want": [
+          "work claim",
+          "sampled for audit"
+      ],
+      "not": [
+          "not scored"
+      ],
+      "after": {
+          "wf-widen-flag.s1.json": {
+              "want": [
+                  "[the message, as this turn read it]",
+                  "Please rerun the face swap",
+                  "\"senses\": [\"touch\"]",
+                  "\"peer\": {\"from\": \"cw-dev\""
+              ]
+          }
+      }
   }
 }

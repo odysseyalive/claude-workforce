@@ -127,19 +127,53 @@ NOTIFICATION = re.compile(r"^\s*<task-notification\b", re.I)
 # opener still open nothing. THE ASK IS THE BODY between the tags, never the tag line.
 PEER_REQUEST = re.compile(
     r"\A\s*(?:Another Claude session sent a message(?: while you were working)?:\s*)?"
-    r"<cross-session-message\b([^>]*)>(.*?)</cross-session-message>", re.S | re.I)
-PEER_ATTR = re.compile(r'\b(from|from-name)="([^"]*)"')
+    r"<(cross-session|teammate)-message\b([^>]*)>(.*?)</\1-message>", re.S | re.I)
+# A TEAMMATE'S MESSAGE IS THE SAME ASK UNDER ITS OWN TAG, named by `teammate_id`, which is
+# the attribute `wf-widen.FROM_ID` already reads. UNMEASURED AS DELIVERED: on 2026-11-09 the
+# only `<teammate-message` text in this machine's transcripts was a search quoting the tag.
+PEER_ATTR = re.compile(r'\b(from|from-name|teammate_id)="([^"]*)"')
+
+# A MESSAGE FROM ANOTHER SYSTEM IS AN ASK LIKE ANY OTHER. User, 2026-11-09: "Messages from
+# other systems for sure need to be part of this system because, you know, how else are they
+# going to be vetted and used if they don't have the same constraints as any other ask? ...
+# If a message comes in, it should be part of the work list too." ENUMERATED 2026-11-09 over
+# every transcript on this machine, the envelopes an incoming message arrives in:
+#   `<cross-session-message from=… from-name=…>`   188 rows behind "Another Claude session
+#                                                   sent a message", ~30 delivered mid-turn
+#   `[agent-msg from=NAME HH:MMZ] …`               104 typed, 20 delivered mid-turn; most are a
+#                                                   pointer ("Long message, read it by running:
+#                                                   agent-say show <id>"), read at Stop
+#   `<agent-message from=…>` hand-back, `<task-notification>`   RESULTS of work already on
+#                                                   the list (2,179 and 2,867): no new ask, and
+#                                                   their docket is inherited (`served_ask`)
+#   `[Cross-session idle notice]`                  18, a status line with no ask
+#   `<teammate-message teammate_id=…>`             read like `<cross-session-message>`; no row
+#                                                   on this machine delivered one
+# The sender header is matched by its
+# shape — a bracketed `…msg from=NAME` at the very start — and never by a tool's name.
+PEER_HEADER = re.compile(r"\A\s*\[[a-z-]*msg from=([A-Za-z0-9_.@:-]{1,64})[^\]\n]{0,40}\]\s*")
 
 
 def peer_request(prompt):
     """(body, sender) for a peer session's request, or None for any other text. `sender` is
     {"from": <the address SendMessage replies to>, "from-name": <the session's name>}, each
     flattened to one line and capped, since both are another session's words."""
-    m = PEER_REQUEST.match(prompt if isinstance(prompt, str) else "")
-    body = m.group(2).strip() if m else ""
+    text = prompt if isinstance(prompt, str) else ""
+    m = PEER_REQUEST.match(text)
+    body = m.group(3).strip() if m else ""
     if not body:
-        return None
-    attrs = dict(PEER_ATTR.findall(m.group(1)))
+        # THE SAME ASK UNDER THE OTHER ENVELOPE: a line typed into this session's prompt by a
+        # peer's messenger (`[agent-msg from=cw-dev 22:08Z] …`). There is no address to reply
+        # to by `SendMessage`, so `from` and `from-name` are both the sender's name.
+        n = PEER_HEADER.match(text)
+        body = text[n.end():].strip() if n else ""
+        if not body:
+            return None
+        name = flat_sender(n.group(1))
+        return body, {"from": name, "from-name": name}
+    attrs = dict(PEER_ATTR.findall(m.group(2)))
+    attrs.setdefault("from", attrs.get("teammate_id"))
+    attrs.setdefault("from-name", attrs.get("teammate_id"))
     return body, {k: flat_sender(attrs.get(k)) for k in ("from", "from-name")}
 
 
@@ -153,6 +187,30 @@ def peer_sender(peer):
     each through `flat_sender` again so a `peer` from anywhere reads the same. The ONE place
     the choice is made, so the index row and the checklist line never name it differently."""
     return flat_sender(peer.get("from-name")) or flat_sender(peer.get("from"))
+
+
+# THE IMPERATIVE, for the `work` kind below: a sentence that OPENS on an action verb, after
+# the words a speaker puts in front of one ("okay, so now add …", "- please move …"). The
+# verbs are the ones a request for work uses; the sentence start is what makes one an order
+# rather than a word in passing ("the add button"). `do`, `have`, `get` and `go` are left
+# out on purpose: at a sentence start they open a question ("do you think …") as often as
+# an order.
+_WORK_LEAD = (r"(?:^|(?<=[.!?;:\n]))\s*[-*>]?\s*"
+              r"(?:(?:ok(?:ay)?|so|now|then|and|also|yeah|yes|sure|alright|well|hey|but"
+              r"|first|next|actually|please|just)[,!.]?\s+)*")
+_WORK_VERB = (
+    r"(?:add|remove|delete|drop|move|rename|make|build|create|write|rewrite|draft|fix|update"
+    r"|change|replace|run|re-?run|start|finish|continue|commit|push|deploy|publish|republish"
+    r"|put|set|generate|render|redo|try|use|install|research|find|look|check|test|show|send"
+    r"|report|implement|process|apply|merge|wire|swap|convert|copy|clean|organi[sz]e|arrange"
+    r"|break|split|list|give|bring|turn|pull|open|close|kill|stop|restart|reach|ask|tell"
+    r"|save|store|keep|mark|file|record|note|draw|design|plan|outline|lay|format|edit|revise"
+    r"|adjust|tweak|fill|hire|retire|audit|review|evaluate|measure|compare|pick|sync|upload"
+    r"|download|fetch|import|export|migrate|port|refactor|rebuild|retry|resume|ship|release"
+    r"|trim|shorten|expand|increase|reduce|lower|raise|enable|disable|switch|point|link"
+    r"|connect|include|exclude|attach|insert|place|resize|crop|scale|clear|reset|undo"
+    r"|revert|restore|archive|sort|group|combine|integrate|wrap|handle|address|solve"
+    r"|resolve|debug|investigate|shut|queue|schedule|deliver|produce|prepare|finali[sz]e)")
 
 KINDS = [
     ("history", re.compile(
@@ -284,6 +342,62 @@ KINDS = [
      "that agent's OUTPUT.md, its transcript, `git log`, the command's own output. A cause "
      "inferred from this turn's own reasoning is the tunnel, and a rule proposed on one "
      "bans whatever it happens to reach"),
+
+    # THE WORK KIND, AND IT IS THE GENERAL CASE THE FIVE ABOVE LEFT OUT. User, 2026-11-09:
+    # "whatever rules that you enter in need to be smart enough that they'll work in any
+    # situation that's relative to the sensory data." The five kinds above ask about FACTS;
+    # most of what a user types asks for WORK — "do a face replacement on X with Y's face",
+    # "Let's start T7", "please report it to cw-dev" — and none of those matched anything.
+    # MEASURED 2026-11-09 over mutze-studio `30e77777` and `0cb6fb41`: every user prompt
+    # behind the five unchecked result claims (a face swap called done, "the face clearly
+    # changed" at RMSE 0.024, a page called updated, a wrong output filed under the final
+    # name) classified as NOTHING, so no juror could sit on any of them.
+    #
+    # THE SENSE IS TOUCH: was the result shown by something that RAN, and checked against
+    # what was asked? A result is a fact about the world after the work, and prose about it
+    # is the turn describing its own success.
+    #
+    # IT READS THE USER'S WORDS, NEVER THE REPLY. The grammar of a request: an imperative,
+    # a request put to the one doing the work ("can you", "I'd like you to", "let's"), work
+    # the user says is still owed ("you never did", "you didn't update"), and the state the
+    # user wants the work to leave ("that body should have the face from …"). A detector
+    # over the reply's outcome words was measured at 49.8% of replies and rejected; this one
+    # reads the ask, before any of the answer exists, the way every kind above does.
+    #
+    # MEASURED 2026-11-09, head only (`HEAD_ONLY`): 217 of 482 typed mutze-studio prompts
+    # (45.0%) in the 40 newest transcripts, 118 of 180 (65.6%) in this repository's own.
+    # That is a large share BY DESIGN — most messages ask for work — and it is affordable
+    # only because the kind is `JURY_ONLY` below: it seats the touch juror and never blocks
+    # on a count of zero runs, since a draft, an answer or a plan is work no run closes.
+    ("work", re.compile(
+        _WORK_LEAD + _WORK_VERB + r"\b(?!\s*(?:is|was|are|were|of)\b)"
+        r"|\b(?:can|could|would) (?:you|we|u)\b"
+        r"(?!\s+(?:tell|explain|describe|say|think|feel|imagine|recommend)\b)"
+        r"|\bplease\b(?!\s+(?:tell|explain|describe)\b)"
+        r"|\b(?:i'?d|i would|i) (?:like|love|want|need)(?: you| us)? to\b"
+        r"(?!\s+(?:know|understand|see|be sure|ask)\b)"
+        r"|\bi (?:want|need) (?!to\b)\w+ (?:to )?" + _WORK_VERB + r"\b"
+        r"|\b(?:we|you) (?:also )?(?:need|have|want|ought) to\b"
+        r"|\bwe'?ll (?:also )?(?:need|want|have) to\b"
+        r"|\b(?:we|you|i) (?:should|may want to|might want to|'d|would) (?:also |just |now )?"
+        + _WORK_VERB + r"\b"
+        r"|\blet'?s\b|\bgo ahead\b|\bmake sure\b"
+        r"|\byou (?:can|could|should|might|may|need to) (?:go ahead and |also |just |now )?"
+        + _WORK_VERB + r"\b"
+        r"|\b(?:it )?(?:would|might) be (?:nice|good|great|better) (?:to|if)\b"
+        r"|\byou (?:never|didn'?t|did not|haven'?t|have not|forgot to|still haven'?t) "
+        r"(?:even |actually |really )?(?:do|did|" + _WORK_VERB[3:-1] + r")\b"
+        r"|\bno \w+(?: \w+)? (?:happen\w*|change\w*|appear\w*)\b"
+        r"|\b(?:we'?re|we are|it'?s|is|are) (?:still )?missing\b"
+        r"|\bneeds? (?:to be )?[a-z]+ed\b"
+        r"|\b(?:should|needs? to|has to|must) (?:still |only |also |now |just |really |always )*"
+        r"(?:be|have|go|say|read|point|show|include|use|look|appear|come|sit|stay)\b", re.I),
+     "touch",
+     "a result is a fact about the world after the work, and only something that RAN shows "
+     "it: the command's output, the file as written, the page as published, the measurement "
+     "against the input. A result described from the turn's own account of what it did is "
+     "the tunnel — `30e77777` called a face swap done that had put the same picture in "
+     "both slots, and called a second one changed at an RMSE of 0.024"),
 ]
 
 # THE FIRST 400 CHARACTERS ONLY, for the kinds named here.
@@ -298,7 +412,16 @@ KINDS = [
 # IT IS A SET RATHER THAN A FIFTH TUPLE FIELD, so the four shipped rows keep the shape they
 # were measured in and nothing has to be re-verified to add one bound.
 HEAD = 400
-HEAD_ONLY = frozenset({"incident"})
+HEAD_ONLY = frozenset({"incident", "work"})
+
+# KINDS THAT SEAT THEIR JUROR AND NEVER BLOCK ON A CHANNEL COUNT. `wf-widen` blocks a turn
+# whose tagged sense recorded zero calls; for `work` a zero is not a fact about the result.
+# A request for a draft, an answer or a plan is work that no command closes, and blocking it
+# for running nothing would be a known wrong fire. What only a reader can tell — whether a
+# RESULT the turn claimed was shown by something that ran — is the juror's question, and
+# the turn is always tried (`wf-widen`, the always-seated rule). A sense another kind or a
+# claim trigger also requires is still gated on its count as it always was.
+JURY_ONLY = frozenset({"work"})
 
 # THE USER'S WORDS DECIDE, NEWEST FIRST — carried on every message, in every project.
 # User directive 2026-09-16 (SKILL.md § Directives). It lives HERE, in a hook the install
@@ -2967,6 +3090,209 @@ def carry_only_checklist(p, carried, untitled, inline=None):
 
 
 # ─────────────────────────────────────────────────────────────────────────────────
+# AN INJECTED TURN IS JUDGED ON THE USER'S WORDS FOR THE WORK IT SERVES.
+#
+# A hand-back or a task notification is not the user's ask, and `classify` keeps refusing
+# it (`INJECTED`). But the turn it opens is where the work lands and where the result is
+# reported, and MEASURED 2026-11-09 on mutze-studio: 584 of 912 Stops (64%) were opened by
+# one, so 64% of turns could never seat a juror. Both unchecked "done" claims in `30e77777`
+# (rows 1399 and 1576) were written in turns a background job's notification opened.
+#
+# THE DOCKET COMES FROM THE ISSUE THE WORK WAS STARTED FOR, never from whichever issue is
+# newest now: a hand-back for i1 that lands while the user is on i4 is still i1's result.
+#   · an agent: its id is the `<task-id>` of its notification and the `from` of its
+#     hand-back, and the ledger links it to its issue at `SubagentStart` (`newest_entry`).
+#   · anything else the session started — a background shell is the measured case
+#     (`boi0hn2x3`, `b0mtvnqof`) — is followed through its `<tool-use-id>` to the turn that
+#     issued the call, and that turn's opener decides: the user's typed message, or, when
+#     an injected row opened that turn too, the same question asked of it, at most
+#     `SERVE_DEPTH` times.
+# Nothing found means no docket. A guess would put somebody else's ask on the turn.
+SERVE_DEPTH = 4
+TASK_ID_TAG = re.compile(r"<task-id>([A-Za-z0-9_-]{1,64})</task-id>")
+TOOL_USE_TAG = re.compile(r"<tool-use-id>([A-Za-z0-9_-]{1,128})</tool-use-id>")
+HANDBACK_FROM = re.compile(r'<agent-message\s+from="([A-Za-z0-9_-]{1,64})"')
+
+
+def _row_text(row):
+    """A user row's text, or None for a tool result or a row with none."""
+    msg = row.get("message") if isinstance(row, dict) else None
+    c = msg.get("content") if isinstance(msg, dict) else None
+    if isinstance(c, str):
+        return c
+    if not isinstance(c, list) or any(
+            isinstance(b, dict) and b.get("type") == "tool_result" for b in c):
+        return None
+    return "\n".join(b["text"] for b in c if isinstance(b, dict) and b.get("type") == "text"
+                     and isinstance(b.get("text"), str)) or None
+
+
+def opener_of_call(lines, tool_use_id):
+    """The text that opened the turn which issued `tool_use_id`, or None.
+
+    Back from the issuing row to the turn's start: the typed user row that opened it, or,
+    for a turn a hand-back opened (an `isMeta` row), the oldest user row after the last
+    turn-end row. A system reminder is never an opener. Rows are matched by parsing, never
+    by their spacing; the substring test only skips rows that cannot match."""
+    at = None
+    for i in range(len(lines) - 1, -1, -1):
+        if tool_use_id not in lines[i] or "tool_use" not in lines[i]:
+            continue
+        try:
+            row = json.loads(lines[i])
+        except ValueError:
+            continue
+        c = (row.get("message") or {}).get("content") if isinstance(row, dict) else None
+        if row.get("type") == "assistant" and isinstance(c, list) and any(
+                isinstance(b, dict) and b.get("type") == "tool_use"
+                and b.get("id") == tool_use_id for b in c):
+            at = i
+            break
+    if at is None:
+        return None
+    oldest = None
+    for line in reversed(lines[:at]):
+        if "system" not in line and "user" not in line:
+            continue
+        try:
+            row = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(row, dict):
+            continue
+        if row.get("type") == "system" and row.get("subtype") in ("stop_hook_summary",
+                                                                  "turn_duration"):
+            break
+        if row.get("type") != "user":
+            continue
+        text = _row_text(row)
+        if not text or text.lstrip().startswith("<system-reminder>"):
+            continue
+        oldest = text
+        if not row.get("isMeta"):
+            break
+    return oldest
+
+
+def served_ask(payload, led, text, lines=None, depth=0):
+    """`{"issue", "prompt", "via"}` for the user ask an injected `text` serves, or None.
+
+    `lines` is the session transcript, read once by the caller that needs it."""
+    if depth > SERVE_DEPTH or not isinstance(text, str):
+        return None
+    m = HANDBACK_FROM.search(text[:400]) or TASK_ID_TAG.search(text[:400])
+    aid = m.group(1) if m else None
+    if aid:
+        iss = newest_entry(led, aid)[0]
+        if isinstance(iss, dict) and isinstance(iss.get("prompt"), str) and iss["prompt"]:
+            return {"issue": _issue_id(iss), "prompt": iss["prompt"][:2000],
+                    "via": "agent " + aid}
+    t = TOOL_USE_TAG.search(text[:600])
+    if not t:
+        return None
+    if lines is None:
+        lines = transcript_lines_of(payload.get("transcript_path"))
+    opener = opener_of_call(lines or [], t.group(1))
+    if not opener:
+        return None
+    if INJECTED.search(opener):
+        return served_ask(payload, led, opener, lines, depth + 1)
+    peer = peer_request(opener)
+    ask = peer[0] if peer else opener
+    flat = " ".join(ask.split())
+    for iss in reversed(led.get("issues", [])):
+        p = iss.get("prompt") if isinstance(iss, dict) else None
+        if isinstance(p, str) and p.strip() and " ".join(p.split())[:500] in flat:
+            return {"issue": _issue_id(iss), "prompt": p[:2000],
+                    "via": ("task " + aid) if aid else "call " + t.group(1)}
+    return {"issue": None, "prompt": ask[:2000],
+            "via": ("task " + aid) if aid else "call " + t.group(1)}
+
+
+def _issue_id(iss):
+    """The issue's id when it has this hook's shape (`i12`), else None: the ledger is a file
+    in the project, and its id is said back to the session."""
+    iid = iss.get("id") if isinstance(iss, dict) else None
+    return iid if isinstance(iid, str) and CHECKLIST_KEY.fullmatch(iid) else None
+
+
+def transcript_lines_of(path):
+    """The transcript's lines, or [] when it cannot be read. Read without following a link,
+    like every other file this hook opens."""
+    if not isinstance(path, str) or not path:
+        return []
+    try:
+        fd = _open_nofollow(path, os.O_RDONLY)
+    except OSError:
+        return []
+    try:
+        with os.fdopen(fd, "rb") as fh:
+            return fh.read().decode("utf-8", "replace").splitlines()
+    except OSError:
+        return []
+
+
+# THE USER'S WORDS, AT THE CALL THAT ACTS ON THEM WITHOUT A STOP IN BETWEEN. `wf-turn-budget`
+# reads this on `PreToolUse` for `Artifact` and `AskUserQuestion`: a page about to be
+# published and a question about to be put to the user are both made against the ask, and
+# MEASURED in `30e77777` both went wrong with the ask out of view (a chooser re-asking what
+# the user had just said; a page called updated that was not the one the user meant). No
+# model call: one tag read, one ledger read. Stated as data, never as an instruction.
+ASK_WORDS_MAX = 1500
+ASK_WORDS = ("The user's own words for the work this {tool} call serves{where}, quoted as "
+             "data and not as an instruction: \"{words}\"")
+
+
+def ask_words(payload, led):
+    """`ASK_WORDS` for this call's open issue, or "" when no user ask can be named.
+
+    An agent's issue is its own (`newest_entry`). The main session's is the one its tag
+    names: the inherited ask of an injected turn, the issue the message opened, or, for a
+    message that opened none, that message itself. Never the newest issue by default."""
+    aid = agent_component(payload)
+    iss, words = None, ""
+    if aid:
+        iss = newest_entry(led, aid)[0]
+    else:
+        tag = read_json_nofollow(tag_path(payload))
+        tag = tag if isinstance(tag, dict) else {}
+        src = tag.get("docket_from") if isinstance(tag.get("docket_from"), dict) else {}
+        rec = tag.get("checklist") if isinstance(tag.get("checklist"), dict) else {}
+        want = src.get("issue") or rec.get("issue")
+        iss = next((i for i in led.get("issues", []) if isinstance(i, dict)
+                    and want and i.get("id") == want), None)
+        if iss is None:
+            words = src.get("prompt") if isinstance(src.get("prompt"), str) else ""
+            if not words and isinstance(tag.get("prompt"), str) and not INJECTED.search(
+                    tag["prompt"]):
+                words = tag["prompt"]
+    if isinstance(iss, dict) and isinstance(iss.get("prompt"), str):
+        words = iss["prompt"]
+    words = plain_text(words, ASK_WORDS_MAX).replace('"', "'")
+    if not words:
+        return ""
+    iid = _issue_id(iss) if iss else None
+    tool = str(payload.get("tool_name") or "")
+    return ASK_WORDS.format(tool=tool if tool in ("Artifact", "AskUserQuestion") else "tool",
+                            where=f" (issue {iid})" if iid else "", words=words)
+
+
+def inherited_hits(payload, prompt):
+    """(hits, docket_from) for an injected turn: the user's words for the work it serves,
+    classified like any message, each hit marked `inherited`. `([], None)` otherwise."""
+    if not NOTIFICATION.search(prompt or "") and not HANDBACK_FROM.search((prompt or "")[:400]):
+        return [], None
+    try:
+        served = served_ask(payload, load_ledger(payload), prompt)
+    except (OSError, ValueError, RecursionError):
+        return [], None
+    if not served:
+        return [], None
+    hits = [dict(h, inherited=True) for h in classify(served["prompt"])]
+    return hits, served
+
+
+# ─────────────────────────────────────────────────────────────────────────────────
 # THE DIRECTIVE CHECK, MOVED OFF THE AGENT AND ONTO THIS EVENT (K6).
 #
 # Every handbook this distribution writes makes the EMPLOYEE hash its own bound directive
@@ -3243,6 +3569,13 @@ def main():
         payload, previous_checklist(payload, _old_tag), earlier)
 
     hits = classify(payload.get("prompt") or "")
+    # AN INJECTED TURN CARRIES THE DOCKET OF THE ISSUE IT SERVES (`served_ask`): the hits
+    # are the USER's words classified, marked `inherited`, and `docket_from` names where
+    # they came from. `prompt` stays the injected text, which `wf-widen` reads to know a
+    # notification opened the turn.
+    docket_from = None
+    if not hits:
+        hits, docket_from = inherited_hits(payload, payload.get("prompt") or "")
     if not hits:
         # AN UNTAGGED TURN MUST NOT INHERIT THE LAST ONE'S TAG. Returning here without
         # clearing left the previous turn's tag file on disk, and `wf-widen` read it at
@@ -3297,6 +3630,7 @@ def main():
                        # the checklist file the session edits.
                        "checklist": checklist_record,
                        "earlier": earlier,
+                       **({"docket_from": docket_from} if docket_from else {}),
                        **({"peer": _peer[1]} if _peer else {})})
 
     # STATED AS FACTS ABOUT THE ASK, NEVER AS AN INSTRUCTION. The hooks reference is
@@ -3305,6 +3639,11 @@ def main():
     # into one more thing a human has to deal with.
     lines = [USER_WORDS, "", CHOOSER_RULE, "", TERMINAL_TEXT_RULE, "", CLEANUP_RULE, "",
              "This ask is of a kind whose wrong answers are on record in this project."]
+    if docket_from:
+        lines[-1] = ("This message is not the user's: it carries the work of the user's ask"
+                     + (f" on issue {docket_from['issue']}" if docket_from.get("issue") else "")
+                     + ", and that ask is of a kind whose wrong answers are on record in "
+                     "this project.")
     for h in hits:
         lines.append(f"  · {h['kind']} — closed by {h['sense'].upper()}: {h['why']}. "
                      f"In practice: {SENSE_HOW[h['sense']]}.")
