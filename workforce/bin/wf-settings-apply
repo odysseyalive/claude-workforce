@@ -36,7 +36,10 @@ audit-setup.md` § 856 said this producer "could be built"; it is built.
                         first use without anybody typing this. It also runs the GIT half
                         (`heal_git_hooks`): the retired pin guard wired `core.hooksPath`
                         at a directory in the repository rather than a settings row, and
-                        nothing removed it from a project that already had it.
+                        nothing removed it from a project that already had it. And it runs
+                        the MODEL half: every recorded choice of a model the pool superseded
+                        moves to its successor, once per project (`wf-model-lanes`
+                        `heal_superseded`), so `verify` and `audit` move it too.
     --installer-rule    allow the ONE exact update command for the scope (INSTALLER_RULES),
                         so `/workforce update` runs the installer without a prompt.
                         `--wire-defaults` performs the same write; without `--execute`
@@ -2747,7 +2750,8 @@ def do_heal(root, execute):
     pin guard's `core.hooksPath` and its copy on disk. One flag runs both, because they are
     two halves of one question — what did a retirement leave behind in this project — and a
     caller that had to know to ask twice is a caller that heals half of it. `verify` § Hook
-    wiring and `audit` Step 6-G both reach the git half through this.
+    wiring and `audit` Step 6-G both reach the git half through this, and the model half: a
+    retired pool row with a successor is the same question about a recorded model choice.
     """
     if not os.path.isdir(os.path.join(root, ".claude")):
         print(f"HEAL   {os.path.join(root, '.claude')} is absent — nothing to heal")
@@ -2758,6 +2762,17 @@ def do_heal(root, execute):
     print(f"HEAL   {os.path.join(root, '.claude')}          <- resolved, not assumed")
     rc = heal(root, execute)["rc"]
     rc = heal_git_hooks(root, execute)["rc"] or rc
+    # THE MODEL HALF: a recorded choice of a model the pool superseded. The decision and every
+    # write are `wf-model-lanes`'s, shared with the session-start carrier (`wf-heal`).
+    sup = _sibling("wf-model-lanes").heal_superseded(root, execute)
+    if sup["refused"]:
+        print(f"MODELS nothing to move: {sup['refused']}")
+    else:
+        print(f"MODELS {sup['moved']} superseded model choice(s) "
+              f"{'moved' if execute else 'to move'} · {sup['failed']} not moved")
+        for line in sup["lines"]:
+            print(f"  {line}")
+    rc = sup["rc"] or rc
     if not execute:
         print("  apply with: --execute")
     return rc

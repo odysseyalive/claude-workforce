@@ -3,7 +3,8 @@
 
 WHAT IT HEALS (`heal_settings`): the retired workforce hook ROWS in the project's
 settings, the retired pin guard's GIT hook, the machine-owned REGIONS a release moved on,
-and the retired commitments ledger (`_retired_ledger`).
+the retired commitments ledger (`_retired_ledger`), and every recorded choice of a model the
+pool SUPERSEDED (`_heal_superseded`).
 
 WHERE IT CAME FROM. This is the `SessionStart` half of `wf-commitments`, which kept a
 per-project list of what a turn said it would do and read it back at the next session.
@@ -139,7 +140,8 @@ def heal_settings(root):
         said = [x for x in (_heal_settings(root, progress),
                             _heal_git_hooks(root, progress),
                             _heal_regions(root, progress),
-                            _retired_ledger(root, progress)) if x]
+                            _retired_ledger(root, progress),
+                            _heal_superseded(root, progress)) if x]
         return "\n".join(said)
     except Exception as exc:                             # noqa: BLE001 — see docstring
         # SILENT ONLY WHEN NOTHING WAS WRITTEN. An error after a write leaves the project
@@ -602,6 +604,47 @@ def _retired_ledger(root, progress):
             f"do; WORK now shows those as `noted` lines. Git tracks this file, so its "
             f"deletion is in `git status` for your next commit. This hook stages nothing "
             f"and commits nothing.")
+
+
+# The marker `wf-model-lanes.heal_superseded` writes, and the template whose bytes it records.
+# Spelled here so the gate below runs with nothing imported; `wf-model-lanes` defines both
+# (`SUPERSEDED_REL`, `TEMPLATE`) and is the only writer.
+SUPERSEDED_MARKER_REL = ".claude/workforce/.models-superseded.json"
+TEMPLATE_REL = ("references", "org-config.template.md")
+
+
+def _heal_superseded(root, progress):
+    """Move every recorded choice of a superseded model to its successor, once per project.
+
+    THE DEFECT. A pool row's replacement reached no project that had already chosen the old
+    row: MEASURED 2026-11-09, a project that recorded `claude-fable-5-1` stayed on it with
+    `verify` calling it healthy and `update` touching nothing. User decision that day: "Their
+    next workforce session moves every 5.1 choice to 5.2 and says so, with no audit needed."
+
+    THE DECISION IS `wf-model-lanes`'s (`heal_superseded`): the map, what counts as a recorded
+    choice, the once-per-project marker that keeps a hand re-pick, and every write. What this
+    function decides is whether to ask at all.
+
+    NEAR ZERO WHEN THERE IS NOTHING TO DO. No `.claude/workforce` (no org, so no recorded
+    choice) ends it with one `stat`. Otherwise the shipped template is hashed and compared
+    with the digest the marker recorded at the last complete pass: equal means neither the
+    map nor anything it was applied against has moved since, and nothing is imported. The
+    digest changes once per release, so a project pays the scan once per release.
+    """
+    wfdir = os.path.join(root, ".claude", "workforce")
+    if not os.path.isdir(wfdir) or os.path.islink(wfdir):
+        return ""
+    import hashlib
+    tpl = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), *TEMPLATE_REL)
+    try:
+        with open(tpl, "rb") as fh:
+            digest = hashlib.sha256(fh.read()).hexdigest()
+    except OSError:
+        return ""
+    marker = TT.read_json_nofollow(os.path.join(root, *SUPERSEDED_MARKER_REL.split("/")))
+    if isinstance(marker, dict) and marker.get("template") == digest:
+        return ""
+    return "\n".join(_sibling("wf-model-lanes").heal_superseded(root, True, progress)["lines"])
 
 
 def main():

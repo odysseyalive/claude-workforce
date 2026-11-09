@@ -117,18 +117,18 @@ recommendation first and the current value last. *The case was left undecided un
 customer run above improvised it: the advisor's recorded model, one the pool had since replaced, rendered FIRST
 as `(current)` and the cheapest pool model was dropped.*
 
-**THIS ROW HAS NEVER EXECUTED ON A REAL HOST, and the trigger is a release, not an audit.** MEASURED
-2026-09-17 by `nc-audit`: a full six-question setup returned
-`INV-BUDGET rendered 6 of 6 owed · 6 messages · in order`.
-Every recorded value was IN the pool, so each of the six rendered as
-`(current · recommended)` and this branch was never entered. It is the only row here with no
-observation behind it. **It fires when a lane's recorded model LEAVES the pool, which a re-audit
-cannot cause on its own — retiring a statics row in `org-config.template.md` is the event that
-activates it, simultaneously, in every org that had recorded the retired value.** So the release that
-next retires a model is the one that owes this row its first real exercise, and a maintainer doing
-that should expect to be the first reader to see it. There is no producer script to hold a fixture
-against — the rendering is executor-followed — which is why the warning lives here rather than in
-`bin/check`.
+**THIS ROW HAS NEVER EXECUTED ON A REAL HOST, and since 2026-11-09 a retired row WITH a successor
+does not reach it.** MEASURED 2026-09-17 by `nc-audit`: a full six-question setup returned
+`INV-BUDGET rendered 6 of 6 owed · 6 messages · in order`. Every recorded value was IN the pool, so
+each of the six rendered as `(current · recommended)` and this branch was never entered. **A recorded
+model that left the pool with a successor is moved to that successor before the budget renders** —
+at the project's first session after the release (`wf-heal`), and again at the top of § Step 0.4 —
+once per project (`org-config.template.md` § Superseded models). So the 2026-11-09 retirement of
+`claude-fable-5-1` arrives here as `claude-fable-5-2`, an in-pool value, not as this row. **The row
+now fires in two cases only:** a pool row retired with no successor in that map, and a superseded
+model the user chose again by hand after the move — which the move deliberately leaves standing, so
+the next budget shows it `(current — not in the pool)`, one click to keep. The rendering is
+executor-followed and has no producer to hold a fixture against, which is why the warning lives here.
 
 ---
 
@@ -594,6 +594,21 @@ not reach installed copies only ever helps new projects.
 decides what happens — not this gate.
 
 ## Step 0.4 — Model budget, effort budget
+
+**Before the first budget call, move every recorded choice of a superseded model to its successor**
+(`org-config.template.md` § Superseded models), so no budget object offers a value the pool replaced
+as the project's `(current)` one:
+
+```bash
+WF="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
+"$WF/bin/wf-model-lanes" --root <absolute project root> --heal-superseded --execute
+```
+
+Print every `MODEL MOVED` line it returns in the run report. It runs once per project: an ID the
+project was already moved off is never moved again, so a value the user chose by hand afterward is
+read as the `(current)` option like any other. Usually it prints nothing, because the session this
+audit runs in moved it at session start. Under `--review`: the same command without `--execute`,
+which prints `MODEL WOULD MOVE` and writes nothing.
 
 Four `AskUserQuestion` calls in total: the model budget is two calls and the effort budget is two calls,
 fixed regardless of headcount (`references/org-config.template.md` § The four lanes). `AskUserQuestion`

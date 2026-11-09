@@ -7,6 +7,9 @@
     wf-model-lanes --root <tree> --check                  verify: read-only, exit 1 on any drift
     wf-model-lanes --root <tree> --lineup                 print each lane's model and effort, the
                                                           advisor, and the file they come from
+    wf-model-lanes --root <tree> --heal-superseded [--execute]
+                                                          move each recorded choice of a superseded
+                                                          model ID to its successor, once per project
 
 WHY THIS EXISTS. A `model:` line was rewritten only when a budget cell changed
 (`procedures/model-map.md` § Model Rewrite), and a re-audit offers the recorded value as the
@@ -45,9 +48,15 @@ and any path `.installed-external` records, so a rewrite there is undone by the 
 distribution's own pins are held to the template's lane picks at release instead. A symlink that
 resolves outside the project is reported the same way: that file belongs to somebody else.
 
+SUPERSEDED MODELS. `org-config.template.md` § Model statics › Superseded models maps a model the
+pool replaced to its successor. `--heal-superseded` moves every recorded choice of one, once per
+project (`heal_superseded`), and `wf-heal` runs it at session start; `--check` reports one still
+recorded as `SUPERSEDED` (not yet moved: drift) or `SUPERSEDED-KEPT` (chosen again by hand after
+the move: reported, not drift); `--lineup` marks one `[superseded by …]`.
+
 EXIT  0  the plan or the lineup printed, or every write verified
       1  --check found drift; or --execute left a file unjudged or unresolved, a write failed
-         to verify, or a symlink was lost or retargeted
+         to verify, or a symlink was lost or retargeted; or --heal-superseded left a value unmoved
       2  usage: no `.claude/` under the root, no lineup to resolve, an unknown lane, or a
          --judge path that names no model-pinned file
 """
@@ -276,12 +285,17 @@ def lineup_lines(root):
         return None
     text, label = src
     lanes, _overrides = parse_lineup(text)
+    smap = superseded_map()
+
+    def note(model):
+        return f"  [superseded by {smap[model][0]}]" if model in smap else ""
     out = [f"Model lineup, from {label}:"]
     for lane in LANES:
         c = lanes[lane]
         pin = f"{c['model'] or '(none selected)'} · {c['effort'] or '(none selected)'}"
-        out.append(f"  {lane:<16} {pin:<24}  {LANE_WORK[lane]}")
-    out.append(f"  {'advisor':<16} {parse_advisor(text) or '(none recorded)':<24}  {ADVISOR_WORK}")
+        out.append(f"  {lane:<16} {pin:<24}  {LANE_WORK[lane]}{note(c['model'])}")
+    adv = parse_advisor(text)
+    out.append(f"  {'advisor':<16} {adv or '(none recorded)':<24}  {ADVISOR_WORK}{note(adv)}")
     return out
 
 
@@ -473,6 +487,397 @@ def _symlinks(rows):
     return {r["rel"]: r["real"] for r in rows if r["link"]}
 
 
+# ── superseded models ────────────────────────────────────────────────────────
+#
+# WHY THIS EXISTS. A recorded model choice moved only when somebody answered the budget again,
+# so a pool row's replacement reached no project that had already picked the old row. MEASURED
+# 2026-11-09, the day row 1 moved from Fable 5.1 to 5.2: `--lineup` and `--check` called a
+# project's recorded `claude-fable-5-1` healthy, `verify` agreed, and `update` touched nothing.
+# User decision that day: "Their next workforce session moves every 5.1 choice to 5.2 and says
+# so, with no audit needed … a project can still pick 5.1 by hand afterward."
+#
+# THE MAP IS `org-config.template.md` § Model statics › Superseded models, read from the shipped
+# template and from nowhere else. The next model swap is a row there, never an edit here.
+
+SUPERSEDED_REL = os.path.join(".claude", "workforce", ".models-superseded.json")
+SUPERSEDED_HEADING = re.compile(r"^#{2,6}\s+Superseded models\b", re.I)
+SETTINGS_NAMES = ("settings.json", "settings.local.json")
+
+
+def superseded_map(template=TEMPLATE):
+    """`{old: (successor, since)}` from the template's Superseded models table, each chain
+    followed to its last successor. A row naming a cycle is dropped; {} when unreadable.
+    Both ID cells must be one backticked ID, so the header row is never read as a pair."""
+    try:
+        with open(template, encoding="utf-8") as fh:
+            text = fh.read()
+    except (OSError, UnicodeDecodeError):
+        return {}
+    pairs, inside = {}, False
+    for raw in text.splitlines():
+        line = raw.strip()
+        if line.startswith("#"):
+            inside = bool(SUPERSEDED_HEADING.match(line))
+            continue
+        if not inside or not line.startswith("|"):
+            continue
+        cells = [c.strip() for c in line.strip("|").split("|")]
+        ids = [re.findall(r"`([^`]+)`", c) for c in cells[:2]]
+        if len(cells) < 3 or not all(len(t) == 1 and MODEL_RX.match(t[0]) for t in ids):
+            continue
+        pairs[ids[0][0]] = (ids[1][0], cells[2].replace("`", "").strip())
+    out = {}
+    for old, (new, since) in pairs.items():
+        seen = {old}
+        while new in pairs and new not in seen:
+            seen.add(new)
+            new = pairs[new][0]
+        if new not in seen:
+            out[old] = (new, since)
+    return out
+
+
+def _id_rx(model):
+    """The ID as a whole token: `claude-fable-5-1` never matches inside `claude-fable-5-10`."""
+    return re.compile(r"(?<![\w.\[\]-])" + re.escape(model) + r"(?![\w.\[\]-])")
+
+
+def config_hits(text, smap):
+    """`[(line index, old, label)]` — every recorded choice of a superseded ID in an org-config.
+
+    WIDER THAN `parse_lineup`, ON PURPOSE. A recorded choice is any TABLE ROW or `advisorModel:`
+    line naming the ID, not only the rows the lineup reader understands. MEASURED 2026-11-09:
+    one live config records `| creative-visual | any | `claude-fable-5-1` | medium |` under
+    `## The lanes`, a heading `parse_lineup` reads nothing under, and a heal held to the
+    lineup's reading would have left that choice on 5.1. Do not narrow this to match the lineup.
+
+    WHAT IS NEVER A CHOICE, each a guard against the wider reading: prose (history, and the
+    user's own sentences); every line under a heading naming `statics` until a heading of the
+    same or higher level (a legacy pool copy — reported stale elsewhere, never rewritten); a row
+    whose first cell is a bare number (the pool's `#` column, should a copy lose its heading);
+    and anything inside a fenced block.
+    """
+    hits, skip_level, fence = [], None, False
+    for i, raw in enumerate(text.split("\n")):
+        line = raw.strip()
+        if line.startswith(("```", "~~~")):
+            fence = not fence
+            continue
+        if fence:
+            continue
+        if line.startswith("#"):
+            level = len(line) - len(line.lstrip("#"))
+            if "statics" in line.lower():
+                skip_level = level
+            elif skip_level is not None and level <= skip_level:
+                skip_level = None
+            continue
+        if skip_level is not None:
+            continue
+        if line.startswith("|") and line.endswith("|"):
+            if re.match(r"^\|[\s:|-]+\|$", line):
+                continue
+            first = line.strip("|").split("|")[0].replace("`", "").replace("*", "").strip()
+            if first.isdigit():
+                continue
+            for old in smap:
+                if _id_rx(old).search(line):
+                    hits.append((i, old, first or "table row"))
+            continue
+        m = ADVISOR_RX.search(line)
+        if m and m.group(1) in smap:
+            hits.append((i, m.group(1), "advisorModel"))
+    return hits
+
+
+def _sibling(name):
+    """A sibling shipped script, imported by path, leaving no bytecode in the shipped bin/."""
+    import importlib.machinery
+    import importlib.util
+    prev = sys.dont_write_bytecode
+    sys.dont_write_bytecode = True
+    try:
+        mod_name = name.replace("-", "_")
+        loader = importlib.machinery.SourceFileLoader(
+            mod_name, os.path.join(os.path.dirname(os.path.abspath(__file__)), name))
+        mod = importlib.util.module_from_spec(importlib.util.spec_from_loader(mod_name, loader))
+        loader.exec_module(mod)
+        return mod
+    finally:
+        sys.dont_write_bytecode = prev
+
+
+def _strict_json(text):
+    """The parsed object, or None when it is not one or carries a duplicate key: the harness
+    keeps one of two duplicates, and a rewrite would silently choose for it."""
+    def pairs(kv):
+        d = {}
+        for k, v in kv:
+            if k in d:
+                raise ValueError(k)
+            d[k] = v
+        return d
+    try:
+        data = json.loads(text, object_pairs_hook=pairs)
+    except ValueError:
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def superseded_refusal(root):
+    """Why no recorded choice in this project may be moved, or None.
+
+    A `.claude` that is the personal config root — `$CLAUDE_CONFIG_DIR` or `~/.claude`, which
+    is what a project rooted at `$HOME` has — holds USER-scope agents and settings, not a
+    project's records. A `.claude` or `.claude/workforce` that leads out of the project, or a
+    project with no `.claude/workforce` at all, has no org that recorded a choice here.
+    Restated from `wf-settings-apply._project_refusal` as two realpaths rather than imported,
+    because this runs at every session start that gets past `wf-heal`'s gate.
+    """
+    claude = os.path.join(root, ".claude")
+    wfdir = os.path.join(claude, "workforce")
+    if not os.path.isdir(wfdir) or os.path.islink(wfdir):
+        return "no .claude/workforce here, so no org recorded a model choice"
+    here, real = _realpath(root), _realpath(claude)
+    if not real.startswith(here.rstrip(os.sep) + os.sep):
+        return f"{claude} resolves outside the project ({real})"
+    home = os.path.join(os.path.expanduser("~"), ".claude")
+    cfg = os.environ.get("CLAUDE_CONFIG_DIR") or home
+    if real in {_realpath(cfg), _realpath(home)}:
+        return f"{claude} is the personal config root, whose files are user scope"
+    return None
+
+
+def read_marker(root):
+    """`{"template": digest, "moved": {old: {"to", "on"}}}` — what this project was moved off.
+    A link at the name is not read (O_NOFOLLOW), and reads as no marker."""
+    try:
+        fd = os.open(os.path.join(root, SUPERSEDED_REL),
+                     os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+        with os.fdopen(fd, encoding="utf-8") as fh:
+            data = json.load(fh)
+    except (OSError, ValueError, UnicodeDecodeError):
+        return {"moved": {}}
+    if not isinstance(data, dict) or not isinstance(data.get("moved"), dict):
+        return {"moved": {}}
+    return data
+
+
+def template_digest(template=TEMPLATE):
+    """sha256 of the shipped template's bytes. `wf-heal` compares this against the marker's
+    `template` to skip the scan when nothing could have changed since the last one."""
+    try:
+        with open(template, "rb") as fh:
+            return hashlib.sha256(fh.read()).hexdigest()
+    except OSError:
+        return None
+
+
+def find_superseded(root, smap):
+    """Every recorded choice of a superseded ID in this project, read-only. Each is a dict:
+    `kind` (agent, config, settings), `rel`, `where` (what a person reads), `old`, `new`,
+    `since`, `refused` (why it may not be written, or None), plus what the writer needs."""
+    out = []
+    if not smap:
+        return out
+
+    def hit(kind, rel, where, old, refused=None, **extra):
+        new, since = smap[old]
+        out.append(dict(kind=kind, rel=rel, where=where, old=old, new=new, since=since,
+                        refused=refused, **extra))
+
+    for r in enumerate_files(root):
+        # A SHIPPED FILE IS NOT THIS PROJECT'S CHOICE: `update` owns it and the distribution's
+        # pins are held to the template at release, so it is not listed at all.
+        if r["model"] not in smap or r["shipped"]:
+            continue
+        where = f"{r['rel']} (model:)"
+        if r["link"] and not r["outside"]:
+            where = f"{r['rel']} (model:, written through its link to " \
+                    f"{os.path.relpath(r['real'], _realpath(root))})"
+        refused = f"it links to {r['real']}, outside this project" if r["outside"] else None
+        hit("agent", r["rel"], where, r["model"], refused, row=r)
+
+    cfg = os.path.join(root, CONFIG_REL)
+    text = _read(cfg)
+    if text is not None:
+        refused = None if _realpath(cfg).startswith(_realpath(root).rstrip(os.sep) + os.sep) \
+            else f"it resolves outside the project ({_realpath(cfg)})"
+        for i, old, label in config_hits(text, smap):
+            hit("config", CONFIG_REL, f"{CONFIG_REL}:{i + 1} ({label})", old, refused, line=i)
+
+    for name in SETTINGS_NAMES:
+        rel = os.path.join(".claude", name)
+        text = _read(os.path.join(root, rel))
+        data = _strict_json(text) if text is not None else None
+        model = data.get("advisorModel") if data else None
+        if isinstance(model, str) and model in smap:
+            hit("settings", rel, f"{rel} (advisorModel)", model)
+    return out
+
+
+def _move_config(root, rel, found):
+    """Rewrite the found lines of the org-config in place, through a link to a target inside
+    the project, and re-read. Returns {line index: error or None}."""
+    path = os.path.join(root, rel)
+    text = _read(path)
+    if text is None:
+        return {f["line"]: "unreadable" for f in found}
+    lines = text.split("\n")
+    for f in found:
+        lines[f["line"]] = _id_rx(f["old"]).sub(f["new"], lines[f["line"]])
+    try:
+        with open(path, "w", encoding="utf-8", newline="") as fh:
+            fh.write("\n".join(lines))
+    except OSError as exc:
+        return {f["line"]: f"write failed: {exc.strerror}" for f in found}
+    back = (_read(path) or "").split("\n")
+    return {f["line"]: None if f["line"] < len(back) and back[f["line"]] == lines[f["line"]]
+            and not _id_rx(f["old"]).search(back[f["line"]]) else "re-read shows the old line"
+            for f in found}
+
+
+def _move_settings(root, f, wsa):
+    """Change ONLY the value of the top-level `advisorModel` key — the characters of the old ID
+    and nothing else, so every other byte of the file is as it was (never load-and-dump). The
+    result is parsed and must differ from the original in that one key alone. Returns the
+    error, or None."""
+    path = os.path.join(root, f["rel"])
+    why = wsa._file_refusal(root, path)
+    if why:
+        return why
+    text = _read(path)
+    before = _strict_json(text) if text is not None else None
+    if not before or before.get("advisorModel") != f["old"]:
+        return "the file changed since it was read"
+    rx = re.compile(r'("advisorModel"\s*:\s*")' + re.escape(f["old"]) + r'"')
+    if len(rx.findall(text)) != 1:
+        return "`advisorModel` is spelled more than once or escaped; left for a hand edit"
+    after_text = rx.sub(lambda m: m.group(1) + f["new"] + '"', text)
+    after = _strict_json(after_text)
+    if not after or after.get("advisorModel") != f["new"] or \
+            dict(after, advisorModel=None) != dict(before, advisorModel=None):
+        return "the edit would change more than the one value; left for a hand edit"
+    try:
+        wsa._atomic_write(_realpath(path), after_text, before=text)
+    except (OSError, RuntimeError) as exc:
+        return str(exc)
+    back = _strict_json(_read(path) or "")
+    return None if back and back.get("advisorModel") == f["new"] else "re-read shows the old value"
+
+
+def _write_marker(root, marker, wsa):
+    path = os.path.join(root, SUPERSEDED_REL)
+    why = wsa.write_refusal(root, path)
+    if why:
+        return why
+    body = {"_about": "Written by wf-model-lanes. Each superseded model ID this project was "
+                      "moved off, once; an ID listed here is never moved again, so a choice "
+                      "of it made afterward stands.",
+            "template": marker.get("template"), "moved": dict(sorted(marker["moved"].items()))}
+    try:
+        wsa._atomic_write(path, json.dumps(body, indent=2, ensure_ascii=False) + "\n")
+    except OSError as exc:
+        return exc.strerror or str(exc)
+    return None
+
+
+def heal_superseded(root, execute, progress=None):
+    """Move every recorded choice of a superseded model ID to its successor, ONCE per project.
+
+    Returns `{"lines", "moved", "failed", "refused", "rc"}`; `lines` is what the session or the
+    CLI prints, one per value moved or left, then one closing line per ID that moved.
+    Without `execute` nothing is written and the lines say "would move".
+
+    ONCE, AND WHY: the user's decision keeps a hand re-pick ("a project can still pick 5.1 by
+    hand afterward"). `.claude/workforce/.models-superseded.json` lists every ID this project
+    has been moved off, and an ID listed there is never moved again. An ID is listed only when
+    every value it was found in moved and re-read correctly, so a refused or failed write leaves
+    it pending and the next run tries again and says so. The marker also carries the template
+    digest `wf-heal` gates on; it is written only when nothing failed, so a failure is retried.
+
+    WRITES: a model-pinned file through `rewrite` (through a symlink, never over it — SKILL.md
+    Atomic-or-Absent rule 3); the org-config line by line through its link; a settings file
+    through `wf-settings-apply`'s own refusal and atomic writer, changing one value only.
+    """
+    res = {"lines": [], "moved": 0, "failed": 0, "refused": superseded_refusal(root), "rc": 0}
+    if res["refused"]:
+        return res
+    smap = superseded_map()
+    marker = read_marker(root)
+    done = marker["moved"]
+    found = [f for f in find_superseded(root, smap) if f["old"] not in done]
+    if progress is None:
+        progress = {"wrote": []}
+    links_before = _symlinks(enumerate_files(root)) if execute else {}
+    errors = {}
+    wsa = None
+    by_line = {}
+    if execute:
+        cfg = [f for f in found if f["kind"] == "config" and not f["refused"]]
+        if cfg:
+            by_line = _move_config(root, CONFIG_REL, cfg)
+            progress["wrote"].append(CONFIG_REL)
+    for f in found:
+        verb = "MOVED" if execute else "WOULD MOVE"
+        err = f["refused"]
+        if execute and not err:
+            if f["kind"] == "agent":
+                err = rewrite(f["row"], f["new"], None)
+                progress["wrote"].append(f["rel"])
+            elif f["kind"] == "config":
+                err = by_line.get(f["line"])
+            else:
+                wsa = wsa or _sibling("wf-settings-apply")
+                err = _move_settings(root, f, wsa)
+                progress["wrote"].append(f["rel"])
+        if err:
+            errors.setdefault(f["old"], []).append(err)
+            res["failed"] += 1
+            res["lines"].append(f"MODEL NOT MOVED  {f['where']}: {f['old']} stays — {err}. "
+                                f"Its successor is {f['new']}; run /workforce verify.")
+            continue
+        res["moved"] += 1
+        res["lines"].append(f"MODEL {verb}  {f['where']}: {f['old']} → {f['new']}")
+    for old in sorted({f["old"] for f in found if f["old"] not in errors}):
+        new, since = smap[old]
+        res["lines"].append(
+            f"MODEL {'MOVED' if execute else 'WOULD MOVE'}  {old} was superseded by {new} on "
+            f"{since}, so each choice of it above {'moved' if execute else 'would move'}, once. "
+            f"Choose {old} again by hand (/workforce model-map) and it stays.")
+    if not execute:
+        res["rc"] = 1 if res["failed"] else 0
+        return res
+    after = _symlinks(enumerate_files(root))
+    for k, v in links_before.items():
+        if after.get(k) != v:
+            res["failed"] += 1
+            res["lines"].append(f"MODEL NOT MOVED  {k} was a symlink to {v} and no longer is.")
+            errors.setdefault("(symlink)", []).append(k)
+    today = datetime.date.today().isoformat()
+    was = json.dumps(marker, sort_keys=True)
+    for old, (new, _since) in smap.items():
+        if old not in done and old not in errors:
+            done[old] = {"to": new, "on": today}
+    marker["template"] = None if errors else template_digest()
+    if json.dumps(marker, sort_keys=True) == was:
+        res["rc"] = 1 if res["failed"] else 0
+        return res
+    wsa = wsa or _sibling("wf-settings-apply")
+    why = _write_marker(root, marker, wsa)
+    # AN UNWRITABLE MARKER IS A FAILURE ONLY WHEN SOMETHING MOVED: then a later hand re-pick
+    # is no longer protected, and that is said. With nothing moved it costs a rescan, no more,
+    # and a read-only `.claude/workforce` must not fail `--heal` (`sa-heal-readonly-record-dir`).
+    if why and res["moved"]:
+        res["failed"] += 1
+        res["lines"].append(f"MODEL MARKER NOT WRITTEN  {SUPERSEDED_REL}: {why}. Each move above "
+                            f"stands; the next run re-checks and finds nothing left to move.")
+    else:
+        progress["wrote"].append(SUPERSEDED_REL)
+    res["rc"] = 1 if res["failed"] else 0
+    return res
+
+
 # ── main ─────────────────────────────────────────────────────────────────────
 
 def main():
@@ -485,13 +890,31 @@ def main():
     ap.add_argument("--check", action="store_true", help="read-only; exit 1 on any drift")
     ap.add_argument("--lineup", action="store_true",
                     help="print each lane's model and effort and the advisor; read-only")
+    ap.add_argument("--heal-superseded", action="store_true",
+                    help="move each recorded choice of a superseded model ID to its successor, "
+                         "once per project; with --execute it writes")
     args = ap.parse_args()
     if args.check and (args.execute or args.judge):
         ap.error("--check is read-only; it takes neither --execute nor --judge")
-    if args.lineup and (args.check or args.execute or args.judge):
+    if args.lineup and (args.check or args.execute or args.judge or args.heal_superseded):
         ap.error("--lineup only prints; it takes no other mode")
+    if args.heal_superseded and (args.check or args.judge):
+        ap.error("--heal-superseded takes only --execute")
 
     root = os.path.abspath(args.root)
+    if args.heal_superseded:
+        res = heal_superseded(root, args.execute)
+        print(f"wf-model-lanes --heal-superseded — {root}")
+        if res["refused"]:
+            print(f"  nothing to move: {res['refused']}")
+            return 0
+        for line in res["lines"]:
+            print(f"  {line}")
+        print(f"INV-SUPERSEDED  {res['moved']} {'moved' if args.execute else 'to move'} · "
+              f"{res['failed']} not moved")
+        if not args.execute and res["moved"]:
+            print("  apply with: --execute")
+        return res["rc"]
     if args.lineup:
         lines = lineup_lines(root)
         if lines is None:
@@ -626,6 +1049,25 @@ def main():
         else:
             counts["written"] += 1
             print(f"  ✓ WROTE    {line}{also}")
+
+    # A SUPERSEDED ID STILL RECORDED IS NOT HEALTHY, whichever lane it sits in. Pending — not
+    # yet moved by `heal_superseded` — is drift; one the project chose again by hand after the
+    # move stands, and is reported so it is never read as an oversight.
+    smap = superseded_map()
+    moved_off = read_marker(root)["moved"]
+    sup = {"pending": 0, "kept": 0}
+    for f in find_superseded(root, smap):
+        if f["old"] in moved_off:
+            sup["kept"] += 1
+            print(f"  = SUPERSEDED-KEPT  {f['where']}: {f['old']}, chosen again after the "
+                  f"{moved_off[f['old']].get('on', '?')} move to {f['new']} — stands")
+            continue
+        sup["pending"] += 1
+        counts["drift"] += 1
+        print(f"  ✗ SUPERSEDED  {f['where']}: {f['old']} → successor {f['new']} (since "
+              f"{f['since']}), not yet moved — the next session start moves it, or "
+              f"wf-settings-apply --root {root} --heal --execute")
+    print(f"\nINV-SUPERSEDED  {sup['pending']} pending · {sup['kept']} kept by hand")
 
     if args.execute:
         live = {r["rel"] for r in rows}

@@ -195,6 +195,11 @@ config, and **never commits**: report the unstaged deletion, because until it is
 clone is healed. A `core.hooksPath` with any other value — a project's own
 `.claude/workforce/maintainers/git-hooks` included — is never touched and is not a finding.
 
+**The same command also moves every recorded choice of a superseded model to its successor**, once
+per project (`org-config.template.md` § Superseded models), and prints the `MODELS` count including
+zero and one `MODEL MOVED` line per value. Report those lines; a `MODEL NOT MOVED` line names its cause
+and stays a finding until it moves.
+
 **Then report all four counts, including the zeroes, and name the fix.** `ORPHANED` → `/workforce hooks
 --execute`. `DEAD WIRING` left after the heal is one it does not own: a foreign script → `wf-apply
 --root <tree> --execute` (`references/passes.md` § `PASS-DEAD-HOOK`), which removes foreign
@@ -362,7 +367,11 @@ WF="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/workforce"; [ -d "$WF" ] || WF="$
 ```
 
 and exit 1 is the finding. `DRIFT` names a file whose recorded lane resolves to a different `model:`
-or `effort:`; `OFF-LINEUP` names an unjudged file whose model no lane selects. The remedy is `audit`
+or `effort:`; `OFF-LINEUP` names an unjudged file whose model no lane selects; `SUPERSEDED` names a
+recorded choice of a model the pool replaced that has not been moved to its successor yet
+(`org-config.template.md` § Superseded models — § Hook wiring's `--heal --execute` above moves it, so
+one left here is a refused or failed write, named with its cause). `SUPERSEDED-KEPT` is a superseded
+model the user chose again by hand after the move: report it, it is not a finding. The remedy is `audit`
 Step 6-M, which judges and rewrites; `verify` writes nothing. This is the verify leg of the three paths
 (`references/enforcement.md`): the shipped pins are held at release, `audit` heals an existing org, and
 this row says when one has drifted between audits.

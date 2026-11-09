@@ -140,9 +140,48 @@ shipped defaults did not move: they stay `claude-opus-5-5`. Verified that day ag
 models overview and the Fable 5.2 model page: `claude-fable-5-2` is **$8/$40**, 1M context, 128K max
 output, adaptive thinking always on, API effort default `high`, and it needs 30-day retention (no
 ZDR). The docs now list `claude-fable-5-1` under legacy models that are still available. At $8/$40 the
-row still costs more than every other row in the pool, so the cost order did not change. In a project
-that recorded `claude-fable-5-1`, the next budget question shows it as `(current — not in the pool)`
-(`audit-setup.md` § What "pre-selected" means on screen).*
+row still costs more than every other row in the pool, so the cost order did not change. A project
+that recorded `claude-fable-5-1` is moved to `claude-fable-5-2` once, at its next session, and told so
+(§ Superseded models, below). User decision, 2026-11-09: *"Move them to 5.2 … Their next workforce
+session moves every 5.1 choice to 5.2 and says so, with no audit needed. Fable 5.2 is cheaper and
+newer, and a project can still pick 5.1 by hand afterward."**
+
+### Superseded models — the map a recorded choice is moved by
+
+**One row per model the pool replaced with a successor.** It is not part of the pool: no ID here is
+offered by any budget question, and the pool's `#` table above is the only list of what is offered.
+A project that recorded a superseded ID is moved to its successor once, and is told so in one line per
+moved value. Retiring a pool row WITH a successor adds a row here; that is the whole procedure, and no
+script needs editing.
+
+| Superseded | Successor | Since | Why |
+|---|---|---|---|
+| `claude-fable-5-1` | `claude-fable-5-2` | 2026-11-09 | row 1 moved to Fable 5.2; 5.1 is a legacy model the API still serves |
+
+**What is moved.** Everywhere a project records a model choice: every table row and every
+`advisorModel:` line of `.claude/workforce/org-config.md` (never prose, never a section whose heading
+names `statics`, never a fenced block); the `model:` line of every model-pinned file
+`wf-model-lanes` enumerates (`.claude/agents/**`, a symlinked one written through its link,
+`.claude/skills/*/agents/*/AGENT.md`, `.claude/skills/*/SKILL.md`); and the top-level `advisorModel` key
+of the project's `.claude/settings.json` and `.claude/settings.local.json`. A shipped file, a file that
+resolves outside the project, a user-scope file, and a project whose `.claude` is the personal config
+root are never written. History is not a choice and is not moved: personnel records, work directories,
+and staged drafts keep the ID they recorded. `org-chart.md` is a rendering of the frontmatter, and the
+next `org index` re-renders it.
+
+**Once per project, so a hand re-pick stands.** `.claude/workforce/.models-superseded.json` records each
+superseded ID this project has been moved off, and the date. An ID recorded there is never moved again
+in this project, so a user who picks `claude-fable-5-1` by hand afterward keeps it. The ID is recorded
+only when every value it was found in moved and re-read correctly; a refused or failed write leaves it
+unrecorded, so the next session tries again and says so. Only a project with a `.claude/workforce/`
+directory is moved, because only an org has recorded a choice.
+
+**Three paths, no command typed** (SKILL.md § Directives, 2026-09-07): `wf-heal` at every session start;
+`audit` before its first budget question (`audit-setup.md` § Step 0.4); and `wf-settings-apply --heal`,
+which `verify` § Hook wiring and `audit` Step 6-G already run. `wf-model-lanes --check` (`verify`
+§ MODEL-DRIFT) reports a superseded ID still recorded: `SUPERSEDED` (not yet moved, exit 1) or
+`SUPERSEDED-KEPT` (picked again by hand after the move, reported, not a failure). `wf-model-lanes
+--heal-superseded [--execute]` is the producer every path calls.
 
 Use the full official model ID. Never an alias, never a date suffix on the IDs above.
 

@@ -11067,6 +11067,207 @@
           "Traceback"
       ]
   },
+  "model-supersede-session-heal": {
+      "_why": "THE SESSION MOVES EVERY RECORDED CHOICE OF A SUPERSEDED MODEL, ONCE, AND SAYS SO. User decision 2026-11-09: a project that picked Fable 5.1 at an earlier audit is moved to 5.2 at its next session, with no audit. Every place a choice is recorded moves: org-config table rows (a `## The lanes` row the lineup reader cannot see included), the employee override, the Advisor model cell, the prose `advisorModel:` line, an agent's `model:`, a SYMLINKED agent written through its link (the AGENT.md target changes; a rename-in-place write would leave it on 5.1), and the settings `advisorModel` with every other byte as it was (a load-and-dump would reformat the compact `permissions` line). Never moved: the legacy statics copy, prose history, a fenced block, `claude-fable-5-10`, an agent on another model. The marker records the move so a later hand re-pick stands.",
+      "script": "wf-heal",
+      "stdin_raw": "{\"cwd\": \".\", \"hook_event_name\": \"SessionStart\", \"source\": \"startup\"}",
+      "exit": 0,
+      "want": [
+          "MODEL MOVED  .claude/agents/design-critic.md (model:): claude-fable-5-1 \\u2192 claude-fable-5-2",
+          "MODEL MOVED  .claude/agents/painter.md (model:, written through its link to .claude/skills/poster/agents/painter/AGENT.md): claude-fable-5-1 \\u2192 claude-fable-5-2",
+          "MODEL MOVED  .claude/workforce/org-config.md:15 (creative-visual): claude-fable-5-1 \\u2192 claude-fable-5-2",
+          "MODEL MOVED  .claude/workforce/org-config.md:31 (Advisor model): claude-fable-5-1 \\u2192 claude-fable-5-2",
+          "MODEL MOVED  .claude/workforce/org-config.md:38 (design-critic): claude-fable-5-1 \\u2192 claude-fable-5-2",
+          "MODEL MOVED  .claude/workforce/org-config.md:42 (advisorModel): claude-fable-5-1 \\u2192 claude-fable-5-2",
+          "MODEL MOVED  .claude/settings.local.json (advisorModel): claude-fable-5-1 \\u2192 claude-fable-5-2",
+          "MODEL MOVED  claude-fable-5-1 was superseded by claude-fable-5-2 on 2026-11-09, so each choice of it above moved, once. Choose claude-fable-5-1 again by hand (/workforce model-map) and it stays."
+      ],
+      "not": [
+          "Traceback",
+          "NOT MOVED",
+          "INTERRUPTED",
+          "keeper.md",
+          "org-config.md:5 ",
+          "org-config.md:26 "
+      ],
+      "after": {
+          ".claude/skills/poster/agents/painter/AGENT.md": {
+              "want": [
+                  "model: claude-fable-5-2\n---"
+              ]
+          },
+          ".claude/agents/design-critic.md": {
+              "want": [
+                  "model: claude-fable-5-2\neffort: high\n"
+              ]
+          },
+          ".claude/agents/keeper.md": {
+              "want": [
+                  "model: claude-opus-4-8\neffort: medium\n"
+              ]
+          },
+          ".claude/settings.local.json": {
+              "want": [
+                  "{\n  \"permissions\": {\"allow\": [\"Bash(ls:*)\"]},\n    \"advisorModel\":   \"claude-fable-5-2\",\n  \"x\": 1\n}\n"
+              ]
+          },
+          ".claude/workforce/org-config.md": {
+              "want": [
+                  "| 1 | `claude-fable-5-1` | 1M | 128K |",
+                  "| `claude-fable-5-1` | `claude-fable-5-2` | 2026-11-09 | a legacy copy, never rewritten |",
+                  "| creative-visual | any | `claude-fable-5-2` | medium |",
+                  "| Creative-visual model | `claude-fable-5-2` |\n|---|---|",
+                  "*[2026-09-02: creative-visual moved to `claude-fable-5-1` by the budget answer.]*",
+                  "```\n| Creative-visual model | `claude-fable-5-1` |\n```",
+                  "| Advisor model | `claude-fable-5-2` |",
+                  "| `design-critic` | `claude-fable-5-2` | `high` |",
+                  "advisorModel: claude-fable-5-2\n",
+                  "| creative-visual | claude-fable-5-10 | medium |"
+              ]
+          },
+          ".claude/workforce/.models-superseded.json": {
+              "want": [
+                  "\"claude-fable-5-1\": {\n      \"to\": \"claude-fable-5-2\""
+              ],
+              "not": [
+                  "\"template\": null"
+              ]
+          }
+      }
+  },
+  "model-supersede-hand-repick": {
+      "_why": "A HAND RE-PICK STANDS. The user's decision: \"a project can still pick 5.1 by hand afterward\". This project was already moved off claude-fable-5-1 (the marker says so) and has since chosen it again in org-config, an agent and settings. A new release changed the template (the marker's digest is stale), so the session scans again, and moves nothing: the ID is listed as moved, and a listed ID is never moved twice. The refreshed digest proves the scan ran rather than the gate stopping it. Fails when the heal ignores the marker.",
+      "script": "wf-heal",
+      "stdin_raw": "{\"cwd\": \".\", \"hook_event_name\": \"SessionStart\", \"source\": \"startup\"}",
+      "exit": 0,
+      "not": [
+          "MODEL",
+          "Traceback"
+      ],
+      "after": {
+          ".claude/workforce/org-config.md": {
+              "want": [
+                  "| Creative-visual model | `claude-fable-5-1` |",
+                  "| Advisor model | `claude-fable-5-1` |"
+              ]
+          },
+          ".claude/agents/design-critic.md": {
+              "want": [
+                  "model: claude-fable-5-1\n"
+              ]
+          },
+          ".claude/settings.json": {
+              "want": [
+                  "\"advisorModel\":   \"claude-fable-5-1\""
+              ]
+          },
+          ".claude/workforce/.models-superseded.json": {
+              "want": [
+                  "\"on\": \"2026-11-09\""
+              ],
+              "not": [
+                  "\"template\": \"0000\""
+              ]
+          }
+      }
+  },
+  "model-supersede-check-pending": {
+      "_why": "VERIFY NO LONGER CALLS A SUPERSEDED MODEL HEALTHY. Measured 2026-11-09: `--check` exited 0 on a project still recording claude-fable-5-1, because the lane reader never reads the superseded map. Every recorded choice not yet moved is drift, named with its successor and the command that moves it, and the lineup marks it. Fails when --check ignores the map.",
+      "script": "wf-model-lanes",
+      "args": [
+          "--check"
+      ],
+      "exit": 1,
+      "want": [
+          "✗ SUPERSEDED  .claude/agents/design-critic.md (model:): claude-fable-5-1 → successor claude-fable-5-2 (since 2026-11-09), not yet moved",
+          "✗ SUPERSEDED  .claude/workforce/org-config.md:5 (Creative-visual model): claude-fable-5-1 → successor claude-fable-5-2",
+          "✗ SUPERSEDED  .claude/workforce/org-config.md:11 (Advisor model): claude-fable-5-1 → successor claude-fable-5-2",
+          "✗ SUPERSEDED  .claude/settings.json (advisorModel): claude-fable-5-1 → successor claude-fable-5-2",
+          "INV-SUPERSEDED  4 pending · 0 kept by hand"
+      ],
+      "not": [
+          "SUPERSEDED-KEPT",
+          "Traceback"
+      ]
+  },
+  "model-supersede-check-kept": {
+      "_why": "A HAND RE-PICK IS REPORTED, NOT FAILED. The project was moved off claude-fable-5-1 and chose it again; `--check` names each such value as SUPERSEDED-KEPT with the move's date and exits 0, so verify neither calls it healthy in silence nor fails a choice the user made on purpose.",
+      "script": "wf-model-lanes",
+      "args": [
+          "--check"
+      ],
+      "exit": 0,
+      "want": [
+          "= SUPERSEDED-KEPT  .claude/settings.json (advisorModel): claude-fable-5-1, chosen again after the 2026-11-09 move to claude-fable-5-2 — stands",
+          "= SUPERSEDED-KEPT  .claude/agents/design-critic.md (model:)",
+          "INV-SUPERSEDED  0 pending · 4 kept by hand"
+      ],
+      "not": [
+          "✗ SUPERSEDED",
+          "Traceback"
+      ]
+  },
+  "model-supersede-verify-heal": {
+      "_why": "THE VERIFY AND AUDIT PATH. `wf-settings-apply --heal --execute` is what `verify` § Hook wiring and `audit` Step 6-G already run; its model half moves a superseded choice exactly as the session start does, prints the count including zero, and writes the marker.",
+      "script": "wf-settings-apply",
+      "args": [
+          "--heal",
+          "--execute"
+      ],
+      "exit": 0,
+      "want": [
+          "MODELS 3 superseded model choice(s) moved · 0 not moved",
+          "MODEL MOVED  .claude/settings.json (advisorModel): claude-fable-5-1 → claude-fable-5-2",
+          "MODEL MOVED  .claude/workforce/org-config.md:11 (Advisor model): claude-fable-5-1 → claude-fable-5-2"
+      ],
+      "not": [
+          "Traceback",
+          "NOT MOVED"
+      ],
+      "after": {
+          ".claude/settings.json": {
+              "want": [
+                  "\"advisorModel\":   \"claude-fable-5-2\""
+              ]
+          },
+          ".claude/workforce/.models-superseded.json": {
+              "want": [
+                  "\"to\": \"claude-fable-5-2\""
+              ]
+          }
+      }
+  },
+  "model-supersede-refused-hardlink": {
+      "_why": "A REFUSED VALUE STAYS PENDING. The settings file has a second hard link, a name that may live outside the project, so `wf-settings-apply`'s own refusal keeps the heal from writing it; the line says so and names the successor. The org-config cells still move. claude-fable-5-1 is NOT recorded as moved and the digest is not stamped, so the next session tries again rather than freezing the project half-moved and `--check` reporting the leftover as a hand re-pick.",
+      "script": "wf-heal",
+      "stdin_raw": "{\"cwd\": \".\", \"hook_event_name\": \"SessionStart\", \"source\": \"startup\"}",
+      "hardlink": {
+          "other-name.json": ".claude/settings.local.json"
+      },
+      "exit": 0,
+      "want": [
+          "MODEL NOT MOVED  .claude/settings.local.json (advisorModel): claude-fable-5-1 stays \\u2014 it has 2 hard links",
+          "Its successor is claude-fable-5-2; run /workforce verify.",
+          "MODEL MOVED  .claude/workforce/org-config.md:11 (Advisor model): claude-fable-5-1 \\u2192 claude-fable-5-2"
+      ],
+      "not": [
+          "Traceback",
+          "was superseded by"
+      ],
+      "after": {
+          ".claude/settings.local.json": {
+              "want": [
+                  "\"advisorModel\":   \"claude-fable-5-1\""
+              ]
+          },
+          ".claude/workforce/.models-superseded.json": {
+              "want": [
+                  "\"template\": null",
+                  "\"moved\": {}"
+              ]
+          }
+      }
+  },
   "code-origin-lineup": {
       "_why": "BEFORE ANY AUDIT, AN AGENT DEFINITION GETS THE SHIPPED DEFAULTS. The edit hook reaches every project with no org; on a `.claude/agents/*.md` write in a project with no org-config.md it shows the template's lineup, and the creative-visual and advisor defaults are Opus 5.5, not the Ultra-tier frontier model the audit still recommends. User decision 2026-11-05. Not a git repository, so the origin report is absent and the lineup alone is emitted.",
       "script": "wf-code-origin",

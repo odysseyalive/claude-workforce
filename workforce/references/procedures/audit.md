@@ -2121,6 +2121,10 @@ WF="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/workforce"; [ -d "$WF" ] || WF="$
    lane is never written as "inherit".
 4. **A shipped file is reported `SHIPPED` and never written.** `update` overwrites it, so its pin is held
    to the template's lane pick at release instead.
+5. **A superseded model was already moved before this step** (`audit-setup.md` § Step 0.4, and every
+   session start): a lane that recorded one now selects its successor, so the plan resolves pins to
+   the successor. A `SUPERSEDED-KEPT` line is a model the user chose again by hand after that move;
+   it is the lane's selection like any other and is reconciled to, never away from.
 
 Its `WROTE` lines extend the Lane assignment block above to every pinned file. Print its `INV-LANES` and
 `INV-SYMLINK` lines in the closing report. Under `--review`: the plan only.
