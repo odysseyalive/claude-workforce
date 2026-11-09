@@ -1102,6 +1102,7 @@ def do_wire_defaults(root, scope, execute):
     rc = prune_dead_hooks(root, scope, execute)
     if scope == "user":
         rc = max(rc, clear_retired_style(root, execute))
+        rc = max(rc, move_superseded_advisor(execute))
     rc = max(rc, do_installer_rule(root, scope, execute))
     for name in DEFAULT_HOOKS:
         rc = max(rc, do_wire_hook(root, name, execute, scope=scope, quiet=True))
@@ -1393,6 +1394,20 @@ def clear_retired_style(root, execute):
     print(f"  - outputStyle {value!r} cleared from {spath} (a style workforce retired; no file "
           f"for it remains) — recorded in {owned_path} § output_style_cleared")
     return 0
+
+
+def move_superseded_advisor(execute):
+    """Move a USER-SCOPE `advisorModel` that names a superseded model to its successor, once
+    per config root, printing each `MODEL MOVED` line. The decision, the one-value edit and the
+    marker are `wf-model-lanes`'s (`heal_superseded_user`), shared with `wf-heal` at session
+    start. Runs here, beside `clear_retired_style`, for the same reason: `--scope user
+    --wire-defaults` is what every `--user` install and update runs, so the update that ships
+    a new Superseded row moves the user's choice in the same run. Silent when there is nothing
+    to move."""
+    res = _sibling("wf-model-lanes").heal_superseded_user(execute)
+    for line in res["lines"]:
+        print(f"  {line}")
+    return res["rc"]
 
 
 def known_roots(root):
@@ -3245,8 +3260,9 @@ def main(argv=None):
         return 2
     if args.scope == "user" and (args.grants or args.wire_hook or args.heal):
         print("wf-settings-apply: --scope user applies to --wire-defaults, "
-              "--unwire-defaults and --installer-rule only. The heal never writes a "
-              "user-scope file.",
+              "--unwire-defaults and --installer-rule only. --heal never writes a "
+              "user-scope file; the one user-scope value a release moves, a superseded "
+              "advisorModel, moves through --wire-defaults.",
               file=sys.stderr)
         return 2
 

@@ -52,7 +52,9 @@ SUPERSEDED MODELS. `org-config.template.md` § Model statics › Superseded mode
 pool replaced to its successor. `--heal-superseded` moves every recorded choice of one, once per
 project (`heal_superseded`), and `wf-heal` runs it at session start; `--check` reports one still
 recorded as `SUPERSEDED` (not yet moved: drift) or `SUPERSEDED-KEPT` (chosen again by hand after
-the move: reported, not drift); `--lineup` marks one `[superseded by …]`.
+the move: reported, not drift); `--lineup` marks one `[superseded by …]`. The user-scope
+`advisorModel` moves once per config root (`heal_superseded_user`), from `wf-heal` and from
+`wf-settings-apply --scope user --wire-defaults`.
 
 EXIT  0  the plan or the lineup printed, or every write verified
       1  --check found drift; or --execute left a file unjudged or unresolved, a write failed
@@ -170,51 +172,99 @@ def _lane_of(key):
     return "creative" if key.startswith("creative") else None
 
 
+SEPARATOR_RX = re.compile(r"^\|[\s:|-]+\|$")
+# Headings whose tables reuse the lane words and are never a selection: the model pool and its
+# Superseded map, the effort ladder, and the budget questions' wording.
+NOT_A_LINEUP = ("statics", "superseded", "wording")
+
+
+def _header_cols(cells):
+    """`{"model", "effort", "tier"}` → column index, read off a table's header row, or None when
+    the header names no Model column. A table with no Model column (`| Lane | What it covers |
+    … |`, `| Department | … | Lane |`) is about the lanes, never a choice of model for one."""
+    cols = {}
+    for i, c in enumerate(cells):
+        name = c.replace("`", "").replace("*", "").strip().lower()
+        for col in ("model", "effort", "tier"):
+            if col not in cols and (name == col or name.startswith(col + " ")):
+                cols[col] = i
+    return cols if "model" in cols else None
+
+
 def parse_lineup(text):
     """`({lane: {"model", "effort"}}, {employee: {"model", "effort"}})` from an org-config.
 
-    TOLERANT BY MEASUREMENT. Six live configs on one workstation spell the lineup five ways:
-    `| Creative-text model | … |` rows, a `| creative-text (writing & copy) | model | effort |`
-    table, a pre-split `| Creative model |` that covers both creative lanes, `| Lead (2) | model
-    | effort |` under the analytical heading, and — in two projects — no lane tables at all,
-    only a `## Budget` receipt whose rows read `| analytical · Lead | model | effort | source |`.
-    A row is read only under a heading that names its lane (or a budget receipt, which fills
-    only what the lane tables left blank), so the `## Model statics` pool and the effort ladder,
-    which reuse the same lane words, are never mistaken for a selection.
+    TOLERANT BY MEASUREMENT. Nine live configs on one workstation spell the lineup six ways:
+    `| Creative-text model | … |` rows, a `| Lane | Model | Effort |` table, a pre-split
+    `| Creative model |` that covers both creative lanes, `| Lead (2) | model | effort |` under a
+    `| Tier | Model | Effort |` header, a `## Budget` receipt whose rows read `| analytical ·
+    Lead | model | effort | source |`, and a `## The lanes` table whose header is `| Lane | Tier |
+    Model | Effort |`, so its analytical rows name the tier in the SECOND cell.
+
+    THE TABLE'S HEADER SAYS WHICH CELL IS WHICH, so the reader is not tied to one heading name.
+    MEASURED 2026-11-09: laika records its whole lineup under `## The lanes`, a heading the old
+    allow-list (`analytical`, `creative`, `code`) skipped, so `--lineup` printed `(none
+    selected)` for all five lanes. A multi-column row is read when its table's header names a
+    Model column, from the columns that header names; a Tier column is joined to the first cell
+    (`analytical` + `Lead (2)`). A key-value row (`| Creative-visual model | id |`) names its own
+    field. Headings only exclude and route: the pool, its Superseded map, the effort ladder and
+    the question wording (NOT_A_LINEUP) are never read, `## Employee overrides` fills the
+    overrides, and a budget receipt fills only what the lane tables left blank.
     """
     tables = {k: {"model": None, "effort": None} for k in LANES + ("creative",)}
     receipt = {k: {"model": None, "effort": None} for k in LANES + ("creative",)}
     overrides = {}
     section = ""
-    for raw in text.splitlines():
+    header = None
+    lines = text.splitlines()
+    for i, raw in enumerate(lines):
         line = raw.strip()
         if line.startswith("#"):
             section = line.lstrip("#").strip().lower()
+            header = None
             continue
-        if not (line.startswith("|") and line.endswith("|")) or re.match(r"^\|[\s:|-]+\|$", line):
+        if not (line.startswith("|") and line.endswith("|")):
+            header = None
+            continue
+        if SEPARATOR_RX.match(line):
             continue
         cells = [c.strip() for c in line.strip("|").split("|")]
+        nxt = lines[i + 1].strip() if i + 1 < len(lines) else ""
+        if SEPARATOR_RX.match(nxt):
+            # This row heads its table. In a key-value table it is also the first value, and
+            # a header such as `| Lane | Tier | … |` names no lane, so it is read on below.
+            header = _header_cols(cells)
         key = cells[0].replace("`", "").replace("*", "").strip().lower()
         if section.startswith("employee overrides"):
             if len(cells) >= 3 and key and key != "employee":
                 overrides[key] = {"model": _model_cell(cells[1]), "effort": _effort_cell(cells[2])}
             continue
-        if section.startswith("budget"):
-            into = receipt
-        elif section.startswith(("analytical", "creative", "code")):
-            into = tables
-        else:
+        if any(word in section for word in NOT_A_LINEUP):
+            continue
+        into = receipt if section.startswith("budget") else tables
+        if len(cells) < 2:
+            continue
+        if len(cells) >= 3 and "model" not in key and "effort" not in key:
+            if header is None:
+                continue
+            tier = header.get("tier", 0)
+            if 0 < tier < len(cells):
+                key = f"{key} {cells[tier].replace('`', '').replace('*', '').strip().lower()}"
+            lane = _lane_of(key)
+            if lane is None:
+                continue
+            mi, ei = header["model"], header.get("effort")
+            into[lane]["model"] = _model_cell(cells[mi]) if mi < len(cells) else None
+            into[lane]["effort"] = _effort_cell(cells[ei]) if ei is not None and ei < len(cells) \
+                else None
             continue
         lane = _lane_of(key)
-        if lane is None or len(cells) < 2:
+        if lane is None:
             continue
-        target = into[lane]
-        if len(cells) >= 3 and "model" not in key and "effort" not in key:
-            target["model"], target["effort"] = _model_cell(cells[1]), _effort_cell(cells[2])
-        elif "model" in key:
-            target["model"] = _model_cell(cells[1])
+        if "model" in key:
+            into[lane]["model"] = _model_cell(cells[1])
         elif "effort" in key:
-            target["effort"] = _effort_cell(cells[1])
+            into[lane]["effort"] = _effort_cell(cells[1])
     lanes = {}
     for lane in LANES:
         fallbacks = [tables[lane], receipt[lane]]
@@ -547,9 +597,10 @@ def config_hits(text, smap):
 
     WIDER THAN `parse_lineup`, ON PURPOSE. A recorded choice is any TABLE ROW or `advisorModel:`
     line naming the ID, not only the rows the lineup reader understands. MEASURED 2026-11-09:
-    one live config records `| creative-visual | any | `claude-fable-5-1` | medium |` under
-    `## The lanes`, a heading `parse_lineup` reads nothing under, and a heal held to the
-    lineup's reading would have left that choice on 5.1. Do not narrow this to match the lineup.
+    one live config recorded `| creative-visual | any | `claude-fable-5-1` | medium |` under
+    `## The lanes`, a heading `parse_lineup` then read nothing under (it reads that table by its
+    header now), and a heal held to the lineup's reading would have left that choice on 5.1. The
+    next shape the lineup reader misses is the same risk, so do not narrow this to match it.
 
     WHAT IS NEVER A CHOICE, each a guard against the wider reading: prose (history, and the
     user's own sentences); every line under a heading naming `statics` until a heading of the
@@ -648,11 +699,12 @@ def superseded_refusal(root):
     return None
 
 
-def read_marker(root):
-    """`{"template": digest, "moved": {old: {"to", "on"}}}` — what this project was moved off.
-    A link at the name is not read (O_NOFOLLOW), and reads as no marker."""
+def read_marker(root, path=None):
+    """`{"template": digest, "moved": {old: {"to", "on"}}}` — what this project (or, given
+    `path`, this config root) was moved off. A link at the name is not read (O_NOFOLLOW), and
+    reads as no marker."""
     try:
-        fd = os.open(os.path.join(root, SUPERSEDED_REL),
+        fd = os.open(path or os.path.join(root, SUPERSEDED_REL),
                      os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
         with os.fdopen(fd, encoding="utf-8") as fh:
             data = json.load(fh)
@@ -738,24 +790,31 @@ def _move_config(root, rel, found):
 
 
 def _move_settings(root, f, wsa):
-    """Change ONLY the value of the top-level `advisorModel` key — the characters of the old ID
-    and nothing else, so every other byte of the file is as it was (never load-and-dump). The
-    result is parsed and must differ from the original in that one key alone. Returns the
-    error, or None."""
+    """A project settings file's `advisorModel`, moved by `_swap_advisor` once
+    `wf-settings-apply`'s own per-file refusal lets it be written. Returns the error, or None."""
     path = os.path.join(root, f["rel"])
     why = wsa._file_refusal(root, path)
     if why:
         return why
+    return _swap_advisor(path, f["old"], f["new"], wsa)
+
+
+def _swap_advisor(path, old, new, wsa):
+    """Change ONLY the value of the top-level `advisorModel` key — the characters of the old ID
+    and nothing else, so every other byte of the file is as it was (never load-and-dump). The
+    result is parsed and must differ from the original in that one key alone. Written to where
+    the name resolves. Returns the error, or None. Whether `path` may be written at all is the
+    caller's question: a project file and the user's own file answer it differently."""
     text = _read(path)
     before = _strict_json(text) if text is not None else None
-    if not before or before.get("advisorModel") != f["old"]:
+    if not before or before.get("advisorModel") != old:
         return "the file changed since it was read"
-    rx = re.compile(r'("advisorModel"\s*:\s*")' + re.escape(f["old"]) + r'"')
+    rx = re.compile(r'("advisorModel"\s*:\s*")' + re.escape(old) + r'"')
     if len(rx.findall(text)) != 1:
         return "`advisorModel` is spelled more than once or escaped; left for a hand edit"
-    after_text = rx.sub(lambda m: m.group(1) + f["new"] + '"', text)
+    after_text = rx.sub(lambda m: m.group(1) + new + '"', text)
     after = _strict_json(after_text)
-    if not after or after.get("advisorModel") != f["new"] or \
+    if not after or after.get("advisorModel") != new or \
             dict(after, advisorModel=None) != dict(before, advisorModel=None):
         return "the edit would change more than the one value; left for a hand edit"
     try:
@@ -763,19 +822,20 @@ def _move_settings(root, f, wsa):
     except (OSError, RuntimeError) as exc:
         return str(exc)
     back = _strict_json(_read(path) or "")
-    return None if back and back.get("advisorModel") == f["new"] else "re-read shows the old value"
+    return None if back and back.get("advisorModel") == new else "re-read shows the old value"
 
 
-def _write_marker(root, marker, wsa):
-    path = os.path.join(root, SUPERSEDED_REL)
+def _write_marker(root, marker, wsa, path=None, whose="this project was"):
+    path = path or os.path.join(root, SUPERSEDED_REL)
     why = wsa.write_refusal(root, path)
     if why:
         return why
-    body = {"_about": "Written by wf-model-lanes. Each superseded model ID this project was "
+    body = {"_about": f"Written by wf-model-lanes. Each superseded model ID {whose} "
                       "moved off, once; an ID listed here is never moved again, so a choice "
                       "of it made afterward stands.",
             "template": marker.get("template"), "moved": dict(sorted(marker["moved"].items()))}
     try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
         wsa._atomic_write(path, json.dumps(body, indent=2, ensure_ascii=False) + "\n")
     except OSError as exc:
         return exc.strerror or str(exc)
@@ -874,6 +934,96 @@ def heal_superseded(root, execute, progress=None):
                             f"stands; the next run re-checks and finds nothing left to move.")
     else:
         progress["wrote"].append(SUPERSEDED_REL)
+    res["rc"] = 1 if res["failed"] else 0
+    return res
+
+
+# Under the personal config root, beside the user-scope `.settings-owned.json`.
+USER_MARKER_REL = os.path.join("workforce", ".models-superseded.json")
+
+
+def heal_superseded_user(execute, progress=None, wsa=None):
+    """Move the USER-SCOPE `advisorModel` off a superseded model to its successor, ONCE per
+    personal config root. Returns the same shape as `heal_superseded`.
+
+    THE DEFECT. `heal_superseded` refuses user scope, so the one model choice user scope records
+    never moved. MEASURED 2026-11-09: this workstation's `~/.claude/settings.json` still read
+    `"advisorModel": "claude-fable-5-1"` after the project heal shipped. The user's decision that
+    day covers it: "Their next workforce session moves every 5.1 choice to 5.2 and says so."
+
+    WHAT IS MOVED: the top-level `advisorModel` of `<config root>/settings.json` and nothing
+    else, by the same one-value edit a project's gets (`_swap_advisor`). It is written to where
+    the name resolves, as `wf-settings-apply.clear_retired_style` writes this file: it is the
+    user's own, often linked into a dotfiles repository, not a name a repository planted. An
+    absent file, or one that is not a single JSON object without duplicate keys, is left with
+    nothing said and nothing recorded, so a value that could not be read is never frozen.
+
+    ONCE, SO A HAND RE-PICK STANDS: `<config root>/workforce/.models-superseded.json`, the
+    project marker's format. AT A PROJECT ROOTED AT $HOME THE TWO ARE ONE FILE, ON PURPOSE:
+    `heal_superseded` refuses that `.claude` (it is user scope), so this is its only writer;
+    `wf-heal`'s project gate then stops at the digest stamped here instead of importing and
+    refusing at every session start, and `--check` there reads a re-pick as SUPERSEDED-KEPT.
+    Do not split it into two files.
+
+    TWO CALLERS, NO COMMAND TYPED: `wf-heal` at every session start, which reaches a machine
+    updated by `bin/sync` (it wires nothing), and `wf-settings-apply --scope user
+    --wire-defaults`, which the installer runs at every `--user` install and update.
+    """
+    res = {"lines": [], "moved": 0, "failed": 0, "refused": None, "rc": 0}
+    wsa = wsa or _sibling("wf-settings-apply")
+    if progress is None:
+        progress = {"wrote": []}
+    cfg, spath = wsa.config_root(), wsa.user_settings_path()
+    text = _read(spath) if os.path.isfile(spath) else None
+    data = _strict_json(text) if text is not None else None
+    if data is None:
+        res["refused"] = f"{spath} is absent, unreadable, or not one JSON object"
+        return res
+    smap = superseded_map()
+    mpath = os.path.join(cfg, USER_MARKER_REL)
+    marker = read_marker(None, mpath)
+    done = marker["moved"]
+    old = data.get("advisorModel")
+    failed = None
+    if isinstance(old, str) and old in smap and old not in done:
+        new, since = smap[old]
+        where = f"{spath} (advisorModel)"
+        err = _swap_advisor(spath, old, new, wsa) if execute else None
+        if err and (_strict_json(_read(spath) or "") or {}).get("advisorModel") == new:
+            # ANOTHER SESSION STARTED AT THE SAME MOMENT AND MOVED IT, and said so. A NOT MOVED
+            # line here would be false about a value that is on its successor.
+            err = None
+        elif err:
+            failed = old
+            res["failed"] += 1
+            res["lines"].append(f"MODEL NOT MOVED  {where}: {old} stays — {err}. Its successor "
+                                f"is {new}; the next session start tries again.")
+        else:
+            verb = "MOVED" if execute else "WOULD MOVE"
+            res["moved"] += 1
+            if execute:
+                progress["wrote"].append(spath)
+            res["lines"] += [
+                f"MODEL {verb}  {where}: {old} → {new}",
+                f"MODEL {verb}  {old} was superseded by {new} on {since}, so your user-scope "
+                f"advisorModel {'moved' if execute else 'would move'}, once. Set it to {old} "
+                f"again by hand and it stays."]
+    if not execute:
+        return res
+    was = json.dumps(marker, sort_keys=True)
+    today = datetime.date.today().isoformat()
+    for o, (n, _since) in smap.items():
+        if o not in done and o != failed:
+            done[o] = {"to": n, "on": today}
+    marker["template"] = None if failed else template_digest()
+    if json.dumps(marker, sort_keys=True) != was:
+        why = _write_marker(cfg, marker, wsa, mpath, "this config root's user scope was")
+        if why and res["moved"]:
+            res["failed"] += 1
+            res["lines"].append(f"MODEL MARKER NOT WRITTEN  {mpath}: {why}. The move above "
+                                f"stands; the next session re-checks and finds nothing to move.")
+        elif not why:
+            progress["wrote"].append(mpath)
     res["rc"] = 1 if res["failed"] else 0
     return res
 

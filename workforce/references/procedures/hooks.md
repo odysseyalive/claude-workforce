@@ -247,6 +247,11 @@ be written. The edit removes that one key character by character, re-reads the f
 `{settings, previous, reason}` to `.settings-owned.json` § `output_style_cleared`, and the run prints
 the line. A selection of any other style is never touched.
 
+**At user scope `--wire-defaults` also moves a superseded `advisorModel`**, once per config root, and
+`wf-heal` does the same at every session start, so a machine updated by `bin/sync` gets it too. Only
+that one key's value changes, character for character; the marker and the rule are
+`org-config.template.md` § Superseded models › User scope moves too. Each move prints `MODEL MOVED`.
+
 **A widened matcher heals through `--wire-defaults` too.** Presence is decided by script and event,
 never by matcher, so a release that changes a shipped hook's matcher would otherwise report `already
 registered — NOOP` on every machine holding the old row. `PRIOR_MATCHERS` in `wf-settings-apply` names

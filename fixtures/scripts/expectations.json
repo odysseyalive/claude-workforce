@@ -11268,6 +11268,128 @@
           }
       }
   },
+  "model-supersede-user-session": {
+      "_why": "THE USER-SCOPE CHOICE MOVES AT SESSION START, ONCE, AND SAYS SO. The project heal refuses user scope, so `~/.claude/settings.json` kept `\"advisorModel\": \"claude-fable-5-1\"` on the author's workstation after every project moved (measured 2026-11-09). The user's decision covers every 5.1 choice, and a machine updated by `bin/sync` runs no `--wire-defaults`, so the session start must reach it. Only the value's characters change: the compact `permissions` line and the odd indentation survive, which a load-and-dump would reformat. The marker lands under the config root, not the project. No project org here, so the user pass alone runs.",
+      "script": "wf-heal",
+      "stdin_raw": "{\"cwd\": \".\", \"hook_event_name\": \"SessionStart\", \"source\": \"startup\"}",
+      "env": {
+          "CLAUDE_CONFIG_DIR": "${TREE}/cfg"
+      },
+      "exit": 0,
+      "want": [
+          "/cfg/settings.json (advisorModel): claude-fable-5-1 \\u2192 claude-fable-5-2",
+          "MODEL MOVED  claude-fable-5-1 was superseded by claude-fable-5-2 on 2026-11-09, so your user-scope advisorModel moved, once. Set it to claude-fable-5-1 again by hand and it stays."
+      ],
+      "not": [
+          "Traceback",
+          "NOT MOVED",
+          "INTERRUPTED"
+      ],
+      "after": {
+          "cfg/settings.json": {
+              "want": [
+                  "{\n  \"permissions\": {\"allow\": [\"Bash(ls:*)\"]},\n    \"advisorModel\":   \"claude-fable-5-2\",\n  \"x\": 1\n}\n"
+              ]
+          },
+          "cfg/workforce/.models-superseded.json": {
+              "want": [
+                  "\"claude-fable-5-1\": {\n      \"to\": \"claude-fable-5-2\""
+              ],
+              "not": [
+                  "\"template\": null"
+              ]
+          },
+          ".claude/workforce/.models-superseded.json": {
+              "absent": true
+          }
+      }
+  },
+  "model-supersede-user-repick": {
+      "_why": "A HAND RE-PICK AT USER SCOPE STANDS. The config root's marker says it was already moved off claude-fable-5-1, and the user has since chosen it again. A new release changed the template (the marker's digest is stale), so the session scans, and moves nothing. The refreshed digest proves the scan ran rather than the gate stopping it. Fails when the user pass ignores its marker.",
+      "script": "wf-heal",
+      "stdin_raw": "{\"cwd\": \".\", \"hook_event_name\": \"SessionStart\", \"source\": \"startup\"}",
+      "env": {
+          "CLAUDE_CONFIG_DIR": "${TREE}/cfg"
+      },
+      "exit": 0,
+      "not": [
+          "MODEL",
+          "Traceback"
+      ],
+      "after": {
+          "cfg/settings.json": {
+              "want": [
+                  "\"advisorModel\":   \"claude-fable-5-1\""
+              ]
+          },
+          "cfg/workforce/.models-superseded.json": {
+              "want": [
+                  "\"on\": \"2026-11-09\""
+              ],
+              "not": [
+                  "\"template\": \"0000\""
+              ]
+          }
+      }
+  },
+  "model-supersede-user-wire": {
+      "_why": "THE UPDATE PATH MOVES IT TOO. `--scope user --wire-defaults --execute` is what every `--user` install and update runs; beside the retired output-style clear it moves a superseded user-scope advisorModel, prints the line, and writes the config root's marker.",
+      "script": "wf-settings-apply",
+      "args": [
+          "--scope",
+          "user",
+          "--wire-defaults",
+          "--execute"
+      ],
+      "env": {
+          "CLAUDE_CONFIG_DIR": "${TREE}/cfg"
+      },
+      "exit": 0,
+      "want": [
+          "/cfg/settings.json (advisorModel): claude-fable-5-1 → claude-fable-5-2",
+          "so your user-scope advisorModel moved, once"
+      ],
+      "not": [
+          "Traceback",
+          "NOT MOVED"
+      ],
+      "after": {
+          "cfg/settings.json": {
+              "want": [
+                  "\"advisorModel\": \"claude-fable-5-2\""
+              ],
+              "not": [
+                  "claude-fable-5-1"
+              ]
+          },
+          "cfg/workforce/.models-superseded.json": {
+              "want": [
+                  "\"to\": \"claude-fable-5-2\""
+              ]
+          }
+      }
+  },
+  "lineup-the-lanes-table": {
+      "_why": "A LINEUP RECORDED UNDER `## The lanes` IS READ. laika's org-config (copied verbatim, plus two guard tables) records every lane in one `| Lane | Tier | Model | Effort |` table, a heading the reader skipped and a shape whose analytical rows name the tier in the second cell. Measured 2026-11-09: `--lineup` printed `(none selected)` for all five lanes. The table's header says which cell is which. The guards: `| Department | Lane |` and `| Department | Lane | Why |` name lanes and no model, and must not set one.",
+      "script": "wf-model-lanes",
+      "args": [
+          "--lineup"
+      ],
+      "exit": 0,
+      "want": [
+          "analytical-lead  claude-opus-4-8 · high",
+          "analytical-ic    claude-opus-4-8 · medium",
+          "creative-text    claude-opus-4-6 · medium",
+          "creative-visual  claude-fable-5-1 · medium",
+          "image generation  [superseded by claude-fable-5-2]",
+          "code             claude-opus-5-5 · high",
+          "advisor          claude-fable-5-1"
+      ],
+      "not": [
+          "(none selected)",
+          "Traceback"
+      ]
+  },
   "code-origin-lineup": {
       "_why": "BEFORE ANY AUDIT, AN AGENT DEFINITION GETS THE SHIPPED DEFAULTS. The edit hook reaches every project with no org; on a `.claude/agents/*.md` write in a project with no org-config.md it shows the template's lineup, and the creative-visual and advisor defaults are Opus 5.5, not the Ultra-tier frontier model the audit still recommends. User decision 2026-11-05. Not a git repository, so the origin report is absent and the lineup alone is emitted.",
       "script": "wf-code-origin",

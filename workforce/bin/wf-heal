@@ -4,7 +4,8 @@
 WHAT IT HEALS (`heal_settings`): the retired workforce hook ROWS in the project's
 settings, the retired pin guard's GIT hook, the machine-owned REGIONS a release moved on,
 the retired commitments ledger (`_retired_ledger`), and every recorded choice of a model the
-pool SUPERSEDED (`_heal_superseded`).
+pool SUPERSEDED (`_heal_superseded`). One pass is not the project's: the USER-SCOPE
+`advisorModel`, moved off a superseded model once per config root (`_heal_superseded_user`).
 
 WHERE IT CAME FROM. This is the `SessionStart` half of `wf-commitments`, which kept a
 per-project list of what a turn said it would do and read it back at the next session.
@@ -135,9 +136,13 @@ def heal_settings(root):
     """
     progress = {"wrote": []}
     try:
+        # THE USER-SCOPE PASS NEEDS NO PROJECT, and runs FIRST: at a project rooted at $HOME
+        # it stamps the marker the project pass below then stops at (`_heal_superseded_user`).
+        user = _heal_superseded_user(progress)
         if not root:
-            return ""
-        said = [x for x in (_heal_settings(root, progress),
+            return user
+        said = [x for x in (user,
+                            _heal_settings(root, progress),
                             _heal_git_hooks(root, progress),
                             _heal_regions(root, progress),
                             _retired_ledger(root, progress),
@@ -611,6 +616,8 @@ def _retired_ledger(root, progress):
 # (`SUPERSEDED_REL`, `TEMPLATE`) and is the only writer.
 SUPERSEDED_MARKER_REL = ".claude/workforce/.models-superseded.json"
 TEMPLATE_REL = ("references", "org-config.template.md")
+# The user-scope marker, under the personal config root (`wf-model-lanes` USER_MARKER_REL).
+USER_MARKER_REL = ("workforce", ".models-superseded.json")
 
 
 def _heal_superseded(root, progress):
@@ -634,17 +641,57 @@ def _heal_superseded(root, progress):
     wfdir = os.path.join(root, ".claude", "workforce")
     if not os.path.isdir(wfdir) or os.path.islink(wfdir):
         return ""
-    import hashlib
-    tpl = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), *TEMPLATE_REL)
-    try:
-        with open(tpl, "rb") as fh:
-            digest = hashlib.sha256(fh.read()).hexdigest()
-    except OSError:
+    digest = _template_digest()
+    if digest is None:
         return ""
     marker = TT.read_json_nofollow(os.path.join(root, *SUPERSEDED_MARKER_REL.split("/")))
     if isinstance(marker, dict) and marker.get("template") == digest:
         return ""
     return "\n".join(_sibling("wf-model-lanes").heal_superseded(root, True, progress)["lines"])
+
+
+_DIGEST = []
+
+
+def _template_digest():
+    """sha256 of the shipped template, read once per process and shared by both gates. None
+    when it cannot be read, and then neither gate asks."""
+    if not _DIGEST:
+        import hashlib
+        tpl = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                           *TEMPLATE_REL)
+        try:
+            with open(tpl, "rb") as fh:
+                _DIGEST.append(hashlib.sha256(fh.read()).hexdigest())
+        except OSError:
+            _DIGEST.append(None)
+    return _DIGEST[0]
+
+
+def _heal_superseded_user(progress):
+    """Move the USER-SCOPE `advisorModel` off a superseded model, once per config root.
+
+    The project pass above refuses user scope, so `~/.claude/settings.json` kept
+    `claude-fable-5-1` after every project moved (measured on this workstation, 2026-11-09).
+    The user's decision covers every 5.1 choice, and a machine updated by `bin/sync` runs no
+    `--wire-defaults`, so the session start is the path that reaches it with no command typed.
+    The decision and the write are `wf-model-lanes`'s (`heal_superseded_user`).
+
+    NEAR ZERO WHEN THERE IS NOTHING TO DO: no user settings file ends it with one `stat`, and a
+    marker whose digest matches the shipped template ends it with one read, nothing imported.
+    The config root is resolved as `wf-settings-apply.config_root` resolves it, restated so the
+    gate imports nothing.
+    """
+    cfg = os.environ.get("CLAUDE_CONFIG_DIR") or os.path.join(os.path.expanduser("~"), ".claude")
+    if not os.path.isfile(os.path.join(cfg, "settings.json")):
+        return ""
+    digest = _template_digest()
+    if digest is None:
+        return ""
+    marker = TT.read_json_nofollow(os.path.join(cfg, *USER_MARKER_REL))
+    if isinstance(marker, dict) and marker.get("template") == digest:
+        return ""
+    return "\n".join(_sibling("wf-model-lanes").heal_superseded_user(True, progress)["lines"])
 
 
 def main():

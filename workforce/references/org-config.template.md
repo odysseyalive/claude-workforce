@@ -164,8 +164,8 @@ names `statics`, never a fenced block); the `model:` line of every model-pinned 
 `wf-model-lanes` enumerates (`.claude/agents/**`, a symlinked one written through its link,
 `.claude/skills/*/agents/*/AGENT.md`, `.claude/skills/*/SKILL.md`); and the top-level `advisorModel` key
 of the project's `.claude/settings.json` and `.claude/settings.local.json`. A shipped file, a file that
-resolves outside the project, a user-scope file, and a project whose `.claude` is the personal config
-root are never written. History is not a choice and is not moved: personnel records, work directories,
+resolves outside the project, and a project whose `.claude` is the personal config root are never
+written by the project heal. History is not a choice and is not moved: personnel records, work directories,
 and staged drafts keep the ID they recorded. `org-chart.md` is a rendering of the frontmatter, and the
 next `org index` re-renders it.
 
@@ -175,6 +175,15 @@ in this project, so a user who picks `claude-fable-5-1` by hand afterward keeps 
 only when every value it was found in moved and re-read correctly; a refused or failed write leaves it
 unrecorded, so the next session tries again and says so. Only a project with a `.claude/workforce/`
 directory is moved, because only an org has recorded a choice.
+
+**User scope moves too, once per config root.** The one model choice user scope records, the top-level
+`advisorModel` of `<config root>/settings.json`, moves by the same one-value edit, written to where that
+name resolves (it is the user's own file, often linked into a dotfiles repository). Its marker is
+`<config root>/workforce/.models-superseded.json`, in the same format, so a hand re-pick there stands
+too. It runs from `wf-heal` at every session start and from `wf-settings-apply --scope user
+--wire-defaults`, which every `--user` install and update runs (`wf-model-lanes`
+`heal_superseded_user`). At a project rooted at `$HOME` the two markers are one file on purpose: the
+project heal refuses that `.claude`, so the user-scope pass is its only writer.
 
 **Three paths, no command typed** (SKILL.md § Directives, 2026-09-07): `wf-heal` at every session start;
 `audit` before its first budget question (`audit-setup.md` § Step 0.4); and `wf-settings-apply --heal`,
