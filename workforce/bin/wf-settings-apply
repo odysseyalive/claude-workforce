@@ -653,7 +653,7 @@ def do_grants(root, spec_arg, execute):
     if not to_add:
         return 0
 
-    data, err = load(spath)
+    data, text, err = load_text(spath)
     if err:
         print(f"wf-settings-apply: {err}", file=sys.stderr)
         return 1
@@ -685,7 +685,12 @@ def do_grants(root, spec_arg, execute):
     for r in to_add:
         if r not in allow:
             allow.append(r)
-    dump(spath, data)
+    try:
+        _write_settings(spath, text, data)
+    except (OSError, ValueError, RuntimeError) as exc:
+        print(f"wf-settings-apply: NOT WRITTEN — {spath}: {exc.__class__.__name__}: {exc}",
+              file=sys.stderr)
+        return 1
 
     # RE-READ. The defect this closes is a write believed and never made.
     back, err = load(spath)
@@ -947,11 +952,12 @@ def _retarget_records(owned, name, event, matcher, carried, deleted, root):
     return changed
 
 
-def _move_in(spath, data, owned_scope, name, event, matcher, command, root, execute,
+def _move_in(spath, data, text, owned_scope, name, event, matcher, command, root, execute,
              live_elsewhere=False):
-    """Run the prior-matcher move on one settings file. None when it held nothing to move,
-    else the exit code. Record first, then the file, then a re-read — the order and the proof
-    every other write in this file uses."""
+    """Run the prior-matcher move on one settings file, whose content was `text` when
+    `data` was parsed from it. None when it held nothing to move, else the exit code. Record
+    first, then the file, then a re-read — the order and the proof every other write in this
+    file uses."""
     moved, carried, deleted = _move_prior_matcher(data, name, event, matcher, command, root,
                                                   live_elsewhere)
     if not moved:
@@ -966,8 +972,8 @@ def _move_in(spath, data, owned_scope, name, event, matcher, command, root, exec
         owned_path, owned = load_owned(root, owned_scope)
         if _retarget_records(owned, name, event, matcher, carried, deleted, root):
             dump(owned_path, owned)
-        dump(spath, data)
-    except OSError as exc:
+        _write_settings(spath, text, data)
+    except (OSError, ValueError, RuntimeError) as exc:
         print(f"  ! {name}  {event}  matcher NOT MOVED in {spath} — "
               f"{exc.__class__.__name__}: {exc}")
         return 1
@@ -1176,7 +1182,7 @@ def do_installer_rule(root, scope, execute):
         print(f"  ~ {rule}  ABSENT — would add (update will prompt to run the installer)")
         return 0
 
-    data, err = load(spath)
+    data, text, err = load_text(spath)
     if err:
         print(f"  ! {rule}  NOT WRITTEN — {err}")
         return 1
@@ -1198,8 +1204,8 @@ def do_installer_rule(root, scope, execute):
             added.append(rule)
         dump(owned_path, owned)
         allow.append(rule)
-        dump(spath, data)
-    except OSError as exc:
+        _write_settings(spath, text, data)
+    except (OSError, ValueError, RuntimeError) as exc:
         print(f"  ! {rule}  NOT WRITTEN — {exc.__class__.__name__}: {exc}")
         return 1
     back, _ = load(spath)
@@ -1224,7 +1230,7 @@ def undo_installer_rule(root, scope, execute):
     added = owned.get("permissions_allow_added")
     if not (isinstance(added, list) and rule in added):
         return 0
-    data, err = load(spath)
+    data, text, err = load_text(spath)
     if err:
         print(f"wf-settings-apply: {err}", file=sys.stderr)
         return 1
@@ -1238,7 +1244,12 @@ def undo_installer_rule(root, scope, execute):
         return 0
     if present:
         perms["allow"] = [e for e in allow if e != rule]
-        dump(spath, data)
+        try:
+            _write_settings(spath, text, data)
+        except (OSError, ValueError, RuntimeError) as exc:
+            print(f"wf-settings-apply: NOT WRITTEN — {spath}: {exc.__class__.__name__}: {exc}",
+                  file=sys.stderr)
+            return 1
     owned["permissions_allow_added"] = [e for e in added if e != rule]
     dump(owned_path, owned)
     if rule in _rules_in([spath], "allow"):
@@ -1675,6 +1686,179 @@ def _strip_rows(text, root):
         raise RuntimeError("the character-level edit did not reproduce the intended "
                            "settings; nothing was written")
     return out
+
+
+# ------------------------------------------------------------- surgical settings writes
+#
+# EVERY WRITE TO A SETTINGS FILE CHANGES ONLY WHAT IT CHANGES. The writers below used to
+# reload the file and `dump()` it whole, so every `--user` install and update re-indented
+# the user's entire `settings.json`. MEASURED 2026-11-09 on `model-supersede-user-wire`:
+# `"advisorModel":   ` (the user's three spaces) came back as `"advisorModel": `, in a
+# run whose only real change was one hook row. Each writer still builds the settings it
+# wants as a dict, exactly as before; `_write_settings` turns the difference between that
+# dict and the file into character edits, and refuses when the edited text does not parse
+# to that dict. `_strip_rows` (removal) and `_swap_advisor` (one value) are the same rule.
+
+
+def load_text(path):
+    """`(data, text, error)`: `load`'s contract, plus the file's exact characters for a
+    writer that edits in place. `data` is parsed the way `load` parses it, so every reader
+    of it decides exactly as before; only `_write_settings` is strict."""
+    if not os.path.exists(path):
+        return None, None, None
+    try:
+        with open(path, encoding="utf-8", newline="") as fh:
+            text = fh.read()
+        return json.loads(text), text, None
+    except (OSError, ValueError) as exc:
+        return None, None, f"{path}: {exc}"
+
+
+def _inline(text, node, parent_inline):
+    """Is this container written on one line? An empty one takes its parent's style."""
+    if not node["c"]:
+        return parent_inline
+    return "\n" not in text[node["s"] + 1:node["c"][0][1]]
+
+
+def _line_indent(text, pos):
+    return re.compile(r"[ \t]*").match(text, text.rfind("\n", 0, pos) + 1).group(0)
+
+
+def _kid_indent(text, kid_start):
+    """The whitespace a multi-line container's members are indented by, read off one."""
+    lead = text[text.rfind("\n", 0, kid_start) + 1:kid_start]
+    return lead if lead.strip(" \t") == "" else _line_indent(text, kid_start)
+
+
+def _value_text(value, indent, unit, nl, inline):
+    """`value` as JSON text that starts at column `indent`, in the file's own style.
+    `ensure_ascii` stays on, as `dump` wrote it, so an inserted row reads as it always did."""
+    if inline or not isinstance(value, (dict, list)) or not value:
+        return json.dumps(value)
+    return json.dumps(value, indent=unit).replace("\n", nl + indent)
+
+
+def _insert_edit(text, node, at, value, key, parent_inline):
+    """`(start, end, replacement)` that inserts `value` (under `key` in an object) as
+    member `at` of container `node`, touching no character already there except, for an
+    empty container, the whitespace between its brackets."""
+    kids = node["c"]
+    nl = "\r\n" if "\r\n" in text else "\n"
+    m = re.search(r"^([ \t]+)\S", text, re.M)
+    unit = m.group(1) if m else "  "
+    inline = _inline(text, node, parent_inline)
+    head = "" if key is None else json.dumps(key) + ": "
+    if not kids:
+        if inline:
+            return node["s"] + 1, node["e"] - 1, head + _value_text(value, "", unit, nl, True)
+        base = _line_indent(text, node["s"])
+        body = head + _value_text(value, base + unit, unit, nl, False)
+        return node["s"] + 1, node["e"] - 1, nl + base + unit + body + nl + base
+    if inline:
+        sep = text[kids[0][2]["e"]:kids[1][1]] if len(kids) > 1 else ", "
+        member = head + _value_text(value, "", unit, nl, True)
+    else:
+        indent = _kid_indent(text, kids[min(at, len(kids) - 1)][1])
+        sep = "," + nl + indent
+        member = head + _value_text(value, indent, unit, nl, False)
+    if at >= len(kids):
+        pos = kids[-1][2]["e"]
+        return pos, pos, sep + member
+    pos = kids[at][1]
+    return pos, pos, member + sep
+
+
+def _next_settings_edit(text, node, cur, want, parent_inline):
+    """The first character edit that moves `cur` (parsed from `node`'s text) toward
+    `want`, or None when they are equal. One edit per call: offsets shift after each, so
+    the caller re-parses. A changed key is edited inside; a key gone is cut; a new key is
+    appended; a list is aligned element by element so an appended row is an insertion."""
+    if cur == want:
+        return None
+    inline = _inline(text, node, parent_inline) if node["k"] != "v" else parent_inline
+    if node["k"] == "{" and isinstance(cur, dict) and isinstance(want, dict):
+        kids = node["c"]
+        for idx, (k, _s, _v) in enumerate(kids):
+            if k not in want:
+                return (*_cut(kids, idx), "")
+        for k, _s, v in kids:
+            if cur[k] != want[k]:
+                return _next_settings_edit(text, v, cur[k], want[k], inline)
+        for k in want:
+            if k not in cur:
+                return _insert_edit(text, node, len(kids), want[k], k, parent_inline)
+    if node["k"] == "[" and isinstance(cur, list) and isinstance(want, list):
+        import difflib
+        kids = node["c"]
+
+        def key(x):
+            return json.dumps(x, sort_keys=True)
+        ops = difflib.SequenceMatcher(None, [key(x) for x in cur], [key(x) for x in want],
+                                      autojunk=False).get_opcodes()
+        for tag, i1, i2, j1, j2 in ops:
+            if tag == "equal":
+                continue
+            if tag == "insert":
+                return _insert_edit(text, node, i1, want[j1], None, parent_inline)
+            if tag == "replace" and i2 - i1 == j2 - j1:
+                return _next_settings_edit(text, kids[i1][2], cur[i1], want[j1], inline)
+            return (*_cut(kids, i1), "")
+    # A SCALAR, OR A VALUE WHOSE TYPE CHANGED: only that value's characters are rewritten.
+    nl = "\r\n" if "\r\n" in text else "\n"
+    m = re.search(r"^([ \t]+)\S", text, re.M)
+    return node["s"], node["e"], _value_text(want, _line_indent(text, node["s"]),
+                                             m.group(1) if m else "  ", nl, parent_inline)
+
+
+def _surgical_text(text, want):
+    """`text` edited until it parses to `want`, changing only the characters that must.
+    A file with a duplicate key is refused: the harness keeps one of the two, and any
+    rewrite silently drops the other (the rule `_load_strict` states for the heal)."""
+    if text is None:
+        return json.dumps(want, indent=2) + "\n"
+    out = text
+    for _ in range(10000):
+        top = _spans(out)
+        cur = json.loads(out, object_pairs_hook=_no_duplicates)
+        edit = _next_settings_edit(out, top, cur, want, False)
+        if edit is None:
+            break
+        nxt = out[:edit[0]] + edit[2] + out[edit[1]:]
+        if nxt == out:
+            raise RuntimeError("an edit changed nothing; left for a hand edit")
+        out = nxt
+    else:
+        raise RuntimeError("the edit did not converge; left for a hand edit")
+    if json.loads(out) != want:
+        raise RuntimeError("the character-level edit did not reproduce the intended "
+                           "settings; nothing was written")
+    return out
+
+
+def _no_duplicates(kv):
+    d = {}
+    for k, v in kv:
+        if k in d:
+            raise ValueError(f"duplicate key {k!r} — a rewrite would drop one of them; "
+                             "left for a hand edit")
+        d[k] = v
+    return d
+
+
+def _write_settings(spath, text, want):
+    """Write `want` into settings file `spath`, whose content was `text` when it was read
+    (None: absent). Returns True when the file changed. Nothing is written when nothing
+    changes, so a re-run leaves the bytes and the mtime alone. The write is `_atomic_write`'s,
+    through a symlink to its target, and is abandoned when the file no longer holds `text`
+    (another writer got there first). Raises OSError, ValueError or RuntimeError."""
+    new = _surgical_text(text, want)
+    if new == text:
+        return False
+    real = os.path.realpath(spath)
+    os.makedirs(os.path.dirname(real), exist_ok=True)
+    _atomic_write(real, new, before=text)
+    return True
 
 
 def _atomic_write(real, text, before=None):
@@ -2833,7 +3017,7 @@ def do_unwire_defaults(root, scope, execute):
               "Removing nothing.")
         return 0
 
-    data, err = load(spath)
+    data, text, err = load_text(spath)
     if err:
         print(f"wf-settings-apply: {err}", file=sys.stderr)
         return 1
@@ -2909,7 +3093,12 @@ def do_unwire_defaults(root, scope, execute):
               "refused the agent's write)")
         return rule_rc
 
-    dump(spath, data)
+    try:
+        _write_settings(spath, text, data)
+    except (OSError, ValueError, RuntimeError) as exc:
+        print(f"wf-settings-apply: NOT WRITTEN — {spath}: {exc.__class__.__name__}: {exc}",
+              file=sys.stderr)
+        return 1
     # The record is cleared ONLY for what was actually reversed, so a second run is a
     # reported NOOP rather than a second attempt at rows that are already gone.
     owned["hooks_added"] = []
@@ -2972,7 +3161,7 @@ def do_wire_hook(root, name, execute, scope="project", quiet=False):
     if matcher is not None:
         entry = {"matcher": matcher, "hooks": [inner]}
 
-    data, err = load(spath)
+    data, text, err = load_text(spath)
     if err:
         print(f"wf-settings-apply: {err}", file=sys.stderr)
         return 1
@@ -2995,18 +3184,18 @@ def do_wire_hook(root, name, execute, scope="project", quiet=False):
         files = []
         for path in union_settings_paths(root):
             if os.path.realpath(path) == os.path.realpath(spath):
-                files.append((path, data))
+                files.append((path, data, text))
             else:
-                fdata, _ferr = load(path)
+                fdata, ftext, _ferr = load_text(path)
                 if isinstance(fdata, dict):
-                    files.append((path, fdata))
+                    files.append((path, fdata, ftext))
         files.sort(key=lambda f: os.path.realpath(f[0]) != user_real)
-        user_data = next((d for p, d in files if os.path.realpath(p) == user_real), None)
-        for path, fdata in files:
+        user_data = next((d for p, d, _t in files if os.path.realpath(p) == user_real), None)
+        for path, fdata, ftext in files:
             is_user = os.path.realpath(path) == user_real
             covered = (not is_user and user_data is not None
                        and _holds_on(user_data, event, matcher, command, root))
-            moves[path] = _move_in(path, fdata, "user" if is_user else "project", name,
+            moves[path] = _move_in(path, fdata, ftext, "user" if is_user else "project", name,
                                    event, matcher, command, root, execute, covered)
     rcs = [rc for rc in moves.values() if rc is not None]
     if any(rcs) or moves.get(spath) is not None:
@@ -3037,8 +3226,8 @@ def do_wire_hook(root, name, execute, scope="project", quiet=False):
             print(f"  ~ {name}  {event}  prompt CHANGED — would update in place")
             return 0
         try:
-            dump(spath, data)
-        except OSError as exc:
+            _write_settings(spath, text, data)
+        except (OSError, ValueError, RuntimeError) as exc:
             print(f"  ! {name}  {event}  NOT WRITTEN — {exc.__class__.__name__}: {exc}")
             return 1
         back, _ = load(spath)
@@ -3117,8 +3306,8 @@ def do_wire_hook(root, name, execute, scope="project", quiet=False):
         return 1
     hooks[event].append(entry)
     try:
-        dump(spath, data)
-    except OSError as exc:
+        _write_settings(spath, text, data)
+    except (OSError, ValueError, RuntimeError) as exc:
         print(f"  ! {name}  {event}  NOT WRITTEN — {exc.__class__.__name__}: {exc}")
         return 1
 
@@ -3165,7 +3354,7 @@ def do_automode(execute):
     spath = user_settings_path()
     print(f"AUTOMODE  {spath}          <- user scope (the classifier ignores project "
           "settings; a repo cannot grant itself auto mode)")
-    data, err = load(spath)
+    data, text, err = load_text(spath)
     if err:
         print(f"wf-settings-apply: {err}", file=sys.stderr)
         return 1
@@ -3194,7 +3383,12 @@ def do_automode(execute):
     data.setdefault("autoMode", {})
     data["autoMode"]["environment"] = new_env
     data["autoMode"]["allow"] = new_allow
-    dump(spath, data)
+    try:
+        _write_settings(spath, text, data)
+    except (OSError, ValueError, RuntimeError) as exc:
+        print(f"wf-settings-apply: NOT WRITTEN — {spath}: {exc.__class__.__name__}: {exc}",
+              file=sys.stderr)
+        return 1
     back, _ = load(spath)
     ok = (isinstance(back, dict)
           and AUTOMODE_ENVIRONMENT in back.get("autoMode", {}).get("environment", [])

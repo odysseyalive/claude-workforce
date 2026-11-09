@@ -54,7 +54,7 @@ NEGATIVE_KEYS = ("not", "must_not", "reject")
 ROW_KEYS = {"script", "exit", "args", "env", "want", "after", "chmod", "concurrent",
             "subst", "hardlink", "git", "before",
             "stdin_file", "stdin_raw", "_why", *NEGATIVE_KEYS}
-AFTER_KEYS = {"want", "once", "absent", *NEGATIVE_KEYS}
+AFTER_KEYS = {"want", "once", "absent", "unchanged", "inserted_only", *NEGATIVE_KEYS}
 GIT_KEYS = {"init", "hooks_from", "commit", "config", "links", "corrupt_index"}
 STEP_KEYS = {"script", "stdin_raw", "want", *NEGATIVE_KEYS}
 WRITE_STEP_KEYS = {"write", "path_from", "path_rx"}
@@ -446,6 +446,22 @@ def _run_in(tree, script, spec):
             return False, "; ".join(_bad)
         _outs.append(_sp.stdout)
 
+    # `unchanged` AND `inserted_only` ARE ABOUT WHAT A WRITER LEFT ALONE, so they compare
+    # against the file as it stood just before the script ran (after `subst`, `chmod` and
+    # `before`). Added 2026-11-09 with the surgical settings writes: a substring cannot
+    # see a whole file re-indented around the one row a run added, and a re-run that wrote
+    # identical bytes still changed the file's mtime and inode.
+    _snap = {}
+    for _rel, _exp in (spec.get("after") or {}).items():
+        if isinstance(_exp, dict) and (_exp.get("unchanged") or _exp.get("inserted_only")):
+            _fp = os.path.join(tree, _rel)
+            try:
+                _st = os.stat(_fp)
+                with open(_fp, "rb") as _fh:
+                    _snap[_rel] = (_fh.read(), _st.st_mtime_ns, _st.st_ino)
+            except OSError:
+                _snap[_rel] = None
+
     # `concurrent: N` starts N copies at once against the same tree and asserts on the
     # FIRST one's output; `after` then sees what all N left behind. It exists for a
     # writer every session start runs, where two sessions opening at once is ordinary.
@@ -542,7 +558,37 @@ def _run_in(tree, script, spec):
             for s in expect.get(_key, []):
                 if s in body:
                     problems.append(f"after {rel}: present but forbidden: {s!r}")
+        problems += _left_alone(rel, expect, _snap.get(rel), os.path.join(tree, rel))
     return (not problems), "; ".join(problems) or "ok"
+
+
+def _left_alone(rel, expect, snap, path):
+    """`unchanged: true` — the same bytes, mtime and inode as before the run: nothing was
+    written. `inserted_only: true` — the run changed the file, and every byte it held before
+    is still there in order: characters were added and none removed or replaced."""
+    if not (expect.get("unchanged") or expect.get("inserted_only")):
+        return []
+    if snap is None:
+        return [f"after {rel}: did not exist before the run, so nothing can be compared"]
+    try:
+        with open(path, "rb") as fh:
+            now = fh.read()
+        st = os.stat(path)
+    except OSError:
+        return []   # already failed above as unreadable
+    out = []
+    if expect.get("unchanged"):
+        if now != snap[0]:
+            out.append(f"after {rel}: bytes changed, expected unchanged")
+        elif (st.st_mtime_ns, st.st_ino) != snap[1:]:
+            out.append(f"after {rel}: same bytes but rewritten (mtime or inode changed)")
+    if expect.get("inserted_only"):
+        it = iter(now)
+        if now == snap[0]:
+            out.append(f"after {rel}: unchanged, expected an insertion")
+        elif not all(b in it for b in snap[0]):
+            out.append(f"after {rel}: a byte it held before was removed or replaced")
+    return out
 
 
 def touching(relpath, cases):

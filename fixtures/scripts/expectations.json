@@ -11333,7 +11333,7 @@
       }
   },
   "model-supersede-user-wire": {
-      "_why": "THE UPDATE PATH MOVES IT TOO. `--scope user --wire-defaults --execute` is what every `--user` install and update runs; beside the retired output-style clear it moves a superseded user-scope advisorModel, prints the line, and writes the config root's marker.",
+      "_why": "THE UPDATE PATH MOVES IT TOO. `--scope user --wire-defaults --execute` is what every `--user` install and update runs; beside the retired output-style clear it moves a superseded user-scope advisorModel, prints the line, and writes the config root's marker. The same run registers the agent hook in that file, and the user's own spacing survives it: the three spaces after `\"advisorModel\":` and the one-line `permissions` object. Measured 2026-11-09 before the surgical writes: the hook write re-dumped the whole file and both came back in `json.dump` style.",
       "script": "wf-settings-apply",
       "args": [
           "--scope",
@@ -11356,7 +11356,9 @@
       "after": {
           "cfg/settings.json": {
               "want": [
-                  "\"advisorModel\": \"claude-fable-5-2\""
+                  "\"advisorModel\":   \"claude-fable-5-2\"",
+                  "  \"permissions\": {\"allow\": [\"Bash(ls:*)\"]},",
+                  "wf-widen-flag"
               ],
               "not": [
                   "claude-fable-5-1"
@@ -11366,6 +11368,77 @@
               "want": [
                   "\"to\": \"claude-fable-5-2\""
               ]
+          }
+      }
+  },
+  "settings-surgical-first-wire": {
+      "_why": "A FIRST WIRE ADDS ROWS AND TOUCHES NOTHING ELSE. `--scope user --wire-defaults --execute` into a user settings file with odd spacing (`\"x\":1`, `\"hooks\" :`, three spaces after `\"permissions\":`), odd key order, a one-line `Stop` array holding the user's own hook and a one-line `allow` list. Every default hook and the update rule land, and every byte the file held before is still there in order (`inserted_only`): new rows are inserted in the style of the container they join. Before the surgical writes each of the 17 writes re-dumped the whole file in `json.dump` style. Fails when any writer goes back to load-and-dump.",
+      "script": "wf-settings-apply",
+      "args": [
+          "--scope",
+          "user",
+          "--wire-defaults",
+          "--execute"
+      ],
+      "env": {
+          "CLAUDE_CONFIG_DIR": "${TREE}/cfg"
+      },
+      "exit": 0,
+      "want": [
+          "+ wf-heal  SessionStart  registered",
+          "+ wf-widen-agent  Stop  registered",
+          "--user)  added",
+          "verified on disk: present once in"
+      ],
+      "not": [
+          "Traceback",
+          "NOT WRITTEN",
+          "UNVERIFIED"
+      ],
+      "after": {
+          "cfg/settings.json": {
+              "inserted_only": true,
+              "want": [
+                  "    \"x\":1,\n  \"hooks\" : {\n      \"Stop\":[ { \"hooks\": [ { \"type\": \"command\", \"command\": \"echo mine\" } ] }, {\"hooks\": [{\"type\": \"command\", ",
+                  "  \"permissions\":   {\"allow\": [\"Bash(ls:*)\", \"Bash(bash -c ",
+                  "        \"advisorModel\":   \"claude-opus-4-8\"\n}\n"
+              ],
+              "once": [
+                  "/cfg/skills/workforce/bin/wf-heal\\\"",
+                  "wf-widen-flag"
+              ]
+          }
+      }
+  },
+  "settings-surgical-rewire-noop": {
+      "_why": "A RE-RUN WITH NOTHING TO CHANGE WRITES NOTHING. The tree is `settings-surgical-first-wire`'s file as that case's run left it: every default hook and the update rule present, in the user's odd spacing and key order. Every writer reports NOOP, and the file keeps its bytes, its mtime and its inode (`unchanged`), so an install or update that changes nothing does not touch the user's settings at all. Fails when a writer writes back an unchanged file.",
+      "script": "wf-settings-apply",
+      "args": [
+          "--scope",
+          "user",
+          "--wire-defaults",
+          "--execute"
+      ],
+      "subst": [
+          "cfg/settings.json"
+      ],
+      "env": {
+          "CLAUDE_CONFIG_DIR": "${TREE}/cfg"
+      },
+      "exit": 0,
+      "want": [
+          "wf-heal already registered on SessionStart — NOOP",
+          "wf-widen-agent already registered on Stop — NOOP",
+          "already allowed — NOOP"
+      ],
+      "not": [
+          "Traceback",
+          "  registered",
+          "  added"
+      ],
+      "after": {
+          "cfg/settings.json": {
+              "unchanged": true
           }
       }
   },
