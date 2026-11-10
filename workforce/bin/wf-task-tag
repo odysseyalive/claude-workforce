@@ -228,6 +228,11 @@ KINDS = [
     # kind from 60 fires to 13, drops 48, and loses no prompt that actually needed an
     # outside source. One residual false positive remains in the 13 and is named rather
     # than tuned away, the way 1.38.0 named what its trigger could not do.
+    #
+    # THE ANECDOTE BEHIND THIS ROW, kept here and out of the emitted text, because every
+    # user's session reads that text and none of them can look this up: reading local
+    # documents to answer a question about the world is how `vendor` was called a live
+    # command in this repository, from docs that had gone stale.
     ("world", re.compile(
         r"\b(deprecat\w*"
         r"|(?:the )?(?:latest|newest|current) (?:version|release|stable|api|docs?|spec)"
@@ -236,17 +241,19 @@ KINDS = [
         r"|has .{0,20}changed|up to date"
         r"|what(?:'s| is) (?:the )?(?:latest|current|new))\b", re.I),
      "hearing",
-     "this repository cannot know the world. Reading local documents to answer it is "
-     "how `vendor` was called a live command from docs that had gone stale"),
+     "a repository cannot know the world. Local documents go stale, so reading them to "
+     "answer it gives the world as it was when they were written"),
 
+    # THE ANECDOTE BEHIND THIS ROW, kept here and out of the emitted text for the reason
+    # given above `world`: four scripts in this repository were described in working
+    # detail by live procedures and existed nowhere.
     ("behaviour", re.compile(
         r"\b(does (?:it|this|that) (?:still |even |actually |really )*(?:work|run|fire|pass)"
         r"|why (?:does|is) .{0,30}(?:fail|break|error)"
         r"|is (?:it|this) working|what does .{0,30}(?:do|return|emit|print)"
         r"|test|verify|prove|reproduce)\b", re.I),
      "touch",
-     "prose says what a script does; running it says what it did. Four scripts here were "
-     "described in working detail by live procedures and existed nowhere"),
+     "prose says what a script does; running it says what it did"),
 
     # THE KIND THAT WAS MISSING, and it is the one the tunnels formed in. The other four
     # ask about FACTS — what the record says, what the world says, what a script does,
@@ -369,6 +376,10 @@ KINDS = [
     # That is a large share BY DESIGN — most messages ask for work — and it is affordable
     # only because the kind is `JURY_ONLY` below: it seats the touch juror and never blocks
     # on a count of zero runs, since a draft, an answer or a plan is work no run closes.
+    #
+    # THE ANECDOTE BEHIND THIS ROW, kept here and out of the emitted text for the reason
+    # given above `world`: in mutze-studio `30e77777` a turn called a face swap done that had
+    # put the same picture in both slots, and called a second one changed at an RMSE of 0.024.
     ("work", re.compile(
         _WORK_LEAD + _WORK_VERB + r"\b(?!\s*(?:is|was|are|were|of)\b)"
         r"|\b(?:can|could|would) (?:you|we|u)\b"
@@ -396,8 +407,7 @@ KINDS = [
      "a result is a fact about the world after the work, and only something that RAN shows "
      "it: the command's output, the file as written, the page as published, the measurement "
      "against the input. A result described from the turn's own account of what it did is "
-     "the tunnel — `30e77777` called a face swap done that had put the same picture in "
-     "both slots, and called a second one changed at an RMSE of 0.024"),
+     "the tunnel"),
 ]
 
 # THE FIRST 400 CHARACTERS ONLY, for the kinds named here.
@@ -570,14 +580,24 @@ CLEANUP_RULE = (
 )
 
 
+# `hearing` named `workforce/changes/` as its record until 2026-11-10. That is this
+# repository's change-record directory and exists in no other project, so the emitted text
+# names the project's own change notes instead (`wf-turn-ledger` still quotes the old line).
 SENSE_HOW = {
-    "hearing": "read the record that decided it (`git log`, `workforce/changes/`), or ask "
-               "a source outside this turn's own reasoning",
+    "hearing": "read the record that decided it (`git log`, the project's own changelog or "
+               "decision notes), or ask a source outside this turn's own reasoning",
     "touch": "run it and read what came back, rather than reading a description of it",
     "taste": "enumerate the set — Glob, find, ls, grep -l — before saying what is in it "
              "or missing from it",
     "sight": "read the file itself",
 }
+
+# WHERE THE SENSES ARE WRITTEN UP, as a path that exists on the reader's machine. It was the
+# bare `references/senses.md`, which resolves only inside this repository; the file ships
+# beside `bin/` in every install (manifest), so it is found from this hook's own location
+# and the line is left out when it is not there.
+SENSES_DOC = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                           os.pardir, "references", "senses.md"))
 
 
 # Explicit enumeration only, and that restraint is the design. Segmenting free-flowing
@@ -3766,17 +3786,22 @@ def main():
     # explicit that text framed as an out-of-band command trips the prompt-injection
     # defences and gets surfaced to the user instead of read — which would turn a tag
     # into one more thing a human has to deal with.
+    #
+    # TRUE IN EVERY PROJECT. This text reaches every user's session, so it says what holds of
+    # the kind of ask, never what is on record in the reader's project: until 2026-11-10 it
+    # said "on record in this project", which was this repository's history read out as the
+    # reader's own.
     lines = [USER_WORDS, "", CHOOSER_RULE, "", TERMINAL_TEXT_RULE, "", CLEANUP_RULE, "",
-             "This ask is of a kind whose wrong answers are on record in this project."]
+             "This ask is of a kind whose wrong answers are well documented."]
     if docket_from:
         lines[-1] = ("This message is not the user's: it carries the work of the user's ask"
                      + (f" on issue {docket_from['issue']}" if docket_from.get("issue") else "")
-                     + ", and that ask is of a kind whose wrong answers are on record in "
-                     "this project.")
+                     + ", and that ask is of a kind whose wrong answers are well documented.")
     for h in hits:
         lines.append(f"  · {h['kind']} — closed by {h['sense'].upper()}: {h['why']}. "
                      f"In practice: {SENSE_HOW[h['sense']]}.")
-    lines.append("Senses are described at `references/senses.md`.")
+    if os.path.isfile(SENSES_DOC):
+        lines.append(f"Senses are described at `{SENSES_DOC}`.")
     if checklist_line:
         lines += ["", checklist_line]
 
