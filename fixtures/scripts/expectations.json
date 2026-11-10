@@ -15896,5 +15896,47 @@
       "additionalContext",
       "updatedInput"
     ]
+  },
+  "bash-stdin-backgrounded-less-than-warns": {
+    "_why": "THE EARLY WARNING. mutze-studio `bh8i2qhz5`: a `sed` whose text held `<after>`, then a bare `ls` aliased to `eza`, outran its 120 s timeout and was moved to the background, where it read the open stdin for eleven hours. At PostToolUse the result carries `backgroundTaskId`, so the agent is told then, with the shell's id and the stop line `wf-widen` prints, found by the shell's output file under TMPDIR. Over 374 transcripts this fires 1.49 times per hang.",
+    "exit": 0,
+    "script": "wf-bash-stdin",
+    "env": {
+      "TMPDIR": "${TREE}"
+    },
+    "stdin_raw": "{\"session_id\": \"fx\", \"cwd\": \".\", \"hook_event_name\": \"PostToolUse\", \"tool_name\": \"Bash\", \"permission_mode\": \"auto\", \"tool_input\": {\"command\": \"cd work && sed -i 's/| filled |/| MET |/' OUTPUT.md && grep -c MET OUTPUT.md; python3 - <<'EOF'\\nprint(1)\\nEOF\\nls\", \"description\": \"d\"}, \"tool_response\": {\"stdout\": \"2\", \"stderr\": \"\", \"interrupted\": false, \"backgroundTaskId\": \"bh8i2qhz5\", \"timedOutAfterMs\": 120000}}",
+    "want": [
+      "\"hookEventName\": \"PostToolUse\"",
+      "additionalContext",
+      "bh8i2qhz5",
+      "open socket",
+      "TaskStop with task_id bh8i2qhz5",
+      "tasks/bh8i2qhz5.output' || fuser",
+      "kill -TERM --"
+    ],
+    "not": [
+      "updatedInput",
+      "permissionDecision"
+    ]
+  },
+  "bash-stdin-backgrounded-no-less-than-is-silent": {
+    "_why": "A backgrounded command with no `<` got `< /dev/null` from the host, so its stdin cannot hang it and there is nothing to say. Without `<`, 1,243 backgrounded commands in the record; warning on them would be noise.",
+    "exit": 0,
+    "script": "wf-bash-stdin",
+    "stdin_raw": "{\"session_id\": \"fx\", \"cwd\": \".\", \"hook_event_name\": \"PostToolUse\", \"tool_name\": \"Bash\", \"permission_mode\": \"auto\", \"tool_input\": {\"command\": \"npm run build && ls\", \"description\": \"d\"}, \"tool_response\": {\"stdout\": \"2\", \"stderr\": \"\", \"interrupted\": false, \"backgroundTaskId\": \"bh8i2qhz5\", \"timedOutAfterMs\": 120000}}",
+    "not": [
+      "hookSpecificOutput",
+      "additionalContext"
+    ]
+  },
+  "bash-stdin-not-backgrounded-is-silent": {
+    "_why": "A `<` command that finished in the foreground came back with no `backgroundTaskId`: it did not hang, and the PreToolUse note already covered the hazard. PostToolUse says nothing.",
+    "exit": 0,
+    "script": "wf-bash-stdin",
+    "stdin_raw": "{\"session_id\": \"fx\", \"cwd\": \".\", \"hook_event_name\": \"PostToolUse\", \"tool_name\": \"Bash\", \"permission_mode\": \"auto\", \"tool_input\": {\"command\": \"cd work && sed -i 's/| filled |/| MET |/' OUTPUT.md && grep -c MET OUTPUT.md; python3 - <<'EOF'\\nprint(1)\\nEOF\\nls\", \"description\": \"d\"}, \"tool_response\": {\"stdout\": \"2\", \"stderr\": \"\", \"interrupted\": false}}",
+    "not": [
+      "hookSpecificOutput",
+      "additionalContext"
+    ]
   }
 }

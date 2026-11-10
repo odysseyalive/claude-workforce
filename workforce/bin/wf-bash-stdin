@@ -43,9 +43,24 @@ refused. A rewrite can't be told apart from that refusal, so every mode gets the
 The rewrite fixed the hang outright, and the note does not. The backstop is `wf-widen`: it
 names the open shell and how to stop it, to the agent and then to its parent.
 
+THE SAME HAZARD, AGAIN WHEN IT BITES: `PostToolUse`. Registered a second time as
+`wf-bash-stdin@background`. When a Bash call's `tool_response` carries `backgroundTaskId`
+(the command was backgrounded, by `run_in_background` or by outrunning its timeout) and its
+text holds `<`, it names that shell, says its stdin is the open socket, and gives the stop
+line `wf-widen` prints for an open shell. It never changes anything. MEASURED 2026-11-10:
+the `PostToolUse` payload carries `tool_response.backgroundTaskId` for a `run_in_background`
+call (a `claude -p` probe), and the record shows `PostToolUse` hook rows on 5 timed-out,
+backgrounded calls, so the event fires on both paths. Over the 374 transcripts that mention a
+backgrounded command, 173 backgrounded commands held `<`. Of those, 116 never closed or
+ended only when killed: 110 of the 140 that timed out, and 6 of the 33 run with
+`run_in_background`. That is 1.49 warnings per hang overall, and 1.27 on the timed-out path.
+Without `<` the timed-out path ended in a kill or never closed 114 times in 445, which is
+why `<` is the gate.
+
 FAIL-OPEN AND SILENT ON NO SIGNAL. Always exits 0, never denies, never asks. A payload it
 cannot read, a tool that is not Bash, a command with no `<`: no output.
 """
+import glob
 import json
 import os
 import re
@@ -79,6 +94,57 @@ def noted_once(payload):
     return True
 
 
+# The shape of a background shell's output file as the host names it, which is also the
+# shape `wf-widen.BG_OUTPUT` accepts. Nothing else reaches the stop line.
+TASK_FILE = re.compile(r"\A[\w./:\\-]+[\\/]tasks[\\/][A-Za-z0-9_-]+\.output\Z")
+
+
+def task_file(sid):
+    """The output file the host writes background shell `sid` to, or "".
+
+    The PostToolUse payload does not carry it (measured: `tool_response` holds stdout,
+    stderr and the id). The host writes it under `<tmp>/claude-<uid>/<project>/<session>/
+    tasks/`, and an id names one shell, so the file is found by its name."""
+    roots = {os.environ.get("TMPDIR") or "", "/tmp", "/private/tmp"}
+    for root in sorted(r for r in roots if r):
+        for path in sorted(glob.glob(os.path.join(root, "claude-*", "*", "*", "tasks",
+                                                  sid + ".output"))):
+            if TASK_FILE.match(path):
+                return path
+    return ""
+
+
+def stop_line(sid, out):
+    """`wf-widen`'s stop line for this shell, so the two never say different things. Loaded
+    only on this path: a backgrounded command holding `<` is a few per hundred Bash calls."""
+    import importlib.machinery
+    import importlib.util
+    sys.dont_write_bytecode = True   # never drop a __pycache__ into the install
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "wf-widen")
+    spec = importlib.util.spec_from_loader(
+        "wf_widen", importlib.machinery.SourceFileLoader("wf_widen", path))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod.stop_remedy(sid, out)
+
+
+def backgrounded(payload):
+    """The PostToolUse note for a backgrounded command that holds `<`, or None."""
+    res = payload.get("tool_response")
+    sid = res.get("backgroundTaskId") if isinstance(res, dict) else None
+    if not (isinstance(sid, str) and re.match(r"\A[A-Za-z0-9_-]+\Z", sid)):
+        return None
+    try:
+        how = stop_line(sid, task_file(sid))
+    except Exception:   # a hook never fails the call it follows
+        how = "TaskStop with task_id %s" % sid
+    note = ("Background shell %s holds `<` in its command, so its stdin is an open socket "
+            "nothing writes to or closes. If anything in it reads stdin, it will wait forever "
+            "and never report. If its output stops moving and nothing in it should still be "
+            "running, stop it: %s" % (sid, how))
+    return {"hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": note}}
+
+
 def decide(payload):
     """The hook's output for one payload, or None."""
     if payload.get("tool_name") != "Bash":
@@ -87,6 +153,8 @@ def decide(payload):
     cmd = inp.get("command") if isinstance(inp, dict) else None
     if not isinstance(cmd, str) or "<" not in cmd or ALREADY.match(cmd):
         return None
+    if payload.get("hook_event_name") == "PostToolUse":
+        return backgrounded(payload)
     if not noted_once(payload):
         return None
     return {"hookSpecificOutput": {"hookEventName": "PreToolUse", "additionalContext": NOTE}}

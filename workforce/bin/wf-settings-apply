@@ -260,6 +260,10 @@ SHIPPED_HOOKS = {
     # It says what to add and never changes the command: a changed input makes auto mode
     # refuse every call after it in the same response. Its header has the measurements.
     "wf-bash-stdin": ("PreToolUse", "Bash"),
+    # AND AGAIN WHEN THE HAZARD BITES: a Bash call that came back backgrounded with a `<` in
+    # its text gets the shell's id and the stop line, as context. Measured at 1.49 warnings
+    # per hang over 173 such commands (header of the script).
+    "wf-bash-stdin@background": ("PostToolUse", "Bash"),
 }
 
 # MATCHERS A SHIPPED HOOK USED TO BE REGISTERED ON, by SHIPPED_HOOKS name. Presence is decided
