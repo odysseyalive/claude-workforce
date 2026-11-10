@@ -18,7 +18,7 @@ first line; keep them in sync so a per-file check is possible.
 
 ## Corpus provenance — the three downloaded origins
 
-The catalog is **distilled and cited** from three repositories cloned to `~/lab`, not vendored verbatim
+The catalog is **distilled and cited** from local clones of three repositories, not vendored verbatim
 (a verbatim copy would be 37 MB and would defeat the selective-loading requirement). A re-distillation
 compares against these pinned commits and appends only new classes:
 

@@ -47,8 +47,8 @@ code catalog's rule unchanged.
 
 ## §3 — Why semgrep is the anchor and not the whole story
 
-`semgrep/semgrep-rules` is downloaded to `~/lab/semgrep-rules` as the corpus. Two cautions the catalog
-inherits from having read it:
+A local clone of `semgrep/semgrep-rules`, pinned at the commit `version.md` records, is the corpus.
+Two cautions the catalog inherits from having read it:
 
 - **Its 2025 OWASP tags are transitional** — some rules carry two conflicting `A0x:2025` strings. Map a
   finding to a class by its **CWE**, which is stable, not by the tag.

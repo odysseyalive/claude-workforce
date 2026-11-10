@@ -549,9 +549,16 @@ def header_fields(text):
     return out
 
 
-def render(slug, root, row, shape, why, run, version, reopened=""):
+def verbatim_block(row):
+    """The row as the inbox file holds it. `render` writes it and `record` looks for it, so the
+    test "has this row's text changed since the file was written" is one string, not two."""
+    return "## The row, verbatim\n\n```\n%s\n```\n" % row["verbatim"]
+
+
+def render(slug, root, row, shape, why, run, version, reopened="", drafted=""):
     """The inbox file for one row. `reopened` names the release whose claimed fix this re-filing
-    measured as failing, when the row was resolved before it."""
+    measured as failing, when the row was resolved before it. `drafted` is the date this row was
+    last printed as a ready-to-file issue, or empty when it never was."""
     cites = citations(row)
     # THE MARKER CARRIES SCRUBBED VALUES, NEVER THE RAW CELL. `row["id"]` comes from a Markdown
     # table in a file an agent edits, and this comment is MACHINE-READ — `header_fields` parses
@@ -576,9 +583,10 @@ def render(slug, root, row, shape, why, run, version, reopened=""):
         "- run id: `%s`\n" % (run or "not recorded"),
         "- installed workforce: `%s`\n" % version,
         "- match: %s — %s\n" % (shape, why),
-        "- recorded: %s\n\n" % time.strftime("%Y-%m-%d", time.gmtime()),
-        "## The row, verbatim\n\n",
-        "```\n%s\n```\n\n" % row["verbatim"],
+        "- recorded: %s\n" % time.strftime("%Y-%m-%d", time.gmtime()),
+        ("- issue drafted: %s\n" % drafted if drafted else ""),
+        "\n",
+        verbatim_block(row) + "\n",
         "## Evidence\n\n",
         ("".join("- `%s`\n" % c for c in cites) if cites
          else "_The row cites no `path:line`. `deferred.md` calls a row whose `Measured` "
@@ -597,6 +605,170 @@ def render(slug, root, row, shape, why, run, version, reopened=""):
     ])
 
 
+# ── the inbox has a reader only where a maintainer works: everywhere else, an issue draft ──
+#
+# THE INBOX IS READ BY `/workforce dev`, AND ONLY A MAINTAINER RUNS IT. On any other machine
+# every row filed above lands in a directory nothing opens, so the one defect report a real
+# project produced for this distribution goes nowhere — the "rule with a reader and no producer"
+# this script was written to end, turned inside out: a producer with no reader. So outside the
+# source checkout the row is still recorded locally, and is ALSO handed to the user as a
+# ready-to-file issue on the public repository. It is printed, never filed: filing is an
+# outward act in the user's name, and the body quotes their project's row verbatim.
+REPO = "odysseyalive/claude-workforce"
+NEW_ISSUE_URL = "https://github.com/%s/issues/new" % REPO
+# GitHub serves a prefilled /issues/new up to roughly 8 KB of URL. Past that the verbatim row is
+# cut in the URL alone, and the body says where the whole of it is kept.
+URL_MAX = 8000
+TITLE_WHAT_MAX = 80
+# C0 and C1 controls and DEL, keeping newline and tab, and the bidirectional overrides. The row
+# is untrusted text bound for a terminal and a public issue: an escape sequence (C1 `\x9b` is a
+# one-byte CSI on some terminals) can rewrite what the screen shows, and a right-to-left override
+# can make the printed command read differently from what it runs. Neither is ever part of what
+# a Markdown cell says.
+CONTROL_RX = re.compile(r"[\x00-\x08\x0b-\x1f\x7f-\x9f\u200e\u200f\u202a-\u202e\u2066-\u2069]")
+
+
+def _sibling(name):
+    """A sibling shipped script, imported by path, leaving no bytecode in the shipped `bin/`.
+    Same loader as `wf-catalog._sibling`: used for a decision a sibling OWNS."""
+    import importlib.machinery
+    import importlib.util
+    prev = sys.dont_write_bytecode
+    sys.dont_write_bytecode = True
+    try:
+        mod_name = name.replace("-", "_")
+        loader = importlib.machinery.SourceFileLoader(
+            mod_name, os.path.join(os.path.dirname(os.path.abspath(__file__)), name))
+        mod = importlib.util.module_from_spec(importlib.util.spec_from_loader(mod_name, loader))
+        loader.exec_module(mod)
+        return mod
+    finally:
+        sys.dont_write_bytecode = prev
+
+
+# THE MACHINE, NOT ONLY THE PROJECT. A maintainer audits downstream projects too, and on their
+# machine `/workforce dev` does read the inbox, so a draft printed there is noise. Nothing in an
+# install says who reads it, so the maintainer's own refresh says so: `bin/sync --personal` —
+# maintainer tooling that never ships — writes this file into the personal config root. No
+# shipped path writes it, so a stranger's install never carries it.
+MAINTAINER_MARKER = ".maintainer"
+# The date a row was last printed as an issue, read from the inbox file's header only — the
+# verbatim row below it is project text, and must not be able to forge the stamp.
+DRAFTED_RX = re.compile(r"^- issue drafted: (\d{4}-\d\d-\d\d)$", re.M)
+
+
+def maintainer_marker():
+    return os.path.join(config_root(), "workforce", MAINTAINER_MARKER)
+
+
+def maintainer_mode(root):
+    """True when a maintainer session reads this machine's inbox: `root` is the workforce source
+    checkout (`SKILL.md` § Dev Path Discipline's test, asked of `wf-due.is_distribution`, which
+    already decides it for the Self-Exclusion Rule), or `bin/sync --personal` has marked this
+    config root as a maintainer's."""
+    return (_sibling("wf-due").is_distribution(root)
+            or os.path.isfile(maintainer_marker()))
+
+
+def _clean(text):
+    return CONTROL_RX.sub("", text or "")
+
+
+def issue_draft(slug, row, run, version, shape, why, cut=None):
+    """`(title, body)` for one row. The project ROOT is left out on purpose — it is an absolute
+    path on the user's machine, and the issue is public; the slug says which project.
+    `cut` truncates the verbatim row to that many characters, for the URL form only."""
+    what = re.sub(r"\s+", " ", plain(_clean(row["what"]))).strip() or "(no finding text)"
+    if len(what) > TITLE_WHAT_MAX:
+        what = what[:TITLE_WHAT_MAX - 1].rstrip() + "…"
+    title = "[upstream] %s row %s: %s" % (slug, safe_part(row["id"], "row"), what)
+    verbatim = _clean(row["verbatim"])
+    if cut is not None and len(verbatim) > cut:
+        verbatim = (verbatim[:cut] + "\n… (cut to fit a URL — paste the rest from "
+                    ".claude/workforce/deferred.md:%d before submitting)" % row["line"])
+    # A fence longer than any backtick run in the row, so a row quoting code cannot close it.
+    fence = "`" * max(3, max((len(m) for m in re.findall(r"`+", verbatim)), default=0) + 1)
+    cites = citations(row)
+    body = "".join([
+        "A downstream audit measured this row as a defect of the workforce distribution and "
+        "could not fix it in its own project. Filed by hand from `wf-upstream`'s output.\n\n",
+        "- project: `%s`\n" % slug,
+        "- run id: `%s`\n" % (run or "not recorded"),
+        "- installed workforce: `%s`\n" % version,
+        "- source: `.claude/workforce/deferred.md:%d`\n" % row["line"],
+        "- match: %s — %s\n\n" % (shape, _clean(why)),
+        "## The row, verbatim\n\n",
+        "%s\n%s\n%s\n\n" % (fence, verbatim, fence),
+        "## Evidence\n\n",
+        ("".join("- `%s`\n" % _clean(c) for c in cites) if cites
+         else "_The row cites no `path:line`; reproducing it starts from the text above._\n"),
+        "\nThe row stays open in the project's queue until a run there re-runs its "
+        "reproduction and watches it pass. Closing this issue does not close it.\n",
+    ])
+    return title, body
+
+
+def issue_command(slug, row, run, version, shape, why):
+    """`(title, body, kind, text)`: the one `gh issue create` command when `gh` is on PATH,
+    else the prefilled new-issue URL. Every value is quoted by `shlex.quote`, never interpolated:
+    the title and body are a Markdown cell from a file an agent edits, and `a$(whoami);rm`
+    is a row id one of this script's own fixtures carries. POSIX quoting is wrong for
+    PowerShell and cmd, so on Windows the URL is given instead — it passes through no shell."""
+    import shlex
+    import shutil
+    import urllib.parse
+    title, body = issue_draft(slug, row, run, version, shape, why)
+    if os.name != "nt" and shutil.which("gh"):
+        return title, body, "command", " ".join(
+            ["gh", "issue", "create", "--repo", REPO,
+             "--title", shlex.quote(title), "--body", shlex.quote(body)])
+
+    def url_for(cut=None):
+        text = body if cut is None else issue_draft(slug, row, run, version, shape, why, cut)[1]
+        return NEW_ISSUE_URL + "?" + urllib.parse.urlencode({"title": title, "body": text})
+
+    url = url_for()
+    if len(url) > URL_MAX:
+        # The longest cut that fits, by bisection: one character of the row encodes to between
+        # one and nine URL bytes, so a cut sized from the overshoot either misses or overshoots.
+        lo, hi = 0, len(_clean(row["verbatim"]))
+        while lo < hi:
+            mid = (lo + hi + 1) // 2
+            if len(url_for(mid)) <= URL_MAX:
+                lo = mid
+            else:
+                hi = mid - 1
+        url = url_for(lo)
+    return title, body, "url", url
+
+
+def print_issues(root, slug, filed, run, version):
+    """The block an audit quotes in its closing report: one issue per row this run filed that is
+    new or whose text changed, and one line per row already drafted on an earlier run."""
+    fresh = [(r, s, w) for r, s, w, new in filed if new]
+    print("\nUPSTREAM-ISSUES %d ready to file · %d already drafted · %s is not the workforce "
+          "source checkout and this machine carries no maintainer marker (%s), so no "
+          "maintainer session reads the inbox above."
+          % (len(fresh), len(filed) - len(fresh), root, maintainer_marker()))
+    for row, _s, _w, new in filed:
+        if not new:
+            print("already drafted: %s" % safe_part(row["id"], "row"))
+    if not fresh:
+        return
+    print("NOTHING WAS FILED. Review each body — it quotes this project's row verbatim — then "
+          "file it yourself on %s. Filing does not close the row in deferred.md." % REPO)
+    for n, (row, shape, why) in enumerate(fresh, 1):
+        title, body, kind, text = issue_command(slug, row, run, version, shape, why)
+        print("\n--- issue %d of %d · row %s ---" % (n, len(fresh), safe_part(row["id"], "row")))
+        print("title: %s" % title)
+        print("body:")
+        print("".join("    %s\n" % ln for ln in body.splitlines()), end="")
+        print("file it with %s:" % ("this command" if kind == "command"
+                                     else "this URL (`gh` is not on PATH)"))
+        print(text)
+        print("--- end issue %d ---" % n)
+
+
 def record(root, args):
     """Write (or refresh) one inbox file per upstream row. Returns an exit code."""
     root = os.path.abspath(root)
@@ -608,11 +780,13 @@ def record(root, args):
             os.path.join(root, ".claude", "workforce", "deferred.md"))))
     except OSError:
         written = ""
-    picked, skipped = [], []
+    picked, skipped, filed = [], [], []
     for row in rows:
         up, shape, why = classify(row)
         (picked if up else skipped).append((row, shape, why))
 
+    maint = maintainer_mode(root) if picked else True
+    today = time.strftime("%Y-%m-%d", time.gmtime())
     print("upstream inbox — %s" % root)
     if note:
         print("  %s" % note)
@@ -661,7 +835,17 @@ def record(root, args):
                 continue
             # The marker is a file anything can edit; what is carried into the body is a release.
             reopened = claimed if VERSION_RX.fullmatch(claimed) else safe_part(claimed, "?")
-        body = render(slug, root, row, shape, why, run, version, reopened)
+        # A DRAFT ONLY WHEN THERE IS SOMETHING NEW TO FILE. The project re-files every open row
+        # on every audit, so drafting on every write hands the user the same issue each time.
+        # A row is drafted when its inbox file is new, when its text changed since the file was
+        # written, or when the file has never recorded a draft — an inbox file written before
+        # drafts existed holds a row nobody was ever shown.
+        head = existing.split("## The row, verbatim", 1)[0]
+        stamp = DRAFTED_RX.search(head)
+        draft = not maint and (not existing or verbatim_block(row) not in existing
+                               or not stamp)
+        drafted = today if draft else (stamp.group(1) if stamp else "")
+        body = render(slug, root, row, shape, why, run, version, reopened, drafted)
         verb = ("reopen" if reopened else "add" if not existing else "update")
         detail = (" — resolved in %s, re-filed measured on %s" % (reopened, version)
                   if reopened else "")
@@ -679,6 +863,7 @@ def record(root, args):
         print("  %-9s row %-10s → %s · %s%s"
               % ({"add": "added", "update": "updated", "reopen": "reopened"}[verb],
                  row["id"], name, shape, detail))
+        filed.append((row, shape, why, draft))
     if args.verbose:
         for row, _shape, why in skipped:
             print("  skipped   row %-10s %s" % (row["id"] or "?", why))
@@ -689,6 +874,12 @@ def record(root, args):
              len(skipped), inbox_dir()))
     if picked and not args.execute:
         print("DISPLAY ONLY — nothing written. Re-run with --execute.")
+    if picked and not maint:
+        if filed:
+            print_issues(root, slug, filed, run, version)
+        elif not args.execute:
+            print("Not the workforce source checkout: --execute also prints each row as a "
+                  "ready-to-file issue for %s." % REPO)
     return 0
 
 

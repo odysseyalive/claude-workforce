@@ -407,6 +407,23 @@ for target, paths in written.items():
     except OSError as exc:
         print(f"  ! could not write {rec}: {exc}")
 
+# THE MAINTAINER MARKER — this machine's inbox has a reader. `wf-upstream` prints each upstream
+# row as a ready-to-file GitHub issue wherever no maintainer session reads
+# `<config-root>/workforce/upstream/`, and on a maintainer's machine `/workforce dev` does, even
+# while the project being audited is somebody else's. Nothing an installer writes can say who
+# reads the inbox, so the maintainer's own refresh says it: this script never ships, and no shipped
+# path writes the file, so a stranger's install never carries it. The name is
+# `wf-upstream.MAINTAINER_MARKER`; only its existence is read.
+if personal:
+    marker = os.path.join(_CONFIG_ROOT, "workforce", ".maintainer")
+    try:
+        os.makedirs(os.path.dirname(marker), exist_ok=True)
+        with open(marker, "w", encoding="utf-8") as fh:
+            fh.write(f"written by bin/sync --personal from {ROOT}\n")
+        print(f"maintainer marker: {marker}")
+    except OSError as exc:
+        print(f"  ! could not write {marker}: {exc}")
+
 # Output styles, placed beside the settings file rather than inside the skill tree.
 # The target is derived from each skill target: `<X>/skills/workforce` implies `<X>`,
 # which is the config root for the personal copy and the project's `.claude` for the
