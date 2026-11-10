@@ -15904,14 +15904,14 @@
     "env": {
       "TMPDIR": "${TREE}"
     },
-    "stdin_raw": "{\"session_id\": \"fx\", \"cwd\": \".\", \"hook_event_name\": \"PostToolUse\", \"tool_name\": \"Bash\", \"permission_mode\": \"auto\", \"tool_input\": {\"command\": \"cd work && sed -i 's/| filled |/| MET |/' OUTPUT.md && grep -c MET OUTPUT.md; python3 - <<'EOF'\\nprint(1)\\nEOF\\nls\", \"description\": \"d\"}, \"tool_response\": {\"stdout\": \"2\", \"stderr\": \"\", \"interrupted\": false, \"backgroundTaskId\": \"bh8i2qhz5\", \"timedOutAfterMs\": 120000}}",
+    "stdin_raw": "{\"session_id\": \"fx\", \"cwd\": \".\", \"hook_event_name\": \"PostToolUse\", \"tool_name\": \"Bash\", \"permission_mode\": \"auto\", \"tool_input\": {\"command\": \"cd work && sed -i 's/| filled |/| MET |/' OUTPUT.md && grep -c MET OUTPUT.md; python3 - <<'EOF'\\nprint(1)\\nEOF\\nls\", \"description\": \"d\"}, \"tool_response\": {\"stdout\": \"2\", \"stderr\": \"\", \"interrupted\": false, \"backgroundTaskId\": \"bfxown001\", \"timedOutAfterMs\": 120000}}",
     "want": [
       "\"hookEventName\": \"PostToolUse\"",
       "additionalContext",
-      "bh8i2qhz5",
+      "bfxown001",
       "open socket",
-      "TaskStop with task_id bh8i2qhz5",
-      "tasks/bh8i2qhz5.output' || fuser",
+      "TaskStop with task_id bfxown001",
+      "/-home-u-proj/3c1f279d/tasks/bfxown001.output' || fuser",
       "kill -TERM --"
     ],
     "not": [
@@ -15937,6 +15937,63 @@
     "not": [
       "hookSpecificOutput",
       "additionalContext"
+    ]
+  },
+  "bash-stdin-other-uid-dir-is-ignored": {
+    "_why": "SHARED /tmp, ANOTHER USER'S TREE. 1.87.2 globbed `claude-*`, so a file named for this shell under another uid's `claude-<uid>` became the target of this user's stop line (commit review, MEDIUM). Only `claude-<this uid>` is searched now; the file here sits under `claude-999999` and is not found, so the note names TaskStop alone.",
+    "exit": 0,
+    "script": "wf-bash-stdin",
+    "env": {
+      "TMPDIR": "${TREE}"
+    },
+    "stdin_raw": "{\"session_id\": \"fx\", \"cwd\": \".\", \"hook_event_name\": \"PostToolUse\", \"tool_name\": \"Bash\", \"permission_mode\": \"auto\", \"tool_input\": {\"command\": \"cd work && sed -i 's/| filled |/| MET |/' OUTPUT.md && grep -c MET OUTPUT.md; python3 - <<'EOF'\\nprint(1)\\nEOF\\nls\", \"description\": \"d\"}, \"tool_response\": {\"stdout\": \"2\", \"stderr\": \"\", \"interrupted\": false, \"backgroundTaskId\": \"bfxuid001\", \"timedOutAfterMs\": 120000}}",
+    "want": [
+      "additionalContext",
+      "bfxuid001",
+      "TaskStop with task_id bfxuid001 (the host named no output file for it)"
+    ],
+    "not": [
+      "lsof -t",
+      "fuser",
+      "updatedInput"
+    ]
+  },
+  "bash-stdin-symlinked-output-is-refused": {
+    "_why": "A LINK WHERE THE OUTPUT FILE SHOULD BE. Under this user's own `claude-<uid>` tree, `tasks/<id>.output` is a symlink to a file elsewhere. Followed, the stop line would kill whatever holds that other file. The file is checked with `lstat` and must be a regular file this user owns, so it is refused.",
+    "exit": 0,
+    "script": "wf-bash-stdin",
+    "env": {
+      "TMPDIR": "${TREE}"
+    },
+    "stdin_raw": "{\"session_id\": \"fx\", \"cwd\": \".\", \"hook_event_name\": \"PostToolUse\", \"tool_name\": \"Bash\", \"permission_mode\": \"auto\", \"tool_input\": {\"command\": \"cd work && sed -i 's/| filled |/| MET |/' OUTPUT.md && grep -c MET OUTPUT.md; python3 - <<'EOF'\\nprint(1)\\nEOF\\nls\", \"description\": \"d\"}, \"tool_response\": {\"stdout\": \"2\", \"stderr\": \"\", \"interrupted\": false, \"backgroundTaskId\": \"bfxlnk001\", \"timedOutAfterMs\": 120000}}",
+    "want": [
+      "additionalContext",
+      "bfxlnk001",
+      "TaskStop with task_id bfxlnk001 (the host named no output file for it)"
+    ],
+    "not": [
+      "lsof -t",
+      "fuser",
+      "updatedInput"
+    ]
+  },
+  "bash-stdin-symlinked-directory-is-refused": {
+    "_why": "A LINK ONE LEVEL UP. The project directory under `claude-<uid>` is a symlink to a tree elsewhere that holds a real `tasks/<id>.output`. Every directory from `claude-<uid>` down is checked with `lstat`, so the walk stops at the link instead of following it.",
+    "exit": 0,
+    "script": "wf-bash-stdin",
+    "env": {
+      "TMPDIR": "${TREE}"
+    },
+    "stdin_raw": "{\"session_id\": \"fx\", \"cwd\": \".\", \"hook_event_name\": \"PostToolUse\", \"tool_name\": \"Bash\", \"permission_mode\": \"auto\", \"tool_input\": {\"command\": \"cd work && sed -i 's/| filled |/| MET |/' OUTPUT.md && grep -c MET OUTPUT.md; python3 - <<'EOF'\\nprint(1)\\nEOF\\nls\", \"description\": \"d\"}, \"tool_response\": {\"stdout\": \"2\", \"stderr\": \"\", \"interrupted\": false, \"backgroundTaskId\": \"bfxlnk002\", \"timedOutAfterMs\": 120000}}",
+    "want": [
+      "additionalContext",
+      "bfxlnk002",
+      "TaskStop with task_id bfxlnk002 (the host named no output file for it)"
+    ],
+    "not": [
+      "lsof -t",
+      "fuser",
+      "updatedInput"
     ]
   }
 }

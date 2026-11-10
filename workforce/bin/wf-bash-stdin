@@ -60,10 +60,10 @@ why `<` is the gate.
 FAIL-OPEN AND SILENT ON NO SIGNAL. Always exits 0, never denies, never asks. A payload it
 cannot read, a tool that is not Bash, a command with no `<`: no output.
 """
-import glob
 import json
 import os
 import re
+import stat
 import sys
 
 # Already closed by the command's own first line, so there is nothing to add.
@@ -99,18 +99,58 @@ def noted_once(payload):
 TASK_FILE = re.compile(r"\A[\w./:\\-]+[\\/]tasks[\\/][A-Za-z0-9_-]+\.output\Z")
 
 
+def _own(st, kind, uid):
+    """True when `st` (an lstat) is a `kind` this user owns. A link is never either."""
+    return kind(st.st_mode) and st.st_uid == uid
+
+
 def task_file(sid):
     """The output file the host writes background shell `sid` to, or "".
 
     The PostToolUse payload does not carry it (measured: `tool_response` holds stdout,
     stderr and the id). The host writes it under `<tmp>/claude-<uid>/<project>/<session>/
-    tasks/`, and an id names one shell, so the file is found by its name."""
+    tasks/`, and an id names one shell, so the file is found by its name.
+
+    ONLY THIS USER'S TREE, AND NOTHING IT DID NOT MAKE. /tmp is shared, so a search over
+    `claude-*` reached other users' directories, and a link planted anywhere on the way
+    could point the stop line at a file some other process holds open (the 1.87.2 commit
+    review, MEDIUM). The walk reads `claude-<this uid>` only. Every directory from there down
+    and the file itself must be this user's own, checked with `lstat`, so a symlink at any
+    level is refused rather than followed. Any failure gives "", and the caller then names
+    TaskStop alone."""
+    getuid = getattr(os, "getuid", None)
+    if getuid is None:          # no uids to check against: no file is trusted
+        return ""
+    uid = getuid()
     roots = {os.environ.get("TMPDIR") or "", "/tmp", "/private/tmp"}
     for root in sorted(r for r in roots if r):
-        for path in sorted(glob.glob(os.path.join(root, "claude-*", "*", "*", "tasks",
-                                                  sid + ".output"))):
-            if TASK_FILE.match(path):
-                return path
+        base = os.path.join(root, "claude-%d" % uid)
+        try:
+            if not _own(os.lstat(base), stat.S_ISDIR, uid):
+                continue
+            projects = sorted(os.listdir(base))
+        except OSError:
+            continue
+        for proj in projects:
+            pdir = os.path.join(base, proj)
+            try:
+                if not _own(os.lstat(pdir), stat.S_ISDIR, uid):
+                    continue
+                sessions = sorted(os.listdir(pdir))
+            except OSError:
+                continue
+            for sess in sessions:
+                sdir = os.path.join(pdir, sess)
+                tdir = os.path.join(sdir, "tasks")
+                path = os.path.join(tdir, sid + ".output")
+                try:
+                    ok = (_own(os.lstat(sdir), stat.S_ISDIR, uid)
+                          and _own(os.lstat(tdir), stat.S_ISDIR, uid)
+                          and _own(os.lstat(path), stat.S_ISREG, uid))
+                except OSError:
+                    continue
+                if ok and TASK_FILE.match(path):
+                    return path
     return ""
 
 

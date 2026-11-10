@@ -106,6 +106,27 @@ def _sub_update_cells(s):
     return s
 
 
+UID_DIR = "claude-UID"
+
+
+def own_uid_dirs(tree):
+    """Rename every `claude-UID` directory in the COPIED tree to `claude-<this uid>`.
+
+    The host keeps background-shell output under `<tmp>/claude-<uid>/`, and `wf-bash-stdin`
+    trusts only the running user's own, so a fixture cannot spell that name in advance any
+    more than it can spell `${TREE}`. A fixture writes `claude-UID`; this makes it the real
+    one. A directory named for some OTHER uid is left as written, which is how a case shows
+    that one is ignored."""
+    uid = getattr(os, "getuid", lambda: None)()
+    if uid is None:
+        return
+    for dirpath, dirnames, _files in os.walk(tree):
+        for d in list(dirnames):
+            if d == UID_DIR and not os.path.islink(os.path.join(dirpath, d)):
+                os.rename(os.path.join(dirpath, d), os.path.join(dirpath, f"claude-{uid}"))
+                dirnames[dirnames.index(d)] = f"claude-{uid}"
+
+
 def _sub_tree(arg, tree):
     """Replace `${TREE}` with the copied fixture tree's absolute path.
 
@@ -309,6 +330,7 @@ def run_case(name, spec):
     # the settings-heal cases (2026-09-14), so no earlier case changes meaning.
     shutil.copytree(src, tree, symlinks=True)
     try:
+        own_uid_dirs(tree)
         problems = fill_complete_installs(tree)
         if problems:
             return False, "; ".join(problems)
