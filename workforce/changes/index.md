@@ -8,7 +8,7 @@
 
 | Version | Date | Surface | Org | Change |
 |---|---|---|---|---|
-| 1.88.0 | 2026-11-10 | docs | no | (pending — message lands on the next regeneration) |
+| 1.88.0 | 2026-11-10 | handbook, audit, verify, update, changes, hooks, scripts, installer, platform | **yes** | Release 1.88.0: stock workforce carries no one person's projects: image-eval and character-scanner retire into the jury and text-eval, playwright-mcp leads page fetch, directives load on demand |
 | 1.87.3 | 2026-11-10 | changes, scripts, installer | no | Release 1.87.3: the stdin warning only trusts this user's own temp tree |
 | 1.87.2 | 2026-11-10 | changes, hooks, scripts, installer | no | Release 1.87.2: a backgrounded command with stdin left open is named at once |
 | 1.87.1 | 2026-11-10 | changes, hooks, scripts, installer | no | Release 1.87.1: wf-bash-stdin notes instead of rewriting |
