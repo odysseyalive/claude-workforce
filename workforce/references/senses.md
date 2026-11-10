@@ -15,7 +15,7 @@ is never "look again." It is "open a channel this turn has not opened."
 | Sense | What it is | What only it can settle |
 |---|---|---|
 | **sight** | reading the thing directly — the file, the line, the source | what a specific known thing says |
-| **hearing** | testimony: the record (`git log`, `changes/`), a spawned reader, a web source, a skill — a voice that is not this turn's own reasoning | anything true of the world outside this repo, and whether an absence here was a decision |
+| **hearing** | testimony: the record (`git log`, the project's changelog or decision notes), a spawned reader, a web source, a skill — a voice that is not this turn's own reasoning | anything true of the world outside this repo, and whether an absence here was a decision |
 | **touch** | running it: an exit code, a test result, output that came back from the world | what a thing DOES, as against what a document says it does |
 | **taste** | discriminating between near-identical candidates: enumerating, diffing, listing before choosing | anything about a SET — what is all of them, what is missing, what is only |
 
@@ -32,7 +32,8 @@ are for.
 ## Guidelines
 
 **The RECORD is testimony, and this table omitted it.** Three other shipped surfaces name it —
-`wf-task-tag`'s own instruction (*"read the record that decided it (`git log`, `workforce/changes/`)"*),
+`wf-task-tag`'s own instruction (*"read the record that decided it (`git log`, the project's own changelog or
+decision notes)"*),
 the juror prompt (*"an outside voice — the record, the web, a spawned reader"*), and the `history` row
 below (*"only the record says whether an absence was a decision"*). This row, the canonical definition,
 listed only a reader, the web and a skill. *Corrected 2026-09-10, after a turn read two change records
@@ -57,12 +58,16 @@ reason the whole file exists — the escape comes from a voice that is not this 
 
 - "There is no X" / "X is the only one" → **taste.** A point read samples a set; it cannot
   close one. Reading four more files is more sight, and more sight never settles it.
-- "X is deprecated" / "the current way is Y" → **hearing.** Local documents are what this
-  operator called `vendor` a live command from. The repo cannot know the world.
-- "This script does X" → **touch.** Four scripts in this distribution were described in
-  working detail by live procedures and existed nowhere; every reader had sight of the
-  prose and none had run an `ls`.
+- "X is deprecated" / "the current way is Y" → **hearing.** Local documents go stale, and a
+  repository cannot know the world.
+- "This script does X" → **touch.** A procedure can describe a script in working detail that
+  does not exist. Sight of the prose cannot tell; an `ls` or a run can.
 - "This file says X" → **sight**, and sight alone is enough.
+
+*Measured in workforce's own development: its local documents once called `vendor` a live
+command, and four of its scripts were described in working detail by live procedures and
+existed nowhere — every reader had sight of the prose and none had run an `ls`. Of its
+judgment escapes, nine of ten came from outside the turn.*
 
 **Two reads of two documents in the same repo is one channel, not two.** Corroboration
 requires a different aperture, not a second sample through the same one.
@@ -81,7 +86,7 @@ checks the turn's channel counts against that tag at `Stop` rather than re-guess
 |---|---|---|---|
 | `history` | why was this removed · should we restore it · was it deliberate | **hearing** | a tree shows what is there; only the record says whether an absence was a decision |
 | `world` | is it deprecated · what is current · still supported | **hearing** | this repository cannot know the world |
-| `judgment` | should we · why not · is that a good idea · what do you think | **hearing** | a proposal you authored cannot be judged from inside; nine of ten escapes came from outside the turn |
+| `judgment` | should we · why not · is that a good idea · what do you think | **hearing** | a proposal you authored cannot be judged from inside; the catch comes from outside the turn |
 | `behaviour` | does it work · why does it fail · what does it return | **touch** | prose says what a script does; running it says what it did |
 | `existence` | is there any · how many · list every · anywhere else | **taste** | a claim about a set is closed by enumerating it |
 | `incident` | what went wrong · why did it break · diagnose | **hearing** | a cause is testimony: the record it came from, not this turn's reasoning |

@@ -156,6 +156,8 @@ locations have been looked at.
    `--rows` is deliberate: the per-release bodies exist for a reader who wants them, and printing
    five of them unasked is the wholesale read this record was structured to avoid. Name the command
    that shows one — `wf-changes --from <before>` without `--rows` — rather than pasting the text.
+   An install carries the bodies of `Org: yes` releases only (and the few a shipped file cites); for
+   any other release that command prints where the full text lives in the repository.
 
    **Then close with this project's own answer, by running:**
 

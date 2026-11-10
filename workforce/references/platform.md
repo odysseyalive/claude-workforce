@@ -632,10 +632,10 @@ interactive main sessions on this host. The asks-checklist display (`wf-turn-bud
 list, and in both sessions the transcript recorded it as an `attachment` row of type
 `hook_system_message`, `hookEvent: "PostToolUse"`, while the person at the terminal saw nothing:
 
-- mutze-studio `29c3e592` (`~/.claude/projects/-home-francis-lab-mutze-studio/29c3e592-2018-49dc-9f6f-88508017d8ff.jsonl`):
+- mutze-studio `29c3e592` (`~/.claude/projects/<mutze-studio project dir>/29c3e592-2018-49dc-9f6f-88508017d8ff.jsonl`):
   rows 580 and 621, `"WORK LIST  i7  Verify workforce 1.82.0"`, at `2026-10-30T04:02:25Z` and
   `04:04:13Z`. That session's producer reported seeing neither.
-- claude-workforce `e1d85496` (`~/.claude/projects/-home-francis-lab-claude-workforce/e1d85496-1e8e-4ee4-98fb-db7712c66243.jsonl`):
+- claude-workforce `e1d85496` (`~/.claude/projects/<claude-workforce project dir>/e1d85496-1e8e-4ee4-98fb-db7712c66243.jsonl`):
   rows 1540 (i12, `04:02:41Z`) and 1585 (i13, `04:04:15Z`); the display memo
   (`wf-asks-shown.<sid>.json`) holds i13's digest, written 21:04:15 local. The user said nothing
   appeared in the terminal.

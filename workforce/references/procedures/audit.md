@@ -1284,7 +1284,7 @@ chart format, the `/org` dispatch checkpoint, the operating principles — and `
 lived only in the skill directory. **`--heal-only` returns exactly the releases whose deltas this
 step must apply**, with the components each one touched.
 
-Read the body for each — `wf-changes --from <chart stamp>` without `--rows` — and take the deltas
+Read the body for each — `wf-changes --from <chart stamp> --heal-only` — and take the deltas
 from the release that shipped them, rather than diffing the current template against a handbook and
 inferring what must have changed. The record is generated from the commits, so it says what moved
 and why; an inferred delta says only what differs now.

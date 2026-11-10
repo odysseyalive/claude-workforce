@@ -38,6 +38,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.dirname(HERE)
 CHANGES = os.path.join(SKILL, "changes")
+REPO_CHANGES = "https://github.com/odysseyalive/claude-workforce/blob/main/workforce/changes"
 
 
 def vkey(v):
@@ -160,7 +161,15 @@ def main():
     for r in reversed(sel):
         p = os.path.join(CHANGES, f"{r['version']}.md")
         if not os.path.exists(p):
-            print(f"(no body file for {r['version']} — index row without a file)")
+            # AN INSTALL SHIPS ONLY THE BODIES A HOST READS: the `Org: yes` releases audit
+            # heals from, and those a shipped file cites (`bin/gen-changes` § manifest
+            # block). Every other body is in the repository, and its index row is above.
+            if r["heal"]:
+                print(f"(no body file for {r['version']} — an Org: yes release always ships "
+                      f"one, so this install is incomplete. Re-run the installer.)")
+            else:
+                print(f"(body for {r['version']} not shipped — nothing it changed reaches an "
+                      f"org. Full text: {REPO_CHANGES}/{r['version']}.md)")
             continue
         print("=" * 72)
         print(open(p).read(), end="")

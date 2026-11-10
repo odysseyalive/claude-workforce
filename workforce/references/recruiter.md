@@ -25,8 +25,8 @@ a per-command procedure — the authoring path (`procedures/handbook.md` § Step
 
 ## The governing principle
 
-<!-- Mechanics of the user directive live here; the sacred verbatim block lives in `SKILL.md`
-     § Directives, never inlined (immutable blocks are sacred). -->
+<!-- Mechanics of the user directive live here; the sacred verbatim block lives in
+     `references/directives.md` (`SKILL.md` § Directives points there), never inlined (immutable blocks are sacred). -->
 
 > **"hire the most capable candidate."** — user directive, 2026-08-26.
 

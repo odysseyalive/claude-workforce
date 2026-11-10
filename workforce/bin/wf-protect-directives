@@ -2,7 +2,8 @@
 """wf-protect-directives — PostToolUse hook guarding immutable directive blocks.
 
 Runs on Edit|Write. Detects byte-level drift in `<!-- origin: user | immutable:
-true -->` blocks across an org's handbooks and its extracted directive files, by
+true -->` blocks in any `.md` that can carry one (handbooks, extracted directive files,
+`SKILL.md`, a skill's `references/`), by
 comparing them against the `.directives.sha` sidecar `/workforce checksums` writes.
 
 WHY THIS EXISTS AT ALL. claude-enforcer defends the user's first directive — that
@@ -90,11 +91,17 @@ def main():
         return 0
 
     norm = path.replace("\\", "/")
-    # Only files that can carry an org's sacred text.
+    # EVERY FILE THAT CAN CARRY SACRED TEXT, by where it sits and never by what it holds now:
+    # a file whose last block was just deleted holds no marker, and that removal is the
+    # MISSING BLOCK finding. This read agents/, directives/ and `*SKILL.md` only, so the user
+    # blocks workforce ships in `references/` (conversion-taxonomy.md, audit-setup.md, and
+    # since 2026-11-10 directives.md, which holds the SKILL.md block) were guarded by nothing
+    # at the edit. Any `.md` under a `.claude/` tree is in `wf-census.sacred_scope`, so it has
+    # a row to compare against; a skill's `references/` is where shipped blocks live in a
+    # personal install and in the source distribution.
     if not (
-        "/.claude/agents/" in norm
-        or "/.claude/workforce/directives/" in norm
-        or norm.endswith("SKILL.md")
+        norm.endswith("SKILL.md")
+        or (norm.endswith(".md") and ("/.claude/" in norm or "/references/" in norm))
     ):
         return 0
     if not os.path.exists(path):
