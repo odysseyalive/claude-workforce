@@ -18,20 +18,30 @@ terminal. Both shells ran for 7 and 11 hours. The fix is not about `eza`: `cat`,
 `python3` with no script and a prompting installer all wait the same way.
 
 WHAT IT DOES. A command with no `<` is left alone, because the host closes its stdin
-already. A command with one is rewritten to begin `exec </dev/null`, which gives the whole
-shell the stdin the host meant to give it. Heredocs, pipes and `< file` are redirects on the
-command they belong to, so they still feed that command; only what read the inherited stdin
-changes, from waiting forever to EOF.
+already. A command with one gets a note, as `additionalContext`, once per agent per session:
+what the open stdin does and what to add (`</dev/null` on the command that reads stdin, or
+`exec </dev/null` first). The note reaches the model and a spawned subagent (measured
+2026-11-10, both). It never changes the command.
 
-ONLY WHERE THE REWRITE IS MEASURED TO RUN. The permission check reads the REWRITTEN command
-(`updatedInput`). MEASURED 2026-11-10 with `claude -p` and an allow rule for the original
-command: in `auto` mode the rewritten command ran, and the shell's stdin read `/dev/null`;
-in `default` and `acceptEdits` it was DENIED ("'exec' evaluates arguments as shell code"),
-and a `{ …; } </dev/null` wrapper was denied too ("Contains brace with quote character").
-So everywhere but `auto` a rewrite would turn an allowed command into a refused one, and
-there the hook only says what to do, as `additionalContext`, once per agent per session.
-That context reaches the model and a spawned subagent (measured the same day, both).
-`bypassPermissions` was not measured and gets the note.
+WHY IT NO LONGER REWRITES. 1.87.0 rewrote the command in `auto` mode to begin
+`exec </dev/null`, and the rewrite cost calls that had nothing to do with it. In auto mode the
+server-side classifier reviews every call in a response before any hook runs. When a hook
+changes one call's input, the host drops the verdict for every call AFTER it in the same
+response and refuses them: "another call in this response was changed after auto mode
+reviewed it". MEASURED 2026-11-10 on 2.1.322, interactive, auto mode:
+  · rewritten call first, `sleep 2; echo` second: the second was refused, not run
+  · the same pair reversed (rewritten call last): both ran
+  · `updatedInput` together with `permissionDecision: "allow"`: the second was still refused,
+    and an `allow` would also skip the user's own review, which a hook never grants
+  · the transcript holds none of the response's tool calls when PreToolUse runs, and every
+    call's PreToolUse fires within 2 ms of the first. So no hook can tell whether its call
+    has siblings after it.
+The first case was also measured in mutze-studio `30e77777` on 2.1.319. Over the 374
+transcripts that mention a backgrounded command, 7,285 of 28,973 Bash calls held `<`, and
+298 responses (390 calls) had a call after a `<` Bash call that the rewrite would have got
+refused. A rewrite can't be told apart from that refusal, so every mode gets the note now.
+The rewrite fixed the hang outright, and the note does not. The backstop is `wf-widen`: it
+names the open shell and how to stop it, to the agent and then to its parent.
 
 FAIL-OPEN AND SILENT ON NO SIGNAL. Always exits 0, never denies, never asks. A payload it
 cannot read, a tool that is not Bash, a command with no `<`: no output.
@@ -41,8 +51,6 @@ import os
 import re
 import sys
 
-REWRITE_MODES = ("auto",)
-PREFIX = "exec </dev/null\n"
 # Already closed by the command's own first line, so there is nothing to add.
 ALREADY = re.compile(r"\A\s*exec\s+0?<\s*/dev/null\b")
 _UNSAFE = re.compile(r"[^A-Za-z0-9_.-]")
@@ -79,10 +87,6 @@ def decide(payload):
     cmd = inp.get("command") if isinstance(inp, dict) else None
     if not isinstance(cmd, str) or "<" not in cmd or ALREADY.match(cmd):
         return None
-    if payload.get("permission_mode") in REWRITE_MODES:
-        new = dict(inp)
-        new["command"] = PREFIX + cmd
-        return {"hookSpecificOutput": {"hookEventName": "PreToolUse", "updatedInput": new}}
     if not noted_once(payload):
         return None
     return {"hookSpecificOutput": {"hookEventName": "PreToolUse", "additionalContext": NOTE}}

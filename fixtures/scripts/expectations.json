@@ -15849,19 +15849,18 @@
       "lsof -t '/tmp/claude-1000/-home-u-proj/3c1f279d/tasks/b1wp3gxsx.output'"
     ]
   },
-  "bash-stdin-auto-rewrites-a-less-than": {
-    "_why": "DEFECT 3. A command holding `<` runs with stdin open on a socket nothing closes (measured 2.1.322), so the trailing `ls` here hangs where `ls` is aliased to `eza`. In `auto` mode, the one mode where the rewritten command is measured to pass the permission check, the hook prefixes `exec </dev/null` and keeps every other input field.",
+  "bash-stdin-auto-mode-notes-and-never-rewrites": {
+    "_why": "THE SIBLING REFUSAL, 1.87.0. The hook rewrote a `<` command to begin `exec </dev/null` in auto mode, and auto mode then refused every later call in the same response: \"another call in this response was changed after auto mode reviewed it\" (measured interactive on 2.1.322, and in mutze-studio `30e77777` on 2.1.319). In 374 transcripts, 298 responses had a call after a `<` Bash call. In auto mode the hook now notes and never changes the input.",
     "exit": 0,
     "script": "wf-bash-stdin",
     "stdin_raw": "{\"session_id\": \"fx\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Bash\", \"permission_mode\": \"auto\", \"tool_input\": {\"command\": \"python3 - <<'EOF'\\nprint(1)\\nEOF\\nls\", \"description\": \"d\", \"timeout\": 600000}}",
     "want": [
-      "\"updatedInput\"",
-      "\"command\": \"exec </dev/null\\npython3 - <<'EOF'",
-      "\"timeout\": 600000",
-      "\"description\": \"d\""
+      "additionalContext",
+      "exec </dev/null"
     ],
     "not": [
-      "additionalContext"
+      "updatedInput",
+      "permissionDecision"
     ]
   },
   "bash-stdin-no-less-than-is-silent": {
