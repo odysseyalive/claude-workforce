@@ -8,7 +8,7 @@
 
 | Version | Date | Surface | Org | Change |
 |---|---|---|---|---|
-| 1.87.1 | 2026-11-10 | docs | no | (pending — message lands on the next regeneration) |
+| 1.87.1 | 2026-11-10 | changes, hooks, scripts, installer | no | Release 1.87.1: wf-bash-stdin notes instead of rewriting |
 | 1.87.0 | 2026-11-10 | changes, hooks, scripts, installer | no | Release 1.87.0: background shells are detected, stoppable, and get stdin closed |
 | 1.86.6 | 2026-11-09 | changes, scripts, installer | no | Release 1.86.6: org chart model and effort cells follow each agent's file |
 | 1.86.5 | 2026-11-09 | changes, scripts, installer | no | Release 1.86.5: issues record when they open and close |
