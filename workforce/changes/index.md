@@ -8,7 +8,7 @@
 
 | Version | Date | Surface | Org | Change |
 |---|---|---|---|---|
-| 1.86.5 | 2026-11-09 | docs | no | (pending — message lands on the next regeneration) |
+| 1.86.5 | 2026-11-09 | changes, scripts, installer | no | Release 1.86.5: issues record when they open and close |
 | 1.86.4 | 2026-11-09 | changes, scripts, installer | no | Release 1.86.4: every turn that starts from a worker's report gets a juror |
 | 1.86.3 | 2026-11-09 | changes, scripts, installer | no | Release 1.86.3: relayed and quantified claims seat a juror |
 | 1.86.2 | 2026-11-09 | audit, changes, scripts, installer | no | Release 1.86.2: sacred-block checksums keyed by content, with a scoped restamp |
