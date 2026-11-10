@@ -144,6 +144,15 @@ sampled (`WF_AUDIT_SAMPLE`), and a turn with no docket keeps the blind sample. M
 `bin/replay-seating` over the 1,313 Stops of the 40 newest mutze transcripts: seated turns rise
 from 17.9 to 53.5 per 100 judged, 33.1 more seats per 100 Stops.
 
+**A turn whose own message asks for nothing still runs inside the session's open work**, so when
+nothing else gives it a docket it inherits the dockets of the open issues its asks checklist
+carries (`ask.carried`, newest first). A carried hit only seats a juror: it never blocks on a
+channel count, never seats the incident jurors, and the jurors are told never to vote no because
+that work is unfinished. It survives a declared hold, because a waiting reply is where a stale
+state claim lives ("the third run is still on the pod", a job that had already failed). MEASURED
+over 1,323 mutze Stops: 19.6 to 34.5 more seats per 100 Stops; of 10 sampled, 9 tried a real
+claim about open work and 1 seated a reply that only asked a question.
+
 **The jurors read the row that opened the turn.** A hand-back or notification goes to them as
 `testimony`, and touch is judged from the transcript's tool_results: a claim with no run supporting
 it is a verified no.

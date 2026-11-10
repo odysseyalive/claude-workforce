@@ -6,12 +6,14 @@ issue ledger is READ, from the project the transcript's rows name, because an in
 turn's docket comes from it. The jury itself is not run: this is the seating decision,
 `wf-widen`'s half, never the model's verdict.
 
-  before  `git show HEAD:workforce/bin/wf-task-tag`'s `classify`, and HEAD's seating rule
-          restated below (a tagged turn seated 1 in `WF_AUDIT_SAMPLE`, `incident` always,
-          an untagged one blind-sampled 1 in `WF_BLIND_SAMPLE`).
-  after   the working tree: `classify` with the `work` kind, the inherited docket of an
-          injected turn (`served_ask`), a message delivered mid-turn merged in, and
-          `wf-widen.seating` with the always-seated rule.
+  before  `wf-task-tag` and `wf-widen` as they stand at HEAD (`git show`, run from memory).
+  after   the same two files in the working tree.
+Both sides run one pipeline (`docket`), in the order the hooks apply it: the turn's own
+words, the message a peer's pointer names, the ask an injected turn serves (`served_ask`),
+a message delivered mid-turn merged in, and, on a side whose `wf-task-tag` has it, the open
+work the turn carries (`carried_docket`). The seating is that side's `wf-widen.seating`: a
+docket from the user's words always seats, a claim-only one 1 in `WF_AUDIT_SAMPLE`, and a
+turn with none is blind-sampled 1 in `WF_BLIND_SAMPLE`.
 
 Usage
     bin/replay-seating TRANSCRIPT.jsonl                 # every judged Stop, then totals
@@ -21,7 +23,9 @@ Usage
 A Stop is named by the line number of its `stop_hook_summary` row. A continuation Stop (the
 turn after a `Stop hook feedback` row) is not judged live, so it is listed as such.
 What it cannot see, and says so: `background_tasks` (so a declared hold is not applied),
-and the asks checklist hand-off, which this change does not touch.
+and the asks checklist hand-off. THE CARRIED ISSUES ARE A LOWER BOUND: the ledger is read as
+it stands now, so the issues a Stop carries are those opened before its turn that are still
+open today, and an issue closed since is not counted.
 """
 
 import hashlib
@@ -59,7 +63,9 @@ def _load_head(name):
 
 W = _load("wf-widen")
 TT, TL = W.TT, W.TL
-OLD = _load_head("wf-task-tag")
+OLD_W = _load_head("wf-widen")
+OLD_W.TT = _load_head("wf-task-tag")
+NEW, OLD = (TT, W), (OLD_W.TT, OLD_W)
 TURN_END = ('"stop_hook_summary"', '"turn_duration"')
 
 
@@ -71,13 +77,17 @@ def _rows(lines, lo, hi):
             continue
 
 
-def turn_of(lines, k):
-    """(opener text, opener typed?, reply, mid-turn texts) for the Stop at index `k`."""
-    lo = 0
+def turn_start(lines, k):
+    """The index of the first row of the turn the Stop at index `k` ends."""
     for i in range(k - 1, -1, -1):
         if any(m in lines[i] for m in TURN_END) and '"type":"system"' in lines[i]:
-            lo = i + 1
-            break
+            return i + 1
+    return 0
+
+
+def turn_of(lines, k):
+    """(opener text, opener typed?, reply, mid-turn texts) for the Stop at index `k`."""
+    lo = turn_start(lines, k)
     opener, typed, reply, mid, rows = None, False, "", [], []
     for i, row in _rows(lines, lo, k):
         rows.append(row)
@@ -102,9 +112,33 @@ def turn_of(lines, k):
     return opener, typed, reply, mid, rows
 
 
-def ask_of(text):
-    peer = TT.peer_request(text or "")
+def ask_of(text, T=TT):
+    peer = T.peer_request(text or "")
     return peer[0] if peer else (text or "")
+
+
+def opened_at(lines, led):
+    """Issue id -> index of the first user row, or delivered message, carrying its words."""
+    want = [(i.get("id"), " ".join(i["prompt"].split())[:200]) for i in led.get("issues", [])
+            if isinstance(i, dict) and isinstance(i.get("prompt"), str) and i["prompt"].strip()]
+    at = {}
+    for n, row in _rows(lines, 0, len(lines)):
+        if not want:
+            break
+        a = row.get("attachment") if row.get("type") == "attachment" else None
+        text = TT._row_text(row) if row.get("type") == "user" else \
+            a.get("prompt") if isinstance(a, dict) and isinstance(a.get("prompt"), str) else None
+        flat = " ".join((text or "").split())
+        for iid, p in [w for w in want if flat and w[1] in flat]:
+            at[iid] = n
+            want.remove((iid, p))
+    return at
+
+
+def carried_before(led, opened, lo):
+    """The ledger as a Stop's submit saw it, approximately: the issues opened before its turn."""
+    return {"issues": [i for i in led.get("issues", []) if isinstance(i, dict)
+                       and opened.get(i.get("id"), lo) < lo]}
 
 
 def counts_at(path, lines, k):
@@ -133,7 +167,7 @@ def _rate(name, default):
         return default
 
 
-def decide(applicable, gate, counts, reply, ask, tagged, incident):
+def decide(V, applicable, gate, counts, reply, ask, tagged, incident):
     """Seats as (outcome, jurors). Shared shape for both sides."""
     if not applicable:
         blind = _rate("WF_BLIND_SAMPLE", 20)
@@ -142,7 +176,7 @@ def decide(applicable, gate, counts, reply, ask, tagged, incident):
                 hashlib.sha256(reply.encode("utf-8")).digest()[1] % rate == 0:
             return "blind", ["smell", "intuition"]
         return "none", []
-    unopened = W.senses(counts, applicable)[0]
+    unopened = V.senses(counts, applicable)[0]
     unopened = [u for u in unopened if u in gate]
     if unopened:
         return "block", sorted(applicable)
@@ -153,38 +187,41 @@ def decide(applicable, gate, counts, reply, ask, tagged, incident):
     return ("seated", sorted(applicable)) if sampled else ("none", [])
 
 
-def before(opener, reply, counts):
-    ask = ask_of(opener)
-    hits = OLD.classify(ask)
-    trips = trips_of(reply)
-    applicable = {W.CLAIM_SENSE[t][0] for t in trips} | {h["sense"] for h in hits}
-    incident = any(h["kind"] == "incident" for h in hits)
-    out = decide(applicable, applicable, counts, reply, ask, False, incident)
-    return out, [h["kind"] for h in hits]
-
-
-def after(payload, led, lines, k, opener, reply, mid, counts, rows):
-    ask = ask_of(opener)
-    hits, via = TT.classify(ask), ""
-    if not hits and TT.peer_request(opener or ""):
-        body = W.relayed_body(rows, ask)
+def docket(M, payload, led, past, lines, k, opener, mid, rows):
+    """(hits, via, ask) for the Stop at index `k`, by one side's `(wf-task-tag, wf-widen)`."""
+    T, V = M
+    ask = ask_of(opener, T)
+    hits, via = T.classify(ask), ""
+    if not hits and T.peer_request(opener or ""):
+        body = V.relayed_body(rows, ask)
         if body:
-            hits = [dict(h, relayed=True) for h in TT.classify(body)]
+            hits = [dict(h, relayed=True) for h in T.classify(body)]
             via = "message read this turn"
-    if not hits and opener and TT.INJECTED.search(opener):
-        served = TT.served_ask(payload, led, opener, lines[:k])
+    if not hits and opener and T.INJECTED.search(opener):
+        served = T.served_ask(payload, led, opener, lines[:k])
         if served:
-            hits = [dict(h, inherited=True) for h in TT.classify(served["prompt"])]
+            hits = [dict(h, inherited=True) for h in T.classify(served["prompt"])]
             via = f"{served.get('issue') or '-'} via {served['via']}"
             ask = served["prompt"]
     for text in mid:
-        if not TT.INJECTED.search(text):
-            hits += [h for h in TT.classify(ask_of(text))
+        if not T.INJECTED.search(text):
+            hits += [h for h in T.classify(ask_of(text, T))
                      if h["kind"] not in {x["kind"] for x in hits}]
-    applicable, gate, why, incident = W.seating(trips_of(reply), hits)
+    if not hits and hasattr(T, "carried_docket"):
+        car = T.carried_docket(past)
+        if car:
+            hits = car["hits"]
+            via = (via + "; " if via else "") + "carried " + ",".join(
+                i["issue"] for i in car["issues"])
+    return hits, via, ask
+
+
+def seat(M, docketed, counts, reply):
+    """(outcome, jurors) for one side, from its `docket` result."""
+    hits, _via, ask = docketed
+    applicable, gate, why, incident = M[1].seating(trips_of(reply), hits)
     tagged = any(t.startswith("TAG:") for t, _s, _r in why)
-    out = decide(applicable, gate, counts, reply, ask, tagged, incident)
-    return out, [h["kind"] for h in hits], via
+    return decide(M[1], applicable, gate, counts, reply, ask, tagged, incident)
 
 
 def replay(path, want=None, quiet=False):
@@ -195,6 +232,7 @@ def replay(path, want=None, quiet=False):
                 if isinstance(r.get("cwd"), str)), None)
     payload = {"session_id": sid, "transcript_path": path, "cwd": cwd}
     led = TT.load_ledger(payload) if cwd else {"issues": []}
+    opened = opened_at(lines, led)
     tot = {"stops": 0, "judged": 0, "before": 0, "after": 0, "injected": 0}
     for k, line in enumerate(lines):
         if '"stop_hook_summary"' not in line:
@@ -215,8 +253,11 @@ def replay(path, want=None, quiet=False):
             continue
         tot["judged"] += 1
         counts = counts_at(path, lines, k) or (0, [], 0, 0, 0, 0, None)
-        (b, bj), bk = before(opener, reply, counts)
-        (a, aj), ak, via = after(payload, led, lines, k, opener, reply, mid, counts, rows)
+        past = carried_before(led, opened, turn_start(lines, k))
+        bd = docket(OLD, payload, led, past, lines, k, opener, mid, rows)
+        ad = docket(NEW, payload, led, past, lines, k, opener, mid, rows)
+        (b, bj), (a, aj) = seat(OLD, bd, counts, reply), seat(NEW, ad, counts, reply)
+        bk, ak, via = [h["kind"] for h in bd[0]], [h["kind"] for h in ad[0]], ad[1]
         tot["before"] += b != "none"
         tot["after"] += a != "none"
         if not quiet:

@@ -12753,7 +12753,7 @@
       ]
   },
   "issues-queued-message-peer-turn-keeps-its-own-record": {
-      "_why": "THE WALK BACK TO THE TURN'S OWN ROW STOPS AT THE TURN BEFORE. A peer session's message opens its turn with an `isMeta` user row (901 of 901 \"Another Claude session sent a message\" rows over 200 transcripts, measured 2026-10-29), and that row's text is not the bare tag the submit saw, so it matches no record. The walk passes it, as it passes a skill's loaded text, and must then stop at the previous turn's `stop_hook_summary` / `turn_duration` rows. Without that stop it reaches message 1's typed row, picks message 1's record, and the peer turn is blocked as an `incident` claim. Passes on the one-slot code too, which only ever read the newest record: this pins that the new selection never reaches into an earlier turn. SINCE 2026-10-30 THE PEER MESSAGE OPENS i2 (`peer_request`), and both are tracked: a peer speaking is not the user moving on, so i1, the user's message before it, is not retired (`track_message`); the walk is unchanged.",
+      "_why": "THE WALK BACK TO THE TURN'S OWN ROW STOPS AT THE TURN BEFORE. A peer session's message opens its turn with an `isMeta` user row (901 of 901 \"Another Claude session sent a message\" rows over 200 transcripts, measured 2026-10-29), and that row's text is not the bare tag the submit saw, so it matches no record. The walk passes it, as it passes a skill's loaded text, and must then stop at the previous turn's `stop_hook_summary` / `turn_duration` rows. Without that stop it reaches message 1's typed row, picks message 1's record, and the peer turn is blocked as an `incident` claim. Passes on the one-slot code too, which only ever read the newest record: this pins that the new selection never reaches into an earlier turn. SINCE 2026-10-30 THE PEER MESSAGE OPENS i2 (`peer_request`), and both are tracked: a peer speaking is not the user moving on, so i1, the user's message before it, is not retired (`track_message`); the walk is unchanged. SINCE 2026-11-09 THE PEER TURN CARRIES i1's OPEN WORK (`carried_docket`): its own words name no kind, so i1's `incident` and `work` senses seat their jurors as `carried`, which never gate and never make the turn an incident. Message 1's own record would print `WIDEN  incident` and block; the carried docket prints `carried incident` and is sampled.",
       "before": [
           {
               "script": "wf-task-tag",
@@ -12774,13 +12774,13 @@
       "exit": 0,
       "not": [
           "Traceback",
-          "incident claim",
+          "WIDEN  incident",
           "\"decision\": \"block\""
       ],
       "script": "wf-widen",
       "stdin_raw": "{\"hook_event_name\": \"Stop\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"transcript_path\": \"t3.jsonl\", \"last_assistant_message\": \"Noted: mutze-dev confirms the allocator.\"}",
       "want": [
-          "WIDEN  not scored",
+          "WIDEN  carried incident + carried work claim",
           "i1  TRACKED",
           "i2  TRACKED  [From the mutze-studio session"
       ]
@@ -14962,6 +14962,58 @@
                   "Please rerun the face swap",
                   "\"senses\": [\"touch\"]",
                   "\"peer\": {\"from\": \"cw-dev\""
+              ]
+          }
+      }
+  },
+  "task-tag-peer-message-carries-the-open-work": {
+      "_why": "A TURN WITH NO DOCKET OF ITS OWN IS TRIED ON THE OPEN WORK IT CARRIES. MEASURED 2026-11-09 in mutze-studio `30e77777`, Stops 2007 and 2203: a peer's message asked for nothing, and the reply restated the state of running work (\"the third run is still on the pod\", about a job that had already failed); no juror sat. The ledger's open issue i1 is a `work` ask, so the tag keeps its words classified as `carried_docket`, each hit marked with the issue it came from. i3 is closed and is not carried.",
+      "script": "wf-task-tag",
+      "exit": 0,
+      "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"transcript_path\": \"s1.jsonl\", \"prompt\": \"[agent-msg from=cw-dev 22:08Z] Long message, read it by running: agent-say show 20261109220815-4078018. To answer, run the shell command: agent-say --from ms-dev cw-dev \\\"<reply>\\\"\"}",
+      "want": [
+          "came from the peer session \\\"cw-dev\\\", not from the user"
+      ],
+      "after": {
+          "wf-task-tag.s1.json": {
+              "want": [
+                  "\"hits\": []",
+                  "\"carried_docket\": {\"hits\": [{\"kind\": \"work\"",
+                  "\"carried\": \"i1\"",
+                  "\"issue\": \"i1\", \"title\": \"Sarah, new actor\""
+              ],
+              "not": [
+                  "\"carried\": \"i3\"",
+                  "\"issue\": \"i3\""
+              ]
+          }
+      }
+  },
+  "widen-carried-docket-seats-touch": {
+      "_why": "THE CARRIED DOCKET IS THE LAST ONE, AND IT SEATS WITHOUT GATING. The peer's pointer names no work and the turn never ran the command that would read the message, so the relayed docket is empty and the open issue's `work` docket is used. Touch is seated (`WF_AUDIT_SAMPLE` 0: only the always-seated rule can raise this flag), the turn ran nothing and is not blocked, and the flag hands the juror `ask.carried` with i1's words, so the claim about the run is tried against the open work.",
+      "script": "wf-widen",
+      "exit": 0,
+      "env": {
+          "WF_BLIND_SAMPLE": "0",
+          "WF_AUDIT_SAMPLE": "0"
+      },
+      "stdin_raw": "{\"transcript_path\": \"s1.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"session_id\": \"s1\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"cw-dev confirmed the three misses and asked me nothing. The third run is still on the pod; I'll measure it before I show it to you.\"}",
+      "want": [
+          "carried work claim",
+          "sampled for audit"
+      ],
+      "not": [
+          "\"decision\": \"block\"",
+          "not scored",
+          "incident"
+      ],
+      "after": {
+          "wf-widen-flag.s1.json": {
+              "want": [
+                  "\"senses\": [\"touch\"]",
+                  "\"carried\": [{\"issue\": \"i1\"",
+                  "face replacement with Sarah's face",
+                  "\"kinds\": [\"carried work\"]"
               ]
           }
       }

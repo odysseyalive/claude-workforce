@@ -3293,6 +3293,61 @@ def inherited_hits(payload, prompt):
 
 
 # ─────────────────────────────────────────────────────────────────────────────────
+# A TURN WITH NO DOCKET OF ITS OWN IS TRIED ON THE OPEN WORK IT CARRIES.
+#
+# MEASURED 2026-11-09 in mutze-studio `30e77777` by `bin/replay-seating`: Stops 2007 and 2203
+# were opened by a peer's message that asked for nothing, and both replies restated the
+# state of the session's running work ("the third run ... is still on the pod", about a job
+# that had already failed). Neither message, the message it pointed at, nor a hand-back
+# named an ask, so no juror sat. The work was named all the same: the asks checklist's
+# `carried` rows (`carry_forward`) are the ledger's open issues, each with its id and the
+# user's own words. Those words are classified like any message, and the senses they
+# summon are this turn's docket. It is the ledger the session keeps, never the
+# newest-issue guess `served_ask` refuses to make.
+#
+# THE LAST DOCKET, NEVER THE FIRST. The turn's own words, the ask an injected turn serves,
+# the message a peer's pointer names and a message delivered mid-turn all come first, and
+# `wf-widen.docket_hits` reads this only when every one of them was empty. Its hits are
+# marked `carried` and JURY-ONLY: the turn asked nothing, so a zero channel count is no
+# fact about it, and an open `incident` issue does not seat the four incident jurors on a
+# later turn that diagnosed nothing (`wf-widen.seating`). The jury is told the senses came
+# from these issues (`ask.carried`) and tries the claims the turn made about that work.
+#
+# MEASURED over the 40 newest mutze-studio transcripts (1,322 Stops): 19.5 more seated
+# juries per 100 Stops counting the issues still open in the ledger today, 34.5 counting
+# every earlier issue that held an item; the live rate lies between. Of ten newly seated
+# Stops read by hand, nine made a claim about the state or result of open work; one only
+# asked the user a question.
+CARRIED_PROMPT_MAX = 400
+
+
+def carried_docket(led, skip=None):
+    """`{"hits", "issues"}` for the open issues this turn carries (`carry_forward`), or None
+    when none of their words summon a sense. `skip` is this message's own issue.
+
+    Newest issue first, one hit per kind, each marked with the issue it came from.
+    `issues` holds only the issues that contributed a hit, with their words cut to
+    `CARRIED_PROMPT_MAX`, for the jury."""
+    by_id = {i.get("id"): i for i in led.get("issues", []) if isinstance(i, dict)}
+    hits, issues, seen = [], [], set()
+    for iid in dict.fromkeys(r["issue"] for r in carry_forward(led, skip=skip)):
+        words = (by_id.get(iid) or {}).get("prompt")
+        found = classify(words) if isinstance(words, str) else []
+        if not found:
+            continue
+        # AN ISSUE A PEER OPENED SAYS SO: its words are the peer's, never the user's.
+        peer = by_id[iid].get("peer")
+        issues.append({"issue": iid, "title": plain_text(by_id[iid].get("title"), TITLE_MAX),
+                       "prompt": plain_text(words, CARRIED_PROMPT_MAX),
+                       **({"peer": peer_sender(peer)} if isinstance(peer, dict) else {})})
+        for h in found:
+            if h["kind"] not in seen:
+                seen.add(h["kind"])
+                hits.append(dict(h, carried=iid))
+    return {"hits": hits, "issues": issues} if hits else None
+
+
+# ─────────────────────────────────────────────────────────────────────────────────
 # THE DIRECTIVE CHECK, MOVED OFF THE AGENT AND ONTO THIS EVENT (K6).
 #
 # Every handbook this distribution writes makes the EMPLOYEE hash its own bound directive
@@ -3595,10 +3650,18 @@ def main():
         # the staleness just as well (it IS this turn's) and keeps the ask on disk for
         # the blind sample in `wf-widen` (§ THE BLIND SAMPLE).
         _n, _how = count_asks(payload.get("prompt") or "")
+        # THE OPEN WORK THIS TURN CARRIES, kept for `Stop` as the last docket
+        # (`carried_docket`). Never fatal: an unreadable ledger only means no fallback.
+        try:
+            _carried = carried_docket(load_ledger(payload),
+                                      skip=(checklist_record or {}).get("issue"))
+        except (OSError, ValueError):
+            _carried = None
         write_json_atomic(tag_path(payload),
                           {"hits": [], "prompt": (payload.get("prompt") or "")[:2000],
                            "senses": [], "asks": _n, "asks_why": _how,
                            "checklist": checklist_record, "earlier": earlier,
+                           **({"carried_docket": _carried} if _carried else {}),
                            **({"peer": _peer[1]} if _peer else {})})
         print(json.dumps({"hookSpecificOutput": {
             "hookEventName": "UserPromptSubmit",

@@ -238,7 +238,7 @@ def _relayed_note(payload, tag):
 
 
 def raise_flag(payload, why, rows, counts, unopened, applicable,
-               sampled=False, reply=""):
+               sampled=False, reply="", carried=None):
     _tag = task_tag(payload)
     """Record what the auditing agent needs to judge RESULTS against the ASK.
 
@@ -281,7 +281,12 @@ def raise_flag(payload, why, rows, counts, unopened, applicable,
                 "senses": sorted(applicable),
                 # A PEER SESSION ASKED, not the user here (`TT.peer_request`).
                 **({"peer": _tag["peer"]} if isinstance((_tag or {}).get("peer"), dict)
-                   else {})},
+                   else {}),
+                # THE OPEN ISSUES THE DOCKET CAME FROM, when it was carried
+                # (`TT.carried_docket`): the turn's own message asked nothing those
+                # senses close, and the juror is told so rather than left to read the
+                # envelope in `prompt` as the ask.
+                **({"carried": carried} if carried else {})},
         "evidence": {"channels": {k: v for k, v in rows},
                      "reads": counts[0], "distinct": len(counts[1] or []),
                      "enumerating": counts[2], "outside": counts[3],
@@ -2331,11 +2336,14 @@ def seating(trips, hits):
         gate.add(sense)
         why.append((t, sense, reason))
     for h in hits:
+        # A CARRIED HIT (`TT.carried_docket`) seats its juror and nothing else: it never
+        # gates and never makes the turn an incident, and its label says where it came from.
+        carried = bool(h.get("carried"))
         applicable.add(h["sense"])
-        if h["kind"] not in TT.JURY_ONLY:
+        if h["kind"] not in TT.JURY_ONLY and not carried:
             gate.add(h["sense"])
-        why.append(("TAG:" + h["kind"], h["sense"], h["why"]))
-        incident = incident or h["kind"] == "incident"
+        why.append(("TAG:" + ("carried " if carried else "") + h["kind"], h["sense"], h["why"]))
+        incident = incident or (h["kind"] == "incident" and not carried)
     return applicable, gate, why, incident
 
 
@@ -2423,6 +2431,14 @@ def docket_hits(payload, reply, subagent):
             if p and any(p in t or t in p for t in texts):
                 hits += [h for h in rec.get("hits") or []
                          if isinstance(h, dict) and not h.get("inherited")]
+    # THE OPEN WORK THE TURN CARRIES IS THE LAST DOCKET (`TT.carried_docket`): read only when
+    # nothing above named one, on the main Stop. IT SURVIVES A DECLARED HOLD, unlike the
+    # inherited docket above. The measured miss is a hold-shaped reply: "the third run is
+    # still on the pod" was said in seven turns about a job that had already failed, and a
+    # claim about the state of running work is one touch can check against the run.
+    if not hits and not subagent:
+        car = tag.get("carried_docket") if isinstance(tag.get("carried_docket"), dict) else {}
+        hits = [h for h in car.get("hits") or [] if isinstance(h, dict) and h.get("carried")]
     seen, out = set(), []
     for h in hits:
         if isinstance(h.get("kind"), str) and h.get("sense") and h["kind"] not in seen:
@@ -2736,8 +2752,11 @@ def widen(payload):
     # because `wf-widen-agent` runs on `Stop` only: the flag would be opened by the main
     # turn, whose ask and whose evidence it does not describe.
     if not subagent:
+        _car = (own_tag(payload) or {}).get("carried_docket")
         raise_flag(payload, why_rows, rows, counts, unopened, applicable,
-                   sampled=sampled, reply=reply)
+                   sampled=sampled, reply=reply,
+                   carried=[i for i in (_car.get("issues") or []) if isinstance(i, dict)]
+                   if isinstance(_car, dict) and any(h.get("carried") for h in hits) else None)
 
     if sampled:
         # A SAMPLED TURN IS NOT BLOCKED. It opened every channel its ask required, so
