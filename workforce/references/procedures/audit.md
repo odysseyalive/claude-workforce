@@ -461,10 +461,11 @@ so a model's draft inside it would later be quoted back to the user as their own
 never be corrected without registering as a directive violation. The script therefore replaces the
 placeholder span (shipped template text, not the user's) with an `origin: workforce | modifiable: true`
 span carrying `drafted-by:`. **Its sidecar consequence is deliberate and bounded:** the placeholder's own
-`.directives.sha` row is orphaned, and the scaffold's later sacred block (the project-principles span)
-keeps every byte — the script verifies it — but shifts its `:directive:<N>` index by one
-(`checksums.md` § The row grammar). Step 5-STAMP's `--directives --execute --restamp`, which re-stamps
-what this run moved, runs after this step and settles both. `principles.md` step 2's rule — ratified
+`.directives.sha` row reads `MISSING`, because its text left the file, and the scaffold's later sacred
+block (the project-principles span) keeps every byte — the script verifies it — and so keeps its row
+wherever it now sits (`checksums.md` § The row grammar: rows are keyed by content). Step 5-STAMP's
+`--directives --execute --restamp`, which re-stamps what this run moved, runs after this step and
+retires the placeholder's row. `principles.md` step 2's rule — ratified
 text is captured verbatim in a user span — is what the user does with the draft, not what the run does.
 
 **This is also the heal.** It keys on the state, never on a version stamp, so an org materialized before

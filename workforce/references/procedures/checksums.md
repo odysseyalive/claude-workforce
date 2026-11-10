@@ -34,17 +34,48 @@ Four rules follow, and they are not optional:
 
 ## The row grammar — canonical, and the one thing this file did not state
 
-**One row per BLOCK. The digest is over the NORMALIZED block content, never the file.**
+**One row per distinct block TEXT in a file, keyed by its content. The digest is over the NORMALIZED
+block content, never the file.**
 
 ```
-<sha256>  <path-relative-to-project-root>:directive:<N>
+<sha256>  <path-relative-to-project-root>
 ```
 
 | Field | |
 |---|---|
-| `<sha256>` | 64 lowercase hex, of the block's content between its markers, normalized |
+| `<sha256>` | 64 lowercase hex, of the block's content between its markers, normalized. It is the row's key |
 | `<path>` | relative to `${CLAUDE_PROJECT_DIR}`, so a sidecar survives being moved with the tree |
-| `:directive:<N>` | 1-based index of the block **within that file**, in document order |
+
+**A row says "this file holds this text", never "slot N holds this text".** Per file, readers compare
+the stamped digests with the blocks on disk:
+
+| On disk | State | `--execute` |
+|---|---|---|
+| a block whose digest has a row, wherever it sits | `OK` (a moved block stays OK) | nothing to write |
+| a block with no row, in a file that lost no stamped text | `UNPROTECTED` (an insert or an append) | writes its row |
+| a block with no row, in a file whose stamped text is gone | `DRIFT` (an edit) | refuses; the stamped digest stays |
+| stamped text gone and nothing new in its place | `MISSING` (a removal) | refuses; the row stays |
+| a row for a path outside the scope, or gone | `ORPHAN` | drops the row |
+
+**How an edit is told from a removal plus an insert.** An edit is the one change that makes a stamped
+digest leave a file at the same moment an unstamped one arrives there. So while a file has lost stamped
+text, every unstamped block in it is `DRIFT`, and none is recorded without `--restamp`: the hash cannot
+say which new block is the edit of which lost one, and holding all of them is the side that cannot bless
+a reworded directive. Appending an item inside one user block changes that block's digest, so it is
+`DRIFT` too, as it should be.
+
+**Byte-identical blocks in one file share one row**, because a key is unique. Removing one of two
+identical copies loses none of the user's words and is not reported. *Measured 2026-11-09: no file in
+mutze-studio's 326 blocks held a duplicate.*
+
+**A LEGACY row ends `:directive:<N>`.** Through 1.86.1 rows were keyed by position, and one block inserted
+above others read every block below it as DRIFT: mutze-studio 0a97ef7 (2026-11-09) showed 97 DRIFT rows,
+96 of them blocks that had only moved, and `--execute` had written 12 slots with the digest of the block
+above them while the inserted blocks got no row. Every reader still parses a legacy row and reads it by
+its digest alone. `wf-stamp.migrate_sidecar` rewrites a legacy sidecar by content, **carrying every digest
+and recomputing none**, so a block that drifted is still DRIFT afterwards. Three paths run it: `wf-heal`
+at `SessionStart`, `wf-settings-apply --heal --execute` (`verify` § Hook wiring, `audit` Step 6-G), and
+any `wf-stamp --directives --execute` (`audit` Step 5-STAMP).
 
 **Block SELECTION, stated once for the same reason — and it was not stated at all until 2026-08-03.**
 This file specified how to *normalize* a block and never how to *find* one, so two readers of the same
@@ -153,7 +184,7 @@ before counting the write, and prints `INV-DIRECTIVES` with every count includin
 copy under `.claude/workforce/migrated/` holding one sacred block: `verify` required a row for it, no
 command could write one, and the row stayed BLOCKING until someone hand-edited `.censusignore`.*
 
-**`--execute` writes a MISSING row only, and `--restamp` is the separate gesture**, exactly as the
+**`--execute` writes rows for new text only, and `--restamp` is the separate gesture**, exactly as the
 contract half works and for the reason § On mismatch gives: a block with no row has no prior claim to
 erase, while a row whose digest differs is either an authorized amendment or an edit nobody approved,
 and the hash cannot tell them apart. An `ORPHAN ROW` — one naming a block that is no longer there — is
@@ -169,6 +200,20 @@ record `wf-apply --record-canary` refuses to accept for the measurement file. Fo
 producer, and the producer was a person typing. Found 2026-09-07 by `/workforce verify` on this
 repository: two rows stale after the 1.24.0 install rewrote their files, and no shipped command able to
 rewrite either.*
+
+**A restamp scoped to one file records an authorized change and nothing else.**
+
+```bash
+"$WF/bin/wf-stamp" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --directives --execute --restamp \
+    --file .claude/skills/operating-principles/SKILL.md --authority .claude/workforce/personnel/AMD-<id>.md
+```
+
+`--file` (repeatable; `--agent <name>` names `.claude/agents/<name>.md`) rewrites only that file's rows to
+what it holds now, prints each digest it records and retires, and leaves every other file's DRIFT where
+it was. The authority is the contract half's: an AMD record that names the file by its project-relative
+path, or an audit run directory; anything else is refused, exit 2, nothing written. The project-wide
+`--restamp` remains for `audit` Step 5-STAMP. *Added 2026-11-09 after mutze-studio could record an
+authorized insert only by re-blessing every unrelated drift row in the tree.*
 
 **The `contract-stamp` half has a script, and until 2026-09-05 it had none.**
 

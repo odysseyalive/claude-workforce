@@ -33,8 +33,8 @@ INC-2026-07-29-sidecar-format-mismatch, the second defect in that subsystem).
 REPORTS; NEVER REPAIRS. It cannot rewrite a directive back. `amend` flags and stops;
 so does this. Five classes, none of which is ever a silent skip:
 
-  DRIFT              row parses, hash differs from the recomputed block
-  MISSING BLOCK      sidecar names a block the file no longer has
+  DRIFT              stamped text left the file as unstamped text arrived (an edit)
+  MISSING BLOCK      stamped text left the file and nothing replaced it
   MALFORMED ROW      a data line the canonical row regex cannot parse
   UNPROTECTED BLOCK  a block in the file with no sidecar row (a coverage gap)
   SIDECAR UNREADABLE the sidecar has data lines and none of them parse
@@ -58,8 +58,11 @@ BLOCK_RX = re.compile(
     r"^<!--\s*origin:\s*user\b[^>]*immutable:\s*true[^>]*-->$(.*?)^<!--\s*/origin\s*-->$",
     re.S | re.M,
 )
-# Generators are strict; readers are liberal (procedures/checksums.md rule 1).
-ROW_RX = re.compile(r"^\s*([0-9a-f]{64})\s+(\S+):directive:(\d+)\s*$", re.I)
+# Generators are strict; readers are liberal (procedures/checksums.md rule 1). A row is
+# keyed by CONTENT, `<sha256>  <path>`; a LEGACY `…:directive:<N>` row is read by its digest
+# and its position is discarded, because a position stops naming a block the moment one is
+# inserted above it (mutze-studio 0a97ef7, 2026-11-09).
+ROW_RX = re.compile(r"^\s*([0-9a-f]{64})\s+(\S+?)(?::directive:(\d+))?\s*$", re.I)
 
 
 def emit(message, system=False):
@@ -155,7 +158,7 @@ def main():
     for line in data_lines:
         m = ROW_RX.match(line)
         if m:
-            rows.setdefault(m.group(2), {})[int(m.group(3))] = m.group(1).lower()
+            rows.setdefault(m.group(2), set()).add(m.group(1).lower())
         else:
             malformed.append(line.strip())
 
@@ -168,23 +171,30 @@ def main():
     # The row is keyed by the file's real project path, so an edit made through a link inside
     # the project still finds it rather than falling back to an unrelated basename.
     rel = os.path.relpath(os.path.realpath(path), os.path.realpath(root)).replace("\\", "/")
-    mine = rows.get(rel) or rows.get(os.path.basename(path)) or {}
+    mine = rows.get(rel) or rows.get(os.path.basename(path)) or set()
 
+    # BY CONTENT: a block whose text has a row is protected wherever it sits, so moving one
+    # is silent. Stamped text that left the file is the finding, and what arrived with it
+    # decides which: unstamped text in the same file is an edit (DRIFT), none is a removal.
+    digests = [hashlib.sha256(content.encode("utf-8")).hexdigest() for content in blocks]
+    gone = sorted(mine - set(digests))
     findings = []
-    for i, content in enumerate(blocks, start=1):
-        want = mine.get(i)
-        if want is None:
-            findings.append(f"UNPROTECTED BLOCK: directive:{i} has no sidecar row")
+    for i, got in enumerate(digests, start=1):
+        if got in mine:
             continue
-        got = hashlib.sha256(content.encode("utf-8")).hexdigest()
-        if got != want:
+        if gone:
             findings.append(
-                f"DRIFT: directive:{i} content changed. A sacred block is never reworded, "
-                f"reordered, or summarized. Restore it, or if the change was intended run "
-                f"`/workforce checksums --execute`."
+                f"DRIFT: directive:{i} is text with no row, in a file that lost stamped text "
+                f"(sha256:{gone[0][:12]}…). A sacred block is never reworded or summarized. "
+                f"Restore it, or if the change was authorized record exactly this file: "
+                f"`wf-stamp --directives --execute --restamp --file {rel} --authority "
+                f"<AMD record naming it>`."
             )
-    for i in sorted(set(mine) - set(range(1, len(blocks) + 1))):
-        findings.append(f"MISSING BLOCK: sidecar names directive:{i}; the file no longer has it")
+        else:
+            findings.append(f"UNPROTECTED BLOCK: directive:{i} has no sidecar row")
+    n_new = sum(1 for d in digests if d not in mine)
+    for d in gone[n_new:]:
+        findings.append(f"MISSING BLOCK: stamped sha256:{d[:12]}… is no longer in the file")
     for line in malformed:
         findings.append(f"MALFORMED ROW: {line[:80]}")
 

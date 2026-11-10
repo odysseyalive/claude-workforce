@@ -1188,15 +1188,15 @@ def draft_objective(root, wf, draft, by, execute):
               f"{' '.join(re.sub(r'[<>]', '', by).split())} -->")
     later = len(USER_SPAN_RX.findall(text[m.end():]))
     # The placeholder is shipped template text, not the user's words, so the whole span is
-    # replaced. That orphans its own `.directives.sha` row and, when sacred blocks follow
-    # it (the scaffold carries one for project principles), shifts their `:directive:<N>`
-    # index by one (`checksums.md` § The row grammar). Their CONTENT is untouched — the
-    # read-back below proves it byte-for-byte — and audit Step 5-STAMP's
-    # `wf-stamp --directives --execute --restamp` re-stamps what this run moved.
+    # replaced. Its `.directives.sha` row then reads MISSING. Sacred blocks after it (the
+    # scaffold carries one for project principles) keep their rows, because rows are keyed by
+    # content (`checksums.md` § The row grammar) and their CONTENT is untouched — the
+    # read-back below proves it byte-for-byte. Audit Step 5-STAMP's
+    # `wf-stamp --directives --execute --restamp` retires the placeholder's row.
     heading = OBJ_HEADING + "\n" if OBJ_HEADING in m.group(1) else ""   # template shape
     new = text[:m.start()] + f"{opener}\n{heading}{draft}\n<!-- /origin -->" + text[m.end():]
     how = (f"placeholder span replaced; {later} later sacred block(s) keep their bytes and "
-           f"shift index by one (Step 5-STAMP re-stamps)" if later else
+           f"keep their rows, which are keyed by content (Step 5-STAMP retires the placeholder's row)" if later else
            "placeholder span replaced; no later sacred block moved")
     if not execute:
         print(f"objective          PLACEHOLDER · {rel} · would draft — {how}")

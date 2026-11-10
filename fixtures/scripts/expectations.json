@@ -2306,8 +2306,8 @@
     "after": {
       ".claude/workforce/.directives.sha": {
         "want": [
-          ".claude/workforce/migrated/SKILL.md.orig.md:directive:1",
-          ".claude/agents/a.md:directive:1"
+          "  .claude/workforce/migrated/SKILL.md.orig.md\n",
+          "  .claude/agents/a.md\n"
         ]
       }
     }
@@ -4044,7 +4044,7 @@
       ".claude/workforce/.directives.sha": {
         "want": [
           "de1e7ed",
-          ".claude/skills/new/SKILL.md:directive:1"
+          "b87685ad4747df08f073f1ed7b8017bccb654166f3fbfa243db13a3524bd4b61  .claude/skills/new/SKILL.md"
         ]
       }
     },
@@ -4101,7 +4101,7 @@
           ".claude/skills/gone/SKILL.md"
         ],
         "want": [
-          ".claude/skills/s/SKILL.md:directive:1"
+          "  .claude/skills/s/SKILL.md\n"
         ]
       }
     },
@@ -4113,7 +4113,7 @@
     "script": "wf-stamp",
     "want": [
       "ORPHAN ROW",
-      ".claude/skills/gone/SKILL.md:directive:1",
+      ".claude/skills/gone/SKILL.md  sha256:c0ffee000000",
       "the counts below are the state AFTER this write",
       "orphan 0"
     ]
@@ -4143,12 +4143,15 @@
     ]
   },
   "stampdir-twoblocks": {
-    "_why": "The row index is 1-based and PER FILE, matching how wf-conform reads a row back as `found[i - 1]`. A file holding two sacred blocks must produce :directive:1 and :directive:2 rather than one row for the file \u2014 a generator that collapsed them would leave the second block unprotected while the count read as covered.",
+    "_why": "One row per distinct block TEXT, keyed by content (checksums.md \u00a7 The row grammar). A file holding two sacred blocks must produce two rows, one per digest, rather than one row for the file \u2014 a generator that collapsed them would leave the second block unprotected while the count read as covered. No row carries a position.",
     "after": {
       ".claude/workforce/.directives.sha": {
+        "not": [
+          ":directive:"
+        ],
         "want": [
-          ".claude/skills/s/SKILL.md:directive:1",
-          ".claude/skills/s/SKILL.md:directive:2"
+          "7c67acbbfe73344e",
+          "75fd206adbb86a91"
         ]
       }
     },
@@ -4188,8 +4191,12 @@
         "not": [
           "not-a-row"
         ],
+        "not": [
+          "not-a-row",
+          ":directive:"
+        ],
         "want": [
-          "  .claude/skills/s/SKILL.md:directive:1",
+          "  .claude/skills/s/SKILL.md\n",
           "7c67acbbfe73344e"
         ]
       }
@@ -15017,5 +15024,316 @@
               ]
           }
       }
+  },
+  "stampdir-keys-insert-top": {
+    "_why": "mutze-studio 0a97ef7: one authorized block inserted ABOVE two stamped ones. Keyed by position, both read DRIFT and --execute wrote the old second block's digest into the third slot while the inserted block got no row. Keyed by content, the two keep their rows and only the insert is recorded.",
+    "script": "wf-stamp",
+    "args": [
+      "--directives",
+      "--execute"
+    ],
+    "exit": 0,
+    "want": [
+      "UNPROTECTED   .claude/agents/x.md:directive:1",
+      "covered 3",
+      "drift 0"
+    ],
+    "not": [
+      "✗ DRIFT"
+    ],
+    "after": {
+      ".claude/workforce/.directives.sha": {
+        "want": [
+          "86612af2bc82dca0",
+          "61fb1bdde6dd0a5c",
+          "9f962c76a0a7d26e"
+        ],
+        "not": [
+          ":directive:"
+        ]
+      }
+    }
+  },
+  "stampdir-keys-move": {
+    "_why": "A block that moves keeps its row wherever it lands, so swapping two stamped blocks is clean and writes nothing.",
+    "script": "wf-stamp",
+    "args": [
+      "--directives",
+      "--execute"
+    ],
+    "exit": 0,
+    "want": [
+      "covered 2",
+      "drift 0",
+      "missing 0"
+    ],
+    "not": [
+      "✗ DRIFT",
+      "wrote .claude/workforce"
+    ]
+  },
+  "stampdir-keys-edit": {
+    "_why": "THE NEGATIVE. A reworded block: its stamped digest leaves the file as an unstamped one arrives, which is an edit, so it is DRIFT, exit 1, and --execute keeps the stamped digest and does not record the new one.",
+    "script": "wf-stamp",
+    "args": [
+      "--directives",
+      "--execute"
+    ],
+    "exit": 1,
+    "want": [
+      "✗ DRIFT        .claude/agents/x.md:directive:1",
+      "gone from .claude/agents/x.md: stamped sha256:61fb1bdde6dd",
+      "drift 1"
+    ],
+    "after": {
+      ".claude/workforce/.directives.sha": {
+        "want": [
+          "61fb1bdde6dd0a5c"
+        ],
+        "not": [
+          "15e15c2337c82202"
+        ]
+      }
+    }
+  },
+  "stampdir-keys-append-inside": {
+    "_why": "The operating-principles case: an item appended INSIDE one whole user block is a content change to that block, so it is DRIFT and plain --execute does not record it. The remedy names the scoped restamp.",
+    "script": "wf-stamp",
+    "args": [
+      "--directives",
+      "--execute"
+    ],
+    "exit": 1,
+    "want": [
+      "✗ DRIFT        .claude/skills/s/SKILL.md:directive:1",
+      "drift 1",
+      "--restamp --file <path> --authority"
+    ],
+    "after": {
+      ".claude/workforce/.directives.sha": {
+        "want": [
+          "7569af67c72e677b"
+        ],
+        "not": [
+          "d20f074873071195"
+        ]
+      }
+    }
+  },
+  "stampdir-keys-removal": {
+    "_why": "A removed block reports MISSING and is held: plain --execute keeps its row (a position-keyed ORPHAN used to be dropped silently when the last block went).",
+    "script": "wf-stamp",
+    "args": [
+      "--directives",
+      "--execute"
+    ],
+    "exit": 1,
+    "want": [
+      "✗ MISSING      .claude/agents/x.md  stamped sha256:61fb1bdde6dd",
+      "missing 1"
+    ],
+    "after": {
+      ".claude/workforce/.directives.sha": {
+        "want": [
+          "61fb1bdde6dd0a5c",
+          "9f962c76a0a7d26e"
+        ]
+      }
+    }
+  },
+  "stampdir-keys-restamp-scoped": {
+    "_why": "ms-dev's remedy: a restamp scoped to the one file an AMD record names records exactly that file. The other file's DRIFT is not blessed, so the run still exits 1.",
+    "script": "wf-stamp",
+    "args": [
+      "--directives",
+      "--execute",
+      "--restamp",
+      "--file",
+      ".claude/agents/a.md",
+      "--authority",
+      ".claude/workforce/personnel/AMD-x-20261109.md"
+    ],
+    "exit": 1,
+    "want": [
+      "RESTAMP      .claude/agents/a.md  under .claude/workforce/personnel/AMD-x-20261109.md: records 1 block(s), retires 1",
+      "drift 1"
+    ],
+    "after": {
+      ".claude/workforce/.directives.sha": {
+        "want": [
+          "15e15c2337c82202",
+          "9f962c76a0a7d26e"
+        ],
+        "not": [
+          "61fb1bdde6dd0a5c",
+          "865d1a82affacde0"
+        ]
+      }
+    }
+  },
+  "stampdir-keys-restamp-unnamed": {
+    "_why": "An AMD record authorizes the files it names. A scoped restamp of a file it does not name is refused, exit 2, nothing written.",
+    "script": "wf-stamp",
+    "args": [
+      "--directives",
+      "--execute",
+      "--restamp",
+      "--file",
+      ".claude/agents/b.md",
+      "--authority",
+      ".claude/workforce/personnel/AMD-x-20261109.md"
+    ],
+    "exit": 2,
+    "want": [
+      "REFUSED",
+      "does not name .claude/agents/b.md"
+    ],
+    "after": {
+      ".claude/workforce/.directives.sha": {
+        "unchanged": true
+      }
+    }
+  },
+  "stampdir-keys-restamp-no-authority": {
+    "_why": "A scoped restamp with no authority is refused, exit 2, nothing written.",
+    "script": "wf-stamp",
+    "args": [
+      "--directives",
+      "--execute",
+      "--restamp",
+      "--file",
+      ".claude/agents/a.md"
+    ],
+    "exit": 2,
+    "want": [
+      "REFUSED",
+      "no --authority given"
+    ],
+    "after": {
+      ".claude/workforce/.directives.sha": {
+        "unchanged": true
+      }
+    }
+  },
+  "stampdir-keys-migrate-drift": {
+    "_why": "Migration of a position-keyed ledger with existing drift. x.md had a block inserted at the top and a bogus duplicate row in slot 3; SKILL.md had a real change. After --execute no row carries a position, the shifted rows are clean, the insert is recorded, and the real change is still DRIFT with its stamped digest kept.",
+    "script": "wf-stamp",
+    "args": [
+      "--directives",
+      "--execute"
+    ],
+    "exit": 1,
+    "want": [
+      "LEGACY KEYS  4 row(s)",
+      "position-keyed 0",
+      "drift 1",
+      "✗ DRIFT        .claude/skills/s/SKILL.md:directive:1"
+    ],
+    "not": [
+      "✗ DRIFT        .claude/agents/x.md"
+    ],
+    "after": {
+      ".claude/workforce/.directives.sha": {
+        "not": [
+          ":directive:",
+          "d20f074873071195"
+        ],
+        "want": [
+          "7569af67c72e677b",
+          "86612af2bc82dca0"
+        ]
+      }
+    }
+  },
+  "heal-directive-keys": {
+    "_why": "The session-start path. A position-keyed ledger is rewritten by content with every digest carried: the real change (SKILL.md) keeps its stamped digest and is still DRIFT, and no block is recorded by the heal.",
+    "script": "wf-heal",
+    "stdin_raw": "{\"cwd\": \".\", \"hook_event_name\": \"SessionStart\", \"source\": \"startup\"}",
+    "exit": 0,
+    "want": [
+      "MIGRATED  .claude/workforce/.directives.sha: 4 position-keyed row(s) are now 3 keyed by content",
+      "1 duplicate row(s) collapsed"
+    ],
+    "not": [
+      "Traceback",
+      "INTERRUPTED"
+    ],
+    "after": {
+      ".claude/workforce/.directives.sha": {
+        "not": [
+          ":directive:",
+          "d20f074873071195",
+          "86612af2bc82dca0"
+        ],
+        "want": [
+          "7569af67c72e677b",
+          "61fb1bdde6dd0a5c",
+          "9f962c76a0a7d26e"
+        ]
+      }
+    }
+  },
+  "sa-heal-directive-keys": {
+    "_why": "The verify/audit path: --heal --execute carries the same migration.",
+    "script": "wf-settings-apply",
+    "args": [
+      "--heal",
+      "--execute"
+    ],
+    "exit": 0,
+    "want": [
+      "SIDECAR 4 position-keyed .directives.sha row(s) migrated",
+      "MIGRATED"
+    ],
+    "not": [
+      "Traceback"
+    ],
+    "after": {
+      ".claude/workforce/.directives.sha": {
+        "not": [
+          ":directive:",
+          "d20f074873071195"
+        ],
+        "want": [
+          "7569af67c72e677b"
+        ]
+      }
+    }
+  },
+  "sidecar-hook-moved": {
+    "_why": "The edit-time hook reads by content: swapped stamped blocks are protected wherever they sit.",
+    "script": "wf-protect-directives",
+    "stdin_file": ".claude/agents/x.md",
+    "exit": 0,
+    "want": [
+      "Directive protection OK", "2 of 2 block(s) examined and matching"
+    ],
+    "not": [
+      "DRIFT"
+    ]
+  },
+  "sidecar-hook-insert": {
+    "_why": "The hook on mutze's shape against a legacy ledger: an inserted block is UNPROTECTED and the blocks below it are not DRIFT.",
+    "script": "wf-protect-directives",
+    "stdin_file": ".claude/agents/x.md",
+    "exit": 0,
+    "want": [
+      "UNPROTECTED BLOCK: directive:1"
+    ],
+    "not": [
+      "DRIFT"
+    ]
+  },
+  "sidecar-legacy-moved": {
+    "_why": "wf-conform reads a legacy row by its digest: a row naming the wrong position for a block it covers passes, with an advisory that the row is still position-keyed.",
+    "script": "wf-conform",
+    "exit": 0,
+    "want": [
+      "0 failed",
+      "keyed by position"
+    ],
+    "not": [
+      "digest matches"
+    ]
   }
 }

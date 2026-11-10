@@ -3,8 +3,9 @@
 
 WHAT IT HEALS (`heal_settings`): the retired workforce hook ROWS in the project's
 settings, the retired pin guard's GIT hook, the machine-owned REGIONS a release moved on,
-the retired commitments ledger (`_retired_ledger`), and every recorded choice of a model the
-pool SUPERSEDED (`_heal_superseded`). One pass is not the project's: the USER-SCOPE
+the retired commitments ledger (`_retired_ledger`), every recorded choice of a model the
+pool SUPERSEDED (`_heal_superseded`), and a `.directives.sha` still keyed by position
+(`_heal_directive_keys`). One pass is not the project's: the USER-SCOPE
 `advisorModel`, moved off a superseded model once per config root (`_heal_superseded_user`).
 
 WHERE IT CAME FROM. This is the `SessionStart` half of `wf-commitments`, which kept a
@@ -146,7 +147,8 @@ def heal_settings(root):
                             _heal_git_hooks(root, progress),
                             _heal_regions(root, progress),
                             _retired_ledger(root, progress),
-                            _heal_superseded(root, progress)) if x]
+                            _heal_superseded(root, progress),
+                            _heal_directive_keys(root, progress)) if x]
         return "\n".join(said)
     except Exception as exc:                             # noqa: BLE001 — see docstring
         # SILENT ONLY WHEN NOTHING WAS WRITTEN. An error after a write leaves the project
@@ -692,6 +694,38 @@ def _heal_superseded_user(progress):
     if isinstance(marker, dict) and marker.get("template") == digest:
         return ""
     return "\n".join(_sibling("wf-model-lanes").heal_superseded_user(True, progress)["lines"])
+
+
+# The sidecar `wf-stamp` writes, spelled here so the gate below runs with nothing imported.
+DIRECTIVES_REL = ".claude/workforce/.directives.sha"
+
+
+def _heal_directive_keys(root, progress):
+    """Rewrite a position-keyed `.directives.sha` by content, once. The line to show, or "".
+
+    THE DEFECT (mutze-studio 0a97ef7, 2026-11-09). Rows were keyed `<path>:directive:<N>`, so
+    one authorized block inserted at the top of a handbook read every block below it as
+    DRIFT, and the only remedy re-blessed every other drift row in the tree as well. Rows are
+    keyed by content now, and a project carrying the old keys is rewritten the first time
+    anyone opens it, with no audit and no typed command (`enforcement.md`, three paths).
+
+    THE DECISION AND THE WRITE ARE `wf-stamp`'s (`migrate_sidecar`): every digest is carried
+    and none is recomputed, so a block that drifted stays DRIFT and a block that only moved
+    is clean again. What this function decides is whether to ask.
+
+    NEAR ZERO WHEN THERE IS NOTHING TO DO: no sidecar costs one failed open, and a sidecar
+    already keyed by content costs one read with nothing imported. The open refuses a link.
+    """
+    p = os.path.join(root, *DIRECTIVES_REL.split("/"))
+    try:
+        with os.fdopen(_open_nofollow(p, os.O_RDONLY), "r", encoding="utf-8",
+                       errors="replace") as fh:
+            text = fh.read()
+    except OSError:
+        return ""
+    if ":directive:" not in text:
+        return ""
+    return _sibling("wf-stamp").migrate_sidecar(root, True, progress)["line"]
 
 
 def main():

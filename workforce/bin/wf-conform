@@ -284,7 +284,9 @@ def _is_path_argument(tok, text):
 # artifact must share one grammar and one normalization, or they cannot both be right.
 BLOCK_RX = re.compile(
     r"^<!--\s*origin:\s*user\b[^>]*immutable:\s*true[^>]*-->$(.*?)^<!--\s*/origin\s*-->$", re.S | re.M)
-ROW_RX = re.compile(r"^\s*([0-9a-f]{64})\s+(\S+):directive:(\d+)\s*$", re.I)
+# A ROW IS KEYED BY CONTENT: `<sha256>  <path>`, one per distinct block text. A row ending
+# `:directive:<N>` is LEGACY (keyed by position) and is read by its digest alone.
+ROW_RX = re.compile(r"^\s*([0-9a-f]{64})\s+(\S+?)(?::directive:(\d+))?\s*$", re.I)
 
 
 def normalize(text):
@@ -2506,7 +2508,14 @@ def check_sidecar(root, res):
     `procedures/checksums.md` § The row grammar is the authority, and both readers
     now implement it: one row per BLOCK, sha over the NORMALIZED block content.
 
-        <sha256>  <path-relative-to-project-root>:directive:<N>
+        <sha256>  <path-relative-to-project-root>
+
+    KEYED BY CONTENT, NOT POSITION (mutze-studio 0a97ef7, 2026-11-09). A row names a text the
+    file must hold, wherever it sits, so a block that moves still matches and an inserted
+    block is only unstamped. Stamped text that is gone fails: as DRIFT when the file gained
+    unstamped text in the same change (an edit), as a missing block when it gained none. A
+    legacy `:directive:<N>` row is read by its digest and reported as an advisory until
+    `wf-stamp` or the session-start heal rewrites it.
 
     This reader and `wf-protect-directives` used to disagree on both halves — this
     one split on a double space and hashed whole FILE bytes, that one parsed
@@ -2531,11 +2540,12 @@ def check_sidecar(root, res):
         return
 
     data = [l for l in body.splitlines() if l.strip() and not l.startswith("#")]
-    rows, malformed = {}, []
+    rows, malformed, legacy = {}, [], 0
     for line in data:
         m = ROW_RX.match(line)
         if m:
-            rows.setdefault(m.group(2), {})[int(m.group(3))] = m.group(1).lower()
+            rows.setdefault(m.group(2), set()).add(m.group(1).lower())
+            legacy += m.group(3) is not None
         else:
             malformed.append(line.strip()[:70])
 
@@ -2546,7 +2556,7 @@ def check_sidecar(root, res):
                 "reports clean about blocks it never examined")
         return
     for bad in malformed:
-        res.add(False, f"sidecar: malformed row {bad!r}", "canonical grammar: <sha>  <path>:directive:<N>")
+        res.add(False, f"sidecar: malformed row {bad!r}", "canonical grammar: <sha256>  <path>")
 
     for rel, blocks in sorted(rows.items()):
         p = os.path.join(root, rel)
@@ -2556,15 +2566,28 @@ def check_sidecar(root, res):
         body_f = read(p, res)
         if body_f is None:
             continue
-        found = [normalize(m.group(1)) for m in BLOCK_RX.finditer(body_f)]
-        for i, want in sorted(blocks.items()):
-            if i > len(found):
-                res.add(False, f"sidecar: {rel}:directive:{i} present",
-                        "the sidecar stamps a block the file no longer has")
-                continue
-            got = hashlib.sha256(found[i - 1].encode("utf-8")).hexdigest()
-            res.add(got == want, f"sidecar: {rel}:directive:{i} digest matches",
-                    "a sacred block changed after it was stamped — flag, never repair")
+        found = [hashlib.sha256(normalize(m.group(1)).encode("utf-8")).hexdigest()
+                 for m in BLOCK_RX.finditer(body_f)]
+        gone = sorted(blocks - set(found))
+        new = [(i, d) for i, d in enumerate(found, 1) if d not in blocks]
+        for i, d in enumerate(found, 1):
+            if d in blocks:
+                res.add(True, f"sidecar: {rel}:directive:{i} digest matches")
+            elif gone:
+                # An edit: stamped text left this file as unstamped text arrived in it. An
+                # unstamped block in a file that lost nothing is an insert, and the coverage
+                # loop below reports it.
+                res.add(False, f"sidecar: {rel}:directive:{i} digest matches",
+                        f"a sacred block changed after it was stamped (stamped sha256:"
+                        f"{gone[0][:12]}… is gone) — flag, never repair")
+        for d in gone[len(new):]:
+            res.add(False, f"sidecar: {rel} stamped sha256:{d[:12]}… present",
+                    "the sidecar stamps a block the file no longer has")
+    if legacy:
+        res.advise(f"sidecar: {legacy} row(s) keyed by position",
+                   "read by content here; the next session start, `wf-settings-apply --heal "
+                   "--execute` or `wf-stamp --directives --execute` rewrites them by content "
+                   "with every digest carried")
 
     # ── COVERAGE: the denominator comes from the TREE, never from the sidecar ──
     # Everything above iterates `rows` — the blocks the sidecar already names — so it
@@ -2618,14 +2641,20 @@ def check_sidecar(root, res):
     unstamped = []
     _files, _scratch_skipped = _load_sibling("wf-census").sacred_scope(root)
     for p in _files:
-        rel = os.path.relpath(p, root)
+        rel = os.path.relpath(p, root).replace(os.sep, "/")
         try:
             with open(p, encoding="utf-8") as fh:
-                n = len(BLOCK_RX.findall(fh.read()))
-        except OSError:
+                found = [hashlib.sha256(normalize(m.group(1)).encode("utf-8")).hexdigest()
+                         for m in BLOCK_RX.finditer(fh.read())]
+        except (OSError, UnicodeDecodeError):
             continue
-        for i in range(1, n + 1):
-            if i not in rows.get(rel, {}):
+        mine = rows.get(rel, set())
+        # A file that lost stamped text had its unstamped blocks failed above as DRIFT, so
+        # they are not counted again here as merely unstamped.
+        if mine - set(found):
+            continue
+        for i, d in enumerate(found, 1):
+            if d not in mine:
                 unstamped.append(f"{rel}:directive:{i}")
     # NEVER SILENT. An exclusion that does not print is indistinguishable from a scan
     # that found nothing, and under-reporting is the direction that hurts (audit.md

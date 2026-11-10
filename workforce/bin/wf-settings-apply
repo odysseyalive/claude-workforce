@@ -2993,6 +2993,15 @@ def do_heal(root, execute):
         for line in sup["lines"]:
             print(f"  {line}")
     rc = sup["rc"] or rc
+    # THE SIDECAR HALF: a `.directives.sha` still keyed by position is rewritten by content,
+    # every digest carried. The decision and the write are `wf-stamp`'s (`migrate_sidecar`),
+    # shared with the session-start carrier (`wf-heal`) and `wf-stamp --directives --execute`.
+    mig = _sibling("wf-stamp").migrate_sidecar(root, execute)
+    print(f"SIDECAR {mig['legacy']} position-keyed .directives.sha row(s) "
+          f"{'migrated' if execute and not mig['rc'] else 'to migrate'}")
+    if mig["line"]:
+        print(f"  {mig['line']}")
+    rc = mig["rc"] or rc
     if not execute:
         print("  apply with: --execute")
     return rc
