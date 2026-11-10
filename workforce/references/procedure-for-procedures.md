@@ -101,8 +101,8 @@ instruction; `Read .claude/workforce/org-config.md` is.
 **3. Ground in tools that exist.** `Grep` and `Glob` are **not** granted to subagents
 (`platform.md` fact 4). A step depending on them fails cold with nobody watching. Use `Bash`, an
 explicit `Read` of a known path, or an MCP server — MCP tools *do* reach subagents. A page fetch is
-`mcp__playwright-mcp__web_fetch` where that server is configured and `WebFetch` where it is not
-(`procedures/handbook.md` Step 2a); `WebFetch` reaches a subagent unless a `permissions.deny` rule
+`mcp__playwright-mcp__web_fetch` where that server is configured and `WebFetch` where it is not, with
+both granted (`procedures/handbook.md` Step 2a); `WebFetch` reaches a subagent unless a `permissions.deny` rule
 names it.
 
 **Enumerate with `find`, never with `ls`.** `ls` is commonly aliased — to `eza`, `lsd`, or a

@@ -360,10 +360,11 @@ verification tier-1 command usually does not exist. `playwright-mcp` supplies ti
   not "the employee believes the page looks right." That is the whole difference between a handbook
   that proves its work and one that asserts it.
 - **It is the primary page fetch, and `WebFetch` is the fallback.** `web_fetch` renders JS and PDFs,
-  returns citation data, and sits behind the exfiltration guards below. Where the server is not
-  configured, a page-fetching employee is granted native `WebFetch` instead (`procedures/handbook.md`
-  Step 2a, written by `wf-web-grant`); `platform.md` fact 4 measured that grant delivering the tool
-  on 2.1.322 wherever no `permissions.deny` rule names it.
+  returns citation data, and sits behind the exfiltration guards below. A page-fetching employee is
+  granted both, and its `## Guardrails` line has it use `WebFetch` only when `web_fetch` is not among
+  its tools, which is the case where the server is not configured (`procedures/handbook.md` Step 2a,
+  written by `wf-web-grant`). `platform.md` fact 4 measured the `WebFetch` grant delivering the tool on
+  2.1.322 wherever no `permissions.deny` rule names it.
 - **`suite_audit` and `suite_methodology`** give a Lead a real basis for reviewing an IC's test work
   rather than eyeballing it.
 - **`suite_audit` needs neither `Bash` nor the browser.** It runs `npx playwright test` inside the
@@ -439,8 +440,9 @@ fixture behind fact 13 ran against a server that exists; what an employee sees w
 the server pattern, the employee has no way to notice what it is missing, and the handbook's
 `## Verification` cannot run. Cold, silent, in a fresh context. Confirm the server is present at hire
 time; if it is not, do not write the dependency into the procedure. **Page fetch is the exception,
-because it has a native fallback:** an absent server means a `WebFetch` grant, written by
-`wf-web-grant` (`procedures/handbook.md` Step 2a), never an employee with no way to fetch.
+because it has a native fallback:** every page-fetching employee also holds `WebFetch`, written by
+`wf-web-grant` (`procedures/handbook.md` Step 2a), so an absent server never leaves it with no way to
+fetch.
 
 **Then take the higher tier instead, because it was always ranked higher.** Look again at the tier
 table at the top of this file: *a command with an exit code* is tier 1 and the MCP suite is tier 2. A

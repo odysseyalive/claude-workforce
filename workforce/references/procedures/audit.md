@@ -1372,17 +1372,16 @@ Per **governed** handbook (adopted agents stay exempt until their first amendmen
    belongs to Step 2. **And never NARROW one either: the removal set is exactly the closed literal set
    `wf-conform` reports — `Grep`, `Glob` — and nothing else.** `WebFetch` left that set 2026-11-10:
    `platform.md` fact 4 re-measured it as granted wherever no deny rule names it, and it is now the
-   page-fetch fallback. **The page-fetch grant is the one exception to both "never widen" and "never
-   narrow", because a rule owns it** (user, 2026-11-10: playwright-mcp primary, native fallback where
-   it is absent). Run `"$WF/bin/wf-web-grant" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --execute` and put
-   its output in the run report. It brings each page-fetching handbook's `tools:` to
-   `procedures/handbook.md` Step 2a's row for this host and appends that step's one `## Guardrails`
-   rule line. On a host with the server, that means adding `mcp__playwright-mcp` and `WebSearch` and
-   removing `WebFetch`; without it, adding `WebFetch` and `WebSearch`. It writes nothing in
-   `## Procedure` or `## Verification`, so the heal is not a contract change. **This command is exempt
-   from item 1's refresh-due gate, as item 2c is**: the right grant depends on the host, not the
-   handbook's stamp, so it runs once per audit over the whole org. `wf-heal` runs the same heal at
-   every session start. A `tools:` entry the project
+   page-fetch fallback. **The page-fetch grant is the one exception to "never widen", because a rule
+   owns it** (user, 2026-11-10: playwright-mcp primary, native fallback where it is absent). Run
+   `"$WF/bin/wf-web-grant" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --execute` and put its output in the
+   run report. It adds whichever of `mcp__playwright-mcp`, `WebFetch` and `WebSearch` a page-fetching
+   handbook's `tools:` lacks, and appends `procedures/handbook.md` Step 2a's one `## Guardrails` rule
+   line. It never removes an entry, and the grant is the same on every host, so a project that moves
+   between servers heals once and is then left alone. It writes nothing in `## Procedure` or
+   `## Verification`, so the heal is not a contract change. **This command is exempt from item 1's
+   refresh-due gate, as item 2c is**: it reads the handbook's grant, not its stamp, so it runs once per
+   audit over the whole org. `wf-heal` runs the same heal at every session start. A `tools:` entry the project
    added by hand survives this item untouched, `mcp__<server>` entries included. This item heals the
    frontmatter; it does not normalize it back to the template, and a `tools:` line is not a contract
    section. *Stated explicitly 2026-09-24 after an IC in a sibling project was found improvising around

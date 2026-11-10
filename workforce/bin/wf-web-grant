@@ -1,25 +1,26 @@
 #!/usr/bin/env python3
-"""wf-web-grant — give every page-fetching employee the fetch tool this host actually has.
+"""wf-web-grant — give every page-fetching employee the primary fetch tool and its fallback.
 
-    wf-web-grant [--root <dir>]              report the path chosen and each handbook's state
-    wf-web-grant [--root <dir>] --execute    and bring each handbook to it
+    wf-web-grant [--root <dir>]              report this host's path and each handbook's state
+    wf-web-grant [--root <dir>] --execute    and bring each handbook to the grant
 
 THE RULE (user, 2026-11-10): "for item 05, we need to set up the playwright-mcp as a primary
 (not a suggestion), if the mcp doesn't exist, it falls back to native tools." And: "the
 playwright-mcp is mainly for page fetch". So this governs PAGE FETCH only. Discovery is
-native `WebSearch` on both paths; interactive browsing (`browser_*`) is not touched here.
+native `WebSearch`; interactive browsing (`browser_*`) is not touched here.
 
-  playwright-mcp PRESENT  ->  `tools:` carries `mcp__playwright-mcp` and `WebSearch`, and
-                              not `WebFetch`: with the server here, `WebFetch` would be an
-                              unguarded path around its exfiltration guards.
-  playwright-mcp ABSENT   ->  `tools:` carries `WebFetch` and `WebSearch`. An existing
-                              `mcp__playwright-mcp` entry stays, because the body may name
-                              its tools and the grant then still matches the body.
+ONE GRANT ON EVERY HOST: `tools:` carries `mcp__playwright-mcp`, `WebFetch` and `WebSearch`.
+The choice between the two fetch tools is made at runtime by the `## Guardrails` line below,
+not in the tracked file: the user runs projects across several servers, and a `tools:` line
+rewritten per host flips in git every time the project is opened somewhere else. A grant for
+an absent server resolves to nothing (fact 13b), which is exactly what lets the employee see
+that `web_fetch` is not among its tools and take `WebFetch`.
 
-PRESENCE is `procedures/handbook.md` Step 2a, the config half: the `mcpServers` keys in the
-config root's `.claude.json` (top level and this project's entry), the project's `.mcp.json`,
-and `.claude/settings*.json`. Read only. NEVER `claude mcp list`, which health-checks every
-registered server. A shape this does not recognise reads ABSENT, the fail-safe direction.
+THIS HOST'S PATH is still detected, for the report: `procedures/handbook.md` Step 2a's config
+half — the `mcpServers` keys in the config root's `.claude.json` (top level and this
+project's entry), the project's `.mcp.json`, and `.claude/settings*.json`. Read only. NEVER
+`claude mcp list`, which health-checks every registered server. A shape this does not
+recognise reads ABSENT, the fail-safe direction. It decides nothing that is written.
 
 WHY `WebFetch` IS A REAL FALLBACK. Measured 2026-11-10 on Claude Code 2.1.322
 (`platform.md` fact 4): an explicit `tools: Read, WebFetch, WebSearch` delivers `WebFetch`
@@ -166,20 +167,18 @@ def fetches(body):
     return False
 
 
-def want_tokens(tokens, present):
+def want_tokens(tokens):
+    """The same grant on every host. Only ever adds, so a second run anywhere is a no-op."""
     out = list(tokens)
-    if present:
-        out = [t for t in out if t != FALLBACK]
-        if not any(PRIMARY_TOKEN_RX.match(t) for t in out):
-            out.append(PRIMARY)
-    elif FALLBACK not in out:
-        out.append(FALLBACK)
-    if DISCOVER not in out:
-        out.append(DISCOVER)
+    if not any(PRIMARY_TOKEN_RX.match(t) for t in out):
+        out.append(PRIMARY)
+    for t in (FALLBACK, DISCOVER):
+        if t not in out:
+            out.append(t)
     return out
 
 
-def plan(body, present):
+def plan(body):
     """-> (state, new_body, changes). state: ok | change | skip:<why> | none."""
     fm = FM_RX.match(body)
     if not fm or not ORG_RECORD_RX.search(body) or not fetches(body):
@@ -191,8 +190,8 @@ def plan(body, present):
     if not raw or raw.startswith("[") or raw.startswith("-"):
         return "skip:`tools:` is not a comma list, so it is not edited", body, []
     tokens = [t.strip() for t in raw.split(",") if t.strip()]
-    want = want_tokens(tokens, present)
-    changes = [f"+{t}" for t in want if t not in tokens] + [f"-{t}" for t in tokens if t not in want]
+    want = want_tokens(tokens)
+    changes = [f"+{t}" for t in want if t not in tokens]
     new = body
     if want != tokens:
         start = fm.start(1) + tl.start(1)
@@ -240,7 +239,8 @@ def handbooks(root):
 
 
 def run(root, execute):
-    """-> (exit code, lines). The first line always says which path was chosen."""
+    """-> (exit code, lines). The first line says which fetch tool an employee on THIS host
+    will use; what is written does not depend on it."""
     present, where, searched = detect(root)
     if present:
         lines = [f"web fetch: {SERVER} PRESENT ({where}) -> primary `{FETCH_TOOL}`, "
@@ -262,7 +262,7 @@ def run(root, execute):
             lines.append(f"  ! {name}  not read ({exc.strerror})")
             code = 1
             continue
-        state, new, changes = plan(body, present)
+        state, new, changes = plan(body)
         if state == "none":
             continue
         if state == "ok":

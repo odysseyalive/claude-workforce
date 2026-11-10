@@ -609,22 +609,18 @@ is named **at server level, inside that allowlist**.
 
 **A web fetcher's fetch tool is a rule, not a choice.** `playwright-mcp` is the primary page fetch;
 where the host has not configured it, the employee falls back to native `WebFetch`. Discovery is
-`WebSearch` on both. `procedures/handbook.md` Step 2a decides which, and `wf-web-grant` writes it:
+`WebSearch` on both. The grant is the same on every host, so a project that moves between servers
+never rewrites it (`procedures/handbook.md` Step 2a), and `wf-web-grant` writes it:
 
 ```yaml
-# playwright-mcp configured on this host
-tools: Read, Write, Bash, mcp__playwright-mcp, WebSearch
+tools: Read, Write, Bash, mcp__playwright-mcp, WebFetch, WebSearch
 disallowedTools: Agent
 ```
 
-```yaml
-# playwright-mcp not configured: the native fallback
-tools: Read, Write, Bash, WebFetch, WebSearch
-disallowedTools: Agent
-```
-
-`wf-web-grant` also appends this line to the employee's `## Guardrails`, so the rule travels with the
-handbook to a machine whose configuration differs from the authoring one:
+Where the server is not configured its grant resolves to nothing (fact 13b), so `web_fetch` is simply
+not among the employee's tools. `wf-web-grant` also appends this line to the employee's
+`## Guardrails`. It makes the choice at runtime, and it is what keeps `WebFetch` from being used as a
+route around the server's guards on a host that has the server:
 
 ```markdown
 <!-- origin: workforce | modifiable: true | web-fetch -->
@@ -653,7 +649,8 @@ a load.
 
 **Check the server is configured before granting it** (`verification.md` § When the server is absent):
 an absent server is dropped silently and the employee cannot tell (fact 13b). For page fetch that
-check is `wf-web-grant`, and an absent server means the `WebFetch` row, never a fetch-less employee.
+check is `wf-web-grant`, and an absent server means the employee fetches with `WebFetch`, never that
+it cannot fetch.
 
 Its `## Verification` should be a scaffolded deterministic suite rather than a judgment
 (`verification.md`) — **unless the employee is a judgment role**, whose verdict is verified by a

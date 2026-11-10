@@ -151,35 +151,44 @@ question is *"is this name configured here"*, and that is answerable by reading.
 **Page fetch is the one dependency with a native fallback, so it never ends at "not available".**
 User, 2026-11-10: *"for item 05, we need to set up the playwright-mcp as a primary (not a suggestion),
 if the mcp doesn't exist, it falls back to native tools"*, and *"the playwright-mcp is mainly for page
-fetch"*. For any employee whose `## Procedure` or `## Verification` fetches a web page:
+fetch"*. Any employee whose `## Procedure` or `## Verification` fetches a web page gets **one grant
+on every host**, and the choice between the two fetch tools is made at runtime:
 
-| `playwright-mcp` | `tools:` carries | The employee fetches with |
+```yaml
+tools: <its other tools>, mcp__playwright-mcp, WebFetch, WebSearch
+```
+
+| On a host where `playwright-mcp` is | The employee fetches with | Because |
 |---|---|---|
-| PRESENT | `mcp__playwright-mcp`, `WebSearch`, and not `WebFetch` | `mcp__playwright-mcp__web_fetch`; discovers with `WebSearch` |
-| ABSENT | `WebFetch`, `WebSearch` | `WebFetch`; discovers with `WebSearch` |
+| configured | `mcp__playwright-mcp__web_fetch` | its `## Guardrails` line forbids `WebFetch` while `web_fetch` is among its tools |
+| not configured | `WebFetch` | the server's grant resolves to nothing (fact 13b), so `web_fetch` is not among its tools |
 
-`WebFetch` is withheld on the PRESENT row because it would be an unguarded path around the server's
-exfiltration guards (`verification.md` § The guards an employee will meet). The fallback is real:
-`platform.md` fact 4 measured an explicit `tools: WebFetch` delivering the tool on 2.1.322, absent
-only where a `permissions.deny` rule names it. Interactive browsing (`browser_*`) is not covered by
-this rule and keeps the ABSENT rule above.
+Discovery is `WebSearch` on both. **The grant does not change per host because projects travel
+between hosts:** the operator runs projects across several servers, and a `tools:` line rewritten for
+each host's configuration would flip in every clone each time the project is opened somewhere else.
+Holding `WebFetch` beside the server is a route around the server's exfiltration guards
+(`verification.md` § The guards an employee will meet); the Guardrails line is what closes it, which is
+why the producer writes that line and the author never leaves it out. The fallback is real:
+`platform.md` fact 4 measured an explicit `tools: WebFetch` delivering the tool on 2.1.322, absent only
+where a `permissions.deny` rule names it. Interactive browsing (`browser_*`) is not covered by this
+rule and keeps the ABSENT rule above.
 
-**The producer is `wf-web-grant`.** Run it once without `--execute` before Step 3, to read the path
-from its first line, and once with `--execute` after Step 3 has written the file. The handbook is not
-done until that second run exits 0:
+**The producer is `wf-web-grant`.** Run it with `--execute` after Step 3 has written the file. The
+handbook is not done until it exits 0:
 
 ```bash
 WF="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/workforce"; [ -d "$WF" ] || WF="${CLAUDE_PROJECT_DIR}/.claude/skills/workforce"
 "$WF/bin/wf-web-grant" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --execute
 ```
 
-It runs this step's presence rules, brings each page-fetching handbook's `tools:` line to the row
-above, and appends one `origin: workforce` rule line to its `## Guardrails`: fetch with
-`mcp__playwright-mcp__web_fetch`, and with `WebFetch` only when that tool is absent. **Print its first
-line in the authoring report.** That line names the path chosen (`PRESENT -> primary` or
-`ABSENT -> native fallback`) and, where a deny rule leaves the fallback with nothing, says so. In that
-case research degrades to the seed and is reported as such (`recruiter.md`). Write the
-`## Procedure` steps against the tool on that path's row.
+It adds whichever of `mcp__playwright-mcp`, `WebFetch` and `WebSearch` a page-fetching handbook's
+`tools:` line lacks, never removes one, and appends one `origin: workforce` rule line to its
+`## Guardrails`: fetch with `mcp__playwright-mcp__web_fetch`, and with `WebFetch` only when that tool
+is not among your tools. A second run on any host changes nothing. **Print its first line in the
+authoring report.** That line names this host's path (`PRESENT -> primary` or `ABSENT -> native
+fallback`) and, where a deny rule leaves the fallback with nothing, says so. In that case research
+degrades to the seed and is reported as such (`recruiter.md`). Write the `## Procedure` steps against
+`mcp__playwright-mcp__web_fetch`; the Guardrails line supplies the fallback.
 
 **Two limits, both stated in the handbook rather than papered over:**
 
