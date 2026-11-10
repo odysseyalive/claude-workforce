@@ -4,8 +4,9 @@
 WHAT IT HEALS (`heal_settings`): the retired workforce hook ROWS in the project's
 settings, the retired pin guard's GIT hook, the machine-owned REGIONS a release moved on,
 the retired commitments ledger (`_retired_ledger`), every recorded choice of a model the
-pool SUPERSEDED (`_heal_superseded`), and a `.directives.sha` still keyed by position
-(`_heal_directive_keys`). One pass is not the project's: the USER-SCOPE
+pool SUPERSEDED (`_heal_superseded`), a `.directives.sha` still keyed by position
+(`_heal_directive_keys`), and a page-fetching handbook whose `tools:` names a fetch tool
+this host does not have (`_heal_web_fetch`). One pass is not the project's: the USER-SCOPE
 `advisorModel`, moved off a superseded model once per config root (`_heal_superseded_user`).
 
 WHERE IT CAME FROM. This is the `SessionStart` half of `wf-commitments`, which kept a
@@ -148,7 +149,8 @@ def heal_settings(root):
                             _heal_regions(root, progress),
                             _retired_ledger(root, progress),
                             _heal_superseded(root, progress),
-                            _heal_directive_keys(root, progress)) if x]
+                            _heal_directive_keys(root, progress),
+                            _heal_web_fetch(root, progress)) if x]
         return "\n".join(said)
     except Exception as exc:                             # noqa: BLE001 — see docstring
         # SILENT ONLY WHEN NOTHING WAS WRITTEN. An error after a write leaves the project
@@ -726,6 +728,24 @@ def _heal_directive_keys(root, progress):
     if ":directive:" not in text:
         return ""
     return _sibling("wf-stamp").migrate_sidecar(root, True, progress)["line"]
+
+
+def _heal_web_fetch(root, progress):
+    """Give each page-fetching handbook the fetch tool this host has. The line, or "".
+
+    THE RULE (user, 2026-11-10): playwright-mcp is the primary page fetch, and where it is
+    not configured the employee falls back to native `WebFetch`. A handbook authored on a
+    host with the server, opened on one without it, held a grant that resolves to nothing
+    (fact 13b), so its research read as "network unavailable". The decision and the write
+    are `wf-web-grant`'s; it touches only the `tools:` line and one `## Guardrails` span,
+    neither of which `contract-stamp` hashes.
+
+    NEAR ZERO WHEN THERE IS NOTHING TO DO: no `.claude/agents/` costs one failed listing,
+    and `wf-web-grant.heal` reads no config until some handbook names a fetch.
+    """
+    if not os.path.isdir(os.path.join(root, ".claude", "agents")):
+        return ""
+    return _sibling("wf-web-grant").heal(root, progress)
 
 
 def main():

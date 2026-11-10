@@ -877,8 +877,13 @@ def check_handbook(path, body, res, ceiling, floors=None):
         # REPORTED, never blocking: the measurement is of one host, the grant is
         # harmless where the tool does exist, and the remedy is a one-line edit —
         # do the searching through `Bash`, which is granted everywhere.
+        # `WebFetch` LEFT THIS SET 2026-11-10: re-measured on 2.1.322 (platform.md fact 4)
+        # it IS delivered by an explicit grant and the fetch succeeds; it was missing only
+        # where a `permissions.deny` rule names it, as this maintainer's own settings did.
+        # It is now the native page-fetch fallback `wf-web-grant` writes, so reporting it
+        # here would hand audit Step 5d item 2b a grant to strip that the heal just added.
         _phantom = sorted({t.strip() for t in _tools_raw.split(",")}
-                          & {"Grep", "Glob", "WebFetch"})
+                          & {"Grep", "Glob"})
         if _phantom:
             res.advise(
                 f"{n}: `tools:` grants {', '.join(_phantom)}",

@@ -98,9 +98,12 @@ the subject so it is findable.
 is complete, every term the project uses is defined or linked. *"Update the config"* is not an
 instruction; `Read .claude/workforce/org-config.md` is.
 
-**3. Ground in tools that exist.** `Grep`, `Glob`, and `WebFetch` are **not** granted to subagents
+**3. Ground in tools that exist.** `Grep` and `Glob` are **not** granted to subagents
 (`platform.md` fact 4). A step depending on them fails cold with nobody watching. Use `Bash`, an
-explicit `Read` of a known path, or an MCP server — MCP tools *do* reach subagents.
+explicit `Read` of a known path, or an MCP server — MCP tools *do* reach subagents. A page fetch is
+`mcp__playwright-mcp__web_fetch` where that server is configured and `WebFetch` where it is not
+(`procedures/handbook.md` Step 2a); `WebFetch` reaches a subagent unless a `permissions.deny` rule
+names it.
 
 **Enumerate with `find`, never with `ls`.** `ls` is commonly aliased — to `eza`, `lsd`, or a
 `--color` wrapper — and the replacements print a **header line**. A step doing `ls … | head -1` then

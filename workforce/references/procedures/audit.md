@@ -1364,13 +1364,25 @@ Per **governed** handbook (adopted agents stay exempt until their first amendmen
    prose — correctly — but a handbook's `tools:`, `disallowedTools:` and `model:` lines sit outside
    both, so a defect there had a detector in `wf-conform` and no authorized fix anywhere in this
    procedure. Apply what `wf-conform` reports on this handbook: a **phantom tool grant** (a `tools:`
-   entry naming something the host has no registry entry for — `Grep`, `Glob` and `WebFetch` are the
-   standing cases, measured absent from the subagent namespace in `platform.md` fact 4) is removed and
+   entry naming something the host has no registry entry for — `Grep` and `Glob` are the standing
+   cases, measured absent from the subagent namespace in `platform.md` fact 4) is removed and
    the work re-grounded in `Bash`; a ceiling declared under `allowed-tools:` is renamed to `tools:`;
    an IC missing either half of the tier ceiling gains it. **Never widen a grant here** — removing an
    entry that resolves to nothing changes no capability, while adding one is an org-shape decision that
    belongs to Step 2. **And never NARROW one either: the removal set is exactly the closed literal set
-   `wf-conform` reports — `Grep`, `Glob`, `WebFetch` — and nothing else.** A `tools:` entry the project
+   `wf-conform` reports — `Grep`, `Glob` — and nothing else.** `WebFetch` left that set 2026-11-10:
+   `platform.md` fact 4 re-measured it as granted wherever no deny rule names it, and it is now the
+   page-fetch fallback. **The page-fetch grant is the one exception to both "never widen" and "never
+   narrow", because a rule owns it** (user, 2026-11-10: playwright-mcp primary, native fallback where
+   it is absent). Run `"$WF/bin/wf-web-grant" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --execute` and put
+   its output in the run report. It brings each page-fetching handbook's `tools:` to
+   `procedures/handbook.md` Step 2a's row for this host and appends that step's one `## Guardrails`
+   rule line. On a host with the server, that means adding `mcp__playwright-mcp` and `WebSearch` and
+   removing `WebFetch`; without it, adding `WebFetch` and `WebSearch`. It writes nothing in
+   `## Procedure` or `## Verification`, so the heal is not a contract change. **This command is exempt
+   from item 1's refresh-due gate, as item 2c is**: the right grant depends on the host, not the
+   handbook's stamp, so it runs once per audit over the whole org. `wf-heal` runs the same heal at
+   every session start. A `tools:` entry the project
    added by hand survives this item untouched, `mcp__<server>` entries included. This item heals the
    frontmatter; it does not normalize it back to the template, and a `tools:` line is not a contract
    section. *Stated explicitly 2026-09-24 after an IC in a sibling project was found improvising around

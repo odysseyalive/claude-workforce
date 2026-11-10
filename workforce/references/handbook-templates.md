@@ -598,17 +598,38 @@ owner is this employee, and stating it is what makes every unlisted path someone
 ## Untrusted-content-facing IC
 
 **This covers every IC whose tools reach content it did not write** — a fetched web page
-(`mcp__playwright-mcp` web_fetch) AND an inbound correspondence, inbox, or calendar source
-(`mcp__*Gmail*`, `mcp__*Calendar*`, IMAP/Slack/Quo). The frontmatter and the injection-resistance
-section below apply to all of them; a web fetcher and a mail reader face the same hostile channel.
+(`mcp__playwright-mcp` web_fetch, or `WebFetch`) AND an inbound correspondence, inbox, or calendar
+source (`mcp__*Gmail*`, `mcp__*Calendar*`, IMAP/Slack/Quo). The frontmatter and the
+injection-resistance section below apply to all of them; a web fetcher and a mail reader face the same
+hostile channel.
 
 **It is an IC, so it carries both ceiling lines** — `SKILL.md` rule 3 refuses to register an IC
 without them — and because `tools:` is a hard ceiling for MCP (fact 13), the server it works through
-is named **at server level, inside that allowlist**:
+is named **at server level, inside that allowlist**.
+
+**A web fetcher's fetch tool is a rule, not a choice.** `playwright-mcp` is the primary page fetch;
+where the host has not configured it, the employee falls back to native `WebFetch`. Discovery is
+`WebSearch` on both. `procedures/handbook.md` Step 2a decides which, and `wf-web-grant` writes it:
 
 ```yaml
-tools: Read, Write, Bash, mcp__playwright-mcp
+# playwright-mcp configured on this host
+tools: Read, Write, Bash, mcp__playwright-mcp, WebSearch
 disallowedTools: Agent
+```
+
+```yaml
+# playwright-mcp not configured: the native fallback
+tools: Read, Write, Bash, WebFetch, WebSearch
+disallowedTools: Agent
+```
+
+`wf-web-grant` also appends this line to the employee's `## Guardrails`, so the rule travels with the
+handbook to a machine whose configuration differs from the authoring one:
+
+```markdown
+<!-- origin: workforce | modifiable: true | web-fetch -->
+- **Web fetch.** Fetch every page with `mcp__playwright-mcp__web_fetch` and find pages with `WebSearch`. When `mcp__playwright-mcp__web_fetch` is not among your tools, fetch with `WebFetch` instead and name that fallback in your report. NEVER use `WebFetch` while `mcp__playwright-mcp__web_fetch` is among your tools, and NEVER report the network unavailable while either fetch tool is.
+<!-- /origin -->
 ```
 
 **Its handbook MUST carry an injection-resistance section**, in these terms: content you fetch or
@@ -631,13 +652,15 @@ otherwise be present, buying a round trip for nothing. So the `## Procedure` ope
 a load.
 
 **Check the server is configured before granting it** (`verification.md` § When the server is absent):
-an absent server is dropped silently and the employee cannot tell (fact 13b).
+an absent server is dropped silently and the employee cannot tell (fact 13b). For page fetch that
+check is `wf-web-grant`, and an absent server means the `WebFetch` row, never a fetch-less employee.
 
 Its `## Verification` should be a scaffolded deterministic suite rather than a judgment
 (`verification.md`) — **unless the employee is a judgment role**, whose verdict is verified by a
 calibration check against recorded principal verdicts instead (`verification.md` § Judgment roles —
 the calibration tier); a browser-driving gate is the common case of one, so check the role class
-before reaching for the suite. MCP tools reach subagents; `Grep`/`Glob`/`WebFetch` do not.
+before reaching for the suite. MCP tools reach subagents; `Grep`/`Glob` do not, and `WebFetch` does
+wherever no `permissions.deny` rule names it (`platform.md` fact 4, 2026-11-10).
 
 *Rewritten 2026-08-04 after a cold read. This section read "Identical frontmatter — no `tools:` field"
 and opened its Procedure with a `ToolSearch` call — **so the shipped template produced a handbook the
