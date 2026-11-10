@@ -2827,6 +2827,17 @@ is closed by the downstream run that RE-RUNS its own reproduction and watches it
 upstream report asserting the fix shipped. So this step writes the row in BOTH places: the queue keeps
 it until the reproduction passes here, and the inbox is what makes somebody upstream aware it exists.
 
+**Outside the workforce source checkout the inbox has no reader, so the row also reaches the user.** The
+inbox is read by `/workforce dev`, which only a maintainer runs. When the project root holds no
+`workforce/SKILL.md` (`SKILL.md` § Dev Path Discipline's test), `--execute` also prints an
+`UPSTREAM-ISSUES` block: one ready-to-file issue per row it filed for `odysseyalive/claude-workforce` —
+a title, a body holding the row verbatim with its evidence, the project slug, the run id and the
+installed version — and the one `gh issue create` command that files it, or the prefilled new-issue URL
+when `gh` is not on PATH. **Quote that block in the closing report, beside `INV-UPSTREAM`, unchanged.**
+Never run the command, and never open the URL: filing is an outward act in the user's name, and the body
+quotes their project's row. Neither the issue nor the inbox file discharges the row — it stays in
+`deferred.md` until its reproduction passes here, whichever path it left by.
+
 *Added 2026-09-25. The carve-out that lets an other-repository row survive also names its own gap —
 "the closing mechanism was a person noticing the paragraph and opening a session by hand", which
 `deferred.md` calls **a rule with a reader and no producer**. MEASURED on `university` the same day:

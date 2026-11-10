@@ -1,17 +1,15 @@
 <!-- ui-design-ref-version: 2 -->
-<!-- CARRIED FORWARD VERBATIM 2026-09-10 from the sibling project apps-odyssey-alive
-     (.claude/skills/design-eval/references/design-quality-catalog.md, design-quality-ref-version 1),
-     which is the canonical built catalog for this capability (evaluators.md item 3b: where a project
-     already carries a ui-design catalog the existing one is canonical and the seed contributes only
-     new entries). Not one row below is reworded. Owner in THIS project: design-evaluator. The seed's
-     additions that this file does not cover live in references/rendered-checks.md, never inlined here.
-     Its own provenance header follows unchanged. -->
 <!-- design-quality-ref-version: 1 -->
-<!-- CANONICAL design-quality catalog for apps.odysseyalive.com. Owner: presentation-critic (read-only
-     library, read BY PATH per evaluators.md — never invoked as a skill by an IC). Seeded 2026-08-26 from
-     run design-critic-hire-20260826 (WebSearch->web_fetch, 20 sources fetched + cited). Growth goes in a
-     machine-owned region at the END of this file; existing rows are never reworded. Basis tags: Stated =
-     quote-backed from the cited source; Derived = inference/owner house-rule anchored to nearest support. -->
+<!-- The design-quality catalog for rendered interfaces. Owner: the project's UI evaluator — whichever
+     employee runs `/ui-design review` (read-only library, read BY PATH per evaluators.md — never
+     invoked as a skill by an IC). Where a project already carries a ui-design catalog, that one is
+     canonical and this file contributes only the entries it lacks (evaluators.md item 3b); the seed's
+     additions this file does not cover live in references/rendered-checks.md, never inlined here.
+     Growth goes in a machine-owned region at the END of this file; existing rows are never reworded.
+     Basis tags: Stated = quote-backed from the cited source; Derived = inference/owner house-rule
+     anchored to nearest support.
+     Provenance: seeded 2026-08-26 from 20 sources fetched and cited (WebSearch->web_fetch); carried
+     forward 2026-09-10 from the project it was built in, with not one row reworded. -->
 # Design-Review Standards Catalog — Rendered Interfaces (marketing, landing, beta-signup, and app screens)
 
 **Purpose.** A cited, checkable catalog of industry-standard criteria professionals use to
