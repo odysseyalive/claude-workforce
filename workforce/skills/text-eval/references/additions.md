@@ -2,10 +2,10 @@
 <!-- origin: workforce | modifiable: true -->
 # Text-tells additions — authored by workforce
 
-**This file is NOT vendored.** the evaluator skill's shipped `references/` is a read-only import from claude-enforcer that
-must stay byte-identical to its origin so a reconcile can still compute a difference
-(`evaluators.md` § Seeding). This file is the other half: entries **workforce itself** contributes,
-tracked and shipped, with no obligation to match anything upstream.
+**This file is NOT the imported set.** The rest of the evaluator skill's shipped `references/` was imported
+from claude-enforcer and is workforce-owned since 2026-11-10 (`version.md`), versioned by its own
+anchor. This file is the other half: entries **workforce itself** authored, tracked and shipped under
+`text-additions-version`, so a reconcile can still tell an imported row from one of ours.
 
 It exists because two rules in `evaluators.md` were in tension without it. § Seeding calls growing
 the shipped seed a **release task** — *"as claude-enforcer stops receiving work, the shipped seed

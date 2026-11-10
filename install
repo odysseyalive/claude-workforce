@@ -442,6 +442,39 @@ kept_slot_due() {
     return 1
 }
 
+# THE BUNDLE GUARD. An `agent` row writes `<agents>/<name>.md` whoever wrote it before, and
+# records it as this installer's, so when a release drops that agent the prune would remove
+# a registration some OTHER skill on the same scope still needs. Found 2026-11-10 while
+# removing image-eval (50f20ec): a project bundling its own `agents/image-validator/AGENT.md`
+# has that registration overwritten by the shipped one and recorded, so the release that
+# drops the agent prunes it. `character-scanner` is the same path: claude-enforcer's text-eval
+# bundles one, and so do projects carrying their own copy (hither-lands, odyssey-alive). So a recorded `<agents>/<name>.md` is KEPT, never pruned, while any skill
+# under this scope's skills root still bundles `agents/<name>/AGENT.md`.
+#
+# A DEFINITION THIS RUN IS ABOUT TO PRUNE IS NOT A BUNDLE. Rule 2 walks the record in the
+# order it was written, so testing the disk alone would make the answer depend on whether
+# workforce's own dropped `AGENT.md` happened to be deleted before or after its
+# registration. A recorded definition the manifest no longer lists goes in this run unless it
+# sits under a kept skill, whose recorded paths are carried, not pruned.
+#
+# Prints the bundling definition and returns 0 when the registration must stay.
+still_bundled() {
+    _sb_name="$(basename "$1" .md)"
+    for _sb_def in "$_skills_root"/*/agents/"$_sb_name"/AGENT.md; do
+        [ -f "$_sb_def" ] || continue
+        if grep -Fxq "$_sb_def" "$_record" && ! grep -Fxq "$_sb_def" "$_ext_now"; then
+            _sb_kept=""
+            for _ks in ${SIBLING_KEPT:-}; do
+                case "$_sb_def" in "$_skills_root/$_ks/"*) _sb_kept="yes" ;; esac
+            done
+            [ -n "$_sb_kept" ] || continue
+        fi
+        echo "$_sb_def"
+        return 0
+    done
+    return 1
+}
+
 prune_scope() {
     _skill_dir="$1"
     _agents_dir="$2"
@@ -603,6 +636,19 @@ prune_scope() {
                 continue
             fi
             if [ -f "$pf" ] && ! grep -Fxq "$pf" "$_ext_now"; then
+                # The bundle guard, for a registration directly in this scope's agents/.
+                # KEPT IN THE RECORD, as a kept skill's paths are: re-tested on every update,
+                # so it is pruned once nothing bundles it any more.
+                if [ "$(dirname "$pf")" = "$_agents_dir" ]; then
+                    case "$pf" in
+                        *.md)
+                            if _sb_by="$(still_bundled "$pf")"; then
+                                echo "$pf" >> "$_ext_now"
+                                echo "  Kept $pf: ${_sb_by#"$_skills_root"/} still bundles it."
+                                continue
+                            fi ;;
+                    esac
+                fi
                 rm -f "$pf" && _pruned=$((_pruned + 1))
                 echo "  Pruned $pf"
                 # A SIBLING THE MANIFEST DROPPED LEAVES NO EMPTY SHELL. The `-empty -delete`
@@ -815,7 +861,7 @@ install_to_scope() {
             # `agent` REGISTERS a shipped evaluator agent with the host. The definition
             # itself arrives as a `sibling` row inside the skill; this row writes the
             # `<name>.md` the host actually reads, where `<name>` is the agent directory —
-            # `agents/character-scanner/AGENT.md` registers as `character-scanner.md`.
+            # `agents/code-design-advisor/AGENT.md` registers as `code-design-advisor.md`.
             # Same destination directory as `canary`, and the same `.installed-external`
             # record, so `disband` and the prune remove it and nothing else.
             "agent "*) flag="agentreg"; path="${line#agent }" ;;

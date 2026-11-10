@@ -323,7 +323,7 @@ function Install-ClaudeWorkforce {
             $dest = Join-Path $stylesDir (Split-Path $path -Leaf)
         } elseif ($flag -eq 'agentreg') {
             # The host reads `<name>.md`, never a nested AGENT.md:
-            # `agents/character-scanner/AGENT.md` registers as `character-scanner.md`.
+            # `agents/code-design-advisor/AGENT.md` registers as `code-design-advisor.md`.
             $dest = Join-Path $agentsDir ((Split-Path ($path -creplace '/AGENT\.md$', '') -Leaf) + '.md')
         } elseif ($flag -eq 'sibling') {
             # A whole skill of its own, beside skills/workforce/ and never inside it.
@@ -408,6 +408,29 @@ function Install-ClaudeWorkforce {
     #   3. `.claude/workforce/` project state is never walked.
     # A partial install never prunes: deleting "everything not in the set" would delete working
     # files whose replacements did not arrive.
+    # THE BUNDLE GUARD. `install` § still_bundled carries the reason: an `agent` row overwrites
+    # and records a registration another skill may bundle, so a recorded `<agents>/<name>.md` is
+    # KEPT while any skill under this scope's skills root still bundles `agents/<name>/AGENT.md`.
+    # A recorded definition this run is about to prune is not a bundle, whatever order the
+    # record lists it in; one under a kept skill is carried, not pruned, so it counts. Returns
+    # the bundling definition relative to the skills root, or $null.
+    function Get-StillBundled([string]$reg, [string]$agentsDir, [string]$skillsRoot,
+                              [string[]]$record, $extNow, [string[]]$keptPrefixes) {
+        if (-not $reg.EndsWith('.md', [System.StringComparison]::OrdinalIgnoreCase)) { return $null }
+        if ((Resolve-FullPath (Split-Path -Parent $reg)) -ne (Resolve-FullPath $agentsDir)) { return $null }
+        $name = [System.IO.Path]::GetFileNameWithoutExtension($reg)
+        $root = Resolve-FullPath $skillsRoot
+        foreach ($skill in @(Get-ChildItem -LiteralPath $root -Directory -ErrorAction SilentlyContinue)) {
+            $def = Resolve-FullPath (Join-Path $skill.FullName (Join-Path 'agents' (Join-Path $name 'AGENT.md')))
+            if (-not (Test-Path -LiteralPath $def -PathType Leaf)) { continue }
+            if (($record -contains $def) -and -not ($extNow -contains $def)) {
+                if (@($keptPrefixes | Where-Object { $def.StartsWith($_, [System.StringComparison]::Ordinal) }).Count -eq 0) { continue }
+            }
+            return $def.Substring($root.Length).TrimStart('\', '/')
+        }
+        return $null
+    }
+
     function Invoke-ScopePrune([string]$skillDir, [string]$agentsDir, [string]$stylesDir,
                                [string[]]$keptSkills, [string[]]$slotClaimed) {
         $skillsRoot = Split-Path $skillDir -Parent
@@ -490,13 +513,22 @@ function Install-ClaudeWorkforce {
         if (Test-Path -LiteralPath $recordPath -PathType Leaf) {
             $keptPrefixes = @($keptSkills | Where-Object { $_ } | ForEach-Object {
                 (Resolve-FullPath (Join-Path $skillsRoot $_)) + [System.IO.Path]::DirectorySeparatorChar })
-            foreach ($pf in @(Get-Content -LiteralPath $recordPath)) {
+            $recordLines = @(Get-Content -LiteralPath $recordPath)
+            foreach ($pf in $recordLines) {
                 if (-not $pf) { continue }
                 if (@($keptPrefixes | Where-Object { $pf.StartsWith($_, [System.StringComparison]::Ordinal) }).Count -gt 0) {
                     if (-not $extNow.Contains($pf)) { $extNow.Add($pf) }
                     continue
                 }
                 if ((Test-Path -LiteralPath $pf -PathType Leaf) -and -not ($extNow -contains $pf)) {
+                    # The bundle guard. Kept in the record, as a kept skill's paths are, so the
+                    # next update re-tests it and prunes it once nothing bundles it.
+                    $bundledBy = Get-StillBundled $pf $agentsDir $skillsRoot $recordLines $extNow $keptPrefixes
+                    if ($bundledBy) {
+                        $extNow.Add($pf)
+                        Write-Host "  Kept $($pf): $bundledBy still bundles it."
+                        continue
+                    }
                     try {
                         Remove-Item -LiteralPath $pf -Force -ErrorAction Stop; $pruned++
                         Write-Host "  Pruned $pf"

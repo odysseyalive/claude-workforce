@@ -87,7 +87,7 @@ design or front-end IC, and is **hired when** the project ships a user interface
 |---|---|---|---|
 | Reviews | code quality — cross-file consistency, mistake taxonomy, guards | text authenticity — machine-writing tells, voice drift | web-security — OWASP Top 10:2025 flaw classes as source-review classes, taint signals, a per-language sink appendix |
 | Catalog | mistake taxonomy, cross-file detection, native tool map, guards, gotchas | the tells catalog, clustering rules, severity tiers | security taxonomy, native-tool map, guards, cross-file detection (each carrying a `security-ref-version` anchor) |
-| Seed source | claude-enforcer (migration import), vendored verbatim | claude-enforcer (migration import), vendored verbatim | **distilled and cited** — OWASP/CheatSheetSeries @c735a6e, swisskyrepo/PayloadsAllTheThings @3bff425, semgrep/semgrep-rules @40b8c63, each row anchored to a CWE. This project's own build, no enforcer predecessor, `origin: workforce · modifiable` |
+| Seed source | claude-enforcer (migration import), vendored verbatim | claude-enforcer (migration import, 2026-08-03), **workforce-owned since 2026-11-10** | **distilled and cited** — OWASP/CheatSheetSeries @c735a6e, swisskyrepo/PayloadsAllTheThings @3bff425, semgrep/semgrep-rules @40b8c63, each row anchored to a CWE. This project's own build, no enforcer predecessor, `origin: workforce · modifiable` |
 | Owner | an engineering IC | a content IC | a security or engineering IC |
 | Hired when | the project has code | the project produces prose | the project has web-facing code |
 
@@ -597,15 +597,20 @@ is the same shape claude-enforcer already ships and this file already describes 
 never happen is workforce **editing** a vendored file to suit itself: that forks a corpus with one
 origin, and `manifest.txt` § Vendored evaluator catalogs says so at the top of the list.
 
-**This "never edit" rule governs the vendored corpora — `code` and `text` — and only them.** The
+**This "never edit" rule governs the vendored corpus — `code` — and only it.** `text` was vendored
+until 2026-11-10 and is workforce's own since: claude-enforcer is superseded and other users do not
+have it, so there is no upstream left for an edit to fork from (user, 2026-11-10: *"please take care
+of items 06 through 10 to clean up this project"*; `text-eval/references/version.md`). A change to
+its set is made here and bumps `creative-scrub-ref-version`. The
 security catalog is not vendored: its single origin is this project, and workforce grows it by
 re-distilling the three cited pins into it (§ Seeding the catalog, step 4). There is no upstream copy for it to fork
 away from, so editing it is not the two-canonical-texts hazard — it is maintenance of the one canonical
 copy, the same as any other reference this project owns. `catalogs/` therefore holds two kinds of corpus
-that share a shape but not a growth rule: **vendored-verbatim** (`code`, `text`, re-copied from
-claude-enforcer and never hand-edited) and **workforce-distilled** (`security`, authored here and
-re-distilled from its pins). Both are read-mostly, version-anchored, and greppable; they differ in
-origin and in who may edit them.
+that share a shape but not a growth rule: **vendored-verbatim** (`code`, re-copied from
+claude-enforcer and never hand-edited), **imported, then owned** (`text`, edited here since
+2026-11-10), and **workforce-distilled** (`security`, authored here and re-distilled from its pins).
+All are read-mostly, version-anchored, and greppable; they differ in origin and in who may edit
+them.
 
 **So growth goes to the evaluator skill's own `skills/<evaluator>/references/additions.md`, and that is the whole reason it exists.**
 Until 2026-08-06 there were two slots and neither could take a new entry authored here: the vendored
@@ -618,7 +623,9 @@ them.
 
 **Standing maintenance item.** As claude-enforcer stops receiving work, the shipped seed here has to
 carry more of the weight — **which now means adding to the evaluator skill's own `skills/<evaluator>/references/additions.md`, never to
-the evaluator skill's vendored corpus beside it.** Growing it is a release task. **It is not on `version.md`'s checklist** — an earlier form claimed it
+the evaluator skill's vendored corpus beside it.** For `text`, a correction to an imported row is made
+in `text-tells.md` itself now; a new row still goes to `additions.md`, so its anchor keeps the two
+provenances apart. Growing it is a release task. **It is not on `version.md`'s checklist** — an earlier form claimed it
 was, and that checklist has five items and has never carried one for the seed, and the honest signal
 is the `seed-only` marker: every project still wearing it is a project whose evaluator has a thin
 corpus.

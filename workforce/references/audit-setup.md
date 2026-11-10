@@ -984,8 +984,8 @@ nothing: separate files, deliberately different, each caller naming the one it w
 | **NAMESPACE** | the whole union, including in-skill `AGENT.md` | **ADVISORY** — constrains what workforce may *claim* for a new employee (`data-skills.md` § Naming), and says nothing about whether the target is broken |
 
 **SHADOWED is advisory because no remedy for it lives inside the tree the run governs.**
-`manifest.txt` carries three `agent` rows, so `install` registers a shipped evaluator's agent —
-`character-scanner`, `code-design-advisor`, `deadcode-gardener` — into the agents/
+`manifest.txt` carries two `agent` rows, so `install` registers a shipped evaluator's agent —
+`code-design-advisor`, `deadcode-gardener` — into the agents/
 directory of the scope it installed into, and a project keeping its own customized copy of that
 evaluator registers the same name at project scope. `install` says what may be done about the other
 scope — *"REPORTED, NEVER REMOVED. The other scope is not this install's to edit"* — and `scopes.md`

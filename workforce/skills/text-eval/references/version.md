@@ -11,9 +11,13 @@ the project's machine-owned library regions are stale → audit's gap check re-r
 against the new shipped content; previously acknowledged gap rows stay suppressed
 unless their shipped entry materially changed since the acked version.
 
-**This file, and its `creative-scrub-ref-version` anchor, track the vendored import ONLY.** The
-creative-integrity set (`text-tells.md` in this directory) is a read-only import from
-claude-enforcer that must match its origin byte-for-byte and is never edited here. Tells that
+**This file, and its `creative-scrub-ref-version` anchor, track the imported set ONLY.** The
+creative-integrity set (`text-tells.md` in this directory) was imported from claude-enforcer's
+skill-builder on 2026-08-03 (commit `ff27cb2`) and is **workforce-owned since 2026-11-10**. User,
+2026-11-10: *"please take care of items 06 through 10 to clean up this project"*, the tenth being
+that claude-enforcer is superseded and other users do not have it. There is no upstream to match
+byte for byte any more: a change to this set is made here, bumps the integer below, and reaches
+installed copies through the forcible append. Tells that
 **workforce itself** authors are not in this set and are not counted by this anchor: they live in
 `text-eval/references/additions.md`, versioned by its own `text-additions-version` anchor. A reader
 who reaches this file by the `catalogs/` path and never sees that slot has diffed the wrong pair
@@ -48,7 +52,8 @@ with this number so a per-file check is possible.
   human-presence markers. Severity/cluster/voice policy stays canonical in
   `creative-integrity.md`; this set carries detection content only.
 
-**The vendored set is `text-tells.md` and `human-markers.md`** (2026-09-10). The second came across
+**The imported set is `text-tells.md` and `human-markers.md`** (2026-09-10). The second came across
 with the evaluators when they began shipping as skills: the consolidated catalog covers every topic the
 project copies carried except positive human-presence signals, and an evaluator that can only score
-tells over-flags writing that is plainly human. Both are imports and neither is edited here.
+tells over-flags writing that is plainly human. Both were imports; both are workforce's own since
+2026-11-10, under the same rule as above.

@@ -226,9 +226,12 @@ workforce/references/org-config.template.md
 # reason: `odyssey-alive/.claude/skills/text-eval/SKILL.md` carries an
 # `origin: user | immutable: true` block of the user's own directives.
 # PROVENANCE, three kinds, because one prefix now holds all three and the contracts differ.
-# VENDORED, NOT AUTHORED: `text-eval/references/text-tells.md` and the `code-evaluator`
-# corpus are byte-identical imports from claude-enforcer. Keep their own anchors, never
-# edit here — rewriting one forks a corpus that has one origin; update by re-copying.
+# VENDORED, NOT AUTHORED: the `code-evaluator` corpus is a byte-identical import from
+# claude-enforcer. Keep its own anchors, never edit here — rewriting it forks a corpus that
+# has one origin; update by re-copying. `text-eval/references/text-tells.md` and
+# `human-markers.md` WERE in this kind: imported 2026-08-03, workforce-owned since 2026-11-10
+# (claude-enforcer is superseded and other users do not have it; `text-eval/references/
+# version.md`). They are edited here now, under their own `creative-scrub-ref-version` anchor.
 # AUTHORED HERE, NOT VENDORED: each `additions.md` is workforce's own slot and the
 # only sanctioned place to GROW a catalog; each `SKILL.md`; and the whole `security-evaluator`
 # corpus, distilled and cited from OWASP/PayloadsAllTheThings/semgrep rather than copied;
@@ -241,22 +244,18 @@ sibling workforce/skills/text-eval/references/version.md
 sibling workforce/skills/text-eval/references/text-tells.md
 sibling workforce/skills/text-eval/references/additions.md
 sibling workforce/skills/text-eval/references/human-markers.md
-# The agents a skill BUNDLES ship with it. A retirement that removed a project copy while
-# the shipped replacement carried no agents would delete capability, not residue — so every
-# project-neutral evaluator agent ships here, and `wf-catalog --migrate` removes the
-# project's now-dangling `.claude/agents/<name>.md` registration — but only after confirming
-# the shipped registration for that agent is on disk, so the agent is never reachable by
-# zero paths. An agent only the project has (one carrying its own voice rules) is kept by
-# the migration and is not shipped.
-sibling workforce/skills/text-eval/agents/character-scanner/AGENT.md
-# REGISTRATION IS SEPARATE FROM SHIPPING, and it is not optional. MEASURED against the
-# host documentation 2026-09-10: an agent nested inside a skill directory is NOT
-# auto-discovered, and `AGENT.md` is not a filename the host registers — a subagent is an
-# ordinary `<name>.md` in an `agents/` directory carrying a frontmatter `name`. So the
-# `sibling` row above places the definition where the SKILL cites it, and the `agent` row
-# below writes the registration the HOST reads. Ship one without the other and the agent
-# is either invisible (definition, no registration) or orphaned (registration, no skill).
-agent workforce/skills/text-eval/agents/character-scanner/AGENT.md
+# TEXT-EVAL'S CHARACTER PASS IS A SCRIPT, run as step 1 of every evaluation. User, 2026-11-10:
+# *"the reason that is there was to remove the constant use of certain characters like
+# em-dashes ... We need to find some way of integrating the problem characters there."* The
+# `character-scanner` agent it replaces shipped here from 2026-09-11 and text-eval's own
+# SKILL.md never called it. Its `sibling` and `agent` rows are gone. NO `retired` ROW, for the
+# reason image-eval's note above gives: it shipped after `.installed-external` existed, so
+# every host that received it has it recorded and `prune_scope` rule 2 removes it on the
+# next `update`; and on a host with no record a `character-scanner.md` is somebody else's —
+# claude-enforcer writes that same registration — which a seeded row would delete. A
+# registration some other skill on the same scope still bundles is KEPT, not pruned
+# (`install` § prune_scope, the bundle guard).
+exec-sibling workforce/skills/text-eval/bin/wf-text-scan
 sibling workforce/skills/code-evaluator/SKILL.md
 sibling workforce/skills/code-evaluator/references/version.md
 sibling workforce/skills/code-evaluator/references/mistake-taxonomy.md
@@ -265,8 +264,22 @@ sibling workforce/skills/code-evaluator/references/guards.md
 sibling workforce/skills/code-evaluator/references/gotchas.md
 sibling workforce/skills/code-evaluator/references/native-tool-map.md
 sibling workforce/skills/code-evaluator/references/additions.md
+# The agents a skill BUNDLES ship with it. A retirement that removed a project copy while
+# the shipped replacement carried no agents would delete capability, not residue — so every
+# project-neutral evaluator agent ships here, and `wf-catalog --migrate` removes the
+# project's now-dangling `.claude/agents/<name>.md` registration — but only after confirming
+# the shipped registration for that agent is on disk, so the agent is never reachable by
+# zero paths. An agent only the project has (one carrying its own voice rules) is kept by
+# the migration and is not shipped.
 sibling workforce/skills/code-evaluator/agents/code-design-advisor/AGENT.md
 sibling workforce/skills/code-evaluator/agents/deadcode-gardener/AGENT.md
+# REGISTRATION IS SEPARATE FROM SHIPPING, and it is not optional. MEASURED against the
+# host documentation 2026-09-10: an agent nested inside a skill directory is NOT
+# auto-discovered, and `AGENT.md` is not a filename the host registers — a subagent is an
+# ordinary `<name>.md` in an `agents/` directory carrying a frontmatter `name`. So the
+# `sibling` rows above place the definition where the SKILL cites it, and the `agent` rows
+# below write the registration the HOST reads. Ship one without the other and the agent
+# is either invisible (definition, no registration) or orphaned (registration, no skill).
 agent workforce/skills/code-evaluator/agents/code-design-advisor/AGENT.md
 agent workforce/skills/code-evaluator/agents/deadcode-gardener/AGENT.md
 sibling workforce/skills/security-evaluator/SKILL.md
