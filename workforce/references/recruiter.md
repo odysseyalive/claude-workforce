@@ -13,9 +13,10 @@ work is a skill, not an employee). It has a deterministic half and a research ha
 
 - **Deterministic:** `workforce/bin/wf-skill-match` ranks the skills already available to a role against
   its competencies. No network, no spawn, same answer every run.
-- **Research:** a `WebSearch → web_fetch` discover-then-verify pass over the role's industry standard,
-  run by the invoking context with its own tools (the main loop and any agent both have them), then
-  distilled and cached with its citations.
+- **Research:** a `WebSearch → mcp__playwright-mcp__web_fetch` discover-then-verify pass over the
+  role's industry standard, falling back to `WebFetch` for the fetch where `playwright-mcp` is not
+  configured (§ The research), run by the invoking context with its own tools, then distilled and
+  cached with its citations.
 
 This file is the mechanism doc for both halves and for the dossier they produce. It is a reference, not
 a per-command procedure — the authoring path (`procedures/handbook.md` § Step 1.5) runs it inline.
@@ -113,8 +114,11 @@ The pass is Francis's global discover-then-verify, run by the invoking context w
 1. **Discover.** `WebSearch` for the role's industry-standard responsibilities, competencies, quality
    bar, and known failure modes — "what is a senior front-end engineer held to", "web QA / e2e coverage
    standards", and so on for the role.
-2. **Verify.** `web_fetch` the top results and read them — never cite a search snippet unread. Prefer
-   primary and authoritative sources over listicles.
+2. **Verify.** Fetch the top results and read them — never cite a search snippet unread. Prefer
+   primary and authoritative sources over listicles. **The fetch tool is a rule** (user, 2026-11-10):
+   `mcp__playwright-mcp__web_fetch` when it is among your tools; otherwise native `WebFetch`. Never
+   use `WebFetch` while the server's tool is present. Say which one fetched in the run's report, the
+   fallback by name: `fetch: WebFetch (playwright-mcp not configured)`.
 3. **Distill** into the dossier schema above, writing the **industry-standard** bar, set high.
 4. **Cache** the dossier with `sourced: web`, every `sources:` URL stamped with the date read, and
    today's `stamped:` date.
@@ -144,7 +148,9 @@ is authored from its researched competencies without a skill to invoke.
 
 **A dead network degrades to the shipped seed; it never FAILs a hire.** This is the tier-canary rule
 (`staging.md` § The three outcomes): `UNAVAILABLE` is not `FAIL`. The degradation is for the genuine
-UNAVAILABLE case only — the network is truly unreachable — and it is **loud**, never silent:
+UNAVAILABLE case only — the network is truly unreachable — and it is **loud**, never silent.
+**`playwright-mcp` being absent is not that case**: the fetch falls back to `WebFetch` (§ The research,
+step 2). Only when neither fetch tool is held, or both fail on the network, is research unavailable:
 
 1. Fall back to `recruit-seed.md` for the role's family (front-end/design, back-end/engineering,
    content, QA/e2e, product/PM) and author the bar from it. Every family still gets a real bar.

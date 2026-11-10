@@ -297,12 +297,13 @@ an earlier revision of this file carried a second, contradictory one that surviv
 On this host, both foreground and background subagents received the same loaded set —
 `Agent, Artifact, Bash, Edit, Read, Skill, ToolSearch, Write` — with ~150 more names *deferred*
 behind `ToolSearch`. **`Grep`, `Glob`, and `WebFetch` were absent from both**, loaded and deferred
-alike.
+alike. *The harness grants `WebFetch`; a deny rule in this host's settings removes it. See the
+2026-11-10 re-measurement below.*
 
 **MCP tools DO reach subagents.** Every `mcp__*` server tool appeared in the deferred list of both
 the foreground and background agents, loadable on demand via `ToolSearch`. This is the opposite of
 what one would assume: an employee running cold can reach an MCP server, but **cannot** rely on
-built-in `Grep`/`Glob`/`WebFetch`.
+built-in `Grep`/`Glob`. It can rely on `WebFetch` only where no deny rule names it (2026-11-10, below).
 
 **Both observations above are of the DEFAULT grant** — agents that declared no `tools:` field.
 
@@ -311,8 +312,57 @@ loaded set came back byte-identical; `Grep`, `Glob` and `WebFetch` are still abs
 alike; every configured MCP server is still deferred behind `ToolSearch`. Two details this fact never
 carried: **`WebSearch` IS granted, deferred** — the fact named `WebFetch` and said nothing either way
 about `WebSearch`, and four files reasoned from that silence — and the deferred namespace is **194**
-names, not "~150". So a delegating employee runs the *discover* half of a discover-then-verify pass
-itself and reaches the *verify* half through `mcp__playwright-mcp`, never through `WebFetch`.
+names, not "~150".
+
+**Re-measured 2026-11-10 on Claude Code 2.1.322, and `WebFetch` is NOT absent by the harness.** Four
+headless runs on haiku, each `claude -p --setting-sources "" --strict-mcp-config --allowedTools WebFetch
+--agents <json> --agent <lead>` from a scratch directory: the lead spawned one IC, the IC reported its own
+tools (`IC_TOOLS=`) and, if it held `WebFetch`, fetched `https://example.com` (`FETCH=`).
+
+| IC grant | Settings | `IC_TOOLS=` | `FETCH=` |
+|---|---|---|---|
+| explicit `tools: Read, WebFetch, WebSearch` | none | `Read,WebFetch,WebSearch` | `Example Domain` |
+| explicit `tools: Read, WebFetch, WebSearch` | `permissions.deny: ["WebFetch"]` | `Read, WebSearch` | `no-webfetch` |
+| default (no `tools:`) | none | 23 names, `WebFetch` and `WebSearch` among them | `Example Domain` |
+| default (no `tools:`) | `permissions.deny: ["WebFetch"]` | 14 names, `WebSearch` and no `WebFetch` | `no-webfetch` |
+
+**So an explicit `tools: WebFetch` grants it, and a `permissions.deny` rule naming it removes it from
+every grant, explicit and default alike.** This maintainer's `~/.claude/settings.json` denies `WebFetch`,
+which is consistent with every earlier measurement on this host seeing it absent; those sessions cannot
+be re-run, so read that as consistent with, not proven to be, the cause. `IC_TOOLS=` is the grant
+evidence. `FETCH=` also needs permission, which is why the runs carry `--allowedTools WebFetch`: a
+headless session refuses an unapproved call, and a copy of this probe without that flag reads a
+permission refusal as a missing grant.
+
+**Page fetch follows from it** (user, 2026-11-10: playwright-mcp is the primary, and where it is absent
+the employee falls back to native tools). A page-fetching IC is granted `mcp__playwright-mcp`,
+`WebFetch` and `WebSearch` on every host, because projects move between servers and a per-host grant
+would rewrite a tracked file on each one. It discovers with `WebSearch`. Where the server is
+configured it fetches with `mcp__playwright-mcp__web_fetch`, and its `## Guardrails` line forbids
+`WebFetch` while that tool is present. Where the server is not configured, the grant for it resolves
+to nothing (fact 13b) and the employee fetches with `WebFetch`. `wf-web-grant` writes and heals that
+grant, and reports a `permissions.deny` rule that leaves the fallback with nothing
+(`procedures/handbook.md` Step 2a).
+
+**The choice is enforced per host by a `PreToolUse` hook, and the hook reaches subagents.** Measured
+2026-11-10 on 2.1.322, the same harness as above, with the session holding `playwright-mcp` and a
+`PreToolUse` hook on `WebFetch` (`wf-webfetch-guard`, its detection pointed at a scratch config root).
+A lead spawned one IC granted `Read, WebFetch, WebSearch, mcp__playwright-mcp`, which called `WebFetch`
+and then `mcp__playwright-mcp__web_fetch` on `https://example.com`:
+
+| The hook's config root | Hook payload | `WEBFETCH=` | `WEB_FETCH=` |
+|---|---|---|---|
+| server configured | `tool_name=WebFetch agent_id=a6f10863902b9d947 agent_type=wfg-ic` | `PreToolUse:WebFetch hook error: playwright-mcp is configured on this host (…), so pages are fetched with mcp__playwright-mcp__web_fetch …` | `Example Domain` |
+| server not configured | `tool_name=WebFetch agent_id=ad390b3a1e95c64fd agent_type=wfg-ic` | `Example Domain` | `Example Domain` |
+| server configured, hook planted to always allow | `tool_name=WebFetch agent_id=a91adb95ae15070be agent_type=wfg-ic` | `The page title is "Example Domain."` | `Example Domain` |
+
+So a `PreToolUse` hook fires on a subagent's tool call, with that subagent's `agent_id`, and its
+`permissionDecision: "deny"` stops the call even under an `--allowedTools` rule that allows it. The
+two layers are not equal. **The hook ENFORCES:** a model talked into `WebFetch` by a fetched page
+still gets nothing. **The `## Guardrails` line is ADVISORY:** it is what the model reads, it saves
+the denied round trip, and it is all that stands where the hook is not wired. In the second row the
+session still held the server and only the hook's view of the config said otherwise; the real absent
+case, where `WebFetch` alone fetches, is the first table's top row.
 
 **`Grep` and `Glob` are absent from this host's registry entirely, not merely from the subagent grant** —
 the main session does not carry them either. Naming one in an explicit `tools:` list is therefore a

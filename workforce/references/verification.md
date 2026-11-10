@@ -353,14 +353,19 @@ verification tier-1 command usually does not exist. `playwright-mcp` supplies ti
 
 - **MCP tools reach subagents; built-in search does not.** `platform.md` fact 4 measured this: every
   `mcp__playwright-mcp__*` tool was available (deferred, loadable via `ToolSearch`) to both foreground
-  and background agents, while `Grep`, `Glob`, and `WebFetch` were absent entirely. An MCP server is
-  *more* dependable grounding for a cold-context handbook than the built-ins are.
+  and background agents, while `Grep` and `Glob` were absent entirely. An MCP server is *more*
+  dependable grounding for a cold-context handbook than the built-ins are.
 - **`session_scaffold_tests` puts no model in the loop.** Capture a login once with `session_login`,
   scaffold a deterministic Playwright suite, and the employee's check becomes "the suite passes" —
   not "the employee believes the page looks right." That is the whole difference between a handbook
   that proves its work and one that asserts it.
-- **It replaces `WebFetch`, which subagents do not get anyway.** `web_fetch` renders JS and PDFs and
-  returns citation data; for an employee, it is the only fetch that exists.
+- **It is the primary page fetch, and `WebFetch` is the fallback.** `web_fetch` renders JS and PDFs,
+  returns citation data, and sits behind the exfiltration guards below. A page-fetching employee is
+  granted both. On a host where the server is configured, the `wf-webfetch-guard` hook denies
+  `WebFetch` at the call (enforced), and its `## Guardrails` line says to use `WebFetch` only when
+  `web_fetch` is not among its tools (advisory), which is the case where the server is not configured (`procedures/handbook.md` Step 2a,
+  written by `wf-web-grant`). `platform.md` fact 4 measured the `WebFetch` grant delivering the tool on
+  2.1.322 wherever no `permissions.deny` rule names it.
 - **`suite_audit` and `suite_methodology`** give a Lead a real basis for reviewing an IC's test work
   rather than eyeballing it.
 - **`suite_audit` needs neither `Bash` nor the browser.** It runs `npx playwright test` inside the
@@ -435,7 +440,10 @@ fixture behind fact 13 ran against a server that exists; what an employee sees w
 *absent* is untested, and the expected failure is the worst kind — `ToolSearch` returns nothing for
 the server pattern, the employee has no way to notice what it is missing, and the handbook's
 `## Verification` cannot run. Cold, silent, in a fresh context. Confirm the server is present at hire
-time; if it is not, do not write the dependency into the procedure.
+time; if it is not, do not write the dependency into the procedure. **Page fetch is the exception,
+because it has a native fallback:** every page-fetching employee also holds `WebFetch`, written by
+`wf-web-grant` (`procedures/handbook.md` Step 2a), so an absent server never leaves it with no way to
+fetch.
 
 **Then take the higher tier instead, because it was always ranked higher.** Look again at the tier
 table at the top of this file: *a command with an exit code* is tier 1 and the MCP suite is tier 2. A
@@ -510,5 +518,6 @@ left the template untouched, so every later hire would have paid the same probe 
    tier), in which case the deterministic suite covers behavior and the calibration check covers the
    verdict, and both are named.
 6. Confirm every tool the check needs is in the default grant or loaded via `ToolSearch` in the
-   procedure. `Grep`/`Glob`/`WebFetch` are **not** in the default grant and cannot be assumed (fact 4).
+   procedure. `Grep`/`Glob` are **not** in the default grant and cannot be assumed (fact 4); `WebFetch`
+   is, unless a `permissions.deny` rule names it, which `wf-web-grant` reports.
    If an explicit `tools:` field is present, confirm the check's tools are listed there.

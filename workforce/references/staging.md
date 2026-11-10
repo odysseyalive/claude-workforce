@@ -66,7 +66,7 @@ Staging only. Zero spawns, zero registration, no agent budget consumed. Determin
 | Delegating tiers carry `background: false` | **report only** — defensive, not the mechanism (fact 2). A block here fails for a reason that is not true |
 | No `Agent(` allowlist anywhere in `tools:`/`disallowedTools:` | **BLOCK** — ignored at runtime, so its presence means someone believes in a guarantee that does not exist |
 | Every path the handbook **reads** resolves on disk | **BLOCK** — the top cold-start failure. Read § Three checks that fail on conformant handbooks |
-| Every tool the body **uses** is in the default grant or loaded via `ToolSearch` in the procedure (or in an explicit `tools:` when present), and `Grep`/`Glob`/`WebFetch` are never assumed | **BLOCK** — fact 4. *Uses*, not *mentions* — see below |
+| Every tool the body **uses** is in the default grant or loaded via `ToolSearch` in the procedure (or in an explicit `tools:` when present), and `Grep`/`Glob` are never assumed | **BLOCK** — fact 4. *Uses*, not *mentions* — see below |
 | Sections present and in order per `procedure-for-procedures.md` | **BLOCK** |
 | `## Verification` names a runnable check, not a judgment | **BLOCK** |
 | `## Probe` present | **BLOCK** — a handbook that cannot say how to check itself is not releasable |

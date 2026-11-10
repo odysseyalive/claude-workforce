@@ -528,7 +528,9 @@ here the whole time, applied to invariants and never to the handbooks. A sentenc
 uncheckable is worth re-reading whenever the neighbouring page checks it.*
 
 **Still read by this command:** every body path resolves; every tool used is granted and
-`Grep`/`Glob`/`WebFetch` are not assumed (`platform.md` fact 4); guardrails contain literal NEVER /
+`Grep`/`Glob` are not assumed (`platform.md` fact 4); every page-fetching handbook holds this host's
+fetch tool, by `"$WF/bin/wf-web-grant" --root "${CLAUDE_PROJECT_DIR:-$PWD}"` (exit 1 lists each
+handbook it would heal, and its first line names the path chosen; report both); guardrails contain literal NEVER /
 MUST NOT / STOP; the escalation sentinel is verbatim; no `memory:`.
 
 **Released-state check:** any handbook amended since its last probe is **UNRELEASED** and must not be

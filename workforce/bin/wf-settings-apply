@@ -264,6 +264,13 @@ SHIPPED_HOOKS = {
     # its text gets the shell's id and the stop line, as context. Measured at 1.49 warnings
     # per hang over 173 such commands (header of the script).
     "wf-bash-stdin@background": ("PostToolUse", "Bash"),
+    # PLAYWRIGHT-MCP IS THE PAGE FETCH WHERE IT IS CONFIGURED, ENFORCED AT THE CALL. A
+    # page-fetching employee holds both `mcp__playwright-mcp` and `WebFetch` on every host
+    # (`wf-web-grant`), so its tracked grant never flips between servers; this denies
+    # `WebFetch` on a host where the server is configured, so the fetch cannot route around
+    # the server's exfiltration guards. `WebFetch` alone: the hook runs for no other tool.
+    # Fires on a subagent's call too, measured 2026-11-10 (script header).
+    "wf-webfetch-guard": ("PreToolUse", "WebFetch"),
 }
 
 # MATCHERS A SHIPPED HOOK USED TO BE REGISTERED ON, by SHIPPED_HOOKS name. Presence is decided

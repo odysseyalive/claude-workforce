@@ -1,0 +1,326 @@
+#!/usr/bin/env python3
+"""wf-web-grant — give every page-fetching employee the primary fetch tool and its fallback.
+
+    wf-web-grant [--root <dir>]              report this host's path and each handbook's state
+    wf-web-grant [--root <dir>] --execute    and bring each handbook to the grant
+
+THE RULE (user, 2026-11-10): "for item 05, we need to set up the playwright-mcp as a primary
+(not a suggestion), if the mcp doesn't exist, it falls back to native tools." And: "the
+playwright-mcp is mainly for page fetch". So this governs PAGE FETCH only. Discovery is
+native `WebSearch`; interactive browsing (`browser_*`) is not touched here.
+
+ONE GRANT ON EVERY HOST: `tools:` carries `mcp__playwright-mcp`, `WebFetch` and `WebSearch`.
+The choice between the two fetch tools is made per host at the call, not in the tracked file:
+`wf-webfetch-guard` (a PreToolUse hook) denies `WebFetch` where the server is configured, which
+ENFORCES it, and the `## Guardrails` line below tells the model the same, which is ADVISORY. the user runs projects across several servers, and a `tools:` line
+rewritten per host flips in git every time the project is opened somewhere else. A grant for
+an absent server resolves to nothing (fact 13b), which is exactly what lets the employee see
+that `web_fetch` is not among its tools and take `WebFetch`.
+
+THIS HOST'S PATH is still detected, for the report: `procedures/handbook.md` Step 2a's config
+half — the `mcpServers` keys in the config root's `.claude.json` (top level and this
+project's entry), the project's `.mcp.json`, and `.claude/settings*.json`. Read only. NEVER
+`claude mcp list`, which health-checks every registered server. A shape this does not
+recognise reads ABSENT, the fail-safe direction. It decides nothing that is written.
+
+WHY `WebFetch` IS A REAL FALLBACK. Measured 2026-11-10 on Claude Code 2.1.322
+(`platform.md` fact 4): an explicit `tools: Read, WebFetch, WebSearch` delivers `WebFetch`
+to a subagent and the fetch succeeds. The tool is missing only where a `permissions.deny`
+rule names it, so this reports such a rule by file. It does not fall back silently.
+
+WHICH HANDBOOKS. Governed ones (an ORG-RECORD marker) with a comma-list `tools:` line whose
+`## Procedure` or `## Verification` names a page fetch (`web_fetch` or `WebFetch`) on a line
+that is not a prohibition. Mentioning a tool is not using it: "`Grep`/`Glob`/`WebFetch` do
+not reach subagents" is a sentence about a tool, not a step that uses one. A delegating tier
+has no `tools:` line and inherits both tools, so it is reported and never edited.
+
+WHAT IT WRITES, and nothing else: the one `tools:` line, and one `origin: workforce` span
+at the end of `## Guardrails` stating the rule to the employee. Neither is in the
+`## Procedure` + `## Verification` text that `contract-stamp` hashes, so a heal never reads
+as CONTRACT-DRIFT. A link is never written through.
+
+CALLERS (`enforcement.md` § Three paths): `procedures/handbook.md` Step 2a when a handbook is
+authored, `audit` Step 5d item 2b with `--execute`, and `wf-heal` at SessionStart through
+`heal()`, so an org that exists already heals the next time the project is opened.
+`/workforce verify` runs it without `--execute` and reports what it prints.
+
+EXIT CODES: 0 nothing pending, or every write landed. 1 a handbook needs the change and
+`--execute` was not given, or a write failed. 2 usage.
+"""
+
+import argparse
+import json
+import os
+import re
+import sys
+
+SERVER = "playwright-mcp"
+PRIMARY = f"mcp__{SERVER}"
+FETCH_TOOL = f"mcp__{SERVER}__web_fetch"
+FALLBACK = "WebFetch"
+DISCOVER = "WebSearch"
+
+FM_RX = re.compile(r"\A---\n(.*?)\n---\n", re.S)
+TOOLS_LINE_RX = re.compile(r"^tools:[ \t]*(.*)$", re.M)
+# Copied from `wf-conform`, as `wf-stamp` copies it: the governed discriminator is the marker.
+ORG_RECORD_RX = re.compile(r"^[ \t]*<!--\s*ORG-RECORD\s+START\b", re.I | re.M)
+# Copied from `wf-conform`: a line that forbids something is not a step that does it.
+PROHIBITION_RX = re.compile(r"\bNEVER\b|\bMUST NOT\b|\bSTOP\b|\bdo not\b|\bdon't\b|\bforbidden\b", re.I)
+# No leading `\b` before `web_fetch`: in `mcp__playwright-mcp__web_fetch` it follows `_`,
+# a word character, so `\bweb_fetch` never matches the form handbooks actually write.
+FETCH_USE_RX = re.compile(r"web_fetch\b|\bWebFetch\b")
+PRIMARY_TOKEN_RX = re.compile(rf"^mcp__{re.escape(SERVER)}(?:__.*)?$")
+
+SPAN_OPEN = "<!-- origin: workforce | modifiable: true | web-fetch -->"
+SPAN_RX = re.compile(r"^" + re.escape(SPAN_OPEN) + r"\n.*?^<!-- /origin -->\n?", re.M | re.S)
+# One line on purpose. It carries NEVER, so `wf-conform`'s body-vs-grant row reads it as a
+# rule about a tool rather than a use of one, on a host where the grant names no server.
+RULE = (f"- **Web fetch.** Fetch every page with `{FETCH_TOOL}` and find pages with "
+        f"`{DISCOVER}`. When `{FETCH_TOOL}` is not among your tools, fetch with `{FALLBACK}` "
+        f"instead and name that fallback in your report. NEVER use `{FALLBACK}` while "
+        f"`{FETCH_TOOL}` is among your tools, and NEVER report the network unavailable while "
+        f"either fetch tool is.")
+SPAN = f"{SPAN_OPEN}\n{RULE}\n<!-- /origin -->\n"
+
+
+def config_root():
+    return os.environ.get("CLAUDE_CONFIG_DIR") or os.path.join(os.path.expanduser("~"), ".claude")
+
+
+def _load(path):
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+        return data if isinstance(data, dict) else None
+    except (OSError, ValueError):
+        return None
+
+
+def _claude_json_paths():
+    """The config root's `.claude.json`. With CLAUDE_CONFIG_DIR set the harness keeps it
+    inside that directory; without it, in the home directory."""
+    if os.environ.get("CLAUDE_CONFIG_DIR"):
+        return [os.path.join(os.environ["CLAUDE_CONFIG_DIR"], ".claude.json")]
+    return [os.path.join(os.path.expanduser("~"), ".claude.json")]
+
+
+def detect(root):
+    """-> (present, where, searched). `where` names the file and key that said PRESENT."""
+    root = os.path.abspath(root)
+    sources = []
+    for p in _claude_json_paths():
+        data = _load(p)
+        if data is None:
+            continue
+        sources.append((f"{p} mcpServers", data.get("mcpServers")))
+        projects = data.get("projects")
+        if isinstance(projects, dict) and isinstance(projects.get(root), dict):
+            sources.append((f"{p} projects[{root}].mcpServers", projects[root].get("mcpServers")))
+    for p in (os.path.join(root, ".mcp.json"),
+              os.path.join(root, ".claude", "settings.json"),
+              os.path.join(root, ".claude", "settings.local.json"),
+              os.path.join(config_root(), "settings.json")):
+        data = _load(p)
+        if data is not None:
+            sources.append((f"{p} mcpServers", data.get("mcpServers")))
+    searched = [s for s, _ in sources]
+    for where, servers in sources:
+        if isinstance(servers, dict) and SERVER in servers:
+            return True, where, searched
+    return False, None, searched
+
+
+def fallback_denied(root):
+    """Every settings file whose `permissions.deny` names the bare `WebFetch` tool. A
+    domain-scoped rule (`WebFetch(domain:x)`) leaves the tool in place and is not counted."""
+    hits = []
+    for p in (os.path.join(config_root(), "settings.json"),
+              os.path.join(root, ".claude", "settings.json"),
+              os.path.join(root, ".claude", "settings.local.json")):
+        data = _load(p) or {}
+        perms = data.get("permissions")
+        deny = perms.get("deny") if isinstance(perms, dict) else None
+        if isinstance(deny, list) and FALLBACK in deny:
+            hits.append(p)
+    return hits
+
+
+def _section(body, heading):
+    """(start, end) of the text under `heading`, up to the next `## ` heading."""
+    m = re.search(r"^" + re.escape(heading) + r"[ \t]*$", body, re.M)
+    if not m:
+        return None
+    nxt = re.search(r"^## ", body[m.end():], re.M)
+    return m.end(), (m.end() + nxt.start()) if nxt else len(body)
+
+
+def fetches(body):
+    """True when `## Procedure` or `## Verification` uses a page fetch on a line that is
+    not a prohibition. The span this script writes is excluded, so it cannot nominate."""
+    text = SPAN_RX.sub("", body)
+    for heading in ("## Procedure", "## Verification"):
+        sec = _section(text, heading)
+        if sec is None:
+            continue
+        for line in text[sec[0]:sec[1]].splitlines():
+            if FETCH_USE_RX.search(line) and not PROHIBITION_RX.search(line):
+                return True
+    return False
+
+
+def want_tokens(tokens):
+    """The same grant on every host. Only ever adds, so a second run anywhere is a no-op."""
+    out = list(tokens)
+    if not any(PRIMARY_TOKEN_RX.match(t) for t in out):
+        out.append(PRIMARY)
+    for t in (FALLBACK, DISCOVER):
+        if t not in out:
+            out.append(t)
+    return out
+
+
+def plan(body):
+    """-> (state, new_body, changes). state: ok | change | skip:<why> | none."""
+    fm = FM_RX.match(body)
+    if not fm or not ORG_RECORD_RX.search(body) or not fetches(body):
+        return "none", body, []
+    tl = TOOLS_LINE_RX.search(fm.group(1))
+    if tl is None:
+        return "skip:no `tools:` line (a delegating tier inherits both tools)", body, []
+    raw = tl.group(1).strip()
+    if not raw or raw.startswith("[") or raw.startswith("-"):
+        return "skip:`tools:` is not a comma list, so it is not edited", body, []
+    tokens = [t.strip() for t in raw.split(",") if t.strip()]
+    want = want_tokens(tokens)
+    changes = [f"+{t}" for t in want if t not in tokens]
+    new = body
+    if want != tokens:
+        start = fm.start(1) + tl.start(1)
+        new = new[:start] + ", ".join(want) + new[fm.start(1) + tl.end(1):]
+    have = SPAN_RX.search(new)
+    if have is None:
+        sec = _section(new, "## Guardrails")
+        if sec is None:
+            changes.append("no `## Guardrails`, so the rule line was not written")
+        else:
+            head, tail = new[:sec[1]].rstrip("\n"), new[sec[1]:]
+            new = head + "\n" + SPAN + ("\n" + tail if tail else "")
+            changes.append("rule line added to `## Guardrails`")
+    elif have.group(0).rstrip("\n") != SPAN.rstrip("\n"):
+        new = new[:have.start()] + SPAN + new[have.end():]
+        changes.append("rule line refreshed")
+    if new == body:
+        return "ok", body, []
+    return "change", new, changes
+
+
+def _write(path, text):
+    """Replace `path` with `text`. A link is refused, never followed."""
+    if os.path.islink(path):
+        raise OSError(f"{path} is a symbolic link; not written")
+    tmp = f"{path}.wf-web-grant.tmp"
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0), 0o644)
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write(text)
+    os.replace(tmp, path)
+
+
+def handbooks(root):
+    """The project's own handbooks. `wf-heal` calls this unattended in any project that is
+    opened, so a `.claude` or `.claude/agents` that is a link out of the project yields
+    nothing: a cloned repository must not steer the heal into the user's personal agents."""
+    d = os.path.join(root, ".claude", "agents")
+    if os.path.realpath(d) != os.path.join(os.path.realpath(root), ".claude", "agents"):
+        return []
+    try:
+        names = sorted(n for n in os.listdir(d) if n.endswith(".md"))
+    except OSError:
+        return []
+    return [os.path.join(d, n) for n in names if not os.path.islink(os.path.join(d, n))]
+
+
+def run(root, execute):
+    """-> (exit code, lines). The first line says which fetch tool an employee on THIS host
+    will use; what is written does not depend on it."""
+    present, where, searched = detect(root)
+    if present:
+        lines = [f"web fetch: {SERVER} PRESENT ({where}) -> primary `{FETCH_TOOL}`, "
+                 f"discovery `{DISCOVER}`"]
+    else:
+        lines = [f"web fetch: {SERVER} ABSENT (searched {len(searched)} config source(s)) -> "
+                 f"native fallback `{FALLBACK}`, discovery `{DISCOVER}`"]
+        for p in fallback_denied(root):
+            lines.append(f"web fetch: `{FALLBACK}` is DENIED by {p} permissions.deny, so no "
+                         f"page fetch reaches an employee on this host. Research degrades to "
+                         f"the seed and says so (recruiter.md)")
+    code = 0
+    for path in handbooks(root):
+        name = os.path.basename(path)
+        try:
+            with open(path, encoding="utf-8") as fh:
+                body = fh.read()
+        except OSError as exc:
+            lines.append(f"  ! {name}  not read ({exc.strerror})")
+            code = 1
+            continue
+        state, new, changes = plan(body)
+        if state == "none":
+            continue
+        if state == "ok":
+            lines.append(f"  ok      {name}")
+        elif state.startswith("skip:"):
+            lines.append(f"  skip    {name}  {state[5:]}")
+        elif not execute:
+            lines.append(f"  heal    {name}  {'; '.join(changes)}")
+            code = 1
+        else:
+            try:
+                _write(path, new)
+                lines.append(f"  healed  {name}  {'; '.join(changes)}")
+            except OSError as exc:
+                lines.append(f"  ! {name}  NOT written ({exc})")
+                code = 1
+    return code, lines
+
+
+def heal(root, progress=None):
+    """`wf-heal`'s entry: execute, and return the lines to show, or "" when nothing moved.
+    Near zero when there is nothing to do: no handbook names a fetch, nothing is parsed."""
+    paths = handbooks(root)
+    if not paths:
+        return ""
+    for p in paths:
+        try:
+            with open(p, encoding="utf-8") as fh:
+                if fetches(fh.read()):
+                    break
+        except OSError:
+            continue
+    else:
+        return ""
+    _, lines = run(root, True)
+    moved = [ln for ln in lines[1:] if ln.lstrip().startswith(("healed", "!"))]
+    if not moved:
+        return ""
+    if progress is not None:
+        progress.setdefault("wrote", []).extend(
+            ln.split()[1] for ln in moved if ln.lstrip().startswith("healed"))
+    said = [ln for ln in lines if ln.startswith("web fetch:")]   # the path, and a deny rule
+    return "\n".join(said + moved)
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    ap.add_argument("--root", default=os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd())
+    ap.add_argument("--execute", action="store_true")
+    args = ap.parse_args(argv)
+    if not os.path.isdir(args.root):
+        print(f"wf-web-grant: {args.root} is not a directory", file=sys.stderr)
+        return 2
+    code, lines = run(os.path.abspath(args.root), args.execute)
+    print("\n".join(lines))
+    return code
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,84 @@
+#!/usr/bin/env python3
+"""wf-webfetch-guard — PreToolUse hook on WebFetch: where playwright-mcp is configured, a page
+is fetched through it, and `WebFetch` is refused.
+
+THE RULE (user, 2026-11-10): "for item 05, we need to set up the playwright-mcp as a primary
+(not a suggestion), if the mcp doesn't exist, it falls back to native tools." `wf-web-grant`
+grants every page-fetching employee `mcp__playwright-mcp`, `WebFetch` and `WebSearch` on every
+host, so a project that moves between servers never rewrites its tracked `tools:` lines. That
+leaves the choice between the two fetch tools to be made per host, at the call.
+
+TWO LAYERS, AND WHAT EACH IS WORTH.
+  - The `## Guardrails` line `wf-web-grant` writes tells the employee to use `web_fetch` while
+    it holds it. That is ADVISORY: a model reads it, and a fetched page that argues
+    otherwise is arguing with a sentence.
+  - This hook is the ENFORCING layer. On a host where the server is configured it denies the
+    `WebFetch` call before it runs, whatever the model was talked into, so the fetch cannot
+    route around the server's exfiltration guards (`verification.md` § The guards an
+    employee will meet). It fires for a subagent's call as well as the main session's,
+    measured 2026-11-10 on 2.1.322 (`platform.md` fact 4).
+On a host without the server it allows the call, and `WebFetch` is the fallback.
+
+DETECTION IS `wf-web-grant.detect`, imported rather than restated, so the hook and the grant
+cannot disagree about whether the server is here. It reads config files only, never
+`claude mcp list`. "Configured" is not "usable": a configured server that failed to start
+still gets `WebFetch` denied, and the reason tells the agent to report that as a tooling
+limit rather than retry (`procedures/handbook.md` Step 2a, the PRESENT limit).
+
+FAIL-OPEN. An unreadable payload, a call that is not `WebFetch`, or any error in detection
+exits 0 with no output, which lets the call proceed under the host's own permission rules.
+A hook that broke every fetch on a parse error would be worse than the gap it closes.
+
+EXIT CODES: 0 always. A deny is the JSON `permissionDecision: "deny"` on stdout.
+"""
+
+import importlib.machinery
+import importlib.util
+import json
+import os
+import sys
+
+
+def _sibling(name):
+    """A sibling script imported by path, so its definitions are shared, not restated."""
+    sys.dont_write_bytecode = True
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), name)
+    modname = name.replace("-", "_")
+    spec = importlib.util.spec_from_loader(
+        modname, importlib.machinery.SourceFileLoader(modname, path))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def decide(payload):
+    """-> the deny reason, or None to allow."""
+    if payload.get("tool_name") != "WebFetch":
+        return None
+    root = os.environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd") or os.getcwd()
+    grant = _sibling("wf-web-grant")
+    present, where, _ = grant.detect(root)
+    if not present:
+        return None
+    return (f"playwright-mcp is configured on this host ({where}), so pages are fetched with "
+            f"`{grant.FETCH_TOOL}`, which applies the exfiltration guards `WebFetch` skips. "
+            f"Call `{grant.FETCH_TOOL}` with the same url. If that tool is not among your "
+            f"tools, report it as a tooling limit and do not retry `WebFetch`.")
+
+
+def main():
+    try:
+        payload = json.loads(sys.stdin.read() or "{}")
+        reason = decide(payload) if isinstance(payload, dict) else None
+    except Exception:                                    # noqa: BLE001 — fail open, see docstring
+        return 0
+    if reason:
+        print(json.dumps({"hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "deny",
+            "permissionDecisionReason": reason}}))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
