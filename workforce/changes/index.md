@@ -8,6 +8,7 @@
 
 | Version | Date | Surface | Org | Change |
 |---|---|---|---|---|
+| 1.86.4 | 2026-11-09 | docs | no | (pending — message lands on the next regeneration) |
 | 1.86.3 | 2026-11-09 | changes, scripts, installer | no | Release 1.86.3: relayed and quantified claims seat a juror |
 | 1.86.2 | 2026-11-09 | audit, changes, scripts, installer | no | Release 1.86.2: sacred-block checksums keyed by content, with a scoped restamp |
 | 1.86.1 | 2026-11-09 | changes, scripts, installer | no | Release 1.86.1: a turn that asks for nothing is still tried on the session's open work |
