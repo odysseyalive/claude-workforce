@@ -2333,7 +2333,16 @@ def widen_reason(unopened, why, rows, inst, counts):
 # were measured far above what a block can bear and well inside what a seat can
 # (`senses.md` § Quantified and relayed claims), so they never block on a channel count and
 # are tried every time they fire (`always_seated`), never 1 in WF_AUDIT_SAMPLE.
-JURY_ONLY_TRIPS = frozenset({"quantified", "relayed"})
+JURY_ONLY_TRIPS = frozenset({"quantified", "relayed", "handback"})
+# A TURN THAT STARTS FROM A WORKER'S REPORT IS ALWAYS TRIED, when nothing else docketed it.
+# User, 2026-11-09, choosing "Build it": "Every turn that starts from a worker's report gets
+# a juror, even when nothing else triggers one." The testimony makes it a case for SIGHT (did
+# the reply read what it passes on as true) and INTUITION (what did it assume). MEASURED on
+# mutze-studio `30e77777` Stop 614: "both changed handbooks are back in service" relayed a
+# bare `PASS`, and no claim grammar can see that (`senses.md` § Quantified and relayed claims).
+HANDBACK_DOCKET = ("sight", "intuition")
+HANDBACK_WHY = ("the turn started from a worker's report and passes its results on; "
+                "testimony is not evidence until what it reports is read")
 RELAY_RUN = 4
 _WORD = re.compile(r"[a-z0-9]+")
 _SENTENCE = re.compile(r"(?<=[.!?:;])\s+|\n+")
@@ -2371,9 +2380,31 @@ def relayed_claims(reply, testimony):
     return out
 
 
-def claim_trips(reply, testimony=None):
+def _sentences(reply):
+    return [s for s in _SENTENCE.split(TL.mask_code(reply or "").strip()) if s.strip()]
+
+
+def question_only(reply):
+    """True when every sentence of the reply is a question to the user: it passes nothing on."""
+    said = _sentences(reply)
+    return bool(said) and all(s.rstrip().endswith("?") for s in said)
+
+
+def hold_only(reply):
+    """True when every sentence of the reply says what it is waiting on, or asks: a declared
+    hold that MAKES NO CLAIM. A hold that also reports a result ("both handbooks are back in
+    service. Still working: the pipeline programmer") passes that result on, and is tried."""
+    said = _sentences(reply)
+    return bool(said) and all(WAITING.search(s) or s.rstrip().endswith("?") for s in said)
+
+
+def claim_trips(reply, testimony=None, hold=False):
     """Every claim the reply trips. ONE DEFINITION, read by the Stop below and by
-    `bin/replay-seating`: absence and universal (gating), quantified and relayed (seat only)."""
+    `bin/replay-seating`: absence and universal (gating), quantified and relayed (seat only),
+    and `handback`, the turn opened by a worker's report that trips nothing else. A declared
+    HOLD (`hold`, the caller's `declared_hold`) and a reply that only asks the user a question
+    pass nothing on, so neither is a `handback` (`senses.md` § A turn that starts from a
+    worker's report)."""
     masked = TL.mask_code(reply or "")
     unquoted = TL._QUOTED.sub(lambda m: " " * len(m.group(0)), masked)
     trips = []
@@ -2385,6 +2416,9 @@ def claim_trips(reply, testimony=None):
         trips.append("quantified")
     if testimony and TT.INJECTED.search(testimony) and relayed_claims(reply, testimony):
         trips.append("relayed")
+    if (not trips and testimony and TT.INJECTED.search(testimony)
+            and not (hold and hold_only(reply)) and not question_only(reply)):
+        trips.append("handback")
     return trips
 
 
@@ -2400,6 +2434,8 @@ def seating(trips, hits):
     by `widen` and by `bin/replay-seating`, so a replay can never seat differently."""
     applicable, gate, why, incident = set(), set(), [], False
     for t in trips:
+        if t == "handback":
+            continue
         sense, reason = CLAIM_SENSE[t]
         applicable.add(sense)
         if t not in JURY_ONLY_TRIPS:
@@ -2414,6 +2450,11 @@ def seating(trips, hits):
             gate.add(h["sense"])
         why.append(("TAG:" + ("carried " if carried else "") + h["kind"], h["sense"], h["why"]))
         incident = incident or (h["kind"] == "incident" and not carried)
+    # A HAND-BACK SEATS ONLY WHEN NOTHING ELSE DID: no tag hit from any source and no claim.
+    if "handback" in trips and not why:
+        for sense in HANDBACK_DOCKET:
+            applicable.add(sense)
+            why.append(("handback", sense, HANDBACK_WHY))
     return applicable, gate, why, incident
 
 
@@ -2673,7 +2714,8 @@ def widen(payload):
     # A HAND-BACK IS TESTIMONY (`claim_trips`): the row that opened a main turn, when the
     # harness wrote it, is what a relayed claim is matched against.
     _opener = (own_tag(payload) or {}).get("prompt") if not subagent else None
-    trips = claim_trips(reply, _opener if isinstance(_opener, str) else None)
+    trips = claim_trips(reply, _opener if isinstance(_opener, str) else None,
+                        hold=bool(_opener) and bool(declared_hold(payload, reply)))
 
     hits = docket_hits(payload, reply, subagent)
     applicable, gate, why, incident = seating(trips, hits)
@@ -3485,10 +3527,19 @@ def ledger_verdict(payload, decided):
     it; a new blocking surface resting on an inference is what this project's rule about a
     zero-known-wrong-fire gate forbids.
     """
-    if payload.get("stop_hook_active"):
+    # A CONTINUATION IS NOT JUDGED AGAIN, BUT AN AGENT'S STOP IS STILL RECORDED. The main
+    # `Stop`'s loop guard is why this returned on `stop_hook_active`, and it returned for
+    # `SubagentStop` too, so an agent whose stop had been blocked once (a background shell
+    # still open) handed back `PASS` on a continuation that recorded nothing: the `handoff`
+    # the final turn-budget notice had written two minutes earlier stayed, and the spawn
+    # guard refused the next engineering-coder for an agent that had finished. MEASURED
+    # 2026-11-10, this repository, `ad43558b02c2df16b`: notice 00:34:59Z, `PASS` 00:35:34Z.
+    # The record below writes the ledger and blocks nothing, so it cannot loop.
+    subagent_stop = payload.get("hook_event_name") == "SubagentStop"
+    if payload.get("stop_hook_active") and not subagent_stop:
         return "", ""
     led = TT.load_ledger(payload)
-    if payload.get("hook_event_name") == "SubagentStop":
+    if subagent_stop:
         # THE JUDGMENT IS WHAT THIS HOOK JUST SAID about the hand-back: its block reason
         # when it blocked, and "returned" when it had nothing to say. Recorded on the issue
         # so the main `Stop` judges the issue against what its agents actually delivered.

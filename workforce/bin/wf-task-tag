@@ -2149,7 +2149,8 @@ def held_by(led, agent_type):
     """The ids of `agent_type` agents this session cut and has NOT resumed yet.
 
     Empty is the answer for every question this guard should not answer: a session with
-    no ledger, an issue already closed, an agent of a different role, a mark an
+    no ledger, a cut agent on any issue but the current one (a different order), an agent
+    of a different role, a mark an
     `agent_resumed` has already retired, and a mark too old to be about a live agent. A
     caller that gets `[]` allows the spawn.
 
@@ -2160,11 +2161,15 @@ def held_by(led, agent_type):
     """
     if not isinstance(led, dict) or not isinstance(agent_type, str) or not agent_type:
         return []
+    # ONLY THE CURRENT ISSUE HOLDS A ROLE. A spawn is linked to the newest open issue
+    # (`current_issue`), so a cut agent on an OLDER issue is holding different work, and a
+    # fresh agent of its role now is a new order, not a replacement. The measured defect
+    # (trial e2e3) re-spawned in the same turn, on the same issue, and is still refused.
+    # The older issue's cut agent is still named for resume by the main `Stop`.
     now = time.time()
     held = []
-    for iss in led.get("issues", []):
-        if not isinstance(iss, dict) or iss.get("state") == "closed":
-            continue
+    cur = current_issue(led)
+    for iss in [cur] if isinstance(cur, dict) else []:
         for a in issue_agents(iss):
             if a.get("state") != "handoff" or a.get("agent_type") != agent_type:
                 continue

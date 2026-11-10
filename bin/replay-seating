@@ -255,7 +255,16 @@ def seat(M, docketed, counts, reply, opener=None):
     (`always_seated`); an older side trips as it did then."""
     hits, _via, ask = docketed
     V = M[1]
-    trips = V.claim_trips(reply, opener) if hasattr(V, "claim_trips") else trips_of(reply, V.TL)
+    if not hasattr(V, "claim_trips"):
+        trips = trips_of(reply, V.TL)
+    else:
+        # THE HOLD IS ITS TEXT HALF HERE: a replay cannot see `background_tasks`, so a reply
+        # that says it is waiting counts as a hold. The live hook also needs the running task,
+        # so the replay's exclusion is an upper bound and its seat count a lower one.
+        try:
+            trips = V.claim_trips(reply, opener, hold=bool(V.WAITING.search(reply or "")))
+        except TypeError:
+            trips = V.claim_trips(reply, opener)
     applicable, gate, why, incident = V.seating(trips, hits)
     tagged = V.always_seated(why) if hasattr(V, "always_seated") else \
         any(t.startswith("TAG:") for t, _s, _r in why)

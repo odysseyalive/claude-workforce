@@ -318,11 +318,44 @@ grammar names quantifiers, not outcomes.
 **What each form catches**, replayed with `bin/replay-seating --before 651c16e`: 284 (relayed: "about
 five pictures each, since the research says the sketch workflow takes about five at once"), 635
 (quantified and relayed: "None of the forest pictures we already have shows the floor in morning
-light"), 726 (quantified: "None of the costume pictures we hold meets the format"). **614 is not caught**:
-"both changed handbooks are back in service" shares no run with its testimony ("PASS"), and "The page
-is republished" is the turn's own action, with no quantifier. The general mechanism that would catch it
-is seating every hand-back turn that has no docket: +14.8 per 100 Stops on mutze-studio, +47.5 on this
-repository, where 52.5% of Stops are such turns. Not built; the operator decides that cost.
+light"), 726 (quantified: "None of the costume pictures we hold meets the format"). **614 was not caught by either**: "both changed handbooks are back in service" shares no run with its
+testimony ("PASS"), and "The page is republished" is the turn's own action, with no quantifier. The
+next section is what catches it.
+
+## A turn that starts from a worker's report
+
+**User decision, 2026-11-09** (chooser answer, verbatim): *"Build it (Recommended)"*, for *"Every turn
+that starts from a worker's report gets a juror, even when nothing else triggers one."* So a main turn
+opened by injected text (a hand-back, a task notification) that has **no docket from any source** (its
+own words, a peer, a served ask, a queued message, carried issues) **and trips no claim** gets the
+`handback` trip (`wf-widen` `claim_trips`, `HANDBACK_DOCKET`): **sight** (did the reply read what it
+passes on as true) and **intuition** (what did it assume). Seat-only, tried every time, never a gate.
+
+**Two exclusions, both measured.** A reply that **only asks the user a question** passes nothing on
+(`question_only`). A **declared hold that makes no claim** (`declared_hold` and every sentence is a
+`WAITING` sentence or a question, `hold_only`) passes nothing on either. A hold that also reports a
+result is tried, which is Stop 614's own shape: "back in service … Still working: the pipeline
+programmer".
+
+| Over the turns this trip could seat | mutze-studio (1,332 Stops) | this repository (442 Stops) |
+|---|---|---|
+| no-docket, no-claim hand-back turns | 177 (13.3 per 100 Stops) | 159 (36.0) |
+| excluded as a claim-free hold | 4 (0.3) | 1 (0.2) |
+| excluded as question-only | 0 | 1 (0.2) |
+
+The hold count is the replay's TEXT half (`bin/replay-seating` cannot see `background_tasks`), so it is an
+upper bound on what the live hook excludes. One of the four ("Screenshots are gone and no server is
+running. Waiting on …") states a fact in a sentence `WAITING` also matches, and is excluded; that is the
+known cost of reading a hold sentence by sentence.
+
+**Seat rates, `bin/replay-seating --before 1927074 --summary`:**
+
+| | before, per 100 judged | after, per 100 judged | added, per 100 Stops |
+|---|---|---|---|
+| mutze-studio, 40 newest transcripts | 79.8 | 91.9 | 11.2 |
+| this repository, 93 transcripts | 56.8 | 91.1 | 32.4 |
+
+Stop 614 on `30e77777` now seats intuition and sight; 284, 635 and 726 seat as before.
 
 **Not measured, so not built:** the reply text a turn showed the user BEFORE its last tool call ("It's
 the only front view we have", Stop 726, row 701) is not the reply (`confirmed_reply`, the last block).

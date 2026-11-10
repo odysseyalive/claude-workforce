@@ -4580,7 +4580,7 @@
     ]
   },
   "widen-between-batches-is-silent": {
-    "_why": "THE GAP BETWEEN BATCHES, REPORTED 2026-09-13 by the session driving four agent batches. `background_tasks` is momentarily EMPTY between one batch finishing and the next being dispatched, and the Stop that lands in that window read a legitimate wait as a turn that announced work and stopped: the tail says \"Continuing.\" and the array that would settle it says nothing. TWO FACTS make it a hold - a task notification opened the turn, which the tag records, and the reply says what it is waiting on - so the words alone never buy silence (see widen-waiting-words-alone-still-block, the same reply with neither fact). Since 2026-10-12 the hold is scoped to the promise trigger, so the turn IS judged and reaches the no-claim verdict instead of being skipped.",
+    "_why": "THE GAP BETWEEN BATCHES, REPORTED 2026-09-13 by the session driving four agent batches. `background_tasks` is momentarily EMPTY between one batch finishing and the next being dispatched, and the Stop that lands in that window read a legitimate wait as a turn that announced work and stopped: the tail says \"Continuing.\" and the array that would settle it says nothing. TWO FACTS make it a hold - a task notification opened the turn, which the tag records, and the reply says what it is waiting on - so the words alone never buy silence (see widen-waiting-words-alone-still-block, the same reply with neither fact). Since 2026-10-12 the hold is scoped to the promise trigger, so the turn IS judged and reaches the no-claim verdict instead of being skipped. SINCE 2026-11-09 the turn is also tried as a `handback` (user: \"Every turn that starts from a worker's report gets a juror\"): the hold reports a result (\"Batch one landed and its report is folded in\"), so it is seated on sight and intuition, and still never blocked as a stop mid-work.",
     "exit": 0,
     "script": "wf-widen",
     "env": {
@@ -4588,7 +4588,7 @@
     },
     "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"Batch one landed and its report is folded in. I am waiting on the next batch before anything else moves.\\n\\nContinuing.\"}",
     "want": [
-      "not scored"
+      "sampled for audit"
     ],
     "not": [
       "not judged",
@@ -10685,7 +10685,7 @@
     "want": []
   },
   "issues-carry-only-stop-closes-the-issue-and-seats-no-juror": {
-    "_why": "THE STOP THAT ENDS THE HAND-BACK TURN, and the two things it owes the session. The carried row for i1 is marked `done` -- what `629732ff` tried to write and could not, because the file was gone -- so this Stop absorbs the status onto the issue the row NAMES and closes i1 in the same breath, where before the kickback repeated on every Stop for the rest of the session. AND THE WIDENING JURY IS SEATED ON NOTHING: the tag's record is `carry_only`, so no checklist is handed over and no flag is raised, because an injected hand-back is not the user's ask and must not be graded as one. The tag counts 2 asks on purpose -- that is the condition that WOULD hand a list to the juror -- so the absent flag is the guard answering and not the hand-off failing to qualify. `ended` is still marked: the turn did end, and that is what stops the next notification from reusing this list.",
+    "_why": "THE STOP THAT ENDS THE HAND-BACK TURN, and the two things it owes the session. The carried row for i1 is marked `done` -- what `629732ff` tried to write and could not, because the file was gone -- so this Stop absorbs the status onto the issue the row NAMES and closes i1 in the same breath, where before the kickback repeated on every Stop for the rest of the session. AND THE WIDENING JURY IS SEATED ON NOTHING: the tag's record is `carry_only`, so no checklist is handed over and no flag is raised, because an injected hand-back is not the user's ask and must not be graded as one. The tag counts 2 asks on purpose -- that is the condition that WOULD hand a list to the juror -- so the absent flag is the guard answering and not the hand-off failing to qualify. `ended` is still marked: the turn did end, and that is what stops the next notification from reusing this list. SUPERSEDED IN PART 2026-11-09 by the user's decision \"Every turn that starts from a worker's report gets a juror, even when nothing else triggers one\": the jury is still not handed the carry-only checklist as the user's ask, but the hand-back's result the reply passes on is tried as a `handback`, on sight and intuition.",
     "after": {
       ".claude/workforce/issues/s1.json": {
         "want": [
@@ -10699,7 +10699,12 @@
         ]
       },
       "wf-widen-flag.s1.json": {
-        "absent": true
+        "want": [
+          "\"trigger\": \"handback\""
+        ],
+        "not": [
+          "\"checklist\""
+        ]
       }
     },
     "env": {
@@ -10714,7 +10719,7 @@
     "script": "wf-widen",
     "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"session_id\": \"s1\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"The event is on the calendar for 16 January 2027 and the invitation is drafted.\"}",
     "want": [
-      "WIDEN  not scored"
+      "sampled for audit"
     ]
   },
   "spawn-guard-cut-agent-of-the-same-role-is-denied": {
@@ -15361,8 +15366,8 @@
       }
     }
   },
-  "widen-handback-no-relay-not-seated": {
-    "_why": "THE NEGATIVE for the relay. The same hand-back, a reply that restates no counted claim from it: nothing is seated, so the trigger costs nothing on a hand-back that only acknowledges.",
+  "widen-handback-no-relay-seats-as-handback": {
+    "_why": "THE RELAY'S NEGATIVE, superseded by the user's decision of 2026-11-09 (\"Build it\": every turn that starts from a worker's report gets a juror). The reply restates no counted claim, so `relayed` does not fire; the turn has no docket, so it is tried as a `handback`, on sight and intuition.",
     "script": "wf-widen",
     "exit": 0,
     "env": {
@@ -15371,15 +15376,20 @@
     },
     "stdin_raw": "{\"transcript_path\": \"s1.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"session_id\": \"s1\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"The art director's list is in. I'll show you the sheet when the rest of the crew reports.\"}",
     "want": [
-      "not scored"
+      "sampled for audit"
     ],
     "not": [
-      "sampled for audit",
-      "\"decision\": \"block\""
+      "\"decision\": \"block\"",
+      "not scored"
     ],
     "after": {
       "wf-widen-flag.s1.json": {
-        "absent": true
+        "want": [
+          "\"trigger\": \"handback\""
+        ],
+        "not": [
+          "\"trigger\": \"relayed\""
+        ]
       }
     }
   },
@@ -15477,5 +15487,150 @@
     "not": [
       "Traceback"
     ]
+  },
+  "spawn-guard-pass-on-a-continuation-is-not-held": {
+    "_why": "THE SAME FALSE BLOCK, REACHED THROUGH A CONTINUATION. MEASURED 2026-11-10, this repository, engineering-coder `ad43558b02c2df16b`: its stop was blocked once for a background shell, the final turn-budget notice marked it `handoff` (00:34:59Z), and it handed back `PASS` (00:35:34Z) on a stop carrying `stop_hook_active`. The ledger half returned on that flag, so nothing retired the mark and the next engineering-coder spawn was refused. The `before` step is that continuation stop; the spawn is allowed and the entry reads `returned`.",
+    "script": "wf-turn-budget",
+    "env": {
+      "WF_BLIND_SAMPLE": "0"
+    },
+    "subst": [
+      ".claude/workforce/issues/s1.json"
+    ],
+    "before": [
+      {
+        "script": "wf-widen",
+        "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"agent_transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"hook_event_name\": \"SubagentStop\", \"session_id\": \"s1\", \"agent_id\": \"a1\", \"agent_type\": \"eng-coder\", \"stop_hook_active\": true}",
+        "not": [
+          "Traceback"
+        ]
+      }
+    ],
+    "stdin_raw": "{\"hook_event_name\": \"PreToolUse\", \"session_id\": \"s1\", \"transcript_path\": \"s1.jsonl\", \"tool_name\": \"Agent\", \"tool_input\": {\"subagent_type\": \"eng-coder\", \"description\": \"seed round 2\", \"prompt\": \"Run id r2.\"}}",
+    "exit": 0,
+    "after": {
+      ".claude/workforce/issues/s1.json": {
+        "want": [
+          "\"agent_id\": \"a1\", \"agent_type\": \"eng-coder\", \"state\": \"returned\""
+        ],
+        "not": [
+          "\"state\": \"handoff\""
+        ]
+      }
+    },
+    "not": [
+      "Traceback",
+      "deny",
+      "hit its turn cap"
+    ]
+  },
+  "spawn-guard-cut-agent-on-an-older-issue-is-not-held": {
+    "_why": "A CUT AGENT ON AN OLDER ISSUE HOLDS DIFFERENT WORK. A spawn is linked to the newest open issue, so a fresh filer while i2 is current is a new order, not a replacement of i1's cut filer: allowed, and i1's mark is left for the main Stop to name. `spawn-guard-cut-agent-of-the-same-role-is-denied` is the same tree with i1 current, and it is still refused.",
+    "script": "wf-turn-budget",
+    "stdin_raw": "{\"hook_event_name\": \"PreToolUse\", \"session_id\": \"s1\", \"transcript_path\": \"s1.jsonl\", \"tool_name\": \"Agent\", \"tool_input\": {\"subagent_type\": \"filer\", \"description\": \"Filer continues notes 09-20\", \"prompt\": \"Run id e2e3 (continuation).\"}}",
+    "subst": [
+      ".claude/workforce/issues/s1.json"
+    ],
+    "exit": 0,
+    "not": [
+      "Traceback",
+      "permissionDecision",
+      "deny"
+    ],
+    "after": {
+      ".claude/workforce/issues/s1.json": {
+        "want": [
+          "\"state\": \"handoff\""
+        ]
+      }
+    }
+  },
+  "widen-handback-no-docket-seated": {
+    "_why": "mutze-studio 30e77777 Stop 614. A turn opened by a worker's PASS passed its result on (\"back in service\", \"republished\") with no docket from any source and no claim any grammar sees. User, 2026-11-09: every turn that starts from a worker's report gets a juror. Sight and intuition are seated every time, and nothing blocks.",
+    "script": "wf-widen",
+    "exit": 0,
+    "env": {
+      "WF_BLIND_SAMPLE": "0",
+      "WF_AUDIT_SAMPLE": "0"
+    },
+    "stdin_raw": "{\"transcript_path\": \"s1.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"session_id\": \"s1\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"The art director's handbook passed its check too, so both changed handbooks are back in service. The page is republished.\"}",
+    "want": [
+      "sampled for audit"
+    ],
+    "not": [
+      "\"decision\": \"block\"",
+      "not scored"
+    ],
+    "after": {
+      "wf-widen-flag.s1.json": {
+        "want": [
+          "\"trigger\": \"handback\"",
+          "\"senses\": [\"intuition\", \"sight\"]"
+        ]
+      }
+    }
+  },
+  "widen-handback-question-only-not-seated": {
+    "_why": "A reply that only asks the user a question passes nothing on from the report, so it is not tried (measured 1 such turn in 442 Stops here, 0 in 1,332 on mutze).",
+    "script": "wf-widen",
+    "exit": 0,
+    "env": {
+      "WF_BLIND_SAMPLE": "0",
+      "WF_AUDIT_SAMPLE": "0"
+    },
+    "stdin_raw": "{\"transcript_path\": \"s1.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"session_id\": \"s1\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"What would you like to clarify about the art director's picture?\"}",
+    "want": [
+      "not scored"
+    ],
+    "not": [
+      "sampled for audit"
+    ],
+    "after": {
+      "wf-widen-flag.s1.json": {
+        "absent": true
+      }
+    }
+  },
+  "widen-handback-hold-only-not-seated": {
+    "_why": "A declared hold that makes no claim: a task is running and every sentence says what the turn waits on. Nothing is passed on, so nothing is tried.",
+    "script": "wf-widen",
+    "exit": 0,
+    "env": {
+      "WF_BLIND_SAMPLE": "0",
+      "WF_AUDIT_SAMPLE": "0"
+    },
+    "stdin_raw": "{\"transcript_path\": \"s1.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"session_id\": \"s1\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"Waiting on the research scout's probe; I'll pick it up when it lands.\", \"background_tasks\": [{\"id\": \"bx1\", \"type\": \"shell\", \"status\": \"running\", \"command\": \"sleep 90\"}]}",
+    "not": [
+      "sampled for audit",
+      "\"decision\": \"block\""
+    ],
+    "after": {
+      "wf-widen-flag.s1.json": {
+        "absent": true
+      }
+    }
+  },
+  "widen-handback-hold-with-claim-seated": {
+    "_why": "THE NEGATIVE for the hold exclusion, and Stop 614's own shape: the turn waits on more work AND passes a result on. A hold excuses only a reply that makes no claim.",
+    "script": "wf-widen",
+    "exit": 0,
+    "env": {
+      "WF_BLIND_SAMPLE": "0",
+      "WF_AUDIT_SAMPLE": "0"
+    },
+    "stdin_raw": "{\"transcript_path\": \"s1.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"session_id\": \"s1\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"Both changed handbooks are back in service. Waiting on the research scout's probe; I'll pick it up when it lands.\", \"background_tasks\": [{\"id\": \"bx1\", \"type\": \"shell\", \"status\": \"running\", \"command\": \"sleep 90\"}]}",
+    "want": [
+      "sampled for audit"
+    ],
+    "not": [
+      "\"decision\": \"block\""
+    ],
+    "after": {
+      "wf-widen-flag.s1.json": {
+        "want": [
+          "\"trigger\": \"handback\""
+        ]
+      }
+    }
   }
 }
