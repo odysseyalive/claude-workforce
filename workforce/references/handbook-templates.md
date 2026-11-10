@@ -618,9 +618,10 @@ disallowedTools: Agent
 ```
 
 Where the server is not configured its grant resolves to nothing (fact 13b), so `web_fetch` is simply
-not among the employee's tools. `wf-web-grant` also appends this line to the employee's
-`## Guardrails`. It makes the choice at runtime, and it is what keeps `WebFetch` from being used as a
-route around the server's guards on a host that has the server:
+not among the employee's tools. On a host that has the server, the `wf-webfetch-guard` hook denies
+`WebFetch` at the call, which is what actually keeps it from being a route around the server's
+guards. `wf-web-grant` also appends this line to the employee's `## Guardrails`. The line is advisory:
+it tells the model the same rule, so it does not spend a call on the denial:
 
 ```markdown
 <!-- origin: workforce | modifiable: true | web-fetch -->

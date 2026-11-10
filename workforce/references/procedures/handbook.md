@@ -160,15 +160,20 @@ tools: <its other tools>, mcp__playwright-mcp, WebFetch, WebSearch
 
 | On a host where `playwright-mcp` is | The employee fetches with | Because |
 |---|---|---|
-| configured | `mcp__playwright-mcp__web_fetch` | its `## Guardrails` line forbids `WebFetch` while `web_fetch` is among its tools |
+| configured | `mcp__playwright-mcp__web_fetch` | the `wf-webfetch-guard` hook denies `WebFetch` on this host (enforced), and its `## Guardrails` line says the same (advisory) |
 | not configured | `WebFetch` | the server's grant resolves to nothing (fact 13b), so `web_fetch` is not among its tools |
 
 Discovery is `WebSearch` on both. **The grant does not change per host because projects travel
 between hosts:** the operator runs projects across several servers, and a `tools:` line rewritten for
 each host's configuration would flip in every clone each time the project is opened somewhere else.
 Holding `WebFetch` beside the server is a route around the server's exfiltration guards
-(`verification.md` § The guards an employee will meet); the Guardrails line is what closes it, which is
-why the producer writes that line and the author never leaves it out. The fallback is real:
+(`verification.md` § The guards an employee will meet). **Two layers close it, and only one
+enforces.** The `wf-webfetch-guard` `PreToolUse` hook denies `WebFetch` on a host where the server is
+configured, before the call runs, for a subagent as for the main session (measured, `platform.md`
+fact 4); `wf-settings-apply --wire-defaults` wires it, so the installer, `audit` and `verify` all reach
+it. The Guardrails line is advisory: a model reads it, and a fetched page can argue with it. It saves
+the denied call and is all that remains where the hook is not wired, which `verify` § Hook wiring
+reports. The fallback is real:
 `platform.md` fact 4 measured an explicit `tools: WebFetch` delivering the tool on 2.1.322, absent only
 where a `permissions.deny` rule names it. Interactive browsing (`browser_*`) is not covered by this
 rule and keeps the ABSENT rule above.

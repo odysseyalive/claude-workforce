@@ -361,8 +361,9 @@ verification tier-1 command usually does not exist. `playwright-mcp` supplies ti
   that proves its work and one that asserts it.
 - **It is the primary page fetch, and `WebFetch` is the fallback.** `web_fetch` renders JS and PDFs,
   returns citation data, and sits behind the exfiltration guards below. A page-fetching employee is
-  granted both, and its `## Guardrails` line has it use `WebFetch` only when `web_fetch` is not among
-  its tools, which is the case where the server is not configured (`procedures/handbook.md` Step 2a,
+  granted both. On a host where the server is configured, the `wf-webfetch-guard` hook denies
+  `WebFetch` at the call (enforced), and its `## Guardrails` line says to use `WebFetch` only when
+  `web_fetch` is not among its tools (advisory), which is the case where the server is not configured (`procedures/handbook.md` Step 2a,
   written by `wf-web-grant`). `platform.md` fact 4 measured the `WebFetch` grant delivering the tool on
   2.1.322 wherever no `permissions.deny` rule names it.
 - **`suite_audit` and `suite_methodology`** give a Lead a real basis for reviewing an IC's test work

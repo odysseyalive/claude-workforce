@@ -10,8 +10,9 @@ playwright-mcp is mainly for page fetch". So this governs PAGE FETCH only. Disco
 native `WebSearch`; interactive browsing (`browser_*`) is not touched here.
 
 ONE GRANT ON EVERY HOST: `tools:` carries `mcp__playwright-mcp`, `WebFetch` and `WebSearch`.
-The choice between the two fetch tools is made at runtime by the `## Guardrails` line below,
-not in the tracked file: the user runs projects across several servers, and a `tools:` line
+The choice between the two fetch tools is made per host at the call, not in the tracked file:
+`wf-webfetch-guard` (a PreToolUse hook) denies `WebFetch` where the server is configured, which
+ENFORCES it, and the `## Guardrails` line below tells the model the same, which is ADVISORY. the user runs projects across several servers, and a `tools:` line
 rewritten per host flips in git every time the project is opened somewhere else. A grant for
 an absent server resolves to nothing (fact 13b), which is exactly what lets the employee see
 that `web_fetch` is not among its tools and take `WebFetch`.

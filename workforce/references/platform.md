@@ -344,6 +344,26 @@ to nothing (fact 13b) and the employee fetches with `WebFetch`. `wf-web-grant` w
 grant, and reports a `permissions.deny` rule that leaves the fallback with nothing
 (`procedures/handbook.md` Step 2a).
 
+**The choice is enforced per host by a `PreToolUse` hook, and the hook reaches subagents.** Measured
+2026-11-10 on 2.1.322, the same harness as above, with the session holding `playwright-mcp` and a
+`PreToolUse` hook on `WebFetch` (`wf-webfetch-guard`, its detection pointed at a scratch config root).
+A lead spawned one IC granted `Read, WebFetch, WebSearch, mcp__playwright-mcp`, which called `WebFetch`
+and then `mcp__playwright-mcp__web_fetch` on `https://example.com`:
+
+| The hook's config root | Hook payload | `WEBFETCH=` | `WEB_FETCH=` |
+|---|---|---|---|
+| server configured | `tool_name=WebFetch agent_id=a6f10863902b9d947 agent_type=wfg-ic` | `PreToolUse:WebFetch hook error: playwright-mcp is configured on this host (…), so pages are fetched with mcp__playwright-mcp__web_fetch …` | `Example Domain` |
+| server not configured | `tool_name=WebFetch agent_id=ad390b3a1e95c64fd agent_type=wfg-ic` | `Example Domain` | `Example Domain` |
+| server configured, hook planted to always allow | `tool_name=WebFetch agent_id=a91adb95ae15070be agent_type=wfg-ic` | `The page title is "Example Domain."` | `Example Domain` |
+
+So a `PreToolUse` hook fires on a subagent's tool call, with that subagent's `agent_id`, and its
+`permissionDecision: "deny"` stops the call even under an `--allowedTools` rule that allows it. The
+two layers are not equal. **The hook ENFORCES:** a model talked into `WebFetch` by a fetched page
+still gets nothing. **The `## Guardrails` line is ADVISORY:** it is what the model reads, it saves
+the denied round trip, and it is all that stands where the hook is not wired. In the second row the
+session still held the server and only the hook's view of the config said otherwise; the real absent
+case, where `WebFetch` alone fetches, is the first table's top row.
+
 **`Grep` and `Glob` are absent from this host's registry entirely, not merely from the subagent grant** —
 the main session does not carry them either. Naming one in an explicit `tools:` list is therefore a
 fact-13b silent drop, and three shipped panel agents were doing exactly that until 2026-09-10.
