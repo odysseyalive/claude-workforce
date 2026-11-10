@@ -659,6 +659,18 @@ Mechanics at `references/evaluators.md` § The five skills ship in the install, 
 operational reading is — **ship the five evaluators and workforce into the user install, make
 `update` the only thing a user runs, and when an ask is clear, build that ask.***
 
+*Amended 2026-11-10: `image-eval` was removed, on the user's decision — "I say we deprecate (remove)
+image-eval. The Jury owns it. Too much emphesis is put on detail and not enough on whether the image
+actually fulfills the request" — with the check the jury owns stated as "does it match the ask
+within the context the image is being presented in, etc." **No quoted user text was touched**: the
+directive above still names five, because that is what the user said on 2026-09-10. What ships now is
+four evaluators — `text-eval`, `code-evaluator`, `security-evaluator`, `ui-design` — and `workforce`,
+and `update` remains the whole path: the next `update` prunes the shipped `image-eval` and its
+`image-validator` registration from every install that recorded writing them, and leaves a project's
+own `image-eval` where it stands. An image's fit is the sight juror's question, seated by the `image`
+trip on any turn that produced, edited, selected or placed one (`references/senses.md` § An image is
+judged where it is shown).*
+
 > **"More weight should be given on evidence, on evidence based on the latest date going
 > backwards.That includes current chats and requests."**
 

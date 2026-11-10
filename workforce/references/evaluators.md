@@ -5,15 +5,15 @@
      "evals" (evals.md) are per-employee measurement sets. Different things, similar
      names — do not conflate them in a procedure or a report. -->
 
-Five capabilities every project gets: **code quality review**, **text authenticity review**,
-**web-security review**, **image authenticity review**, and **UI design review**. Three of them ship a
+Four capabilities every project gets: **code quality review**, **text authenticity review**,
+**web-security review**, and **UI design review**. Three of them ship a
 **built catalog** — a corpus an employee greps against. `code-evaluator` and `text-eval` originate in
 claude-enforcer, where they are force-installed companion skills carrying shipped catalogs, and this
 project imports them **verbatim** (vendored). `security-evaluator` originates **here**, and its catalog
 is not vendored: it is workforce-authored, **distilled from three pinned upstream corpora and cited to
-them** rather than copied from a predecessor (§ Seeding). The remaining two, `image-eval` and
-`ui-design`, are also authored here and **shipped as built catalogs since 2026-09-10**
-(`skills/image-eval/references/`, `skills/ui-design/references/`). *They shipped as single seed specs until
+them** rather than copied from a predecessor (§ Seeding). The fourth, `ui-design`, is also authored
+here and **shipped as a built catalog since 2026-09-10** (`skills/ui-design/references/`). *It and the
+since-removed `image-eval` shipped as single seed specs until
 then — `image-eval-seed.md` and `ui-design-seed.md`, copied into a project once on absence and tracked
 by nothing afterwards. Measured that day: 8 projects held an `image-eval` copy, 1 a `ui-design`, 1 a
 `design-eval` under a third spelling, and not one carried a version anchor. A seed is a corpus that
@@ -21,12 +21,16 @@ cannot be resolved, cannot be reported stale, and reaches an existing project on
 re-audit — which is the drift the install-side corpus exists to end (§ Where a catalog resolves from).
 The content was promoted unchanged; what it gained is an anchor and a resolver entry.*
 
-**`image-eval` and `ui-design` are medium-disjoint, and that is why they are two catalogs, not one.**
-`image-eval` reviews image **authenticity** — is a picture AI-generated, does a rendered medium respect
-its physical constraints. `ui-design` reviews **UI design** — is the interface applied to a deliberate
-theme, differentiated in hierarchy, complete (no blank or placeholder media slot), responsive, and
-accessible. A blank card and an AI-generated card are different failures caught by different criteria
-(`discovery.md` — medium-disjoint capabilities are separate catalogs), so neither subsumes the other.
+**There is no image evaluator, and that is a decision.** `image-eval` shipped from 2026-09-10 to
+2026-11-10 and was removed on the user's decision: *"I say we deprecate (remove) image-eval. The Jury
+owns it. Too much emphesis is put on detail and not enough on whether the image actually fulfills the
+request."* Its catalog graded detail — signatures, symmetry, metadata, technique rows — and nothing in
+it asked whether the image fulfils the ask where it is shown. That question is the sight juror's now,
+seated by the `image` trip on any turn that produced, edited, selected or placed an image
+(`senses.md` § An image is judged where it is shown). `ui-design` still checks that a declared image
+slot renders (no blank or placeholder media); whether the image in it fits is the jury's. **A project's
+own image skill is the project's**: workforce no longer ships, seeds, appends to or migrates one, and
+`wf-catalog`, `wf-conform` and `install` leave a project's `.claude/skills/image-eval` where it stands.
 
 ## Why they matter here specifically
 
@@ -66,26 +70,26 @@ only quality check is its own self-assessment should say so.
 
 ---
 
-## The evaluators — three built catalogs and two seeds
+## The evaluators — three built catalogs and a seed
 
-`code-evaluator`, `text-eval`, and `security-evaluator` each ship a **built catalog**; `image-eval` and
-`ui-design` ship **seed specs** and become built catalogs on the first project that grows one. The
+`code-evaluator`, `text-eval`, and `security-evaluator` each ship a **built catalog**; `ui-design`
+ships a **seed spec** and becomes a built catalog on the first project that grows one. The
 seed-source row is where the three built catalogs differ most, and the difference is load-bearing: two
 are vendored verbatim from a predecessor and never edited, one is authored here and re-distilled from
 cited pins (§ Seeding).
 
-The table below details the three built catalogs and `image-eval`. **`ui-design` is the fifth
-capability**, a seed spec sibling of `image-eval`: it **reviews** UI design (applied theme, visual
+The table below details the three built catalogs. **`ui-design` is the fourth capability**, a seed
+spec: it **reviews** UI design (applied theme, visual
 hierarchy, present art, responsiveness, accessibility), ships as `skills/ui-design/references/`, is **owned** by a
 design or front-end IC, and is **hired when** the project ships a user interface.
 
-| | `code-evaluator` | `text-eval` | `security-evaluator` | `image-eval` |
-|---|---|---|---|---|
-| Reviews | code quality — cross-file consistency, mistake taxonomy, guards | text authenticity — machine-writing tells, voice drift | web-security — OWASP Top 10:2025 flaw classes as source-review classes, taint signals, a per-language sink appendix | image authenticity — AI generation tells, technique violations, metadata provenance |
-| Catalog | mistake taxonomy, cross-file detection, native tool map, guards, gotchas | the tells catalog, clustering rules, severity tiers | security taxonomy, native-tool map, guards, cross-file detection (each carrying a `security-ref-version` anchor) | AI image patterns, technique authenticity checks, metadata provenance signals, visual clarity criteria |
-| Seed source | claude-enforcer (migration import), vendored verbatim | claude-enforcer (migration import), vendored verbatim | **distilled and cited** — OWASP/CheatSheetSeries @c735a6e, swisskyrepo/PayloadsAllTheThings @3bff425, semgrep/semgrep-rules @40b8c63, each row anchored to a CWE. This project's own build, no enforcer predecessor, `origin: workforce · modifiable` | authored here, promoted from `image-eval-seed.md` to `skills/image-eval/references/` on 2026-09-10 (this project only — no enforcer predecessor) |
-| Owner | an engineering IC | a content IC | a security or engineering IC | a content or design IC |
-| Hired when | the project has code | the project produces prose | the project has web-facing code | the project produces or ships images |
+| | `code-evaluator` | `text-eval` | `security-evaluator` |
+|---|---|---|---|
+| Reviews | code quality — cross-file consistency, mistake taxonomy, guards | text authenticity — machine-writing tells, voice drift | web-security — OWASP Top 10:2025 flaw classes as source-review classes, taint signals, a per-language sink appendix |
+| Catalog | mistake taxonomy, cross-file detection, native tool map, guards, gotchas | the tells catalog, clustering rules, severity tiers | security taxonomy, native-tool map, guards, cross-file detection (each carrying a `security-ref-version` anchor) |
+| Seed source | claude-enforcer (migration import), vendored verbatim | claude-enforcer (migration import), vendored verbatim | **distilled and cited** — OWASP/CheatSheetSeries @c735a6e, swisskyrepo/PayloadsAllTheThings @3bff425, semgrep/semgrep-rules @40b8c63, each row anchored to a CWE. This project's own build, no enforcer predecessor, `origin: workforce · modifiable` |
+| Owner | an engineering IC | a content IC | a security or engineering IC |
+| Hired when | the project has code | the project produces prose | the project has web-facing code |
 
 **The catalog installs on ABSENCE ALONE, never gated on a declared department.** This is
 claude-enforcer's hard-won rule (`DEC-2026-06-12-install-on-absence`): an all-coding project received no
@@ -548,20 +552,17 @@ source carries ~126 pattern rows; one real project's hand-grown catalog had ~57 
 reconciled; a second had ~49. Workforce shipped **zero**, so a fresh install on any machine without the
 predecessor was strictly thinner than the system it supersedes — which is the one outcome the standing
 directive in `SKILL.md` § Directives forbids. Vendoring the corpora is what closes it.*
-3. **For `image-eval`**, this project ships `skills/image-eval/references/` as the corpus. It covers AI image
-   patterns, technique authenticity (watercolor, oil, ink), visual clarity, metadata provenance, and
-   image-set evaluation. Where a project already carries an `image-eval` (e.g. odyssey-alive's
-   watercolor-specific catalog), the existing catalog is canonical and the seed is only a source of
-   new entries through the forcible-append mechanism. The project's customizations, medium-specific
-   checks, and user directives are never overwritten.
+3. **`image-eval` is not seeded.** It was removed on 2026-11-10 (*There is no image evaluator*, at the
+   top of this file). A project that carries its own (odyssey-alive's watercolor catalog, which its
+   `/image` skill chains to) keeps it untouched; nothing here appends to, migrates or reports it.
 
    3b. **For `ui-design`**, this project ships `skills/ui-design/references/` as the corpus. It covers the required
    checks — no missing art (a blank or placeholder media slot FAILS), applied theme (no default
    palette), contrast and accessibility — plus visual hierarchy, responsive layout, and default-design
-   tells. It installs on absence alone, the same as `image-eval`, and where a project already carries a
+   tells. It installs on absence alone, and where a project already carries a
    `ui-design` catalog the existing one is canonical and the seed contributes only new entries through
-   the forcible-append mechanism. It is a **separate** catalog from `image-eval` because UI design and
-   image authenticity are medium-disjoint (§ The evaluators).
+   the forcible-append mechanism. It checks that a declared image slot renders; whether the image fits
+   the ask is the jury's (`senses.md` § An image is judged where it is shown).
 4. **For `security-evaluator`, the catalog is authored here and distilled — not vendored.** Its five
    files under `skills/security-evaluator/references/` carry `origin: workforce · modifiable: true`, and they
    are **distilled from three pinned upstream corpora** — OWASP/CheatSheetSeries @c735a6e,

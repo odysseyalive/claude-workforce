@@ -221,10 +221,10 @@ makes the working directory the project is step 4's rule — run it from the roo
 with a bootstrap prompt. Both installers dropped that check with the evacuation directive; the prose
 outlived it by six weeks.*
 
-### The five evaluators come with it, and so do `blueprint`, `shared-artifact`, `records-code-map` and `timezone`
+### The four evaluators come with it, and so do `blueprint`, `shared-artifact`, `records-code-map` and `timezone`
 
-**`update` installs ten skills, not one.** `text-eval`, `code-evaluator`, `security-evaluator`,
-`image-eval` and `ui-design` ship as SIBLINGS of `skills/workforce/` — each complete, carrying the
+**`update` installs nine skills, not one.** `text-eval`, `code-evaluator`, `security-evaluator`
+and `ui-design` ship as SIBLINGS of `skills/workforce/` — each complete, carrying the
 corpus it grades against and the agents it runs — and the same rows register those agents where the
 host reads them. That is the whole of the 2026-09-10 directive: *"All I have to do is update
 workforce."* Nothing about an evaluator reaches a project through an audit any more, so **a catalog

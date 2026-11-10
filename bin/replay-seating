@@ -284,10 +284,11 @@ def docket(M, payload, led, past, lines, k, opener, mid, rows):
     return hits, via, ask
 
 
-def seat(M, docketed, counts, reply, opener=None):
+def seat(M, docketed, counts, reply, opener=None, rows=None):
     """(outcome, jurors) for one side, from its `docket` result. A side whose `wf-widen` has
     `claim_trips` reads the opener as testimony and seats its seat-only trips every time
-    (`always_seated`); an older side trips as it did then."""
+    (`always_seated`); an older side trips as it did then. A side with `image_work` reads the
+    turn's `rows` for image work, the same walk the live hook makes."""
     hits, _via, ask = docketed
     V = M[1]
     if not hasattr(V, "claim_trips"):
@@ -296,8 +297,9 @@ def seat(M, docketed, counts, reply, opener=None):
         # THE HOLD IS ITS TEXT HALF HERE: a replay cannot see `background_tasks`, so a reply
         # that says it is waiting counts as a hold. The live hook also needs the running task,
         # so the replay's exclusion is an upper bound and its seat count a lower one.
+        kw = {"images": V.image_work(rows, opener, reply)} if hasattr(V, "image_work") else {}
         try:
-            trips = V.claim_trips(reply, opener, hold=bool(V.WAITING.search(reply or "")))
+            trips = V.claim_trips(reply, opener, hold=bool(V.WAITING.search(reply or "")), **kw)
         except TypeError:
             trips = V.claim_trips(reply, opener)
     applicable, gate, why, incident = V.seating(trips, hits)
@@ -339,8 +341,8 @@ def replay(path, want=None, quiet=False):
         past, unknown = carried_before(led, opened, lo, turn_time(lines, lo))
         bd = docket(OLD, payload, led, past, lines, k, opener, mid, rows)
         ad = docket(NEW, payload, led, past, lines, k, opener, mid, rows)
-        (b, bj), (a, aj) = (seat(OLD, bd, counts, reply, opener),
-                            seat(NEW, ad, counts, reply, opener))
+        (b, bj), (a, aj) = (seat(OLD, bd, counts, reply, opener, rows),
+                            seat(NEW, ad, counts, reply, opener, rows))
         bk, ak, via = [h["kind"] for h in bd[0]], [h["kind"] for h in ad[0]], ad[1]
         tot["before"] += b != "none"
         tot["after"] += a != "none"

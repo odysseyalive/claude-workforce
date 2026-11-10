@@ -93,6 +93,11 @@ import time
 # own `references/`, named exactly as `wf-seed.CATALOGS` names it where wf-seed seeds the kind.
 # A kind workforce has authored nothing for carries None, which is a first-class answer and
 # never an empty file.
+#
+# NO `image` KIND SINCE 2026-11-10. `image-eval` was removed on the user's decision ("The Jury
+# owns it"), so nothing ships to resolve, migrate or refresh, and a project's own
+# `.claude/skills/image-eval` is the project's: this tool no longer reads it as a copy of
+# anything. `--kind image` says so rather than failing as a parser error (`RETIRED_KINDS`).
 CATALOGS = {
     "code":     {"skills": ("code-evaluator",),     "anchor": "code-eval-ref-version",
                  "additions": "additions.md", "additions_anchor": "code-additions-version"},
@@ -103,8 +108,6 @@ CATALOGS = {
     # `design-eval` is a third spelling of the same concern, measured on `apps-odyssey-alive`
     # 2026-09-10. It is listed because a catalog nobody can NAME is a catalog nobody can
     # resolve, and the alternative is a copy that drifts under a synonym.
-    "image":    {"skills": ("image-eval",),         "anchor": "image-eval-ref-version",
-                 "additions": None,            "additions_anchor": None},
     # THE UI SLOT IS `rendered-checks.md`, and it always was workforce's authored half: its own
     # header calls it "the seed contribution", the entries the carried catalog did not cover. It
     # was listed as None, so the report never said the ui corpus has two provenances and a
@@ -254,7 +257,8 @@ def install_dir(root, kind):
     """The shipped corpus for `kind`, or None when workforce is installed nowhere.
 
     THE CORPUS IS THE EVALUATOR SKILL'S OWN `references/`, not a directory inside
-    workforce. The user directive of 2026-09-10 is that the five evaluators are
+    workforce. The user directive of 2026-09-10 is that the evaluators (five then, four since
+    image-eval's removal on 2026-11-10) are
     self-contained in the user install and `update` is the whole propagation path
     (SKILL.md § Directives), so `manifest.txt` installs each one as a SIBLING of
     `skills/workforce/` and its `references/` is the shipped catalog. One copy per
@@ -1693,7 +1697,9 @@ def shipped_agents(root, kind):
     MEASURED 2026-09-10 on `odyssey-alive`: six bundled agents across the five copies. Four
     are project-neutral and now ship (`character-scanner`, `image-validator`,
     `code-design-advisor`, `deadcode-gardener`); `prose-evaluator` and `structure-checker`
-    carry the project's own voice rules, ship nowhere, and are kept.
+    carry the project's own voice rules, ship nowhere, and are kept. (`image-validator`
+    stopped shipping with image-eval on 2026-11-10; the `image` kind is gone, so this never
+    runs on a project's own `image-eval`.)
     """
     inst = install_dir(root, kind)
     if not inst:
@@ -2570,7 +2576,21 @@ def migrate(root, args):
     return 1 if refused else 0
 
 
+# A KIND THAT USED TO SHIP, and where its question went. A handbook rewritten to
+# `wf-catalog --kind image` before 2026-11-10 gets this line and exit 2, not a usage error.
+RETIRED_KINDS = {
+    "image": "the `image` catalog was removed on 2026-11-10 (image-eval is retired; the jury "
+             "judges whether an image fulfils the ask where it is shown, `senses.md`). A "
+             "project's own image skill is read directly, never through this resolver.",
+}
+
+
 def main():
+    _kind = next((sys.argv[i + 1] for i, a in enumerate(sys.argv[:-1]) if a == "--kind"),
+                 next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--kind=")), None))
+    if _kind in RETIRED_KINDS:
+        print("wf-catalog: --kind %s: %s" % (_kind, RETIRED_KINDS[_kind]), file=sys.stderr)
+        return 2
     ap = argparse.ArgumentParser(add_help=True)
     ap.add_argument("--root", default=os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd())
     ap.add_argument("--kind", choices=sorted(CATALOGS))

@@ -407,7 +407,7 @@ WIRE_FAILED=""
 # skill. MEASURED 2026-09-14 at a peer host on 1.58.0 whose project root is $HOME: four
 # customized evaluators pre-dated the install, the sibling guard kept them (correctly), and
 # with them it skipped `references/additions.md`, which is not vendored corpus but workforce's
-# OWN authored slot (manifest.txt § The five evaluator skills; evaluators.md § Seeding 1b). No
+# OWN authored slot (manifest.txt § The four evaluator skills; evaluators.md § Seeding 1b). No
 # copy existed anywhere under ~/.claude, so `wf-seed --execute` failed `additions slot not
 # found` on every audit, and with `update` the whole propagation path (SKILL.md § Directives,
 # 2026-09-10) nothing could ever deliver one.
@@ -605,6 +605,19 @@ prune_scope() {
             if [ -f "$pf" ] && ! grep -Fxq "$pf" "$_ext_now"; then
                 rm -f "$pf" && _pruned=$((_pruned + 1))
                 echo "  Pruned $pf"
+                # A SIBLING THE MANIFEST DROPPED LEAVES NO EMPTY SHELL. The `-empty -delete`
+                # below walks only the workforce skill directory, so removing `image-eval`
+                # (2026-11-10) left `skills/image-eval/references/` and
+                # `agents/image-validator/` standing, empty, in the user's skills root. rmdir
+                # removes only an empty directory, so a project file left inside stops it.
+                case "$pf" in
+                    "$_skills_root"/*/*)
+                        _pd="$(dirname "$pf")"
+                        while [ "$_pd" != "$_skills_root" ] && [ "${_pd#"$_skills_root"/}" != "$_pd" ]; do
+                            rmdir "$_pd" 2>/dev/null || break
+                            _pd="$(dirname "$_pd")"
+                        done ;;
+                esac
             fi
         done < "$_record"
     fi
@@ -786,7 +799,7 @@ install_to_scope() {
             # future style has a destination.
             "style "*) flag="style"; path="${line#style }" ;;
             # `sibling` files do NOT live in the workforce skill directory: they are
-            # WHOLE SKILLS OF THEIR OWN — the five evaluators — and a skill is only
+            # WHOLE SKILLS OF THEIR OWN — the four evaluators — and a skill is only
             # discoverable at `<skills-root>/<name>/SKILL.md`. Shipping them here is
             # the user directive of 2026-09-10: the five evaluators and workforce are
             # self-contained in the user install, and `update` is the entire

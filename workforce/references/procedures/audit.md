@@ -1214,9 +1214,11 @@ is already authorized to make (§ When the evidence exceeds the cap — the evid
 no-question rule there governs this too.
 
 **3. The design critic is one instance of step 2 — and the evaluator-coverage half.** A department that
-ships visual or UI output with **no design-evaluator path** gets the `ui-design` and `image-eval`
-catalogs installed (on absence alone, § Step 6-E and `evaluators.md`) and the **design critic hired
-in-run**. It grep-checks `ui-design` as its tier-3 gate and its Lead names the design evaluator as
+ships visual or UI output with **no design-evaluator path** gets the `ui-design` catalog
+installed (on absence alone, § Step 6-E and `evaluators.md`) and the **design critic hired
+in-run**. No image catalog is installed: since 2026-11-10 whether an image fits the ask where it is
+shown is the jury's question (`senses.md` § An image is judged where it is shown), and a project's own
+image skill is left as it stands. It grep-checks `ui-design` as its tier-3 gate and its Lead names the design evaluator as
 tier-4, symmetric to `security-evaluator` for web work.
 
 **Guardrails — unchanged and load-bearing; this must NOT become headcount bloat.** The minimum-viable-org
@@ -1410,9 +1412,11 @@ Per **governed** handbook (adopted agents stay exempt until their first amendmen
    with the `$WF` prefix that section shows because nothing here puts `bin/` on `PATH`. **A citation in
    `## Sources` takes a different edit**: that section declares sources by path as a matter of
    contract, so name the resolver as the read mechanism and keep the source named, rather than dropping
-   a bare command into a path list. **Every resolvable kind is healed, and that is now all five** —
-   `text-eval`, `code-evaluator`, `security-evaluator`, `image-eval` and `ui-design`, the last of which
-   the resolver also serves under its `design-eval` spelling. *This item read `only the three
+   a bare command into a path list. **Every resolvable kind is healed, and that is now all four** —
+   `text-eval`, `code-evaluator`, `security-evaluator` and `ui-design`, the last of which
+   the resolver also serves under its `design-eval` spelling. A literal `.claude/skills/image-eval/`
+   citation is NOT healed and not flagged: the `image` kind was removed on 2026-11-10, and the
+   project's own image skill is a path it reads directly. *This item read `only the three
    resolvable kinds` until 2026-09-13, and the restriction was correct when it was written: an earlier
    draft flagged all five against a three-kind resolver, and 5 of 13 flagged handbooks on
    `odyssey-alive` cited only catalogs the resolver did not serve — 38% false positives carrying a
@@ -2173,7 +2177,9 @@ question," and both run here before `verify` so `verify` checks their result.
 
 ### Step 6-F — Retire the project's evaluator copies
 
-**The five evaluators ship in the install, and the project's old copies go.** The user directive of
+**The four evaluators ship in the install, and the project's old copies go.** (Five until 2026-11-10;
+`image-eval` was removed then, so a project's own `image-eval` is not a copy of anything shipped and
+this step never touches it.) The user directive of
 2026-09-10 (SKILL.md § Directives) states both halves: *"the five evaluations and workforce should be
 self-contained in the user during install so that I don't have to run an audit every time there are
 changes"*, and *"the audit of a project removes the old ones of the project so that the one in the user

@@ -238,7 +238,7 @@ def _relayed_note(payload, tag):
 
 
 def raise_flag(payload, why, rows, counts, unopened, applicable,
-               sampled=False, reply="", carried=None):
+               sampled=False, reply="", carried=None, images=None):
     _tag = task_tag(payload)
     """Record what the auditing agent needs to judge RESULTS against the ASK.
 
@@ -299,6 +299,10 @@ def raise_flag(payload, why, rows, counts, unopened, applicable,
            if isinstance((_tag or {}).get("prompt"), str)
            and TT.INJECTED.search(_tag["prompt"]) else {}),
         "said_earlier": said_earlier(payload, reply),
+        # THE IMAGES THIS TURN PRODUCED, EDITED, SELECTED OR PLACED (`image_work`), and the
+        # files that show them: the sight juror LOOKS at each and judges it where it is shown.
+        **({"images": {"files": images[0], "placed_in": images[1]}}
+           if images and images[0] else {}),
         # PASSED IN, NEVER DERIVED FROM `why`. Deriving it listed every
         # APPLICABLE sense as unopened, which on a sampled turn is every sense
         # the ask needed — including ones the turn opened 24 times.
@@ -634,6 +638,9 @@ CLAIM_SENSE = {
                             "whole set, in any domain; only enumerating the set settles it"),
     "relayed": ("sight", "the reply restates a counted or quantified claim from a hand-back "
                          "it received; testimony is not evidence until its source is read"),
+    "image": ("sight", "the turn produced, edited, selected or placed an image; whether it "
+                       "fulfils the ask where it is shown is settled only by looking at the "
+                       "image and at the place that shows it"),
     "absence": ("taste", "a claim that something is NOT there is a claim about a SET, "
                          "and no number of point reads can settle it — only enumerating "
                          "the set can"),
@@ -2406,7 +2413,7 @@ def widen_reason(unopened, why, rows, inst, counts):
 # were measured far above what a block can bear and well inside what a seat can
 # (`senses.md` § Quantified and relayed claims), so they never block on a channel count and
 # are tried every time they fire (`always_seated`), never 1 in WF_AUDIT_SAMPLE.
-JURY_ONLY_TRIPS = frozenset({"quantified", "relayed", "handback"})
+JURY_ONLY_TRIPS = frozenset({"quantified", "relayed", "handback", "image"})
 # A TURN THAT STARTS FROM A WORKER'S REPORT IS ALWAYS TRIED, when nothing else docketed it.
 # User, 2026-11-09, choosing "Build it": "Every turn that starts from a worker's report gets
 # a juror, even when nothing else triggers one." The testimony makes it a case for SIGHT (did
@@ -2471,13 +2478,13 @@ def hold_only(reply):
     return bool(said) and all(WAITING.search(s) or s.rstrip().endswith("?") for s in said)
 
 
-def claim_trips(reply, testimony=None, hold=False):
+def claim_trips(reply, testimony=None, hold=False, images=None):
     """Every claim the reply trips. ONE DEFINITION, read by the Stop below and by
     `bin/replay-seating`: absence and universal (gating), quantified and relayed (seat only),
     and `handback`, the turn opened by a worker's report that trips nothing else. A declared
     HOLD (`hold`, the caller's `declared_hold`) and a reply that only asks the user a question
     pass nothing on, so neither is a `handback` (`senses.md` § A turn that starts from a
-    worker's report)."""
+    worker's report). `images` is `image_work`'s pair: any image found trips `image`."""
     masked = TL.mask_code(reply or "")
     unquoted = TL._QUOTED.sub(lambda m: " " * len(m.group(0)), masked)
     trips = []
@@ -2492,7 +2499,112 @@ def claim_trips(reply, testimony=None, hold=False):
     if (not trips and testimony and TT.INJECTED.search(testimony)
             and not (hold and hold_only(reply)) and not question_only(reply)):
         trips.append("handback")
+    # AFTER the hand-back test, so image work never suppresses it (`seating` agrees).
+    if images and images[0]:
+        trips.append("image")
     return trips
+
+
+# AN IMAGE IS JUDGED WHERE IT IS SHOWN. User, 2026-11-10, removing image-eval: "The Jury owns
+# it. Too much emphesis is put on detail and not enough on whether the image actually
+# fulfills the request", and the check is "does it match the ask within the context the image
+# is being presented in". MEASURED on mutze-studio `30e77777`: a face swap was called done
+# that had put the same picture in both slots, each image fine alone and wrong against the
+# ask. So a turn that PRODUCED, EDITED, SELECTED or PLACED an image seats the sight juror,
+# which looks at the image file and at the file that shows it (`senses.md` § An image is
+# judged where it is shown). Seat-only: a seat costs one jury call and blocks nothing.
+#
+# WHAT COUNTS, read off the turn's own tool calls and never off its prose:
+#   a write tool (Write, Edit, MultiEdit, NotebookEdit) whose target IS an image, or whose new
+#     text EMBEDS one (`![..](x)`, `<img src=x>`, `src=`/`srcset=`/`poster=`/`url(` naming an
+#     image); the edited file is where it is placed;
+#   a shell command or an MCP tool naming an image path, minus a segment that only removes or
+#     lists files and minus a screenshot or page snapshot, which captures a page to inspect it;
+#   an image the turn READ and the reply names by file name: the turn picked it and passed it on;
+#   an image path in the hand-back or notification that opened the turn: a worker made it.
+# A delegation (`Agent`) is not the image: its hand-back is, on the turn that relays it.
+IMAGE_EXTS = "png|jpe?g|webp|gif|avif|heic|heif|tiff?|bmp"
+IMAGE_EXT = r"(?:" + IMAGE_EXTS + r")"
+_IMAGE_PATH = re.compile(r"(?<![\w%/.${}-])((?:[\w~.%+@${}-]*/)*[\w~.%+@-]+\." + IMAGE_EXT + r")(?![\w-])",
+                         re.I)
+_EMBED = re.compile(
+    r"!\[[^\]\n]*\]\(\s*<?([^)\s>]+)"
+    r"|<img\b[^>]*?\bsrc\s*=\s*[\"']?([^\"'\s>]+)"
+    r"|\b(?:src|srcset|poster|href)\s*=\s*[\"']?([^\"'\s>,]+\.(?:" + IMAGE_EXTS + r"|svg))"
+    r"|url\(\s*[\"']?([^\"')\s]+\.(?:" + IMAGE_EXTS + r"|svg))", re.I)
+_IMAGE_FILE = re.compile(r"\.(?:" + IMAGE_EXTS + r"|svg)$", re.I)
+NOT_IMAGE_WORK = ("Read", "Grep", "Glob", "LS", "WebFetch", "WebSearch", "TodoWrite",
+                  "Agent", "Task", "SendMessage", "AskUserQuestion", "Skill", "TaskStop",
+                  "TaskOutput", "BashOutput", "KillShell")
+_CAPTURE_TOOL = re.compile(r"screenshot|snapshot", re.I)
+_LISTING_SEGMENT = re.compile(r"^\s*(?:sudo\s+)?(?:rm|rmdir|ls|eza|exa|stat|du|file|test|\[)\b")
+IMAGES_MAX = 12
+PLACED_MAX = 8
+
+
+def _new_text(name, inp):
+    if name == "Write":
+        return [inp.get("content")]
+    if name == "Edit":
+        return [inp.get("new_string")]
+    if name == "MultiEdit":
+        return [e.get("new_string") for e in inp.get("edits") or [] if isinstance(e, dict)]
+    return [inp.get("new_source")]
+
+
+def image_work(rows, testimony=None, reply=""):
+    """(images, placed_in): the image paths this turn produced, edited, selected or placed,
+    and the files it placed them in, each in first-seen order and bounded. ([], []) when the
+    turn did no image work. `rows` is any walk of the turn (`turn_rows` here, oldest-first
+    in `bin/replay-seating`); a tool_use block is read the same in either order."""
+    images, placed, read = [], [], []
+
+    def add(bucket, path):
+        if isinstance(path, str) and path and path not in bucket:
+            bucket.append(path)
+
+    for row in rows or []:
+        c = (row.get("message") or {}).get("content") if row.get("type") == "assistant" else None
+        for b in c if isinstance(c, list) else []:
+            if not isinstance(b, dict) or b.get("type") != "tool_use":
+                continue
+            name, inp = b.get("name") or "", b.get("input")
+            if not isinstance(inp, dict):
+                continue
+            if name == "Read":
+                p = inp.get("file_path")
+                if isinstance(p, str) and _IMAGE_FILE.search(p):
+                    add(read, p)
+                continue
+            if name in NOT_IMAGE_WORK or _CAPTURE_TOOL.search(name):
+                continue
+            if name in WRITE_TOOLS:
+                target = inp.get("file_path") or inp.get("notebook_path")
+                if isinstance(target, str) and _IMAGE_FILE.search(target):
+                    add(images, target)
+                    continue
+                for text in _new_text(name, inp):
+                    for m in _EMBED.finditer(text if isinstance(text, str) else ""):
+                        add(images, next(g for g in m.groups() if g))
+                        add(placed, target)
+                continue
+            if name == "Bash":
+                cmd = inp.get("command") if isinstance(inp.get("command"), str) else ""
+                for seg in _SEGMENT.split(cmd):
+                    if not _LISTING_SEGMENT.match(seg):
+                        for m in _IMAGE_PATH.finditer(seg):
+                            add(images, m.group(1))
+                continue
+            for m in _IMAGE_PATH.finditer(json.dumps(inp, ensure_ascii=False)):
+                add(images, m.group(1))
+    said = (reply or "").lower()
+    for p in read:
+        if os.path.basename(p).lower() in said:
+            add(images, p)
+    if testimony and TT.INJECTED.search(testimony):
+        for m in _IMAGE_PATH.finditer(testimony[:TESTIMONY_MAX]):
+            add(images, m.group(1))
+    return images[:IMAGES_MAX], placed[:PLACED_MAX]
 
 
 def always_seated(why):
@@ -2524,7 +2636,8 @@ def seating(trips, hits):
         why.append(("TAG:" + ("carried " if carried else "") + h["kind"], h["sense"], h["why"]))
         incident = incident or (h["kind"] == "incident" and not carried)
     # A HAND-BACK SEATS ONLY WHEN NOTHING ELSE DID: no tag hit from any source and no claim.
-    if "handback" in trips and not why:
+    # Image work is not a claim the hand-back made, so it never takes the hand-back's seats.
+    if "handback" in trips and all(t == "image" for t, _s, _r in why):
         for sense in HANDBACK_DOCKET:
             applicable.add(sense)
             why.append(("handback", sense, HANDBACK_WHY))
@@ -2787,8 +2900,11 @@ def widen(payload):
     # A HAND-BACK IS TESTIMONY (`claim_trips`): the row that opened a main turn, when the
     # harness wrote it, is what a relayed claim is matched against.
     _opener = (own_tag(payload) or {}).get("prompt") if not subagent else None
-    trips = claim_trips(reply, _opener if isinstance(_opener, str) else None,
-                        hold=bool(_opener) and bool(declared_hold(payload, reply)))
+    _opener = _opener if isinstance(_opener, str) else None
+    images = image_work(turn_rows(TL.reply_transcript(payload)), _opener, reply)
+    trips = claim_trips(reply, _opener,
+                        hold=bool(_opener) and bool(declared_hold(payload, reply)),
+                        images=images)
 
     hits = docket_hits(payload, reply, subagent)
     applicable, gate, why, incident = seating(trips, hits)
@@ -2940,7 +3056,7 @@ def widen(payload):
     if not subagent:
         _car = (own_tag(payload) or {}).get("carried_docket")
         raise_flag(payload, why_rows, rows, counts, unopened, applicable,
-                   sampled=sampled, reply=reply,
+                   sampled=sampled, reply=reply, images=images if "image" in trips else None,
                    carried=[i for i in (_car.get("issues") or []) if isinstance(i, dict)]
                    if isinstance(_car, dict) and any(h.get("carried") for h in hits) else None)
 

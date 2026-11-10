@@ -500,6 +500,16 @@ function Install-ClaudeWorkforce {
                     try {
                         Remove-Item -LiteralPath $pf -Force -ErrorAction Stop; $pruned++
                         Write-Host "  Pruned $pf"
+                        # A sibling the manifest dropped leaves no empty shell (`install` §
+                        # prune_scope): its emptied directories go, up to the skills root and
+                        # never past a directory still holding something.
+                        $rootPrefix = (Resolve-FullPath $skillsRoot) + [System.IO.Path]::DirectorySeparatorChar
+                        $pd = Split-Path -Parent $pf
+                        while ($pd -and $pd.StartsWith($rootPrefix, [System.StringComparison]::Ordinal)) {
+                            if (@(Get-ChildItem -LiteralPath $pd -Force -ErrorAction SilentlyContinue).Count -ne 0) { break }
+                            Remove-Item -LiteralPath $pd -Force -ErrorAction SilentlyContinue
+                            $pd = Split-Path -Parent $pd
+                        }
                     } catch {
                         Write-Host "  Could not prune $($pf): $($_.Exception.Message)"
                     }

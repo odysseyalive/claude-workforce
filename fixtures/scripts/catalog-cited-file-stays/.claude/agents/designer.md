@@ -3,4 +3,4 @@ name: designer
 ---
 # Designer
 
-Take hexes only from `.claude/skills/image-eval/references/palette.md`.
+Take hexes only from `.claude/skills/security-evaluator/references/palette.md`.

@@ -1,1 +1,1 @@
-Run report: read .claude/skills/image-eval/references/old-notes.md during the audit.
+Run report: read .claude/skills/security-evaluator/references/old-notes.md during the audit.

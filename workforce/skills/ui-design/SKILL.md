@@ -23,9 +23,9 @@ threshold, a body that scrolls sideways at 320 px. **Every `review` and `sweep` 
 report-only** and keys to a stable rule ID with the severity the catalog states. `direct`
 is the one command that writes: it writes the project's design record and nothing else.
 
-**Medium-disjoint from `image-eval`.** This catalog reviews UI *design*; `image-eval`
-reviews image *authenticity*. A blank card and an AI-generated card are different
-failures — never absorb one into the other.
+**An image's fit is not graded here.** This catalog checks that a declared image slot
+renders (no blank or placeholder art). Whether the image in it fulfils the ask where it is
+shown is the jury's question (workforce `senses.md` § An image is judged where it is shown).
 
 ## Interface
 

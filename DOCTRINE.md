@@ -152,10 +152,10 @@ Updating replaces the skill wholesale. Nothing you edit lives inside it, so ther
 It syncs and stops; it never inspects your org, so its cost doesn't grow with how much you've
 staffed. To check the org against the new release, run `/workforce verify` afterward.
 
-**Update is the whole path.** Installing puts ten skills on your machine, not one. You get
-`workforce` itself plus five evaluators (`text-eval`, `code-evaluator`, `security-evaluator`,
-`image-eval`, `ui-design`), each one complete with the catalog it grades against and the agents it
-runs. The seventh is `blueprint`, which writes a plan as a file, cites its evidence, and never starts the work. The eighth is `shared-artifact`, the house style for any page you publish as a shareable link, and a hook applies it on its own so you never have to ask for it. The ninth is `records-code-map`, which tells an agent where things are in your code. The tenth is `timezone`: type `/timezone` to pick the zone Claude Code shows its times in, without running an audit. They sit side by side in your skills directory and every project on the machine reaches them.
+**Update is the whole path.** Installing puts nine skills on your machine, not one. You get
+`workforce` itself plus four evaluators (`text-eval`, `code-evaluator`, `security-evaluator`,
+`ui-design`), each one complete with the catalog it grades against and the agents it
+runs. The sixth is `blueprint`, which writes a plan as a file, cites its evidence, and never starts the work. The seventh is `shared-artifact`, the house style for any page you publish as a shareable link, and a hook applies it on its own so you never have to ask for it. The eighth is `records-code-map`, which tells an agent where things are in your code. The ninth is `timezone`: type `/timezone` to pick the zone Claude Code shows its times in, without running an audit. They sit side by side in your skills directory and every project on the machine reaches them.
 When an evaluator's catalog changes, `/workforce update` is all you run. You never re-audit a project
 to collect a change. Earlier versions copied them into each project instead, which meant an update
 reached none of them.
@@ -450,7 +450,7 @@ If the skill is gone and you can't run the command, the restore kit inside `.cla
 
 ## The Tools That Check the Work
 
-Agents write most of what's in this project: the handbooks, the references, the scripts, this page. So the work gets checked against a written catalog anyone can point at, instead of against somebody's taste. Five evaluators do that, and each has its own catalog.
+Agents write most of what's in this project: the handbooks, the references, the scripts, this page. So the work gets checked against a written catalog anyone can point at, instead of against somebody's taste. Four evaluators do that, and each has its own catalog; images go to the jury instead.
 
 **text-eval reads prose the way an editor hunting for a robot would.** It looks for the tells that give away machine writing: the em-dash leaned on as a crutch, the "it's not X, it's Y" reasoning models reach for, a sentence built like a paragraph when a person would just say it. One tell is only a word choice. It flags a passage when several cluster together. The whole catalog is here, and every rule comes with a test you can hold it to: [text-tells.md](workforce/skills/text-eval/references/text-tells.md).
 
@@ -458,7 +458,7 @@ Agents write most of what's in this project: the handbooks, the references, the 
 
 **security-evaluator reads the same code for a different kind of danger.** code-evaluator asks whether the code is clean; this one asks whether it's safe to put on the web: a query built by pasting a request straight into it, a password hard-coded where every reader of the repo can see it, a redirect that trusts whatever address it's handed. Its catalog is the OWASP Top 10 written out as signals you can grep for, one per flaw and tagged by language, so a change only pulls in the checks its own code could trip. The catalog can be exhaustive that way without every review carrying all of it. Where a real scanner like semgrep is installed, that's the verdict; where it isn't, the catalog flags candidates and says plainly what a static read can't prove. It's [security-taxonomy.md](workforce/skills/security-evaluator/references/security-taxonomy.md), an [analyzer map](workforce/skills/security-evaluator/references/native-tool-map.md), and [guards](workforce/skills/security-evaluator/references/guards.md).
 
-**image-eval checks whether a picture was made by a person or by a generator.** It looks for the tells a generator leaves behind: signature and watermark artefacts, unnatural symmetry, and the metadata a generator writes into the file, including C2PA manifests and IPTC source-type tags. Then it grades visual clarity, whether a claimed technique (watercolor, oil, ink) actually holds, and whether a set of images reads as one body of work or a batch of unrelated outputs. The catalog is [image-tells.md](workforce/skills/image-eval/references/image-tells.md).
+**Images are judged by the jury, not by a catalog.** An image evaluator shipped here until 2026-11-10, grading signatures, symmetry and metadata. The user removed it: "Too much emphesis is put on detail and not enough on whether the image actually fulfills the request." Now any turn that makes, edits, picks or places an image seats a juror that opens the picture itself, reads the page or article that shows it, and asks whether it does what was asked, there. A face swap that put the same picture in both slots passes every detail check and fails that one. How it's seated is in [senses.md](workforce/references/senses.md).
 
 **ui-design reviews what the interface actually looks like when it renders, not what the code says it should look like.** A page can build, pass its tests, and still ship with a blank hero image, a default framework palette nobody replaced, or text below the contrast threshold. It checks declared slots against rendered ones, applied theme against framework default, visual hierarchy, typography, color roles, reflow at 320 pixels, WCAG 2.2 AA contrast and focus, and the templated-default tells that say nobody actually designed this. The catalog is split across [design-quality-catalog.md](workforce/skills/ui-design/references/design-quality-catalog.md) and [rendered-checks.md](workforce/skills/ui-design/references/rendered-checks.md).
 

@@ -3,4 +3,4 @@
 **Status:** accepted
 
 The audit healed `text-evaluator`'s catalog read. The old literal path was
-`.claude/skills/image-eval/references/ai-patterns.md`; it now resolves through `wf-catalog`.
+`.claude/skills/security-evaluator/references/ai-patterns.md`; it now resolves through `wf-catalog`.

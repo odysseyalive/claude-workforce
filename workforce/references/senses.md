@@ -159,7 +159,7 @@ it is a verified no.
 
 | Juror | Its one question |
 |---|---|
-| **sight** | does the source say what the conclusion says it says? |
+| **sight** | does the source say what the conclusion says it says? On image work, does each image fulfil the ask where it is shown (§ An image is judged where it is shown)? |
 | **hearing** | did an outside voice actually address this, and was it read? |
 | **touch** | was the behaviour claimed demonstrated by something that was RUN? |
 | **taste** | was the set the conclusion speaks about actually enumerated? |
@@ -359,6 +359,42 @@ Stop 614 on `30e77777` now seats intuition and sight; 284, 635 and 726 seat as b
 
 **Not measured, so not built:** the reply text a turn showed the user BEFORE its last tool call ("It's
 the only front view we have", Stop 726, row 701) is not the reply (`confirmed_reply`, the last block).
+
+## An image is judged where it is shown
+
+**User decision, 2026-11-10**, removing the `image-eval` skill: *"I say we deprecate (remove)
+image-eval. The Jury owns it. Too much emphesis is put on detail and not enough on whether the image
+actually fulfills the request"*, and the check the jury owns is *"does it match the ask within the
+context the image is being presented in, etc."* The reference case is mutze-studio `30e77777`: a face
+swap was called done that had put the same picture in both slots, each image fine alone and wrong
+against the ask.
+
+**It is a condition on the sight juror, seated by a trip of its own.** A turn that produced, edited,
+selected or placed an image trips `image` (`wf-widen` `image_work`, `CLAIM_SENSE`, `JURY_ONLY_TRIPS`):
+seat-only, tried every time, never a gate, and it never takes a hand-back's seats. The flag carries
+`images.files` and `images.placed_in`, and the sight juror LOOKS at each file with Read, then reads where
+it is shown — the page, file or article that embeds it, its caption and surrounding text, the images
+beside it, the project's design record — and asks whether it fulfils the ask there. A trip rather than
+prompt text alone, because an undocketed turn is otherwise seated only 1 in `WF_BLIND_SAMPLE`, and the
+unchecked claims in `30e77777` sat in turns the sample skipped. No medium, style or technique rule: the
+ask and the placement are the whole standard.
+
+**What counts is read off the turn's tool calls, never its prose:** a write whose target is an image or
+whose new text embeds one (`![..](x)`, `<img src>`, `src=`, `srcset=`, `poster=`, `url(`); a shell
+command or MCP tool naming an image path, minus segments that only remove or list files and minus a
+screenshot or page snapshot; an image the turn read and the reply names by file name (it picked it); and
+an image path in the hand-back or notification that opened the turn. A delegation is not the image.
+
+| Measured 2026-11-10 | mutze-studio, 40 newest transcripts | this repository, 93 transcripts |
+|---|---|---|
+| Stops with a reply that trip `image` | 374 of 1,345 (27.8%) | 1 of 463 (0.2%) |
+| seats added, `bin/replay-seating --summary` | 19 (1.4 per 100 Stops) | 0 |
+| sampled, real image work | 15 of 15 | — |
+
+The seat counts read mutze-studio's live issue ledger, so a re-run while a session there is open can move them. Most image turns were already seated by the user's words; what the trip adds there is the `images`
+field and the instruction to look at the picture in its place.
+
+**Not built:** a turn that only read images and named none in its reply (looking, not choosing).
 
 ## Where this is enforced
 
