@@ -64,6 +64,13 @@ try:
         sys.stderr.write(install.stdout + install.stderr)
         sys.exit(f"sandbox install failed (rc={install.returncode}) — {sandbox} removed")
 
+    # A SANDBOX IS A STRANGER'S INSTALL. `bin/sync --personal` marks a config root as a
+    # maintainer's (`<config-root>/workforce/.maintainer`), and `wf-upstream` then prints no
+    # issue drafts. No real install carries the marker, so this one must not either.
+    marker = os.path.join(sandbox, "workforce", ".maintainer")
+    if os.path.isfile(marker):
+        os.remove(marker)
+
     dest = os.path.join(sandbox, "skills", "workforce")
     n = sum(len(f) for _, _, f in os.walk(dest))
     print(f"sandbox install: {n} files at {dest}")

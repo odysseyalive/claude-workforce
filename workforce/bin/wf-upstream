@@ -549,9 +549,16 @@ def header_fields(text):
     return out
 
 
-def render(slug, root, row, shape, why, run, version, reopened=""):
+def verbatim_block(row):
+    """The row as the inbox file holds it. `render` writes it and `record` looks for it, so the
+    test "has this row's text changed since the file was written" is one string, not two."""
+    return "## The row, verbatim\n\n```\n%s\n```\n" % row["verbatim"]
+
+
+def render(slug, root, row, shape, why, run, version, reopened="", drafted=""):
     """The inbox file for one row. `reopened` names the release whose claimed fix this re-filing
-    measured as failing, when the row was resolved before it."""
+    measured as failing, when the row was resolved before it. `drafted` is the date this row was
+    last printed as a ready-to-file issue, or empty when it never was."""
     cites = citations(row)
     # THE MARKER CARRIES SCRUBBED VALUES, NEVER THE RAW CELL. `row["id"]` comes from a Markdown
     # table in a file an agent edits, and this comment is MACHINE-READ — `header_fields` parses
@@ -576,9 +583,10 @@ def render(slug, root, row, shape, why, run, version, reopened=""):
         "- run id: `%s`\n" % (run or "not recorded"),
         "- installed workforce: `%s`\n" % version,
         "- match: %s — %s\n" % (shape, why),
-        "- recorded: %s\n\n" % time.strftime("%Y-%m-%d", time.gmtime()),
-        "## The row, verbatim\n\n",
-        "```\n%s\n```\n\n" % row["verbatim"],
+        "- recorded: %s\n" % time.strftime("%Y-%m-%d", time.gmtime()),
+        ("- issue drafted: %s\n" % drafted if drafted else ""),
+        "\n",
+        verbatim_block(row) + "\n",
         "## Evidence\n\n",
         ("".join("- `%s`\n" % c for c in cites) if cites
          else "_The row cites no `path:line`. `deferred.md` calls a row whose `Measured` "
@@ -638,11 +646,28 @@ def _sibling(name):
         sys.dont_write_bytecode = prev
 
 
+# THE MACHINE, NOT ONLY THE PROJECT. A maintainer audits downstream projects too, and on their
+# machine `/workforce dev` does read the inbox, so a draft printed there is noise. Nothing in an
+# install says who reads it, so the maintainer's own refresh says so: `bin/sync --personal` —
+# maintainer tooling that never ships — writes this file into the personal config root. No
+# shipped path writes it, so a stranger's install never carries it.
+MAINTAINER_MARKER = ".maintainer"
+# The date a row was last printed as an issue, read from the inbox file's header only — the
+# verbatim row below it is project text, and must not be able to forge the stamp.
+DRAFTED_RX = re.compile(r"^- issue drafted: (\d{4}-\d\d-\d\d)$", re.M)
+
+
+def maintainer_marker():
+    return os.path.join(config_root(), "workforce", MAINTAINER_MARKER)
+
+
 def maintainer_mode(root):
-    """True when `root` is the workforce source checkout — `SKILL.md` § Dev Path Discipline's
-    test, `workforce/SKILL.md` under the project root. `wf-due.is_distribution` already makes
-    that decision for the Self-Exclusion Rule, so it is asked rather than restated here."""
-    return _sibling("wf-due").is_distribution(root)
+    """True when a maintainer session reads this machine's inbox: `root` is the workforce source
+    checkout (`SKILL.md` § Dev Path Discipline's test, asked of `wf-due.is_distribution`, which
+    already decides it for the Self-Exclusion Rule), or `bin/sync --personal` has marked this
+    config root as a maintainer's."""
+    return (_sibling("wf-due").is_distribution(root)
+            or os.path.isfile(maintainer_marker()))
 
 
 def _clean(text):
@@ -718,16 +743,23 @@ def issue_command(slug, row, run, version, shape, why):
 
 
 def print_issues(root, slug, filed, run, version):
-    """The block an audit quotes in its closing report, one issue per row this run filed."""
-    print("\nUPSTREAM-ISSUES %d ready to file · %s is not the workforce source checkout (no "
-          "workforce/SKILL.md beside a manifest.txt), so the inbox above is read only if a "
-          "maintainer session runs on this machine." % (len(filed), root))
+    """The block an audit quotes in its closing report: one issue per row this run filed that is
+    new or whose text changed, and one line per row already drafted on an earlier run."""
+    fresh = [(r, s, w) for r, s, w, new in filed if new]
+    print("\nUPSTREAM-ISSUES %d ready to file · %d already drafted · %s is not the workforce "
+          "source checkout and this machine carries no maintainer marker (%s), so no "
+          "maintainer session reads the inbox above."
+          % (len(fresh), len(filed) - len(fresh), root, maintainer_marker()))
+    for row, _s, _w, new in filed:
+        if not new:
+            print("already drafted: %s" % safe_part(row["id"], "row"))
+    if not fresh:
+        return
     print("NOTHING WAS FILED. Review each body — it quotes this project's row verbatim — then "
-          "file it yourself on %s. Already filed it? Skip it: the title names the project and "
-          "row. Filing does not close the row in deferred.md." % REPO)
-    for n, (row, shape, why) in enumerate(filed, 1):
+          "file it yourself on %s. Filing does not close the row in deferred.md." % REPO)
+    for n, (row, shape, why) in enumerate(fresh, 1):
         title, body, kind, text = issue_command(slug, row, run, version, shape, why)
-        print("\n--- issue %d of %d · row %s ---" % (n, len(filed), safe_part(row["id"], "row")))
+        print("\n--- issue %d of %d · row %s ---" % (n, len(fresh), safe_part(row["id"], "row")))
         print("title: %s" % title)
         print("body:")
         print("".join("    %s\n" % ln for ln in body.splitlines()), end="")
@@ -753,6 +785,8 @@ def record(root, args):
         up, shape, why = classify(row)
         (picked if up else skipped).append((row, shape, why))
 
+    maint = maintainer_mode(root) if picked else True
+    today = time.strftime("%Y-%m-%d", time.gmtime())
     print("upstream inbox — %s" % root)
     if note:
         print("  %s" % note)
@@ -801,7 +835,17 @@ def record(root, args):
                 continue
             # The marker is a file anything can edit; what is carried into the body is a release.
             reopened = claimed if VERSION_RX.fullmatch(claimed) else safe_part(claimed, "?")
-        body = render(slug, root, row, shape, why, run, version, reopened)
+        # A DRAFT ONLY WHEN THERE IS SOMETHING NEW TO FILE. The project re-files every open row
+        # on every audit, so drafting on every write hands the user the same issue each time.
+        # A row is drafted when its inbox file is new, when its text changed since the file was
+        # written, or when the file has never recorded a draft — an inbox file written before
+        # drafts existed holds a row nobody was ever shown.
+        head = existing.split("## The row, verbatim", 1)[0]
+        stamp = DRAFTED_RX.search(head)
+        draft = not maint and (not existing or verbatim_block(row) not in existing
+                               or not stamp)
+        drafted = today if draft else (stamp.group(1) if stamp else "")
+        body = render(slug, root, row, shape, why, run, version, reopened, drafted)
         verb = ("reopen" if reopened else "add" if not existing else "update")
         detail = (" — resolved in %s, re-filed measured on %s" % (reopened, version)
                   if reopened else "")
@@ -819,7 +863,7 @@ def record(root, args):
         print("  %-9s row %-10s → %s · %s%s"
               % ({"add": "added", "update": "updated", "reopen": "reopened"}[verb],
                  row["id"], name, shape, detail))
-        filed.append((row, shape, why))
+        filed.append((row, shape, why, draft))
     if args.verbose:
         for row, _shape, why in skipped:
             print("  skipped   row %-10s %s" % (row["id"] or "?", why))
@@ -830,7 +874,7 @@ def record(root, args):
              len(skipped), inbox_dir()))
     if picked and not args.execute:
         print("DISPLAY ONLY — nothing written. Re-run with --execute.")
-    if picked and not maintainer_mode(root):
+    if picked and not maint:
         if filed:
             print_issues(root, slug, filed, run, version)
         elif not args.execute:
