@@ -253,6 +253,13 @@ SHIPPED_HOOKS = {
     # the user had named both pictures, and a shared page was called updated while the page
     # the user meant was not. Both were made with the ask out of view.
     "wf-turn-budget@agentspawn": ("PreToolUse", "Agent|Artifact|AskUserQuestion"),
+    # NO BASH COMMAND RUNS WITH A STDIN NOTHING WILL CLOSE. The host closes a command's
+    # stdin unless the command text holds a `<`, and then leaves it a socket that never
+    # closes; anything reading it hangs, in the background too. MEASURED in mutze-studio
+    # `30e77777` (2026-11-09): two agents' shells ran 7 and 11 hours on a trailing `ls`.
+    # It rewrites in `auto` mode, the one mode where the rewritten command is measured to
+    # run, and says what to do everywhere else. Its header has the measurements.
+    "wf-bash-stdin": ("PreToolUse", "Bash"),
 }
 
 # MATCHERS A SHIPPED HOOK USED TO BE REGISTERED ON, by SHIPPED_HOOKS name. Presence is decided

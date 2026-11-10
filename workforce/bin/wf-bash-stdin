@@ -1,0 +1,103 @@
+#!/usr/bin/env python3
+"""wf-bash-stdin — PreToolUse hook on Bash: no command runs with a stdin nothing will close.
+
+THE DEFECT, MEASURED 2026-11-10 on Claude Code 2.1.322. The host runs a Bash command as
+`zsh -c … eval '<command>' < /dev/null` (or bash), so a command that reads stdin gets EOF at
+once. It leaves the `< /dev/null` off whenever the command TEXT contains a `<` anywhere: a
+heredoc, an input redirect, or a `<` inside a quoted string. Then the shell's stdin is a
+socket the host never writes to and never closes, so anything in the command that reads
+stdin waits forever, and goes on waiting after the host moves it to the background. Pinned
+with three calls in one session: a heredoc then `readlink /proc/$$/fd/0` read `socket:[…]`;
+`sed 's/<after>/x/'` then the same read `socket:[…]`; `[ 1 -lt 2 ]` then the same read
+`/dev/null`.
+
+WHAT IT COST. mutze-studio `30e77777`, two agents: `b1wp3gxsx` (a `python3 - <<'EOF'`
+heredoc) and `bh8i2qhz5` (a `sed` whose text held `<after>`) each ended in a bare `ls`, which
+that machine aliases to `eza`, and `eza` reads file names from stdin when stdin is not a
+terminal. Both shells ran for 7 and 11 hours. The fix is not about `eza`: `cat`, `read`, a
+`python3` with no script and a prompting installer all wait the same way.
+
+WHAT IT DOES. A command with no `<` is left alone, because the host closes its stdin
+already. A command with one is rewritten to begin `exec </dev/null`, which gives the whole
+shell the stdin the host meant to give it. Heredocs, pipes and `< file` are redirects on the
+command they belong to, so they still feed that command; only what read the inherited stdin
+changes, from waiting forever to EOF.
+
+ONLY WHERE THE REWRITE IS MEASURED TO RUN. The permission check reads the REWRITTEN command
+(`updatedInput`). MEASURED 2026-11-10 with `claude -p` and an allow rule for the original
+command: in `auto` mode the rewritten command ran, and the shell's stdin read `/dev/null`;
+in `default` and `acceptEdits` it was DENIED ("'exec' evaluates arguments as shell code"),
+and a `{ …; } </dev/null` wrapper was denied too ("Contains brace with quote character").
+So everywhere but `auto` a rewrite would turn an allowed command into a refused one, and
+there the hook only says what to do, as `additionalContext`, once per agent per session.
+That context reaches the model and a spawned subagent (measured the same day, both).
+`bypassPermissions` was not measured and gets the note.
+
+FAIL-OPEN AND SILENT ON NO SIGNAL. Always exits 0, never denies, never asks. A payload it
+cannot read, a tool that is not Bash, a command with no `<`: no output.
+"""
+import json
+import os
+import re
+import sys
+
+REWRITE_MODES = ("auto",)
+PREFIX = "exec </dev/null\n"
+# Already closed by the command's own first line, so there is nothing to add.
+ALREADY = re.compile(r"\A\s*exec\s+0?<\s*/dev/null\b")
+_UNSAFE = re.compile(r"[^A-Za-z0-9_.-]")
+NOTE = (
+    "This Bash command contains `<`, so the host leaves its stdin open: a socket nothing "
+    "writes to or closes. Anything in it that reads stdin (`cat` or `read` with no input, "
+    "a prompting installer, an `ls` aliased to a tool that reads names from stdin) waits "
+    "forever, even after it is moved to the background. Give such a command `</dev/null`, "
+    "or start the command with `exec </dev/null`. Heredocs and pipes are unaffected.")
+
+
+def noted_once(payload):
+    """True the first time this agent in this session is told; False after that.
+
+    The marker is created with O_EXCL and never followed, so a link planted at its name in a
+    shared temp directory reads as already told and is never written through (CWE-59)."""
+    d = payload.get("scratchpad_dir") or os.environ.get("TMPDIR") or "/tmp"
+    key = "%s.%s" % (_UNSAFE.sub("_", str(payload.get("session_id") or ""))[:64] or "nosession",
+                     _UNSAFE.sub("_", str(payload.get("agent_id") or ""))[:64] or "main")
+    try:
+        fd = os.open(os.path.join(d, "wf-bash-stdin.%s" % key),
+                     os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0), 0o600)
+    except OSError:
+        return False
+    os.close(fd)
+    return True
+
+
+def decide(payload):
+    """The hook's output for one payload, or None."""
+    if payload.get("tool_name") != "Bash":
+        return None
+    inp = payload.get("tool_input")
+    cmd = inp.get("command") if isinstance(inp, dict) else None
+    if not isinstance(cmd, str) or "<" not in cmd or ALREADY.match(cmd):
+        return None
+    if payload.get("permission_mode") in REWRITE_MODES:
+        new = dict(inp)
+        new["command"] = PREFIX + cmd
+        return {"hookSpecificOutput": {"hookEventName": "PreToolUse", "updatedInput": new}}
+    if not noted_once(payload):
+        return None
+    return {"hookSpecificOutput": {"hookEventName": "PreToolUse", "additionalContext": NOTE}}
+
+
+def main():
+    try:
+        payload = json.load(sys.stdin)
+    except ValueError:
+        return 0
+    out = decide(payload) if isinstance(payload, dict) else None
+    if out:
+        print(json.dumps(out))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

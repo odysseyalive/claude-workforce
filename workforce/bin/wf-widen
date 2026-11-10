@@ -958,9 +958,37 @@ MAY_RESUME = re.compile(r"background work of its own still running"
 # "Command running in background with ID: b447g3ff2" into its own output, and the pattern
 # read the quotation as a start. A session that reads transcripts is exactly the session
 # this check runs in.
+#
+# THE HOST'S STRUCTURED RECORD COMES FIRST, AND THE ANCHOR IS NOW ONLY ITS FALLBACK. A Bash
+# tool result row carries `toolUseResult`, which keeps the command's `stdout` apart from what
+# the host adds, and a backgrounded command's row adds `backgroundTaskId`. Quoted output
+# cannot forge that key, so a row that names it needs no anchor, and a row that has no
+# `toolUseResult` at all is read by the anchored phrases below. MEASURED 2026-11-10 over
+# every transcript under `~/.claude*/projects` (374 files that mention a backgrounded
+# command): 1,408 rows carry the key, and the host's text names the same id in every one.
+# The phrases were 783 `running in background with ID:`, 311 `did not complete within its Ns
+# timeout and was moved to the background (ID:`, 272 `was moved to the background (ID: …)
+# after running for Ns`, and 42 `was moved to the background (ID: …) so that a message that
+# arrived while it was running can reach you`. 84 of the 1,408 had command output BEFORE the
+# phrase, so the anchor alone missed them (mutze-studio `bh8i2qhz5`: "2\nCommand did not
+# complete …"), and it had no alternative for the third and fourth phrasings at all (seven
+# shells in one mutze agent, `b48srplko` among them). Every phrase found WITHOUT the key, 57
+# of them, sat mid-line: a turn quoting a transcript, which is the case the anchor exists for.
+BG_TASK_KEY = "backgroundTaskId"
 BG_START = re.compile(
     r"^Command (?:running in background with ID: "
-    r"|did not complete[^.\n]{0,60}moved to the background \(ID: )([A-Za-z0-9_-]+)")
+    r"|did not complete[^.\n]{0,60}moved to the background \(ID: "
+    r"|was moved to the background \(ID: )([A-Za-z0-9_-]+)")
+# WHERE THE SHELL WRITES, which is how it is stopped. The host runs each Bash command as
+# `zsh -c … eval '<command>'` (or bash), a session and process-group leader whose stdout
+# and stderr are this file. MEASURED 2026-11-10 on 2.1.322: `lsof -t` and `fuser` on a
+# background shell's file returned exactly that shell and its child, and nothing of the
+# host's. The id is NOT in the shell's command line, so `pkill -f <id>` matches only the
+# `pkill`'s own shell: mutze-studio agent `af2154159bd55ca5b` ran `pkill -f "b1wp3gxsx"`,
+# killed itself (exit 144) and left the real shell running. A path is accepted only in the
+# shape the host writes, so nothing quoted into a stop instruction can carry shell syntax.
+BG_OUTPUT = re.compile(r"Output is being written to: ([\w./:\\-]+?[\\/]tasks[\\/]"
+                       r"([A-Za-z0-9_-]+)\.output)\b")
 # Same anchor, same reason: a quoted notification inside a reply or a tool result is not a
 # notification. These are the three openings the host itself uses for one.
 FRAME = ("<task-notification>", "[SYSTEM NOTIFICATION",
@@ -1066,7 +1094,8 @@ def closeout_facts(lines):
       finished   agent ids whose task-notification reports a terminal status AND is not a
                  stop the agent can be resumed from (`MAY_RESUME`)
       shutdown   every name a `shutdown_request` was addressed to
-      shells     background shell id -> the command that made it
+      shells     background shell id -> (the command that made it, the file it writes to
+                 or "" when the host named none)
       closed     shell and task ids closed by a terminal notification or an explicit stop
     """
     spawned, pending, tool_cmd = {}, {}, {}
@@ -1100,6 +1129,8 @@ def closeout_facts(lines):
         # A TOOL RESULT IS READ ON ITS OWN, never as part of a joined row, because both
         # patterns below are anchored at its first character.
         c = (d.get("message") or {}).get("content")
+        tur = d.get("toolUseResult")
+        keyed = tur.get(BG_TASK_KEY) if isinstance(tur, dict) else None
         for b in (c if isinstance(c, list) else []):
             if not (isinstance(b, dict) and b.get("type") == "tool_result"):
                 continue
@@ -1109,9 +1140,19 @@ def closeout_facts(lines):
             if tid in pending and rtext.startswith(SPAWN_OK):
                 nm, why = pending[tid]
                 f["teammates"][nm] = why
-            m = BG_START.match(rtext)
-            if m and tid in tool_cmd:
-                f["shells"][m.group(1)] = tool_cmd[tid]
+            # THE KEY, WHEN THE ROW HAS ONE, AND THE ANCHORED PHRASE OTHERWISE. See
+            # `BG_TASK_KEY`. The key is the row's, so it is taken for the block whose text
+            # names that id, which is every block the host has written it for.
+            sid = keyed if isinstance(keyed, str) and keyed and keyed in rtext else None
+            if sid is None:
+                m = BG_START.match(rtext)
+                sid = m.group(1) if m else None
+            if sid and tid in tool_cmd:
+                # THE LAST ONE, because the host writes its sentence AFTER the command's
+                # output, and a line the command printed must not choose what gets killed.
+                out = ([o.group(1) for o in BG_OUTPUT.finditer(rtext)
+                        if o.group(2) == sid] or [""])[-1]
+                f["shells"][sid] = (tool_cmd[tid], out)
             f["closed"].update(STOPPED.findall(rtext))
         text = _row_text(d).lstrip()
         if not text.startswith(FRAME):
@@ -1238,14 +1279,14 @@ def closeout(payload):
         # closes the shell is not in the file that opened it. MEASURED over 277 real
         # sessions: reading only the agent's own transcript named 30 shells, and 19 of
         # them — 63% — had been closed in the session's. The union names 11.
-        for sid, cmd in sorted(af["shells"].items()):
+        for sid, (cmd, out) in sorted(af["shells"].items()):
             if sid not in af["closed"] and sid not in f["closed"] and ("s:" + sid) not in seen:
-                shells.append((aid, sid, cmd))
+                shells.append((aid, sid, cmd, out))
     if not stale and not shells:
         return None
 
     closeout_record(payload, {"t:" + n for n in stale}
-                    | {"s:" + s for _a, s, _c in shells})
+                    | {"s:" + s for _a, s, _c, _o in shells})
 
     lines_out = ["This session started something it has not closed, and the turn is over."]
     if stale:
@@ -1262,13 +1303,14 @@ def closeout(payload):
         lines_out.append("")
         lines_out.append("Background shells still open, whose starting agent has already "
                          "handed back:")
-        for aid, sid, cmd in shells:
+        for aid, sid, cmd, out in shells:
             lines_out.append(f"  · {sid} — started by {aid} — {cmd}")
+            lines_out.append(f"      stop it: {stop_remedy(sid, out)}")
         lines_out.append(
             "Nothing is left that will read these. MEASURED 2026-09-24: one such shell "
-            "outlived its agent by nine hours and then woke it up again. Kill each one, "
-            "or say why it is being left.")
-    named = [n for n in stale] + [s for _a, s, _c in shells]
+            "outlived its agent by nine hours and then woke it up again. Stop each one "
+            "with its line above, or say why it is being left. " + NEVER_PKILL)
+    named = [n for n in stale] + [s for _a, s, _c, _o in shells]
     return {
         "decision": "block",
         "reason": "\n".join(lines_out),
@@ -1315,6 +1357,34 @@ def closeout(payload):
 # time the agent stopped. That is the same defect the main path measured at 63%, arriving
 # from the other direction.
 SHELLS_SHOWN = 8
+# THE AGENT IS TOLD UNDER ITS OWN KEY, AND THE PARENT STILL HEARS. Every payload in a
+# session carries the parent's `session_id` (platform.md fact 22c), so the once-record above
+# is ONE file for the session and every agent in it. This half used to record the shell as
+# `s:<id>`, the key the main `Stop` reads, so telling the agent silenced the parent for good.
+# And telling the agent is not enough: `SubagentHandback` is a tool call, so its report is
+# already delivered when `SubagentStop` fires, and an agent that cannot stop the shell has
+# no report left to name it in. MEASURED in mutze-studio `af2154159bd55ca5b`: told at turn
+# 37 of 40 after its hand-back, it killed its own shell instead, and nothing ran again for
+# seven hours. Under `sa:` the agent is asked once, and the parent's next `Stop` still names
+# any shell that is open, with the line that stops it.
+AGENT_TOLD = "sa:"
+NEVER_PKILL = ("Never `pkill -f <id>`: the id is not in the shell's command line, so it "
+               "matches only the shell running the `pkill`.")
+
+
+def stop_remedy(sid, out):
+    """One instruction that stops background shell `sid` with Bash alone, or with TaskStop.
+
+    BY THE FILE IT WRITES, NEVER BY NAME. See `BG_OUTPUT`: the shell is the process group
+    leader holding `out` open, so its group is found from the holders of that file and the
+    caller's own shell is not among them. `lsof -t` first because macOS ships it, `fuser`
+    where it does not. With no path the host named, TaskStop is the only exact means.
+    """
+    if not out:
+        return f"TaskStop with task_id {sid} (the host named no output file for it)"
+    return (f"TaskStop with task_id {sid}, or in Bash: "
+            f"p=$( (lsof -t '{out}' || fuser '{out}') 2>/dev/null | awk '{{print $1; exit}}'); "
+            f"[ -n \"$p\" ] && kill -TERM -- \"-$(ps -o pgid= -p \"$p\" | tr -d ' ')\"")
 
 
 def closeout_subagent(payload):
@@ -1335,19 +1405,20 @@ def closeout_subagent(payload):
     closed = f["closed"] | (closeout_facts(slines)["closed"] if slines else set())
 
     seen = closeout_reported(payload)
-    shells = [(sid, cmd) for sid, cmd in sorted(f["shells"].items())
-              if sid not in closed and ("s:" + sid) not in seen]
+    shells = [(sid, cmd, out) for sid, (cmd, out) in sorted(f["shells"].items())
+              if sid not in closed and (AGENT_TOLD + sid) not in seen]
     if not shells:
         return None
-    closeout_record(payload, {"s:" + sid for sid, _c in shells})
+    closeout_record(payload, {AGENT_TOLD + sid for sid, _c, _o in shells})
 
     # CAPPED, because one measured fire named twelve at once — an agent that had opened
     # `sleep 90 … sleep 300` as idle timers and said so in its own reply. The reason string
     # is the next instruction, and a twelve-item bulleted list of `sleep` calls buries the
     # sentence that says what to do about them.
     lines_out = ["You are stopping with a background shell you started still open.", ""]
-    for sid, cmd in shells[:SHELLS_SHOWN]:
+    for sid, cmd, out in shells[:SHELLS_SHOWN]:
         lines_out.append(f"  · {sid} — {cmd}")
+        lines_out.append(f"      stop it: {stop_remedy(sid, out)}")
     if len(shells) > SHELLS_SHOWN:
         lines_out.append(f"  · … and {len(shells) - SHELLS_SHOWN} more")
     lines_out += [
@@ -1357,12 +1428,14 @@ def closeout_subagent(payload):
         "will read them. MEASURED 2026-09-24: one such shell outlived its agent by nine "
         "hours and then woke the finished agent up again.",
         "",
-        "Kill each one now, or name it in your report with the reason it is being left "
-        "running. Either answer ends this; it is asked once per shell."]
+        "Stop each one now with its line above. " + NEVER_PKILL + " If you are keeping "
+        "one, say why in one line. Your report may already be delivered, so the session "
+        "that spawned you is told at its next stop about any shell still open. This is "
+        "asked once per shell."]
     return {
         "decision": "block",
         "reason": "\n".join(lines_out),
-        "systemMessage": "WIDEN  close-out — " + ", ".join(s for s, _c in shells)
+        "systemMessage": "WIDEN  close-out — " + ", ".join(s for s, _c, _o in shells)
                          + " still open at hand-back",
     }
 

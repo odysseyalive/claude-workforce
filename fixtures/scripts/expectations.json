@@ -15787,5 +15787,115 @@
         "unchanged": true
       }
     }
+  },
+  "widen-subagent-shell-output-before-phrase-blocks": {
+    "_why": "DEFECT 1(a), mutze-studio agent `a49f3cb4a3a631a6f` (2026-11-09): the command printed `2` before the host's sentence, so the phrase anchored at the result's first character never matched and `bh8i2qhz5` ran eleven hours unnamed. The row's `toolUseResult.backgroundTaskId` is the host's own record and decides. The block also names a stop that works with Bash alone, by the shell's output file, and never `pkill -f <id>`.",
+    "exit": 0,
+    "script": "wf-widen",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"agent_transcript_path\": \"t/subagents/agent-a2cd0001.jsonl\", \"cwd\": \".\", \"hook_event_name\": \"SubagentStop\", \"scratchpad_dir\": \".\", \"session_id\": \"fx\", \"agent_id\": \"a2cd0001\", \"last_assistant_message\": \"PASS | report updated\"}",
+    "want": [
+      "\"decision\": \"block\"",
+      "bh8i2qhz5",
+      "still open at hand-back",
+      "lsof -t '/tmp/claude-1000/-home-u-proj/3c1f279d/tasks/bh8i2qhz5.output'",
+      "kill -TERM --",
+      "TaskStop with task_id bh8i2qhz5",
+      "Never `pkill -f <id>`"
+    ],
+    "not": [
+      "Kill each one now"
+    ]
+  },
+  "widen-subagent-shell-moved-after-running-blocks": {
+    "_why": "DEFECT 1(b), mutze-studio agent `a49f3cb4a3a631a6f`: `Command was moved to the background (ID: …) after running for 180s` is a host phrasing the anchor had no alternative for (272 of 1,408 starts on this machine, plus 42 of its `so that a message … can reach you` form). This row has no `toolUseResult`, so it pins the anchored fallback that reads a transcript from a host that writes no key.",
+    "exit": 0,
+    "script": "wf-widen",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"agent_transcript_path\": \"t/subagents/agent-a2cd0001.jsonl\", \"cwd\": \".\", \"hook_event_name\": \"SubagentStop\", \"scratchpad_dir\": \".\", \"session_id\": \"fx\", \"agent_id\": \"a2cd0001\", \"last_assistant_message\": \"PASS | report updated\"}",
+    "want": [
+      "\"decision\": \"block\"",
+      "b48srplko",
+      "lsof -t '/tmp/claude-1000/-home-u-proj/3c1f279d/tasks/b48srplko.output'"
+    ]
+  },
+  "widen-subagent-shell-quoted-in-output-is-silent": {
+    "_why": "THE ANCHOR'S REASON, KEPT. A turn that greps transcripts prints a host sentence into its own output. The row's `toolUseResult` carries no `backgroundTaskId` and the sentence is mid-line, so it is a quotation, not a start: all 57 phrase hits without the key on this machine (2026-11-10) are this shape.",
+    "exit": 0,
+    "script": "wf-widen",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"agent_transcript_path\": \"t/subagents/agent-a2cd0001.jsonl\", \"cwd\": \".\", \"hook_event_name\": \"SubagentStop\", \"scratchpad_dir\": \".\", \"session_id\": \"fx\", \"agent_id\": \"a2cd0001\", \"last_assistant_message\": \"PASS | report updated\"}",
+    "not": [
+      "bquoted01",
+      "\"decision\": \"block\""
+    ]
+  },
+  "widen-shell-agent-told-still-reaches-parent": {
+    "_why": "DEFECT 2, timing. mutze-studio agent `af2154159bd55ca5b` was told about `b1wp3gxsx` at its SubagentStop, after its hand-back had been delivered; it ran `pkill -f`, killed its own shell, and the real one ran seven hours. Telling the agent wrote `s:b1wp3gxsx` into the session's one close-out record, the key the parent's Stop reads, so the parent was never told. The agent is now recorded under `sa:` and the parent's next Stop still names the open shell with the line that stops it.",
+    "exit": 0,
+    "script": "wf-widen",
+    "before": [
+      {
+        "script": "wf-widen",
+        "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"agent_transcript_path\": \"t/subagents/agent-a2cd0001.jsonl\", \"cwd\": \".\", \"hook_event_name\": \"SubagentStop\", \"scratchpad_dir\": \".\", \"session_id\": \"fx\", \"agent_id\": \"a2cd0001\", \"last_assistant_message\": \"PASS | report updated\"}",
+        "want": [
+          "still open at hand-back",
+          "b1wp3gxsx"
+        ]
+      }
+    ],
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"hook_event_name\": \"Stop\", \"scratchpad_dir\": \".\", \"session_id\": \"fx\", \"last_assistant_message\": \"The report is updated.\"}",
+    "want": [
+      "\"decision\": \"block\"",
+      "b1wp3gxsx",
+      "a2cd0001",
+      "lsof -t '/tmp/claude-1000/-home-u-proj/3c1f279d/tasks/b1wp3gxsx.output'"
+    ]
+  },
+  "bash-stdin-auto-rewrites-a-less-than": {
+    "_why": "DEFECT 3. A command holding `<` runs with stdin open on a socket nothing closes (measured 2.1.322), so the trailing `ls` here hangs where `ls` is aliased to `eza`. In `auto` mode, the one mode where the rewritten command is measured to pass the permission check, the hook prefixes `exec </dev/null` and keeps every other input field.",
+    "exit": 0,
+    "script": "wf-bash-stdin",
+    "stdin_raw": "{\"session_id\": \"fx\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Bash\", \"permission_mode\": \"auto\", \"tool_input\": {\"command\": \"python3 - <<'EOF'\\nprint(1)\\nEOF\\nls\", \"description\": \"d\", \"timeout\": 600000}}",
+    "want": [
+      "\"updatedInput\"",
+      "\"command\": \"exec </dev/null\\npython3 - <<'EOF'",
+      "\"timeout\": 600000",
+      "\"description\": \"d\""
+    ],
+    "not": [
+      "additionalContext"
+    ]
+  },
+  "bash-stdin-no-less-than-is-silent": {
+    "_why": "The host already closes stdin (`eval '…' < /dev/null`) for a command with no `<`, so the hook adds nothing, in any mode. This is the cost bound: most Bash calls leave on one substring test.",
+    "exit": 0,
+    "script": "wf-bash-stdin",
+    "stdin_raw": "{\"session_id\": \"fx\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Bash\", \"permission_mode\": \"auto\", \"tool_input\": {\"command\": \"git status && ls\", \"description\": \"d\", \"timeout\": 600000}}",
+    "not": [
+      "updatedInput",
+      "additionalContext",
+      "hookSpecificOutput"
+    ]
+  },
+  "bash-stdin-other-modes-note-once": {
+    "_why": "In `default` and `acceptEdits` the rewritten command was measured DENIED, so a rewrite would refuse a command the user allowed. There the hook rewrites nothing and says what to add, once per agent per session: the `before` step gets the note and this call does not.",
+    "exit": 0,
+    "script": "wf-bash-stdin",
+    "before": [
+      {
+        "script": "wf-bash-stdin",
+        "stdin_raw": "{\"session_id\": \"fx\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Bash\", \"permission_mode\": \"default\", \"tool_input\": {\"command\": \"python3 - <<'EOF'\\nprint(1)\\nEOF\\nls\", \"description\": \"d\", \"timeout\": 600000}}",
+        "want": [
+          "additionalContext",
+          "</dev/null"
+        ],
+        "not": [
+          "updatedInput"
+        ]
+      }
+    ],
+    "stdin_raw": "{\"session_id\": \"fx\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Bash\", \"permission_mode\": \"default\", \"tool_input\": {\"command\": \"python3 - <<'EOF'\\nprint(1)\\nEOF\\nls\", \"description\": \"d\", \"timeout\": 600000}}",
+    "not": [
+      "additionalContext",
+      "updatedInput"
+    ]
   }
 }
