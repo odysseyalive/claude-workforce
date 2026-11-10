@@ -9,9 +9,11 @@ follows by hand, and nothing else writes `.claude/workforce/org-chart.md`. So an
 landing in `.claude/agents/` — written this session, copied in, arriving on a `git pull`,
 written by another session — leaves the chart stale until somebody runs a full index. `/org`
 dispatch rung 8 only notices at dispatch time and then asks the user to run one. This runs on
-the events where those files appear and writes the two things that can be derived
-mechanically: an ADOPTED roster row for an agent the chart does not list, and a generated
-`## Skills` list.
+the events where those files appear and writes the three things that can be derived
+mechanically: an ADOPTED roster row for an agent the chart does not list, a generated
+`## Skills` list, and every roster row's Model and Effort cells, which are its agent file's
+frontmatter (`apply_models`; 2026-11-10, after the superseded-model heal left four charts on
+this machine reading 5.1 beside agent files that said 5-2).
 
 WHAT IT IS NOT. It is not an index. It computes no tier, no department, no manager, no
 fan-out, no stamp, and it never rewrites the `Generated:` header — that line must keep saying
@@ -567,7 +569,8 @@ def apply_skills(lines, text, nl, root, notes, problems):
 
 
 def apply_roster(lines, authored, root, notes, problems):
-    """Adopt what is on disk and not charted; ghost what is charted and gone. In place."""
+    """Adopt what is on disk and not charted; ghost what is charted and gone. In place.
+    Returns `{name: relative path}` for the agents on disk, for `apply_models`."""
     agents, unchartable = project_agents(root)
     for rel in unchartable:
         problems.append("`%s` declares a name that cannot be written into a table cell as "
@@ -579,7 +582,7 @@ def apply_roster(lines, authored, root, notes, problems):
         problems.append("no roster table found (no table under a `## Roster` heading and "
                         "none whose first header cell is `Employee`), so no agent could be "
                         "adopted or ghosted — `/workforce org index` owns the chart's shape")
-        return
+        return agents
     headers, head_i, last_i = roster
     name_col = headers.index("employee") if "employee" in headers else 0
     charted = {}
@@ -602,7 +605,7 @@ def apply_roster(lines, authored, root, notes, problems):
                             "has no Status column" % safe_label(name))
 
     if "status" not in headers:
-        return
+        return agents
     status_col = headers.index("status")
     # AN EMPTY OR ABSENT `.claude/agents` PROVES NOTHING. A project whose handbooks moved,
     # or a checkout mid-clone, would otherwise ghost the entire roster in one pass.
@@ -621,10 +624,126 @@ def apply_roster(lines, authored, root, notes, problems):
         cells[status_col] = (" GHOST (was %s) " % was) if was else " GHOST "
         lines[i] = "|" + "|".join(cells) + "|"
         notes.append("marked `%s` GHOST — its file is gone" % safe_label(name))
+    return agents
+
+
+# A MODEL ID AS CHARTS SPELL ONE IN PROSE, for the stale-mention report only.
+MODEL_ID_RX = re.compile(r"(?<![0-9A-Za-z_-])claude-[a-z0-9]+(?:-[a-z0-9]+)*(?![0-9A-Za-z_-])")
+# What a `model:` or `effort:` value may be to be written into a cell (`claude-opus-5[1m]`, `high`).
+MODEL_VALUE_RX = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:\[\]-]{0,79}$")
+# A cell's value with the markup around it kept: leading space and emphasis/backticks, the
+# value, then the same on the way out.
+_ONE_RX = re.compile(r"^(\s*[`*_]*)(.*?)([`*_]*\s*)$", re.S)
+_TWO_RX = re.compile(r"^(\s*[`*_]*)(.*?)([`*_]*\s*/\s*[`*_]*)(.*?)([`*_]*\s*)$", re.S)
+
+
+def _set_cell(cell, want):
+    """`cell` with its value(s) replaced by `want` (one value, or a (model, effort) pair, either
+    member None to keep what is there), every other byte kept. None when the cell does not
+    read as that shape, which is reported rather than overwritten."""
+    if isinstance(want, tuple):
+        m = _TWO_RX.match(cell)
+        if not m or not m.group(2).strip() or not m.group(4).strip():
+            return None
+        model = want[0] if want[0] is not None else m.group(2)
+        effort = want[1] if want[1] is not None else m.group(4)
+        return m.group(1) + model + m.group(3) + effort + m.group(5)
+    m = _ONE_RX.match(cell)
+    if not m:
+        return None
+    return m.group(1) + want + m.group(3)
+
+
+def apply_models(lines, agents, root, notes, problems, stale):
+    """Keep every roster row's model and effort cells equal to its agent file's frontmatter.
+
+    THE CELLS ARE DERIVED, SO THEY ARE KEPT, NOT AUTHORED. MEASURED 2026-11-10: after the
+    superseded-model heal moved agents to `claude-fable-5-2`, three charts on this machine
+    still read 5.1 in the roster (university `media-producer`, odyssey-alive `visual-lead`
+    and `visual-illustrator`, krull-ai `generic-design-evaluator`), and only a hand-run
+    `org index` refreshed a row. Only rows whose agent file resolves are touched, only the
+    `Model` / `Effort` / `Model / Effort` cells, and only the key the frontmatter declares: an
+    absent `effort:` leaves the cell's effort as it is. A cell that does not read as that
+    shape is reported, never overwritten.
+
+    PROSE IS MODEL-AUTHORED AND IS NOT REWRITTEN. A line outside the roster that names a
+    resolvable agent and a `claude-…` model other than its file's is listed in `stale`, so
+    the operator knows a mention remains (university line 59)."""
+    roster = find_roster(lines)
+    if roster is None or not agents:
+        return
+    headers, head_i, last_i = roster
+    name_col = headers.index("employee") if "employee" in headers else 0
+    cols = []
+    for j, h in enumerate(headers):
+        if h in ("model / effort", "model/effort"):
+            cols.append((j, "pair"))
+        elif h in ("model", "effort"):
+            cols.append((j, h))
+    rows = set()
+    fms, old = {}, {}
+    for i in range(head_i + 1, last_i + 1):
+        if is_separator(lines[i]):
+            continue
+        cells = split_row(lines[i])
+        if len(cells) <= name_col:
+            continue
+        name = _norm_name(cells[name_col])
+        if name not in agents:
+            continue
+        rows.add(i)
+        fm = fms.setdefault(name, frontmatter(os.path.join(root, agents[name])))
+        model, effort = fm.get("model"), fm.get("effort")
+        changed = []
+        for j, kind in cols:
+            if j >= len(cells):
+                continue
+            want = {"pair": (model, effort), "model": model, "effort": effort}[kind]
+            if want is None or want == (None, None):
+                continue
+            # ONLY A VALUE SHAPED LIKE A MODEL ID OR AN EFFORT RUNG IS WRITTEN. Frontmatter comes
+            # from whoever wrote the tree (a clone included), and the cell is read by `/org` and
+            # by employees: a `|` would split the row, `-->` would close a comment, and a long
+            # sentence would take over the table. Anything else is left as the chart has it.
+            vals = want if isinstance(want, tuple) else (want,)
+            if any(v and not MODEL_VALUE_RX.match(v) for v in vals):
+                continue
+            was = MODEL_ID_RX.findall(cells[j])
+            new = _set_cell(cells[j], want)
+            if new is None:
+                problems.append("`%s`'s %s cell does not read as `model / effort`, so it was "
+                                "left as written" % (safe_label(name), headers[j]))
+                continue
+            if new != cells[j]:
+                changed.append("%s → %s" % (cells[j].strip(), new.strip()))
+                if model:
+                    old.setdefault(name, set()).update(m for m in was if m != model)
+                cells[j] = new
+        if changed:
+            lines[i] = "|" + "|".join(cells) + "|"
+            notes.append("`%s` model/effort from its file: %s"
+                         % (safe_label(name), "; ".join(safe_label(c) for c in changed)))
+    # ONLY THE MODEL THIS PASS REPLACED, and only on a line that does not also name the new
+    # one. MEASURED against odyssey-alive's chart: reporting any other model on a line naming
+    # the agent flagged its change log ("repinned `claude-opus-4-8` -> `claude-opus-4-6`")
+    # fifteen times, all history and none stale.
+    for i, line in enumerate(lines):
+        if i in rows or i == head_i or SYNCED_RX.match(line.strip()):
+            continue
+        for name, gone in sorted(old.items()):
+            model = fms[name].get("model")
+            if not is_charted(line, name) or model in MODEL_ID_RX.findall(line):
+                continue
+            hit = [m for m in MODEL_ID_RX.findall(line) if m in gone]
+            if hit:
+                stale.append("line %d names `%s` with `%s` while its file says `%s`; it is "
+                             "prose, so it was left as written"
+                             % (i + 1, safe_label(name), safe_label(hit[0]), safe_label(model)))
 
 
 def sync(root, today):
-    """`(new_text_or_None, notes, problems, target)` for this project's chart.
+    """`(new_text_or_None, notes, problems, target, stale)` for this project's chart. `stale`
+    lists prose mentions of a model this pass replaced in the roster (`apply_models`).
 
     `new_text_or_None` is None when there is nothing to change — which is what makes a second
     run a no-op. `notes` are what changed, in plain words; `problems` are what could not be
@@ -633,16 +752,18 @@ def sync(root, today):
     """
     target, text, refusal = open_chart(root)
     if target is None:
-        return None, [], ([refusal] if refusal else []), None
+        return None, [], ([refusal] if refusal else []), None, []
 
     nl = "\r\n" if "\r\n" in text else "\n"
     lines = text.split(nl)
     notes, problems = [], []
     authored = apply_skills(lines, text, nl, root, notes, problems)
-    apply_roster(lines, authored, root, notes, problems)
+    agents = apply_roster(lines, authored, root, notes, problems)
+    stale = []
+    apply_models(lines, agents, root, notes, problems, stale)
 
     if not notes:
-        return None, notes, problems, target
+        return None, notes, problems, target, stale
 
     # ── the Synced marker, written ONLY beside a real change, so it cannot churn ──
     stamp = "<!-- Synced: %s by wf-org-sync | %s -->" % (today, summarize(notes))
@@ -653,7 +774,7 @@ def sync(root, today):
         after = next((i for i, l in enumerate(lines) if GENERATED_RX.match(l.strip())), 0)
         lines.insert(after + 1, stamp)
 
-    return nl.join(lines), notes, problems, target
+    return nl.join(lines), notes, problems, target, stale
 
 
 def emit(event, notes, problems, would=False):
@@ -711,13 +832,16 @@ def main(argv=None):
         return 0
 
     try:
-        new, notes, problems, target = sync(root, datetime.date.today().isoformat())
+        new, notes, problems, target, stale = sync(root, datetime.date.today().isoformat())
     except OSError as exc:
         # A HOOK NEVER TAKES A TURN DOWN. Whatever could not be read is said out loud and
         # the chart is left exactly as it was.
         emit(event, [], ["could not be synced (%s: %s)" % (exc.__class__.__name__, exc)])
         return 0
 
+    # STALE PROSE IS SAID ONLY BESIDE THE CHANGE THAT FOUND IT: an unchanged chart stays silent.
+    if stale and notes:
+        problems = problems + ["stale prose — " + summarize(stale)]
     if new is None or args.dry_run:
         emit(event, notes, problems, would=args.dry_run)
         return 0

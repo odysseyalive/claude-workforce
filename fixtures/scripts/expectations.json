@@ -15711,5 +15711,81 @@
     "want": [
       "issue i1"
     ]
+  },
+  "orgsync-model-columns-refreshed": {
+    "_why": "A roster's Model and Effort cells are derived from the agent file, so they are kept. Separate `Model | Effort` columns (this repository's own layout): only those two cells change, and the prose line naming the replaced model is reported, never rewritten (university line 59, 2026-11-10).",
+    "script": "wf-org-sync",
+    "exit": 0,
+    "want": [
+      "`eng-coder` model/effort from its file: claude-opus-5 \\u2192 claude-opus-5-5; high \\u2192 medium",
+      "stale prose \\u2014 line 14 names `eng-coder` with `claude-opus-5`"
+    ],
+    "not": [
+      "Traceback"
+    ],
+    "after": {
+      ".claude/workforce/org-chart.md": {
+        "want": [
+          "| eng-coder | 3 (IC) | engineering | operator | claude-opus-5-5 | medium | the code | released |",
+          "  - eng-coder (T3, IC, claude-opus-5, effort high)",
+          "| data-analyst | — | — | — | claude-sonnet-5 | medium | — | adopted |"
+        ],
+        "once": [
+          "<!-- Synced:"
+        ]
+      }
+    }
+  },
+  "orgsync-model-pair-refreshed": {
+    "_why": "The `Model / Effort` layout (odyssey-alive, university, krull-ai): the model half is replaced, the backticks around it and the effort half are kept, and a row already current is left byte for byte.",
+    "script": "wf-org-sync",
+    "exit": 0,
+    "want": [
+      "`data-analyst` model/effort from its file: `claude-fable-5-1` / medium \\u2192 `claude-fable-5-2` / medium"
+    ],
+    "not": [
+      "Traceback",
+      "eng-coder` model"
+    ],
+    "after": {
+      ".claude/workforce/org-chart.md": {
+        "want": [
+          "| data-analyst | — | — | — | `claude-fable-5-2` / medium | — | adopted |",
+          "| eng-coder | 3 (IC) | engineering | operator | claude-opus-5 / high | the code | released |"
+        ]
+      }
+    }
+  },
+  "orgsync-model-adopted-under-skill": {
+    "_why": "krull-ai's `generic-design-evaluator`: an adopted agent whose file lives under a skill and is registered by a link in `.claude/agents`. The link is read through, and its row's model follows the file.",
+    "script": "wf-org-sync",
+    "exit": 0,
+    "want": [
+      "`generic-design-evaluator` model/effort from its file: claude-fable-5-1 \\u2192 claude-fable-5-2"
+    ],
+    "not": [
+      "Traceback"
+    ],
+    "after": {
+      ".claude/workforce/org-chart.md": {
+        "want": [
+          "| generic-design-evaluator | — | — | — | claude-fable-5-2 | medium | — | adopted |"
+        ]
+      }
+    }
+  },
+  "orgsync-model-current-writes-nothing": {
+    "_why": "Every model and effort cell already matches its file: nothing is printed and not a byte is written, so the hook stays silent on every tool call.",
+    "script": "wf-org-sync",
+    "exit": 0,
+    "not": [
+      "hookSpecificOutput",
+      "Traceback"
+    ],
+    "after": {
+      ".claude/workforce/org-chart.md": {
+        "unchanged": true
+      }
+    }
   }
 }
