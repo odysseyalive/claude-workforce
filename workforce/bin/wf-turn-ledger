@@ -231,6 +231,25 @@ UNIVERSAL = re.compile(
     rf"\b({_UNIV_PHRASE})\b[^.\n]{{0,70}}?\b(?:{_PROJECT_NOUN})\b"
     rf"|\b(?:{_PROJECT_NOUN})\b[^.\n]{{0,70}}?\b({_UNIV_PHRASE})\b", re.I)
 
+# ── the quantified-claim grammar (seats a juror, never blocks) ─────────────────
+# A claim about a WHOLE SET in any domain, not only near a project noun: "none of the X",
+# "the only X we have", "no X has/shows", "not one". MEASURED 2026-11-09 over every judged
+# reply: 7.8% of 1,238 on mutze-studio's 40 newest transcripts, 13.5% of 415 on this
+# repository's, 10 of 15 sampled hits in each a real set claim (`senses.md` § Quantified
+# and relayed claims). Far above what a BLOCK can bear (7.0% retired a guard), so it only
+# seats the taste juror (`wf-widen` JURY_ONLY_TRIPS). Bare "the only" (6.4%) is excluded:
+# it is the shipped UNIVERSAL phrase's job near a project noun, and alone it is mostly prose.
+_QDET = r"(?:the|our|my|your|these|those|its|their|them|us|all)"
+QUANTIFIED = re.compile(
+    rf"\bnone of {_QDET}\b"
+    r"|\bthe only (?:[a-z-]+ ){0,3}?[a-z-]+ (?:we|i|you|they|that|which|in|on|of|left|here|there)\b"
+    r"|\bno (?:[a-z-]+ ){1,4}?(?:has|have|had|shows?|showed|meets?|met|matches|matched|carries"
+    r"|carried|holds?|held|contains?|fits?)\b"
+    r"|\bnot (?:one|a single)\b", re.I)
+# A sentence carrying a count or a quantifier: what makes a relayed sentence a CLAIM.
+CARDINAL = re.compile(r"\b(?:\d+(?:\.\d+)?|one|two|three|four|five|six|seven|eight|nine|ten"
+                      r"|eleven|twelve|both|all|every|each)\b", re.I)
+
 _FENCE = re.compile(r"```.*?```", re.S)
 _CODE = re.compile(r"`[^`\n]*`")
 

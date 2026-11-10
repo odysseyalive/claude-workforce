@@ -15335,5 +15335,147 @@
     "not": [
       "digest matches"
     ]
+  },
+  "widen-handback-relayed-claim-seated": {
+    "_why": "mutze-studio 30e77777 Stop 284. A hand-back's count relayed to the user as fact, on a turn with no docket, went unchecked: the encoder takes three, not five. The relayed sentence shares a four-word run with the testimony and carries a count, so the sight juror is seated every time, and never blocks.",
+    "script": "wf-widen",
+    "exit": 0,
+    "env": {
+      "WF_BLIND_SAMPLE": "0",
+      "WF_AUDIT_SAMPLE": "0"
+    },
+    "stdin_raw": "{\"transcript_path\": \"s1.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"session_id\": \"s1\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"Per beat: about five pictures each, since the research says the sketch workflow takes about five at once.\"}",
+    "want": [
+      "sampled for audit"
+    ],
+    "not": [
+      "\"decision\": \"block\"",
+      "not scored"
+    ],
+    "after": {
+      "wf-widen-flag.s1.json": {
+        "want": [
+          "\"trigger\": \"relayed\"",
+          "\"senses\": [\"sight\"]"
+        ]
+      }
+    }
+  },
+  "widen-handback-no-relay-not-seated": {
+    "_why": "THE NEGATIVE for the relay. The same hand-back, a reply that restates no counted claim from it: nothing is seated, so the trigger costs nothing on a hand-back that only acknowledges.",
+    "script": "wf-widen",
+    "exit": 0,
+    "env": {
+      "WF_BLIND_SAMPLE": "0",
+      "WF_AUDIT_SAMPLE": "0"
+    },
+    "stdin_raw": "{\"transcript_path\": \"s1.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"session_id\": \"s1\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"The art director's list is in. I'll show you the sheet when the rest of the crew reports.\"}",
+    "want": [
+      "not scored"
+    ],
+    "not": [
+      "sampled for audit",
+      "\"decision\": \"block\""
+    ],
+    "after": {
+      "wf-widen-flag.s1.json": {
+        "absent": true
+      }
+    }
+  },
+  "widen-quantified-claim-seated-not-blocked": {
+    "_why": "mutze-studio 30e77777 Stops 635 and 726: a claim about a whole set outside any project noun. It seats the taste juror every time and never blocks, although the turn enumerated nothing: the grammar hits 7.8% of replies, far above what a block can bear (senses.md).",
+    "script": "wf-widen",
+    "exit": 0,
+    "env": {
+      "WF_BLIND_SAMPLE": "0",
+      "WF_AUDIT_SAMPLE": "0"
+    },
+    "stdin_raw": "{\"transcript_path\": \"s1.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"session_id\": \"s1\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"None of the forest pictures we hold shows the floor in morning light, so a new photo is needed.\"}",
+    "want": [
+      "sampled for audit"
+    ],
+    "not": [
+      "\"decision\": \"block\"",
+      "not scored"
+    ],
+    "after": {
+      "wf-widen-flag.s1.json": {
+        "want": [
+          "\"trigger\": \"quantified\"",
+          "\"senses\": [\"taste\"]"
+        ]
+      }
+    }
+  },
+  "widen-bare-the-only-not-quantified": {
+    "_why": "THE NEGATIVE for the grammar. A bare \"the only X is\" names no set the reply holds; it was measured at 6.4% of replies and left out, so nothing is seated.",
+    "script": "wf-widen",
+    "exit": 0,
+    "env": {
+      "WF_BLIND_SAMPLE": "0",
+      "WF_AUDIT_SAMPLE": "0"
+    },
+    "stdin_raw": "{\"transcript_path\": \"s1.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"session_id\": \"s1\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"The only change is the header, and it is in.\"}",
+    "want": [
+      "not scored"
+    ],
+    "not": [
+      "sampled for audit"
+    ],
+    "after": {
+      "wf-widen-flag.s1.json": {
+        "absent": true
+      }
+    }
+  },
+  "replay-seating-before-release": {
+    "_why": "'before' was HEAD, so once a change was committed before and after were the same files. A release number names the commit that set WORKFORCE-VERSION to it in version.md; 1.86.0 was set by 8ea49d2.",
+    "script": "../../bin/replay-seating",
+    "args": [
+      "--before",
+      "1.86.0",
+      "t.jsonl"
+    ],
+    "exit": 0,
+    "want": [
+      "before = 1.86.0 (8ea49d20629b)",
+      "1 transcript(s), 1 Stops"
+    ],
+    "not": [
+      "Traceback"
+    ]
+  },
+  "replay-seating-before-unknown": {
+    "_why": "A --before that names no commit is refused, exit 2, rather than silently replayed against HEAD.",
+    "script": "../../bin/replay-seating",
+    "args": [
+      "--before",
+      "9.9.9",
+      "t.jsonl"
+    ],
+    "exit": 2,
+    "want": [
+      "names no commit"
+    ],
+    "not": [
+      "Traceback"
+    ]
+  },
+  "replay-seating-before-predates-seating": {
+    "_why": "1.85.2 (cc213b2) has no `wf-widen.seating`, the definition both sides are replayed through, so the replay is refused, exit 2, rather than crashing mid-transcript.",
+    "script": "../../bin/replay-seating",
+    "args": [
+      "--before",
+      "1.85.2",
+      "t.jsonl"
+    ],
+    "exit": 2,
+    "want": [
+      "predates `wf-widen.seating`"
+    ],
+    "not": [
+      "Traceback"
+    ]
   }
 }

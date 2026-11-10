@@ -630,6 +630,10 @@ def instruments(cwd):
 #
 # Each row is (claim trigger, the sense that settles it, why that one).
 CLAIM_SENSE = {
+    "quantified": ("taste", "\"none of the X\", \"the only X we have\", \"no X has\" claim a "
+                            "whole set, in any domain; only enumerating the set settles it"),
+    "relayed": ("sight", "the reply restates a counted or quantified claim from a hand-back "
+                         "it received; testimony is not evidence until its source is read"),
     "absence": ("taste", "a claim that something is NOT there is a claim about a SET, "
                          "and no number of point reads can settle it — only enumerating "
                          "the set can"),
@@ -2325,6 +2329,71 @@ def widen_reason(unopened, why, rows, inst, counts):
     return "\n".join(lines)
 
 
+# TRIPS THAT SEAT THEIR JUROR AND NEVER GATE: the trip's analogue of `TT.JURY_ONLY`. Both
+# were measured far above what a block can bear and well inside what a seat can
+# (`senses.md` § Quantified and relayed claims), so they never block on a channel count and
+# are tried every time they fire (`always_seated`), never 1 in WF_AUDIT_SAMPLE.
+JURY_ONLY_TRIPS = frozenset({"quantified", "relayed"})
+RELAY_RUN = 4
+_WORD = re.compile(r"[a-z0-9]+")
+_SENTENCE = re.compile(r"(?<=[.!?:;])\s+|\n+")
+
+
+def _runs(text):
+    w = _WORD.findall(text.lower())
+    return {" ".join(w[i:i + RELAY_RUN]) for i in range(len(w) - RELAY_RUN + 1)}
+
+
+def relayed_claims(reply, testimony):
+    """The reply's sentences that RESTATE a hand-back's COUNTED claim: each shares a run of
+    `RELAY_RUN` words with the testimony, and carries a count or a quantifier THE TESTIMONY
+    ALSO CARRIES, so the number came from the hand-back and not from the user's own ask ("on
+    the calendar for 16 January" beside a relayed "the invitation is drafted" is not one).
+
+    MEASURED ON mutze-studio `30e77777` (2026-11-09): a subagent's report said "the sketch
+    workflow takes about five at once", the main turn relayed it to the user as fact, and
+    the encoder takes three. The turn had no docket, so nothing was seated. Testimony is
+    HEARING; relaying it as fact without reading its source is the claim. Bounded to what the
+    juror is shown (`TESTIMONY_MAX`), so a replay and the hook see the same text."""
+    if not reply or not testimony:
+        return []
+    said = testimony[:TESTIMONY_MAX]
+    have = _runs(said)
+    counts = {m.group(0).lower() for m in TL.CARDINAL.finditer(said)}
+    quantified = bool(TL.QUANTIFIED.search(said))
+    out = []
+    for s in _SENTENCE.split(TL.mask_code(reply)):
+        if not s.strip() or not _runs(s) & have:
+            continue
+        if ({m.group(0).lower() for m in TL.CARDINAL.finditer(s)} & counts
+                or (quantified and TL.QUANTIFIED.search(s))):
+            out.append(s.strip())
+    return out
+
+
+def claim_trips(reply, testimony=None):
+    """Every claim the reply trips. ONE DEFINITION, read by the Stop below and by
+    `bin/replay-seating`: absence and universal (gating), quantified and relayed (seat only)."""
+    masked = TL.mask_code(reply or "")
+    unquoted = TL._QUOTED.sub(lambda m: " " * len(m.group(0)), masked)
+    trips = []
+    if TL.ABSENCE.search(masked):
+        trips.append("absence")
+    if TL.UNIVERSAL.search(unquoted):
+        trips.append("universal")
+    if TL.QUANTIFIED.search(unquoted):
+        trips.append("quantified")
+    if testimony and TT.INJECTED.search(testimony) and relayed_claims(reply, testimony):
+        trips.append("relayed")
+    return trips
+
+
+def always_seated(why):
+    """Whether this docket is tried every time rather than 1 in WF_AUDIT_SAMPLE: a docket
+    from the user's words (`TAG:`), or a seat-only claim trip (`JURY_ONLY_TRIPS`)."""
+    return any(t.startswith("TAG:") or t in JURY_ONLY_TRIPS for t, _s, _r in why)
+
+
 def seating(trips, hits):
     """(applicable, gate, why, incident) for a turn: every sense its reply's claims and its
     docket ask for, and the subset whose zero count blocks (`gate`). ONE DEFINITION, read
@@ -2333,7 +2402,8 @@ def seating(trips, hits):
     for t in trips:
         sense, reason = CLAIM_SENSE[t]
         applicable.add(sense)
-        gate.add(sense)
+        if t not in JURY_ONLY_TRIPS:
+            gate.add(sense)
         why.append((t, sense, reason))
     for h in hits:
         # A CARRIED HIT (`TT.carried_docket`) seats its juror and nothing else: it never
@@ -2600,12 +2670,10 @@ def widen(payload):
         if left_open:
             return left_open
 
-    masked = TL.mask_code(reply or "")
-    trips = []
-    if TL.ABSENCE.search(masked):
-        trips.append("absence")
-    if TL.UNIVERSAL.search(TL._QUOTED.sub(lambda m: " " * len(m.group(0)), masked)):
-        trips.append("universal")
+    # A HAND-BACK IS TESTIMONY (`claim_trips`): the row that opened a main turn, when the
+    # harness wrote it, is what a relayed claim is matched against.
+    _opener = (own_tag(payload) or {}).get("prompt") if not subagent else None
+    trips = claim_trips(reply, _opener if isinstance(_opener, str) else None)
 
     hits = docket_hits(payload, reply, subagent)
     applicable, gate, why, incident = seating(trips, hits)
@@ -2729,7 +2797,10 @@ def widen(payload):
     # 1-in-5 sample skipped or never reached. The sample above now prices only the turns
     # whose docket came from a claim the REPLY tripped; `WF_BLIND_SAMPLE` still prices the
     # turns with no docket at all. This is `incident`'s rule, made general.
-    if any(t.startswith("TAG:") for t, _s, _r in why) and not unopened and not subagent:
+    # A SEAT-ONLY CLAIM TRIP (`JURY_ONLY_TRIPS`) is tried every time on the same rule: it was
+    # admitted at a measured rate only because it never blocks, and a sample of it would let
+    # four relayed claims in five go out unread (`senses.md` § Quantified and relayed claims).
+    if always_seated(why) and not unopened and not subagent:
         sampled = True
 
     if not unopened and not sampled:

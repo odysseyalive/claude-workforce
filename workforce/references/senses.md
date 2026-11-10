@@ -281,6 +281,52 @@ recorded escapes came from one and why this fires it without anybody choosing to
 second author working from a partial view of the task, and the finding is the whole
 deliverable: `file:line`, a commit SHA, what the record actually says.
 
+## Quantified and relayed claims
+
+Two claim trips **seat their juror every time and never block** (`wf-widen` `JURY_ONLY_TRIPS`,
+`always_seated`). They exist because four result claims on mutze-studio `30e77777` (Stops 284, 614,
+635, 726, all hand-back turns before the session's first issue) were seated by nothing on 1.86.2. The
+user, 2026-11-09: *"all of these issues should have been caught if that system was working"*, and the
+rule must be general, *"smart enough to manage everything ... within these senses"*, not a rule per
+situation.
+
+| Trip | What fires it | Sense |
+|---|---|---|
+| `quantified` | a set claim in any domain (`wf-turn-ledger` `QUANTIFIED`): `none of the/our/these … X`, `the only X we/that/in/left …`, `no X … has/shows/meets/matches/carries/holds/contains/fits`, `not one` / `not a single` | taste |
+| `relayed` | on a turn opened by injected text (a hand-back, a notification), a reply sentence that shares a four-word run with that testimony (as the juror is shown it, `TESTIMONY_MAX`) and carries a count (`CARDINAL`) the testimony also carries, or a `QUANTIFIED` phrase when the testimony has one. The count must come from the hand-back: "on the calendar for 16 January" beside a relayed "the invitation is drafted" is not a relayed count | sight |
+
+**Measured 2026-11-09**, every judged reply (mutze-studio: the 40 newest transcripts across both config
+roots, 1,330 Stops, 1,238 judged; this repository: 93 transcripts, 440 Stops, 415 judged):
+
+| | mutze-studio | this repository |
+|---|---|---|
+| `quantified` hits, share of judged replies | 7.8% | 13.5% |
+| of which real set claims, 15 sampled | 10 of 15 | 10 of 15 |
+| bare `the only`, left out | 6.4% | 6.5% |
+| seated before (1.86.2), per 100 judged | 75.0 | 39.8 |
+| seated after, per 100 judged | 79.8 | 56.9 |
+| **added, per 100 Stops** | **4.5** | **16.1** |
+
+**Why a seat can bear what a block cannot.** The blocking triggers were admitted at 0.5% and 1.5%, and a
+guard at 7.0% was retired (`changes/1.30.1.md`), because a false BLOCK costs the user a round trip and
+teaches the turn to ignore the guard. A seat costs one jury call and blocks nothing: the jury is the
+precision layer, and two seats in three put a real set claim in front of it. The spend it adds (4.5 per
+100 Stops on mutze-studio) is below the 1-in-20 blind sample already spent on undocketed turns, on a
+corpus that already seats three turns in four. An outcome-word list hit 49.8% and was rejected; this
+grammar names quantifiers, not outcomes.
+
+**What each form catches**, replayed with `bin/replay-seating --before 651c16e`: 284 (relayed: "about
+five pictures each, since the research says the sketch workflow takes about five at once"), 635
+(quantified and relayed: "None of the forest pictures we already have shows the floor in morning
+light"), 726 (quantified: "None of the costume pictures we hold meets the format"). **614 is not caught**:
+"both changed handbooks are back in service" shares no run with its testimony ("PASS"), and "The page
+is republished" is the turn's own action, with no quantifier. The general mechanism that would catch it
+is seating every hand-back turn that has no docket: +14.8 per 100 Stops on mutze-studio, +47.5 on this
+repository, where 52.5% of Stops are such turns. Not built; the operator decides that cost.
+
+**Not measured, so not built:** the reply text a turn showed the user BEFORE its last tool call ("It's
+the only front view we have", Stop 726, row 701) is not the reply (`confirmed_reply`, the last block).
+
 ## Where this is enforced
 
 `wf-widen` checks the turn's channel counts at `Stop` and `SubagentStop`, and blocks rather than stopping

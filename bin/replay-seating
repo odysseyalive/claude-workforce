@@ -6,8 +6,10 @@ issue ledger is READ, from the project the transcript's rows name, because an in
 turn's docket comes from it. The jury itself is not run: this is the seating decision,
 `wf-widen`'s half, never the model's verdict.
 
-  before  `wf-task-tag` and `wf-widen` as they stand at HEAD (`git show`, run from memory).
-  after   the same two files in the working tree.
+  before  `wf-task-tag`, `wf-widen` and `wf-turn-ledger` as they stand at `--before <rev>`
+          (default HEAD; `git show`, run from memory). A release number such as `1.85.2`
+          names the commit that set `WORKFORCE-VERSION: 1.85.2` in `version.md`.
+  after   the same three files in the working tree.
 Both sides run one pipeline (`docket`), in the order the hooks apply it: the turn's own
 words, the message a peer's pointer names, the ask an injected turn serves (`served_ask`),
 a message delivered mid-turn merged in, and, on a side whose `wf-task-tag` has it, the open
@@ -19,6 +21,7 @@ Usage
     bin/replay-seating TRANSCRIPT.jsonl                 # every judged Stop, then totals
     bin/replay-seating TRANSCRIPT.jsonl --stops 1404,1581
     bin/replay-seating --summary T1.jsonl T2.jsonl ...  # totals only, over many
+    bin/replay-seating --before 1.85.2 TRANSCRIPT.jsonl # before = that release, not HEAD
 
 A Stop is named by the line number of its `stop_hook_summary` row. A continuation Stop (the
 turn after a `Stop hook feedback` row) is not judged live, so it is listed as such.
@@ -51,21 +54,49 @@ def _load(name):
     return mod
 
 
-def _load_head(name):
-    """`name` as it stands at HEAD, executed from memory: nothing is written."""
-    src = subprocess.run(["git", "-C", ROOT, "show", f"HEAD:workforce/bin/{name}"],
+def resolve_rev(rev):
+    """The commit `rev` names, or None. A bare release number (`1.85.2`) is the commit that
+    SET `WORKFORCE-VERSION: 1.85.2` in `version.md`, the oldest of the commits whose diff
+    adds or removes that line; anything else is passed to git as it is.
+
+    WHY: 'before' was HEAD, so once a change was committed, before and after were the same
+    files and every replay of it read "added 0" (2026-11-09, the 1.86.2 checksum batch)."""
+    if all(p.isdigit() for p in rev.split(".")) and rev.count(".") == 2:
+        out = subprocess.run(
+            ["git", "-C", ROOT, "log", "--reverse", "--format=%H",
+             "-G", r"^WORKFORCE-VERSION: " + rev.replace(".", r"\.") + "$",
+             "--", "workforce/references/version.md"],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL).stdout.decode().split()
+        return out[0] if out else None
+    out = subprocess.run(["git", "-C", ROOT, "rev-parse", "--verify", "--quiet",
+                          rev + "^{commit}"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    return out.stdout.decode().strip() or None
+
+
+def _load_rev(name, rev):
+    """`name` as it stands at commit `rev`, executed from memory: nothing is written."""
+    src = subprocess.run(["git", "-C", ROOT, "show", f"{rev}:workforce/bin/{name}"],
                          check=True, stdout=subprocess.PIPE).stdout.decode("utf-8")
-    mod = types.ModuleType(name.replace("-", "_") + "_head")
+    mod = types.ModuleType(name.replace("-", "_") + "_before")
     mod.__file__ = os.path.join(BIN, name)
-    exec(compile(src, f"HEAD:{name}", "exec"), mod.__dict__)
+    exec(compile(src, f"{rev[:12]}:{name}", "exec"), mod.__dict__)
     return mod
 
 
 W = _load("wf-widen")
 TT, TL = W.TT, W.TL
-OLD_W = _load_head("wf-widen")
-OLD_W.TT = _load_head("wf-task-tag")
-NEW, OLD = (TT, W), (OLD_W.TT, OLD_W)
+NEW = (TT, W)
+OLD = None
+
+
+def load_before(rev):
+    """Set the 'before' side to the three scripts at `rev`. Each module's siblings are
+    replaced with the same revision's, so no half of 'before' runs today's code."""
+    global OLD
+    old_w = _load_rev("wf-widen", rev)
+    old_w.TT = _load_rev("wf-task-tag", rev)
+    old_w.TL = _load_rev("wf-turn-ledger", rev)
+    OLD = (old_w.TT, old_w)
 TURN_END = ('"stop_hook_summary"', '"turn_duration"')
 
 
@@ -150,12 +181,14 @@ def counts_at(path, lines, k):
         TL._read_lines = real
 
 
-def trips_of(reply):
-    masked = TL.mask_code(reply or "")
+def trips_of(reply, L=None):
+    """The reply-claim trips, by one side's `wf-turn-ledger` (`L`, default the working tree)."""
+    L = L or TL
+    masked = L.mask_code(reply or "")
     trips = []
-    if TL.ABSENCE.search(masked):
+    if L.ABSENCE.search(masked):
         trips.append("absence")
-    if TL.UNIVERSAL.search(TL._QUOTED.sub(lambda m: " " * len(m.group(0)), masked)):
+    if L.UNIVERSAL.search(L._QUOTED.sub(lambda m: " " * len(m.group(0)), masked)):
         trips.append("universal")
     return trips
 
@@ -216,11 +249,16 @@ def docket(M, payload, led, past, lines, k, opener, mid, rows):
     return hits, via, ask
 
 
-def seat(M, docketed, counts, reply):
-    """(outcome, jurors) for one side, from its `docket` result."""
+def seat(M, docketed, counts, reply, opener=None):
+    """(outcome, jurors) for one side, from its `docket` result. A side whose `wf-widen` has
+    `claim_trips` reads the opener as testimony and seats its seat-only trips every time
+    (`always_seated`); an older side trips as it did then."""
     hits, _via, ask = docketed
-    applicable, gate, why, incident = M[1].seating(trips_of(reply), hits)
-    tagged = any(t.startswith("TAG:") for t, _s, _r in why)
+    V = M[1]
+    trips = V.claim_trips(reply, opener) if hasattr(V, "claim_trips") else trips_of(reply, V.TL)
+    applicable, gate, why, incident = V.seating(trips, hits)
+    tagged = V.always_seated(why) if hasattr(V, "always_seated") else \
+        any(t.startswith("TAG:") for t, _s, _r in why)
     return decide(M[1], applicable, gate, counts, reply, ask, tagged, incident)
 
 
@@ -256,7 +294,8 @@ def replay(path, want=None, quiet=False):
         past = carried_before(led, opened, turn_start(lines, k))
         bd = docket(OLD, payload, led, past, lines, k, opener, mid, rows)
         ad = docket(NEW, payload, led, past, lines, k, opener, mid, rows)
-        (b, bj), (a, aj) = seat(OLD, bd, counts, reply), seat(NEW, ad, counts, reply)
+        (b, bj), (a, aj) = (seat(OLD, bd, counts, reply, opener),
+                            seat(NEW, ad, counts, reply, opener))
         bk, ak, via = [h["kind"] for h in bd[0]], [h["kind"] for h in ad[0]], ad[1]
         tot["before"] += b != "none"
         tot["after"] += a != "none"
@@ -271,6 +310,31 @@ def replay(path, want=None, quiet=False):
 def main(argv):
     summary = "--summary" in argv
     argv = [a for a in argv if a != "--summary"]
+    before = "HEAD"
+    if "--before" in argv:
+        i = argv.index("--before")
+        before = argv[i + 1] if i + 1 < len(argv) else ""
+        del argv[i:i + 2]
+    # `--root DIR`: relative transcript paths are read from DIR (the fixture harness).
+    if "--root" in argv:
+        i = argv.index("--root")
+        base = argv[i + 1] if i + 1 < len(argv) else "."
+        del argv[i:i + 2]
+        argv = [a if os.path.isabs(a) or a.startswith("-") else os.path.join(base, a)
+                for a in argv]
+    # A REV IS NEVER AN OPTION: `git show -x:…` would read it as a flag (CWE-88).
+    rev = resolve_rev(before) if before and not before.startswith("-") else None
+    if not rev:
+        print(f"replay-seating: --before {before!r} names no commit (a git rev, or a release "
+              f"number that `WORKFORCE-VERSION:` in version.md was set to)", file=sys.stderr)
+        return 2
+    load_before(rev)
+    if not hasattr(OLD[1], "seating"):
+        print(f"replay-seating: {before} ({rev[:12]}) predates `wf-widen.seating`, the one "
+              f"definition both sides are replayed through; pick a later revision",
+              file=sys.stderr)
+        return 2
+    print(f"before = {before} ({rev[:12]})")
     want = None
     if "--stops" in argv:
         i = argv.index("--stops")
