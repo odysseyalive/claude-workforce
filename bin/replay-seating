@@ -26,9 +26,11 @@ Usage
 A Stop is named by the line number of its `stop_hook_summary` row. A continuation Stop (the
 turn after a `Stop hook feedback` row) is not judged live, so it is listed as such.
 What it cannot see, and says so: `background_tasks` (so a declared hold is not applied),
-and the asks checklist hand-off. THE CARRIED ISSUES ARE A LOWER BOUND: the ledger is read as
-it stands now, so the issues a Stop carries are those opened before its turn that are still
-open today, and an issue closed since is not counted.
+and the asks checklist hand-off. THE CARRIED ISSUES are those opened before the Stop's turn and
+not closed before it, read off each issue's `closed_at` and its `done_at` map of item times (written since
+2026-11-10). An issue
+closed with no `closed_at` was closed by an older release at a time nobody recorded: it keeps
+the old rule (not carried) and the Stop's line says `closed, time unknown` rather than none.
 """
 
 import hashlib
@@ -166,10 +168,43 @@ def opened_at(lines, led):
     return at
 
 
-def carried_before(led, opened, lo):
-    """The ledger as a Stop's submit saw it, approximately: the issues opened before its turn."""
-    return {"issues": [i for i in led.get("issues", []) if isinstance(i, dict)
-                       and opened.get(i.get("id"), lo) < lo]}
+def turn_time(lines, lo):
+    """The ISO `timestamp` of the first row of the turn starting at index `lo`, or None."""
+    for _i, row in _rows(lines, lo, min(len(lines), lo + 50)):
+        if isinstance(row.get("timestamp"), str):
+            return row["timestamp"]
+    return None
+
+
+def carried_before(led, opened, lo, at=None):
+    """`(ledger as the Stop's submit saw it, ids closed at a time nobody recorded)`.
+
+    An issue opened before the turn is carried unless it was CLOSED BEFORE the turn: an issue
+    whose `closed_at` is later than the turn's first row was open then, and is replayed open.
+    An issue closed with no `closed_at` (an older release) cannot be placed, so it stays
+    closed and is named in the second value. ISO UTC strings compare as text."""
+    def later(when):
+        return isinstance(when, str) and bool(at) and when[:19] > at[:19]
+
+    past, unknown = [], []
+    for i in led.get("issues", []):
+        if not isinstance(i, dict) or opened.get(i.get("id"), lo) >= lo:
+            continue
+        if i.get("state") == "closed" and not isinstance(i.get("closed_at"), str):
+            unknown.append(i.get("id"))
+        elif i.get("state") == "closed" and later(i.get("closed_at")):
+            i = dict(i, state="open")
+        # AN ITEM DONE AFTER THE TURN WAS OPEN AT IT (`done_at`, `wf-task-tag.mark_item`). An
+        # item with no `done_at` keeps today's status, the lower bound.
+        items = i.get("items") if isinstance(i.get("items"), list) else []
+        times = i.get("done_at") if isinstance(i.get("done_at"), dict) else {}
+
+        def done_later(x):
+            return isinstance(x, dict) and later(times.get(TT.item_key(x)))
+        if any(done_later(x) for x in items):
+            i = dict(i, items=[dict(x, status="open") if done_later(x) else x for x in items])
+        past.append(i)
+    return {"issues": past}, unknown
 
 
 def counts_at(path, lines, k):
@@ -300,7 +335,8 @@ def replay(path, want=None, quiet=False):
             continue
         tot["judged"] += 1
         counts = counts_at(path, lines, k) or (0, [], 0, 0, 0, 0, None)
-        past = carried_before(led, opened, turn_start(lines, k))
+        lo = turn_start(lines, k)
+        past, unknown = carried_before(led, opened, lo, turn_time(lines, lo))
         bd = docket(OLD, payload, led, past, lines, k, opener, mid, rows)
         ad = docket(NEW, payload, led, past, lines, k, opener, mid, rows)
         (b, bj), (a, aj) = (seat(OLD, bd, counts, reply, opener),
@@ -312,7 +348,9 @@ def replay(path, want=None, quiet=False):
             head = " ".join((opener or "").split())[:60]
             print(f"{n:>6}  before {b:<6} {'/'.join(bj) or '-':<22} kinds {','.join(bk) or '-':<14}"
                   f" | after {a:<6} {'/'.join(aj) or '-':<22} kinds {','.join(ak) or '-'}"
-                  f"{'  [' + via + ']' if via else ''}\n        opened by: {head}")
+                  f"{'  [' + via + ']' if via else ''}"
+                  f"{'  [closed, time unknown: ' + ','.join(map(str, unknown)) + ']' if unknown else ''}"
+                  f"\n        opened by: {head}")
     return tot
 
 

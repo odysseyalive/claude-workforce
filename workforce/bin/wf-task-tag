@@ -1304,6 +1304,65 @@ def issue_agents(iss):
             and a["agent_id"].strip()]
 
 
+def utc_now():
+    """The ISO UTC second, the spelling transcript rows' `timestamp` compares against."""
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+
+def close_issue(iss):
+    """Close `iss` and stamp WHEN, the first time it closes; a re-close keeps a fresh stamp.
+
+    WHY THE TIME (2026-11-10). The ledger recorded `state` and no time, so `bin/replay-seating`
+    could only rebuild what a past Stop carried from TODAY's states: an issue closed after the
+    Stop read as never carried, and a whole-session replay of mutze `30e77777` showed Stop 2007
+    fall from "seated touch [carried i1]" to none with no code change behind it."""
+    if iss.get("state") != "closed":
+        iss["closed_at"] = utc_now()
+    iss["state"] = "closed"
+
+
+def item_key(item):
+    """The key an item's done time is filed under: a digest of its words, never the words,
+    so the ledger holds each ask once (`stamp_item`)."""
+    return hashlib.sha256(str((item or {}).get("ask") or "")[:CARRY_ASK].encode("utf-8")
+                          ).hexdigest()[:16]
+
+
+def stamp_item(iss, item):
+    """Record WHEN an item was done, on its issue's `done_at` map keyed by `item_key`;
+    an open item loses its entry. The item's half of `close_issue`'s record, so a replay can
+    tell what a past Stop still carried (an issue's close time bounds its items, it does not
+    date them). On the ISSUE, after every other key, so an item keeps the `{ask, status}`
+    shape every reader and fixture spells."""
+    key = item_key(item)
+    times = iss.get("done_at") if isinstance(iss.get("done_at"), dict) else {}
+    if item_done(item):
+        if key not in times:
+            times[key] = utc_now()
+    else:
+        times.pop(key, None)
+    if times:
+        iss["done_at"] = times
+    else:
+        iss.pop("done_at", None)
+
+
+def mark_item(iss, item, status):
+    """Set an item's status and record its done time (`stamp_item`)."""
+    item["status"] = status
+    stamp_item(iss, item)
+
+
+def reopen_issue(iss, state="open"):
+    """Reopen `iss`: its close time no longer says anything. `state=None` drops the key, which
+    `open_issues` reads as open (the fold-undo spelling)."""
+    iss.pop("closed_at", None)
+    if state is None:
+        iss.pop("state", None)
+    else:
+        iss["state"] = state
+
+
 def open_issues(led):
     """Every issue not yet closed, oldest first. An issue with no `state` is open."""
     return [i for i in led.get("issues", [])
@@ -1349,7 +1408,7 @@ def add_issue(payload, led):
     # measured when the item waited for the Stop.
     fallback = fallback_item(prompt)
     iss = {"id": "i%d" % n, "prompt": prompt[:2000], "state": "open",
-           "items": [fallback] if fallback else [], "agents": []}
+           "items": [fallback] if fallback else [], "agents": [], "opened_at": utc_now()}
     # A PEER SESSION'S REQUEST NAMES ITS SENDER (`peer_request`), so a reader of the ledger
     # or the index can tell it from a message the user typed here.
     if isinstance(payload.get("peer"), dict):
@@ -1455,10 +1514,10 @@ def heal_empty(led):
         elif stale_notice(iss):
             for item in issue_items(iss):
                 if not item_done(item):
-                    item["status"] = "superseded"
+                    mark_item(iss, item, "superseded")
         else:
             continue
-        iss["state"] = "closed"
+        close_issue(iss)
         healed += 1
     return healed
 
@@ -1506,29 +1565,31 @@ def absorb_items(led, issue_id, items, title=""):
         dest = targets.get(it.get("issue")) if isinstance(it.get("issue"), str) else None
         if dest is None:
             mine.append(row)
+            stamp_item(own, row)
             continue
         moved += 1
         have = dest.setdefault("items", [])
         same = next((x for x in have if isinstance(x, dict) and x.get("ask") == row["ask"]), None)
         if same is None:
             have.append(row)
+            stamp_item(dest, row)
         else:
-            same["status"] = row["status"]
+            mark_item(dest, same, row["status"])
         if dest.get("state") == "closed" and not item_done(row):
-            dest["state"] = "open"
+            reopen_issue(dest)
     if title:
         own["title"] = title
     if moved and not mine and not any(a.get("state") == "running" for a in issue_agents(own)):
         # EVERYTHING THIS MESSAGE ASKED CONTINUES AN EARLIER ISSUE, so it opens nothing of
         # its own: folded, which `open_issues` reads as closed. Never over a running agent,
         # whose result would land on an issue nobody reads.
-        own["state"] = "closed"
         own["merged"] = True
         own["items"] = []
+        close_issue(own)
         return
     if own.pop("merged", None):
         # A FOLD IS UNDONE when the same message later gets items of its own.
-        own.pop("state", None)
+        reopen_issue(own, None)
     if not mine and any(i.get("fallback") is True for i in issue_items(own)):
         return
     # AN EMPTY LIST NEVER ERASES ITEMS THE SESSION WROTE. MEASURED 2026-10-28, mutze session
@@ -1671,7 +1732,7 @@ def absorb_carried(led, rows):
                 # the file on every message that carries anything.
                 if (item["ask"][:CARRY_ASK] == row["ask"] and item.get("status") != want
                         and (item_done({"status": want}) or not item_done(item))):
-                    item["status"] = want
+                    mark_item(iss, item, want)
                     landed += 1
             break
     return landed
@@ -1750,7 +1811,7 @@ def late_marks(payload, led):
             want = row["status"].strip()[:40]
             for item in issue_items(iss):
                 if item["ask"][:CARRY_ASK] == row["ask"][:CARRY_ASK] and not item_done(item):
-                    item["status"] = want
+                    mark_item(iss, item, want)
                     landed += 1
     return landed
 
@@ -1810,7 +1871,7 @@ def track_message(led, issue_id, written):
             continue
         for item in issue_items(iss):
             if item.get("fallback") is True and not item_done(item):
-                item["status"] = "superseded"
+                mark_item(iss, item, "superseded")
     if target is None or written or issue_items(target) or issue_agents(target):
         return
     item = fallback_item(target.get("prompt"))
@@ -2437,7 +2498,7 @@ def judge_ledger(payload, led):
     for iss in open_issues(led):
         verdict, why = judge_issue(iss)
         if verdict == "closed":
-            iss["state"] = "closed"
+            close_issue(iss)
             for a in issue_agents(iss):
                 if a.get("state") == "handoff":
                     a["state"] = "returned"

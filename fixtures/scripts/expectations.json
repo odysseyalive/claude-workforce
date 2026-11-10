@@ -12520,7 +12520,8 @@
               ],
               "want": [
                   "\"id\": \"i1\", \"prompt\": \"Request from Francis",
-                  "\"status\": \"open\", \"fallback\": true}], \"agents\": [], \"peer\": {\"from\": \"bridge:session_013CTKJujdGQrVv3nHXzXmdR\", \"from-name\": \"save-issue\"}",
+                  "\"status\": \"open\", \"fallback\": true}], \"agents\": []",
+                  "\"peer\": {\"from\": \"bridge:session_013CTKJujdGQrVv3nHXzXmdR\", \"from-name\": \"save-issue\"}",
                   "\"id\": \"i2\""
               ]
           }
@@ -13240,7 +13241,7 @@
               ],
               "want": [
                   "\"prompt\": \"Workforce 1.82.0 is installed, please check the two Work list fixes and reply to wf-dev with what you see\", \"state\": \"closed\", \"items\": [{\"ask\": \"index.json no longer lists the dead sessions\", \"status\": \"answered\"}, {\"ask\": \"the list shows to the producer right away\", \"status\": \"answered\"}, {\"ask\": \"context: wf-dev found why the list never showed on screen\", \"status\": \"answered\"}]",
-                  "\"prompt\": \"Your check 2 found a real bug: the hook fired, but Claude Code records that message without showing it on screen\", \"state\": \"closed\", \"items\": [], \"agents\": [], \"merged\": true"
+                  "\"prompt\": \"Your check 2 found a real bug: the hook fired, but Claude Code records that message without showing it on screen\", \"state\": \"closed\", \"items\": [], \"agents\": []"
               ]
           }
       },
@@ -13284,7 +13285,7 @@
               ],
               "want": [
                   "\"prompt\": \"Workforce 1.82.0 is installed, please check the two Work list fixes and reply to wf-dev with what you see\", \"state\": \"open\", \"items\": [{\"ask\": \"index.json no longer lists the dead sessions\", \"status\": \"answered\"}, {\"ask\": \"the list shows to the producer right away\", \"status\": \"answered\"}, {\"ask\": \"re-check that the Work list shows on screen once the fix lands\", \"status\": \"open\"}]",
-                  "\"prompt\": \"Your check 2 found a real bug: the hook fired, but Claude Code records that message without showing it on screen\", \"state\": \"closed\", \"items\": [], \"agents\": [], \"merged\": true"
+                  "\"prompt\": \"Your check 2 found a real bug: the hook fired, but Claude Code records that message without showing it on screen\", \"state\": \"closed\", \"items\": [], \"agents\": []"
               ]
           }
       },
@@ -15632,5 +15633,83 @@
         ]
       }
     }
+  },
+  "replay-seating-carries-issue-closed-later": {
+    "_why": "A whole-session replay of mutze 30e77777 showed Stop 2007 fall from \"seated touch [carried i1]\" to none with no code change: the replay rebuilt what a past Stop carried from TODAY's ledger, where i1 had since closed and its items were done. The ledger now records when (`closed_at` on the issue, `done_at` by item words). Here i1 and its item close at 10:20, after the turn that starts at 10:05, so that Stop still carries i1.",
+    "script": "../../bin/replay-seating",
+    "args": [
+      "s1.jsonl"
+    ],
+    "exit": 0,
+    "want": [
+      "after seated touch                  kinds work  [carried i1]"
+    ],
+    "not": [
+      "Traceback",
+      "time unknown"
+    ]
+  },
+  "replay-seating-legacy-close-time-unknown": {
+    "_why": "An issue an older release closed records no time, so the replay cannot place it: it keeps today's rule (not carried) and says so rather than reading as none.",
+    "script": "../../bin/replay-seating",
+    "args": [
+      "s1.jsonl"
+    ],
+    "exit": 0,
+    "want": [
+      "[closed, time unknown: i1]"
+    ],
+    "not": [
+      "Traceback",
+      "[carried i1]"
+    ]
+  },
+  "issues-close-records-when": {
+    "_why": "THE CLOSE IS DATED. The same Stop that closes i1 on its carried `done` row records when: `closed_at` on the issue and the item's time in the issue's `done_at` map, so `bin/replay-seating` can rebuild what an earlier Stop still carried (mutze 30e77777 Stop 2007).",
+    "after": {
+      ".claude/workforce/issues/s1.json": {
+        "want": [
+          "\"state\": \"closed\"",
+          "\"closed_at\": \"20",
+          "\"done_at\": {\""
+        ]
+      }
+    },
+    "env": {
+      "WF_BLIND_SAMPLE": "0"
+    },
+    "exit": 0,
+    "not": [
+      "Traceback",
+      "KICKBACK",
+      "i1  "
+    ],
+    "script": "wf-widen",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"session_id\": \"s1\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"The event is on the calendar for 16 January 2027 and the invitation is drafted.\"}",
+    "want": [
+      "sampled for audit"
+    ]
+  },
+  "issues-open-records-when": {
+    "_why": "THE OPEN IS DATED. An issue records `opened_at` when the message opens it, after every other key, so readers that spell the issue's leading keys are unchanged.",
+    "after": {
+      ".claude/workforce/issues/s1.json": {
+        "want": [
+          "\"agents\": [], \"opened_at\": \"20"
+        ],
+        "not": [
+          "\"closed_at\""
+        ]
+      }
+    },
+    "exit": 0,
+    "not": [
+      "Traceback"
+    ],
+    "script": "wf-task-tag",
+    "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"please fix it, then make sure that @dotfiles installs this fix during the omarchy installation script\"}",
+    "want": [
+      "issue i1"
+    ]
   }
 }
