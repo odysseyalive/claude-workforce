@@ -1,6 +1,6 @@
 ---
 name: code-evaluator
-description: Evaluate code to prevent common AI coding mistakes — dead code, duplication, complexity hotspots, reinvented helpers, leftover scaffolding. Two functions plus a pre-write advisor. Use after writing or editing code, when asked to review code quality, clean up the codebase, find unused code, find duplicates, check complexity, or evaluate what an AI just wrote. Commands: review (post-write), sweep (full codebase).
+description: 'Evaluate code to prevent common AI coding mistakes — dead code, duplication, complexity hotspots, reinvented helpers, leftover scaffolding. Two functions plus a pre-write advisor. Use after writing or editing code, when asked to review code quality, clean up the codebase, find unused code, find duplicates, check complexity, or evaluate what an AI just wrote. Commands: review (post-write), sweep (full codebase).'
 lane: coding
 code_eval_ref_version: 5
 allowed-tools: Read, Glob, Grep, Bash, Task, Skill
