@@ -389,8 +389,9 @@ new tell and not a new exemption: the tells and their scopes are unchanged, and 
 evaluator may no longer demote a firing tell on any authority but the register's.
 
 **This is a structural claim about the shipped doctrine** (`invariants.md` § The rule): the pairing that
-makes it true is a `bin/check` assertion that this subsection is present in `evaluators.md`, and a
-`bin/prove` del-case that deletes a load-bearing fragment of it and confirms the assertion breaks. A
+made it true was a `bin/check` assertion that this subsection is present in `evaluators.md`, and a
+`bin/prove` del-case that deleted a load-bearing fragment of it and confirmed the assertion broke.
+Both were retired on 2026-10-14; nothing asserts it now. A
 precedence rule that reads as settled and binds nothing is the exact failure this repository keeps paying
 for.
 

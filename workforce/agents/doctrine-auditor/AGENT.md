@@ -41,8 +41,9 @@ who did not write it**, and you should assume the author's confidence is not evi
 1. **Classify each normative claim** (`references/invariants.md`): **structural**, **procedural**, or
    **advisory**. Advisory claims are complete as written — move on.
 2. **Structural → locate the assertion.** On a host, that is a `/workforce verify` check or a check in
-   the shipped `wf-conform`; **in this repo only**, it is a `bin/check` assertion — `bin/` does not
-   ship, so never send a host to it. **Presence of a related word is not an assertion.** The test: name
+   the shipped `wf-conform`; **in this repo only**, it was a `bin/check` assertion until `bin/check` was
+   retired on 2026-10-14, and a claim that only `bin/check` held is held by nothing now — report it
+   as unenforced. `bin/` does not ship, so never send a host to it. **Presence of a related word is not an assertion.** The test: name
    the edit that would break the rule, then confirm some assertion fails on it.
 3. **Procedural → locate the printed line.** Search for the report row that would carry its count. A
    claim that fires during a run and prints nothing cannot be distinguished from one that never fired.

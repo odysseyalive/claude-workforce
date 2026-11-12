@@ -218,7 +218,7 @@ rule 3b, `enforcement.md`, `staging.md` § UNAVAILABLE). Consumer named, produce
 the earlier five of that shape, this one was invisible from the maintainer's own repo, whose `CLAUDE.md`
 carried the request **by hand**. **A defect that cannot reproduce where it is being looked for is not a
 defect anyone finds by looking.** *Tense corrected 2026-08-07: this read "carries … by hand", present
-tense, and that repo has no `CLAUDE.md` — it was evacuated, and `bin/check` asserts its absence. The
+tense, and that repo has no `CLAUDE.md` — it was evacuated, and `bin/check` asserted its absence until it was retired on 2026-10-14. The
 hand-written copy is what made the defect unreproducible then; it is not a thing that exists now.*
 
 ## Where it runs

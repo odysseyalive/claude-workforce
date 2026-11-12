@@ -12,8 +12,8 @@ are old wordings that cite files since deleted, and a second copy of them would 
 
 **Complete, not curated.** One row per distinct text the `operating-principles` template in
 `references/templates.md` has carried in any commit, oldest first, current items included. The note
-after each digest names the first commit that shipped it. `bin/check` rebuilds the set from git history
-and fails when this file differs from it. Never delete a row: an org built from that release still
+after each digest names the first commit that shipped it. `bin/check` rebuilt the set from git history
+and failed when this file differed from it, until it was retired on 2026-10-14; nothing asserts it now. Never delete a row: an org built from that release still
 holds the text.
 
 - `e1568008028fd53a2decab6b49358c02fcf9666a1225bda516677f957ba88cb6` — item 1 as of `221efd4` (2026-07-29): Every decision conforms to the Strategic Objective, these Pr

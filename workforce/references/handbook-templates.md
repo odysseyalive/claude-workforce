@@ -432,7 +432,7 @@ command got a bad argument (§ The negative must fail for the RIGHT REASON).*
    deliverable live there** — so a `git diff … | awk 'length > N'` lint returns empty and exits 0
    **whatever you wrote**, on every probe run, by construction. **Run the check's direct form against
    the files** (`awk 'length > N' <files>`) **and say which form you ran.** A check reporting green
-   because it observed nothing is the `VACUOUS` verdict `bin/prove` exists to name, arriving in a
+   because it observed nothing is the `VACUOUS` verdict `bin/prove` existed to name until its retirement on 2026-10-14, arriving in a
    handbook instead of in an assertion.
 
 **Both lines sit at column 0 with a list marker** (`-`, `*`, `+`, `1.` or `1)`), never indented and never inside a fence — that is

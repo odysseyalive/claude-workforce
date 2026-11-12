@@ -52,7 +52,7 @@ detection at the next command, and the user's first directive is the thing it pr
 | `wf-turn-budget` | `PostToolUse` | `*` | **tells a capped employee it is near its turn limit, once, while it still has turns to write with.** MEASURED in odyssey-alive session `52aabcb1` (2026-10-12): of 18 dispatches, the 2 that hit `maxTurns` were both build orders, both had already finished and verified their main work, and both returned **no report at all** — the run ends mid-sentence and the manager gets nothing to read. At 80% of the agent's `maxTurns` it injects one instruction: start no new work, write `OUTPUT.md` with every exit criterion MET or UNMET, write the seven-section continuation brief at `HANDOFF.md`, return `HANDOFF <path>` — which is the verdict `org.md` rung 12b acts on. A second injection at `maxTurns − 3` says return now with what exists, writing both files in ONE turn as parallel `Write` calls and replying with the verdict on the next — measured in commit `d782174`'s end-to-end run, at `maxTurns − 2` the agent spent both remaining turns writing a file each and the verdict never reached the manager. Each fires at most once, claimed with `O_CREAT\|O_EXCL` because parallel calls in one turn run this hook concurrently. It counts **TURNS, not calls** — assistant messages carrying a `tool_use`, read from the subagent's own transcript at `<session>/subagents/agent-<agent_id>.jsonl` from a stored byte offset — because parallel calls share a turn and two measured report orders ran 42 and 44 calls inside a 40-turn cap and both finished. Silent for the main thread (no `agent_id`), for an agent hook's own agent (`agent_id`, no `agent_type`), for an agent with no handbook, and for one with no `maxTurns` (every Lead). The counter is scratch under `$TMPDIR`, never in the project. § The turn budget below |
 | `wf-turn-budget` | `PreToolUse` | `Agent\|Artifact\|AskUserQuestion` | **On `Artifact` and `AskUserQuestion` it hands the call the open issue's user words** as `additionalContext` (`wf-task-tag.ask_words`): the inherited ask of an injected turn, the issue the message opened, or an agent's own issue; never the newest by default. Context only, no spawn, no write. MEASURED in mutze-studio `30e77777` (2026-11-09): a chooser re-asked what the user had just said, and a page was called updated that was not the one meant. **On `Agent` it refuses the other wrong answer to a turn cap: a fresh agent instead of the resume.** MEASURED in trial e2e3, session `bb8a3e53` (2026-10-13): a cap-10 filer was cut and, in the SAME main turn, the session spawned a second filer with the `Agent` tool and then a third. Both cut agents sat at `handoff` in the issue ledger for the rest of the session and neither was ever resumed. K8's RESUME kickback lives on the main `Stop`, and a session that never stops between dispatches never reaches it — the correction arrived after all three runs were over. This event is the only one that can say NO, in the turn the wrong action is taken, carrying the `agent_id` to `SendMessage` instead. It denies when the requested `subagent_type` is one this session has a LIVE `handoff` agent of, and is silent for everything else: another role, a spawn from inside a subagent (`agent_id` present), a project with no issue ledger, and a mark `wf-task-tag.held_by` reads as stale. **It can never wedge a session**, which is the whole reason the mark has an age: `agent_handoff` stamps `handoff_at`, and a mark older than `HANDOFF_STALE_AFTER` (30 minutes) or carrying no stamp at all — every mark written by a release before this one — blocks nothing. The deny also lifts when the issue closes, when `agent_resumed` retires the mark at the resumed agent's next tool call, and for a spawn of any other role. § The turn budget below |
 
-**The table above IS the count** — every row is a shipped hook, and `bin/check` derives the set from `wf-settings-apply`'s `SHIPPED_HOOKS` and requires it to match this table and the manifest. *No prose here states a number: three statements of this one fact disagreed across two files on 2026-09-09, and a sentence beside the table is a fourth place for it to drift.* Two more were
+**The table above IS the count** — every row is a shipped hook, and `bin/check` derived the set from `wf-settings-apply`'s `SHIPPED_HOOKS` and required it to match this table and the manifest until it was retired on 2026-10-14; nothing asserts it now. *No prose here states a number: three statements of this one fact disagreed across two files on 2026-09-09, and a sentence beside the table is a fourth place for it to drift.* Two more were
 tabled here after the simplification release removed them: `wf-budget-guard`, which blocked a
 mis-rendered budget picker, and `wf-standing-request`, which added the cold-reader request to every
 turn. Neither script is in `workforce/bin/` and neither is in `manifest.txt`.
@@ -278,7 +278,7 @@ Docs births as well (fixtures `sa-hook-matcher-moved`, `sa-hook-matcher-moved-us
 |---|---|
 | the shared resolver (`wf-census` `workforce_hook`) reads the command as a workforce row: one absolute, `${CLAUDE_PROJECT_DIR}`, per-session `${CLAUDE_CONFIG_DIR:-$HOME/.claude}` or `$HOME` path ending `/skills/workforce/bin/wf-*`, in at most one pair of quotes, with no other variable, no shell syntax and no unquoted space | anything else runs something this cannot stat. The same resolver feeds the census and `wf-conform`, so the three never disagree. A `..` is allowed and never normalised as text: every decision is a kernel stat or a realpath of the joined path, which is physically correct across a symlinked directory, so no removal can hang on how `..` is spelled |
 | it is a plain `command` row, not exec-form (`args`) | an exec-form row runs a different argv than the path read here |
-| its script is in `RETIRED_HOOKS` | every script git has deleted from `workforce/bin/` that the manifest does not ship now; `bin/check` derives the set and fails when it drifts. A shipped name is never removed, even with its file missing |
+| its script is in `RETIRED_HOOKS` | every script git has deleted from `workforce/bin/` that the manifest does not ship now; `bin/check` derived the set and failed when it drifted, until its retirement on 2026-10-14; nothing asserts it now. A shipped name is never removed, even with its file missing |
 | the file is missing, and the install's `bin/` holds every currently shipped hook script | "not there right now" is also true without a vendored install, inside `bin/sync`'s window, on a slow mount and under EACCES |
 
 **The same verdict decides every removal of a workforce row.** `wf-apply`'s `PASS-DEAD-HOOK` removes a
@@ -296,8 +296,8 @@ the same test the heal applies to the install a row points into; an abandoned di
 script is not evidence. At user scope there is no project, and nothing reads the current directory. **The limit, stated:** an account or machine this one cannot name — another user,
 another workstation reading a committed file — may run an older install that still ships the name. For
 that account the row keeps working until the heal on THIS machine removes it; the next update of that
-install retires the script there too, and the name can never come back (`bin/check` fails if a retired
-name ships again, renames included). Nothing on one machine can see the others, and waiting for proof
+install retires the script there too, and the name can never come back (`bin/check` failed if a retired
+name shipped again, renames included, until its retirement on 2026-10-14; nothing asserts it now). Nothing on one machine can see the others, and waiting for proof
 that cannot arrive would keep a row failing here forever.
 
 **It refuses the whole project, writing nothing, when** the project's `.claude` is a personal config
@@ -366,7 +366,8 @@ change's commit): `sa-heal-execute` and `sa-heal-display` (every row rule in one
 `commitments-heal-failure-first`, `commitments-heal-failure-once`, `commitments-sessionstart-clean`,
 `sa-hook-project-never-personal`, `apply-deadhook-workforce-verdict`, `conform-hook-wiring-dead`,
 `conform-cross-root-personal`, `conform-cross-root-single` and `conform-cross-root-monorepo`. The lock,
-its fallback and timeout, and the stale-write check are also run directly by `bin/check`.
+its fallback and timeout, and the stale-write check were also run directly by `bin/check` until its
+retirement on 2026-10-14.
 
 ---
 
@@ -678,8 +679,8 @@ the text arrives as a `hook_additional_context` attachment in the subagent's own
 **`HANDOFF` has a consumer: `org.md` rung 12b.** The brief's seven sections are defined there, and
 this hook's text names them. Before 2026-10-12 rung 12b verified "sections 3–7" of a format defined
 in no file on disk — `wf-handoff`, the producer, was retired in the simplification release, so the
-verdict had a consumer and nothing that could satisfy it. `bin/check` requires the seven section
-lines to appear in both the script and `org.md`.
+verdict had a consumer and nothing that could satisfy it. `bin/check` required the seven section
+lines to appear in both the script and `org.md` until it was retired on 2026-10-14; nothing asserts it now.
 
 **What rung 12b does with the verdict is RESUME that same agent** — `SendMessage`, continue from the
 brief, context intact and a fresh turn allowance — and spawn a successor only when the agent reports

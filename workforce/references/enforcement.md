@@ -152,8 +152,8 @@ exactly one hook". `procedures/hooks.md` tabled three. **Three statements of one
 files, all wrong, in the document whose job is refusing claims the runtime will not back.** Found by a
 panel reading this repo against its own manifest. The number was previously stale from 2026-08-19 to
 2026-09-07; the lesson taken then was to state it, and the lesson now is that stating it in three places
-is how it went wrong again — so `bin/check` asserts this line against `SHIPPED_HOOKS` rather than
-trusting anyone to update it.*
+is how it went wrong again — so `bin/check` asserted this line against `SHIPPED_HOOKS` rather than
+trusting anyone to update it, until it was retired on 2026-10-14; nothing asserts it now.*
 
 *The second landed 2026-08-04, and it closes a gap this file had already named against itself.* Under
 declared succession `procedures/hooks.md` holds that **workforce owes a predecessor's capability**, and
@@ -240,7 +240,7 @@ What covers the ground instead:
 | immutable-block drift | `verify`'s integrity check, and the FLAG-NEVER-TOUCH rule in `amend` |
 | registry / marker census on a host | **`wf-census`**, shipped and invoked by `audit` Step 1b |
 | handbook and data-skill conformance on a host | **`wf-conform`**, shipped and invoked by `verify` |
-| repo-level conformance (maintainers only) | `bin/check` in the source distribution — **not shipped**, and no shipped file may send a host to it |
+| repo-level conformance (maintainers only) | `bin/script-conformance`, `bin/conformance` and `bin/idempotence` in the source distribution (`bin/check` until its retirement on 2026-10-14) — **not shipped**, and no shipped file may send a host to them |
 
 **What the shipped hook recovers** is edit-time detection between audits: drift in an immutable block
 is reported at the moment of the edit rather than at the next `verify`. **What is still lost** is
@@ -290,8 +290,8 @@ same `hooks_added` for user-scope wiring, `permissions_allow_added` for the upda
 These are the keys the writers write, and no others: `wf-settings-apply` writes `permissions_allow_added`
 and `hooks_added`, `wf-permissions` rewrites `permissions_allow_added` when it repairs a rule, and
 `wf-apply` writes `hooks_removed` and `files_removed`; `wf-timezone` writes `env_added` and
-`env_object_added`, in the user-scope record only. `bin/check` derives this set from those three
-scripts and fails when the example drifts from it.
+`env_object_added`, in the user-scope record only. `bin/check` derived this set from those three
+scripts and failed when the example drifted from it, until it was retired on 2026-10-14; nothing asserts it now.
 
 **The `_removed` sections are the ones `disband` RESTORES rather than removes, and the asymmetry is
 deliberate.** An `_added` key records something workforce *added*, so reversal means deleting it. A

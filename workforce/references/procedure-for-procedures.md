@@ -169,8 +169,8 @@ directive one is retention.
 (`platform.md`, `org-config.md`). A handbook that hardcodes one is a `verify` finding.
 
 **8b. A rule lands with its enforcement, in the same change.** Classify it first
-(`references/invariants.md`): **structural** → a **`verify`** check on the host (`bin/check` is this
-repo's own equivalent and does not ship); **procedural** → a counted line
+(`references/invariants.md`): **structural** → a **`verify`** check on the host (`bin/check` was this
+repo's own equivalent until its retirement on 2026-10-14, and never shipped); **procedural** → a counted line
 in the run report; **advisory** → say so explicitly, so nobody later assumes a mechanism exists.
 
 A rule written without one of those three is not a rule, it is an intention. This project has recorded
@@ -274,8 +274,8 @@ relocation exercise that produced 172 was run on a document of ordinary prose �
 runs a median line of 96 characters and 113 bytes per line across the file — so the number bounds
 what an employee is handed only while that density holds. **The companion figure is therefore
 DERIVED, not chosen: `172 × 113 = 19,436 B`**, the measured ceiling at the measured density. It is
-stated here and once in `wf-conform` (`MEASURED_BYTES_PER_LINE`), and `bin/check` asserts the two
-agree, because a constant restated in a second file is the drift Core Principle 9a exists for.
+stated here and once in `wf-conform` (`MEASURED_BYTES_PER_LINE`), and `bin/check` asserted the two
+agree until it was retired on 2026-10-14 (nothing asserts it now), because a constant restated in a second file is the drift Core Principle 9a exists for.
 
 MEASURED 2026-09-10 on the live `apps-odyssey-alive` org: **all five of its IC handbooks sit at
 169–172 lines — right at the ceiling — while ranging from 30,156 B to 95,832 B.** The largest passes

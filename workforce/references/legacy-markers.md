@@ -18,7 +18,7 @@ is precisely the confusing half-migrated state succession exists to prevent.
 
 ## The marker table
 
-Stated once. `bin/check` fails on restatement elsewhere.
+Stated once. `bin/check` failed on restatement elsewhere until it was retired on 2026-10-14; nothing asserts it now.
 
 | Marker | Regex | Class |
 |---|---|---|

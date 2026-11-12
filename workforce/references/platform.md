@@ -18,8 +18,9 @@ PYTHON-FLOOR: 3.6        <- oldest python3 every shipped script must run on
 **`PYTHON-FLOOR` is a host fact, not a harness fact, and it is stated here because this block is where
 constants live.** RHEL 8's system `python3` is 3.6 and RHEL 8 is supported to 2029. A real audit on a
 cPanel jailshell on RHEL 8 (2026-09-15) found three 3.7+ calls in shipped scripts: two crashed with a
-TypeError and one check quietly stopped working. `bin/check` reads this line and fails on any API newer
-than it in a shipped script, so raising the floor is a one-line edit here.
+TypeError and one check quietly stopped working. `bin/check` read this line and failed on any API newer
+than it in a shipped script until it was retired on 2026-10-14. Raising the floor is a one-line edit
+here, and nothing checks the shipped scripts against it now.
 
 Everything in claude-workforce rests on how Claude Code actually delegates. This file records what
 is **MEASURED** and what is merely **DOCUMENTED**, and never lets the two blur.
@@ -600,8 +601,8 @@ wrote identical content under three names, and `FINDINGS.md` was refused with th
 prefix match on the basename.
 
 **Consequence:** no handbook template, probe work product or agent definition may direct a subagent to
-write such a name (`handbook-templates.md` § Reporting, `staging.md` § Phase B); `bin/check` scans every
-shipped file against the harness's own pattern. The one shipped name that matches, the audit's
+write such a name (`handbook-templates.md` § Reporting, `staging.md` § Phase B); `bin/check` scanned every
+shipped file against the harness's own pattern until it was retired on 2026-10-14; nothing scans now. The one shipped name that matches, the audit's
 closing report file, is written by the orchestrating session and never delegated (`procedures/audit.md` § Step 7).
 
 ### Fact 27 — `env.TZ` in a settings file sets the zone Claude Code shows its own times in ✅ MEASURED

@@ -1435,7 +1435,8 @@ Per **governed** handbook (adopted agents stay exempt until their first amendmen
    catalogs shipped on 2026-09-10, `wf-catalog`'s `CATALOGS` table has served all five kinds since, and
    `wf-conform`'s `CATALOG_KIND` table behind `INV-CATREAD` names the same five (under six spellings,
    `design-eval` among them); `bin/check` § `conform: a catalog read grounded on a literal path has a
-   detector, and it is advisory` asserts the two tables agree as a set relation, so a sixth catalog
+   detector, and it is advisory` asserted the two tables agree as a set relation until it was retired
+   on 2026-10-14 (nothing asserts it now), so a sixth catalog
    added to one and not the other fails there rather than on somebody's org. The
    restriction outlived its reason by three days and named this item as the fix locus while doing it.*
    **Confirm the kind resolves before rewriting a citation**, which is one command per kind and is the

@@ -157,8 +157,8 @@ else. Wiring one to a tool-use matcher would claim prevention the design does no
 (`references/enforcement.md` § Nothing ships dormant).
 
 **The prose is not deleted when the script is written.** `## Invariants` states the rule; the maintainer
-decides it. That is the relation `references/invariants.md` has with `bin/check` in this project's own
-repo, and collapsing it would leave the rule legible only as code.
+decides it. That is the relation `references/invariants.md` had with `bin/check` in this project's own
+repo until `bin/check` was retired on 2026-10-14, and collapsing it would leave the rule legible only as code.
 
 The run prints **`INV-MAINTAINERS`** — mechanical invariants against maintainers written against
 negative tests passed (`references/invariants.md`). All four counts, always, including zeros: a dataset

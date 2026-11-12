@@ -202,8 +202,9 @@ install is unchanged.
 **It repeats in every command block on purpose.** Each block runs in a fresh shell, so a `WF` set in an
 earlier block is gone by the next one, and a reader who copies a single block must get a working
 command. This is a deliberate exception to *constants are stated once*: the resolver is stated once
-*here*, and the copies are mechanical duplicates that `bin/check` compares against this section rather
-than independent statements of the same fact.
+*here*, and the copies are mechanical duplicates that `bin/check` compared against this section rather
+than independent statements of the same fact, until it was retired on 2026-10-14; nothing compares
+them now.
 
 *Written 2026-08-03. Eleven shipped sites carried the bare project path, and a real `audit` run against
 a personal install failed at every one of them. `procedures/hooks.md` had already hit this on

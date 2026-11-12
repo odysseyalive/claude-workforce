@@ -110,7 +110,7 @@ no-restatement rule governs *prose*, where a constant should be cited rather tha
 explicitly**, or the rule forbids the only form the platform accepts.
 
 The pattern under all three: **a blocking check written from the failure it prevents, never executed
-against a passing case.** `bin/check` asserts the checks are *specified*; only running one against a
+against a passing case.** `bin/check` asserted the checks are *specified* until its retirement on 2026-10-14; only running one against a
 real artifact shows what it does to a correct one.
 
 ---
@@ -396,7 +396,7 @@ prints the exact `platform-local.md` bytes, or writes them under `--execute`.
 the user's explicit marks, because a registered agent sits in every session's agent menu on the
 machine, and every audit after it returned `UNAVAILABLE` and marked every handbook `Tier ceiling:
 unverified`. The removal's constraint binds this instrument: **no step anywhere writes a canary
-definition into an `agents/` directory** (`bin/check` asserts it over every shipped file).
+definition into an `agents/` directory** (`bin/check` asserted it over every shipped file until its retirement on 2026-10-14; nothing asserts it now).
 
 **Two independent assertions, because they measure different things:**
 

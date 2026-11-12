@@ -15,7 +15,8 @@ classification every other claim in this project carries. An unclassified pass i
 
 This is the whole of what keeps the catalog from becoming doctrine. A pass with no recorded defect
 behind it is speculative guidance, and Core Principle 9c holds that guidance is a live cost paid on
-every spawn, forever. `bin/check` fails on a row whose citation does not resolve.
+every spawn, forever. `bin/check` failed on a row whose citation did not resolve until it was retired
+on 2026-10-14; nothing asserts it now.
 
 **Where the citations come from: `plan/transactions/`.** A real transaction that went wrong is the
 cheapest source of a defect class this project has, and it is the only one that reports on the system
@@ -45,7 +46,8 @@ correct — but only with a **measured precision figure and the tree it was meas
 pass's own section. "It might be wrong" is not a reason. `1 true of 2 on odyssey-alive, and the false
 one names a real file inside the playwright-mcp server` is, because someone can re-run it and disagree.
 
-A pass whose verdict is `REPORT` with no measurement is **unfinished**, and `bin/check` fails on it.
+A pass whose verdict is `REPORT` with no measurement is **unfinished**. `bin/check` failed on it until it
+was retired on 2026-10-14; nothing asserts it now.
 
 ## What a pass may do
 
@@ -68,7 +70,8 @@ produces churn that passes its own check.
 3. the target has a shipped reversal artifact, written **before** the edit;
 4. profitability is > 0 and measured, with the instrument named;
 5. precision is measured at **1.00** on a named tree, hand-verified;
-6. the check that decided (1) has a recorded negative test in `bin/prove`.
+6. the check that decided (1) has a recorded negative test: a demonstration that plants the defect in a
+   copy and shows the check catch it (`bin/prove` held these until its retirement on 2026-10-14).
 
 **Ownership is not a precondition, and asking whether a file is "workforce's" is the reservation the
 user removed on 2026-08-05** (`SKILL.md` § Directives): *"There should be no percieved reservations from
@@ -177,10 +180,10 @@ fixture-lifecycle rule is repo-side only.*
 
 ### `PASS-MARKER-GRAMMAR`
 
-Every reader of a shared marker grammar must **accept the same blocks**. Detector: `bin/check`
-§ PASS-MARKER-GRAMMAR walks every module-level `re.compile` in `bin/` and `workforce/bin/` whose
-pattern names both `origin:` and `immutable`, compiles it, and runs it against a corpus of legal and
-illegal spellings.
+Every reader of a shared marker grammar must **accept the same blocks**. Detector, until its retirement
+on 2026-10-14: `bin/check` § PASS-MARKER-GRAMMAR walked every module-level `re.compile` in `bin/` and
+`workforce/bin/` whose pattern named both `origin:` and `immutable`, compiled it, and ran it against a
+corpus of legal and illegal spellings. Nothing runs that comparison now.
 
 It tests **what patterns accept, not what they look like**. The assertion it replaced compared regex
 *source text* between two files — 2 of 8 readers, spelling rather than behaviour — and a faithful copy
@@ -283,14 +286,16 @@ and a finding parked in a baseline forever is still a defect.
 
 ## Adding a pass
 
-Four artifacts, in one change. `bin/check` refuses a row missing any of them.
+Four artifacts, in one change. `bin/check` refused a row missing any of them until it was retired on
+2026-10-14; nothing asserts it now.
 
 1. a row above, with a `defect` citation that resolves;
 2. a detector — extend an existing producer wherever one already reads the artifact, because the
    tuned part of every producer in this project is its false-positive filtering, and a fresh extractor
    re-earns those from zero;
-3. a `bin/prove` case that **breaks the filter, not the feature** — proving a flag name is greppable
-   proves nothing;
+3. a demonstration that **breaks the filter, not the feature** — a planted defect in a copy that the
+   detector must catch (a `bin/prove` case until its retirement on 2026-10-14); proving a flag name is
+   greppable proves nothing;
 4. a fixture under `fixtures/scripts/` with an `expectations.json` row, so the behaviour is
    re-runnable rather than an anecdote.
 

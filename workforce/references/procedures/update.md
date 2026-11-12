@@ -278,8 +278,8 @@ in prose would defeat the reason it exists.
 So the four commands above are the same four the README publishes, and updating is **exactly** one of
 them — the one the census picked. Anything the installer learns to do, `update` gets for free.
 
-**These commands are a sanctioned restatement of the README's install block, and `bin/check` compares
-the two.** A restated constant that nothing compares is the drift this project fails a run over.
+**These commands are a sanctioned restatement of the README's install block, and `bin/check` compared
+the two until it was retired on 2026-10-14; nothing asserts it now.** A restated constant that nothing compares is the drift this project fails a run over.
 
 ## Update syncs; it does not audit
 

@@ -153,9 +153,9 @@ surfaced as a question** (`evaluators.md` § House rules dominate). The self-che
 flag: the deliverable is not done while a mandatory fix is outstanding.
 
 **Classification (`invariants.md`): structural claim about the shipped doctrine.** The pairing that
-makes it true is a `bin/check` assertion that this requirement is present here and wired into
-`handbook` and `audit`, plus a `bin/prove` del-case that deletes a load-bearing fragment and
-confirms the assertion breaks.
+made it true was a `bin/check` assertion that this requirement is present here and wired into
+`handbook` and `audit`, plus a `bin/prove` del-case that deleted a load-bearing fragment and
+confirmed the assertion broke. Both were retired on 2026-10-14; nothing asserts it now.
 
 ---
 
@@ -184,8 +184,9 @@ is a cleared candidate, a real defect fixed in-pass, or a flagged design-policy 
 surfaced for the human to adjudicate on a hunch.
 
 **Classification (`invariants.md`): a structural claim, enforced the way its prose twin is.** A
-`bin/check` assertion holds this section present and wired into `handbook` and `audit`; a `bin/prove`
-del-case removes a load-bearing fragment of it and confirms that assertion fails. A standing gate that
+`bin/check` assertion held this section present and wired into `handbook` and `audit`, and a `bin/prove`
+del-case removed a load-bearing fragment of it and confirmed that assertion failed, until both were
+retired on 2026-10-14; nothing asserts it now. A standing gate that
 binds nothing is the failure this whole file exists to close.
 
 ---
@@ -205,8 +206,9 @@ done, it is half-checked. This never judges whether a gate's verdict was *good* 
 job; this proves the gate was *there*. Coverage of gates, not quality of their output.
 
 **Classification (`invariants.md`): a structural claim, enforced the way the catalog gates above are.**
-A `bin/check` assertion holds this section present and the gate-map schema shipped; a `bin/prove`
-del-case removes a load-bearing fragment and confirms it fails. On a host the wiring itself is a
+A `bin/check` assertion held this section present and the gate-map schema shipped, and a `bin/prove`
+del-case removed a load-bearing fragment and confirmed it failed, until both were retired on
+2026-10-14; nothing asserts it now. On a host the wiring itself is a
 `/workforce verify` check (`procedures/verify.md` § Gate wiring), the structural mechanism — not an
 `INV-*` row, which is reserved for a property of a *run*.
 
@@ -244,7 +246,8 @@ checks that could not check.
 `procedures/verify.md` already requires that every invariant classed `mechanical` record a
 negative-test result, for exactly this reason: *"a validator nobody ever saw reject anything —
 indistinguishable from `exit 0`."* Applying it to `## Verification` is a class fix, not an invention.
-Its ancestor is `bin/prove`, which this project has demanded since 2026-08-03: **an assertion never
+Its ancestor is `bin/prove`, which this project demanded from 2026-08-03 until its retirement on
+2026-10-14: **an assertion never
 observed failing might be testing nothing.**
 
 ### The runnable form is declared

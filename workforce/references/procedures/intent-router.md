@@ -58,7 +58,8 @@ untouched. An employee named `triage-lead` invoked as `<employee> today --no-tri
 --no-triage` intact.
 
 *(Employee names appear here only as `<employee>`, never spelled out after `/workforce`. `bin/check`
-asserts that every literal `/workforce <word>` is a real command, and a concrete example would read as a
+asserted that every literal `/workforce <word>` is a real command until its retirement on 2026-10-14
+(nothing asserts it now), and a concrete example would read as a
 phantom one. The check is correct to be strict and must not be relaxed to accommodate an example.)*
 
 **This is what replaces a converted skill's slash command.** Conversion deletes the skill and leaves no

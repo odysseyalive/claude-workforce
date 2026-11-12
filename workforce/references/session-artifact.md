@@ -67,7 +67,7 @@ The directive is enforced in **layers**, and each is named at its true strength 
 advisory mechanism is never described as enforced).
 
 **STRUCTURAL — the clause itself, in every generated org.** Item 9 of the operating-principles default
-body is a shipped constitution rule, present in the template and asserted on every write; `bin/check`
+body is a shipped constitution rule, present in the template and asserted on every write; `bin/check` did so until its retirement on 2026-10-14, and
 (on a host, `/workforce verify`) fails if the template drops it or a write materializes without it. What
 this proves is that the *rule reaches every employee*, not that any given session obeyed it.
 

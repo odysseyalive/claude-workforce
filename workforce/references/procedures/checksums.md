@@ -91,7 +91,7 @@ tree disagreed on the count:
 
 *Corrected 2026-08-05, and this file was WRONG against every reader that ships.* It read "leading
 whitespace allowed" and listed a marker inside a fenced code example as counting — while `wf-census`,
-`wf-conform`, `wf-protect-directives` and both `bin/check` sites reject an indented marker, on the
+`wf-conform`, `wf-protect-directives` and both `bin/check` sites (retired 2026-10-14) rejected an indented marker, on the
 ruling that an indented line in markdown IS a code block. `bin/baseline` had established that and
 measured it: 68 naive against 37 anchored, 46% inflation, *"a marker quoted inside a sentence is
 documentation about the format, not a span opener."*

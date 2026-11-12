@@ -396,6 +396,19 @@ non-empty and names at least one literal invocation; the length ceiling; the imm
 digests; `tools:` is a real allowlist rather than the display string; and the staged draft still
 matches the registered bytes.
 
+**Frontmatter is parsed as YAML, not split into lines.** The first three rows below judge it through
+the shipped `wf-frontmatter` (PyYAML where it imports, its own stdlib scanner otherwise; both give the
+same verdict on every case measured). The fourth checks the install's version mirror:
+
+| Row | Fails on |
+|---|---|
+| `<handbook>.md: frontmatter parses` | a governed handbook whose `---` block a YAML loader refuses — an unquoted value holding `: `, a value starting with a YAML indicator, a tab in the indentation, an unclosed quote — or that carries a duplicate key or a value cut at ` #`. An adopted agent with the same defect gets a note, not a failure |
+| `.claude/skills/<name>/SKILL.md: frontmatter parses` | the same, for every project skill with a `---` block; a count line names how many were judged, and by which backend |
+| `this install: every SKILL.md it ships has valid frontmatter` | the install `wf-conform` runs from: its own `SKILL.md`, and in the source tree `workforce/skills/*/SKILL.md` |
+| ``this install: SKILL.md `version:` mirrors WORKFORCE-VERSION`` | the install's `SKILL.md` `version:` differing from `references/version.md`, the one place the number is authored |
+
+A file can be judged directly: `"$WF/bin/wf-frontmatter" <file>...` exits `1` on any finding.
+
 Three advisory rows post-date most deployed handbooks and block nothing: `## Reporting` echoes the
 `REQUEST (verbatim)` block (dispatch CHECKPOINT clauses 6c/6d), `## Reporting` carries the
 **say-the-state clause** (every finding reports its outcome in the same breath; no work handed up the
@@ -700,7 +713,8 @@ and the two user-facing docs (`README.md`, `COMMANDS.md`).
 *This read "the sanctioned duplication points are `bin/check`'s `CONST_EXEMPT` … read the list from the
 check; never restate it from memory" — an instruction to a host to open a file that does not ship.
 `invariants.md` caught this class once and fixed it in one file; the sweep never reached here. The list
-is now stated where its reader is, and the maintainer-side set is checked against it by `bin/check`.*
+is now stated where its reader is, and the maintainer-side set was checked against it by `bin/check` until its retirement on
+2026-10-14; nothing asserts it now.*
 
 An earlier form of this section named four and omitted `org-config.template.md`. A `verify` following it
 would have reported the shipped model-budget statics as a constants violation — **re-opening the exact

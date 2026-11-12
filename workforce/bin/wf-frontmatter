@@ -79,6 +79,13 @@ def block(body):
     return True, (m.group(1) if m else None)
 
 
+def _printable(msg):
+    """`msg` with every control character escaped. A message quotes the file's own text (a key,
+    a tag), and a file can carry terminal escape sequences that would otherwise reach the
+    reader's terminal through `wf-conform` and this CLI."""
+    return "".join(c if c.isprintable() else repr(c)[1:-1] for c in msg)
+
+
 class _Stop(Exception):
     """The first parse error. The scanner stops there, as a YAML loader does."""
 
@@ -108,11 +115,11 @@ class _Scanner:
         self.anchors = set()
 
     def fail(self, n, msg):
-        self.parse.append(f"line {n}: {msg}")
+        self.parse.append(f"line {n}: {_printable(msg)}")
         raise _Stop()
 
     def warn(self, n, msg):
-        self.lint.append(f"line {n}: {msg}")
+        self.lint.append(f"line {n}: {_printable(msg)}")
 
     # ── scalars ───────────────────────────────────────────────────────────────
     def _close_quote(self, s, start, q, n):
