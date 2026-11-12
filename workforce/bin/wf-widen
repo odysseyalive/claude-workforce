@@ -1878,8 +1878,11 @@ def counter_state(base, session, agent_id):
     return (state, d) if isinstance(state, dict) else ({}, "")
 
 
+# A HOST ADAPTER PATCHES THIS TUPLE AFTER THE MODULE LOADS (codex-workforce moves the store
+# to `.codex-workforce/personnel`), so every path built from it, in the code or in the text
+# a stop emits, is joined from it at the moment it is used. A string joined here, at import,
+# would keep naming `.claude/workforce/personnel` after the store had moved.
 PERF_STORE_PARTS = (".claude", "workforce", "personnel")
-PERF_STORE = os.path.join(*PERF_STORE_PARTS)
 PERF_SLUG_RX = re.compile(r"[^A-Za-z0-9._-]+")
 
 
@@ -1987,8 +1990,9 @@ def cap_perf(payload, path, ask, capped):
     # write is worse than one that reports nothing: the next reader goes looking for a
     # file that is not there and concludes the cap hit was never seen.
     note = (head
-            + (f"PERF filed at {os.path.join(PERF_STORE, name)}" if store
-               else f"no PERF written to {PERF_STORE} — a link is on the way to it"))
+            + (f"PERF filed at {os.path.join(*PERF_STORE_PARTS, name)}" if store
+               else f"no PERF written to {os.path.join(*PERF_STORE_PARTS)} — a link is on "
+                    f"the way to it"))
     if not store:
         return {"systemMessage": note}
     try:
@@ -2012,6 +2016,9 @@ def cap_perf(payload, path, ask, capped):
             sha = "unread"
     quoted = "\n".join("> " + ln for ln in (ask or "").strip().splitlines()[:12]) \
         or "> (the order was not recorded)"
+    # Joined here rather than spelled in the record, so a host that patched `WORK_DIRS`
+    # quotes its own work tree. `/` because the handbook sentence quoted is spelled with it.
+    work = "/".join(WORK_DIRS)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
             fh.write(f"""# PERF-{run}-{agent}-turn-cap
@@ -2020,7 +2027,7 @@ def cap_perf(payload, path, ask, capped):
 **Employee:** {agent}
 **Handbook:** `{handbook}` @ sha {sha}
 **Section implicated:** § Reporting "Write your deliverable to \
-`.claude/workforce/work/<run-id>/<name>/OUTPUT.md`"
+`{work}/<run-id>/<name>/OUTPUT.md`"
 **Attribution:** **ENVIRONMENT**
 
 ## What Was Expected
@@ -3393,7 +3400,9 @@ def asks_line(payload):
 # (2026-10-13). The ESCALATION's wording below has one speaker and stays here.
 ESCALATE_ACTION = ("→ DECIDE THIS ONE YOURSELF: {who} stopped at its cap twice with the "
                    "same work open, so resuming it again is not progress. {brief}")
-NO_BRIEF = ("No readable HANDOFF.md under .claude/workforce/work/<run-id>/{who}/, so "
+# `{work}` IS FILLED FROM `WORK_DIRS` WHEN THE LINE IS SAID, never spelled here: a host
+# adapter that patches `WORK_DIRS` would otherwise be told to look in `.claude/`.
+NO_BRIEF = ("No readable HANDOFF.md under {work}/<run-id>/{who}/, so "
             "section 1 cannot be quoted.")
 HAS_BRIEF = "Its own HANDOFF section 1 is quoted below, for you to read."
 # THE BRIEF IS AGENT-WRITTEN TEXT, SO IT IS QUOTED AS DATA AND SENT TO THE USER'S CHANNEL.
@@ -3544,7 +3553,8 @@ def handoff_action(payload, iss, verdict):
             says.append(HAS_BRIEF)
             quotes.append(QUOTE_FRAME.format(who=a["agent_id"], text=s1))
         else:
-            says.append(NO_BRIEF.format(who=atype if TT.bare_name(atype) else "<employee>"))
+            says.append(NO_BRIEF.format(work="/".join(WORK_DIRS),
+                                        who=atype if TT.bare_name(atype) else "<employee>"))
     return (ESCALATE_ACTION.format(who=TT.name_agents(ids), brief=" ".join(says)),
             "\n".join(quotes))
 
