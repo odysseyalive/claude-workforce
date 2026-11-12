@@ -1,0 +1,4 @@
+---
+---
+
+Planted case `empty-ok`.

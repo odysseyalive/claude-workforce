@@ -724,6 +724,27 @@ def _digest(path):
         return None
 
 
+_FRONTMATTER = []
+
+
+def _frontmatter_judge():
+    """The `wf-frontmatter` module, loaded once."""
+    if not _FRONTMATTER:
+        _FRONTMATTER.append(_load_sibling("wf-frontmatter"))
+    return _FRONTMATTER[0]
+
+
+def frontmatter_errors(body):
+    """(present, findings) from `wf-frontmatter`, the one YAML judge both this file and
+    `bin/baseline` load. `frontmatter()` below stays the raw `key: value` reader every other
+    row here was written against; this is the verdict on whether a loader accepts the block.
+
+    THE ROW BELOW CALLED ITSELF "frontmatter parses" AND PARSED NOTHING (2026-11-11). It passed
+    whenever the `---` lines were there, so `code-evaluator/SKILL.md` shipped a `description:`
+    that PyYAML and Go's yaml.v3 both refuse."""
+    return _frontmatter_judge().body_errors(body)
+
+
 def frontmatter(body):
     m = FM_RX.match(body or "")
     if not m:
@@ -767,6 +788,10 @@ def check_adopted(path, body, res):
     # measured 2026-09-01 on a real org: two adopted reviewers declared "Read-only"
     # under `allowed-tools:`, one of them authorized to apply deletions, both
     # ceilings very likely unread by the loader.
+    _present, _fm_bad = frontmatter_errors(body)
+    if _fm_bad:
+        hazards.append("frontmatter is not valid YAML, so a harness with a strict loader cannot "
+                       "load this agent: " + "; ".join(_fm_bad))
     _afm = frontmatter(body)
     if _afm is not None and "allowed-tools" in _afm and "tools" not in _afm:
         hazards.append(
@@ -781,7 +806,9 @@ def check_adopted(path, body, res):
 def check_handbook(path, body, res, ceiling, floors=None):
     n = os.path.basename(path)
     fm = frontmatter(body)
-    res.add(fm is not None, f"{n}: frontmatter parses")
+    _present, _fm_bad = frontmatter_errors(body)
+    res.add(fm is not None and not _fm_bad, f"{n}: frontmatter parses",
+            "; ".join(_fm_bad) if _fm_bad else "no `---` frontmatter block opens the file")
     if fm is None:
         return
 
@@ -2487,6 +2514,79 @@ def is_record(root, path, patterns=None):
     rel = os.path.relpath(path, root).replace(os.sep, "/")
     return any(rx.match(rel) for rx, _d in
                (record_patterns(root) if patterns is None else patterns))
+
+
+def check_skill_frontmatter(root, res):
+    """Every project skill's `SKILL.md` frontmatter, judged as YAML.
+
+    No row checked a skill's frontmatter at all, so a `description:` that a strict loader
+    refuses was invisible here however it was written (`frontmatter_errors`). A SKILL.md with
+    no `---` block is not judged: there is nothing to parse, and this row is about parsing."""
+    base = os.path.join(root, ".claude", "skills")
+    try:
+        names = sorted(os.listdir(base))
+    except OSError:
+        names = []
+    seen = bad = 0
+    for name in names:
+        p = os.path.join(base, name, "SKILL.md")
+        if not os.path.isfile(p):
+            continue
+        body = read(p, res)
+        if body is None:
+            continue
+        present, found = frontmatter_errors(body)
+        if not present:
+            continue
+        seen += 1
+        bad += bool(found)
+        res.add(not found, f".claude/skills/{name}/SKILL.md: frontmatter parses",
+                "; ".join(found) + " — a harness with a strict YAML loader cannot load this "
+                "skill")
+    res.count(f"SKILL.md frontmatter: {seen} project skill(s) · {bad} not valid YAML "
+              f"(judged by {_frontmatter_judge().backend()})")
+
+
+def check_install(res):
+    """The install this script runs from: its `SKILL.md` `version:` mirror, and the frontmatter
+    of every `SKILL.md` it ships.
+
+    `references/version.md` is where the number is authored and `SKILL.md` carries a mirror
+    because the skill schema wants the field. Two documents said `bin/check` held them equal;
+    `bin/check` was retired on 2026-10-14 and nothing held them equal after it (found
+    2026-11-11). This is that assertion, on the host, where `verify` runs.
+
+    WHICH SKILL.md FILES. The install's own, and in the source tree `workforce/skills/*/`,
+    where the siblings are authored. An installed sibling sits beside the skill directory
+    among the user's own skills, which the project row judges when they are project skills.
+    """
+    anchor = installed_version()
+    skill_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    smd = os.path.join(skill_dir, "SKILL.md")
+    try:
+        with open(smd, encoding="utf-8") as fh:
+            body = fh.read()
+    except (OSError, UnicodeDecodeError):
+        return
+    if anchor is not None:
+        raw = (frontmatter(body) or {}).get("version", "")
+        mirror = raw.strip().strip("\"'")
+        res.add(mirror == anchor, "this install: SKILL.md `version:` mirrors WORKFORCE-VERSION",
+                f"SKILL.md says {raw or '(no version: line)'}, references/version.md says "
+                f"{anchor}. version.md is the anchor: set SKILL.md's `version:` to {anchor}")
+    files = [smd] + sorted(glob.glob(os.path.join(skill_dir, "skills", "*", "SKILL.md")))
+    found = []
+    for p in files:
+        try:
+            with open(p, encoding="utf-8") as fh:
+                _present, errs = frontmatter_errors(fh.read())
+        except (OSError, UnicodeDecodeError) as exc:
+            errs = [f"unreadable ({type(exc).__name__})"]
+        found += [f"{os.path.relpath(p, skill_dir)}: {e}" for e in errs]
+    res.add(not found, "this install: every SKILL.md it ships has valid frontmatter",
+            "; ".join(found) + " — a harness with a strict YAML loader cannot load it")
+    res.count(f"this install: {len(files)} SKILL.md file(s) · "
+              f"{len({f.split(':', 1)[0] for f in found})} with frontmatter that is not valid YAML")
 
 
 def check_data_skill(path, body, res):
@@ -4415,6 +4515,8 @@ def main():
     # alone, which never saw a converted predecessor knowledge base.
     for skill_dir, body in data_skills(root):
         check_data_skill(os.path.join(skill_dir, "SKILL.md"), body, res)
+    check_skill_frontmatter(root, res)
+    check_install(res)
 
     check_sidecar(root, res)
     check_canary_record(root, res)

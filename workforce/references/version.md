@@ -8,16 +8,18 @@ WORKFORCE-VERSION: 1.88.0
 
 The **source of truth** for the installed release, and the only place the number is *authored*. One
 other file states it — `SKILL.md`'s frontmatter `version:` — because Claude Code's skill schema
-requires that field; it is a **mirror**, not a second anchor, and `bin/check` asserts the two are
-byte-equal so they can never drift (`/workforce verify` on a host). Bump here, and update the mirror
-in the same commit.
+requires that field; it is a **mirror**, not a second anchor. `wf-conform`'s row *this install:
+SKILL.md `version:` mirrors WORKFORCE-VERSION* fails when the two differ, on every `/workforce
+verify` and in every `wf-conform` case `bin/script-conformance` runs. Bump here, and update the
+mirror in the same edit.
 
 `/workforce version` prints it; `--check` compares against `main` and reports whether an update is
 available. `/workforce update` re-runs the installer.
 
-A change to any shipped file **must** advance this number — enforced at commit time by the
-maintainer hook `bin/pre-commit-version` (not shipped: it guards workforce's own development, not a
-user's project). A shipped change that rides on an unchanged version is refused.
+The number advances **once per development session**, not once per commit: `/workforce dev wrap`
+bumps it at session end over everything the session shipped (`procedures/wrap.md`). No commit hook
+enforces a bump. `bin/pre-commit-version` still exists and is wired to nothing, deliberately — a
+per-commit bump was retired as *"a bad model"* (`wrap.md`).
 
 ---
 
@@ -56,5 +58,5 @@ current-or-stale rather than folding it into the product version.
 3. Confirm no constant is restated outside its single source (`verify`'s constants check).
 4. Confirm the manifest lists every shipped file, and that nothing writes project state into the skill
    directory.
-5. Bump this file, and update `SKILL.md`'s frontmatter `version:` to the same value (the commit hook
-   and `bin/check`'s equality assertion both refuse a mismatch).
+5. Bump this file, and update `SKILL.md`'s frontmatter `version:` to the same value (`wf-conform`'s
+   mirror row fails on a mismatch).

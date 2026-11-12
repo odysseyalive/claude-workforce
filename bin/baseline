@@ -474,6 +474,25 @@ def git_status(root, relpath):
     return "untracked"
 
 
+def _frontmatter_judge():
+    """`workforce/bin/wf-frontmatter`, the one YAML judge `wf-conform` also loads.
+
+    Loaded by path with bytecode off, as `wf-conform`'s `_load_sibling` does: an import here
+    would write `__pycache__/` into the shipped `workforce/bin/`."""
+    import importlib.machinery
+    import importlib.util
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        "workforce", "bin", "wf-frontmatter")
+    prev, sys.dont_write_bytecode = sys.dont_write_bytecode, True
+    try:
+        loader = importlib.machinery.SourceFileLoader("wf_frontmatter", path)
+        mod = importlib.util.module_from_spec(importlib.util.spec_from_loader("wf_frontmatter", loader))
+        loader.exec_module(mod)
+    finally:
+        sys.dont_write_bytecode = prev
+    return mod
+
+
 def read(p):
     try:
         with open(p, encoding="utf-8", errors="replace") as f:
@@ -567,6 +586,7 @@ def census(root):
     file_scope_owners = []
 
     names = sorted(os.listdir(skills_dir)) if os.path.isdir(skills_dir) else []
+    fm_judge = _frontmatter_judge()
     for name in names:
         sdir = os.path.join(skills_dir, name)
         if not os.path.isdir(sdir):
@@ -586,13 +606,23 @@ def census(root):
         # Frontmatter parses? A skill that cannot be read is QUARANTINED: excluded
         # from downstream work, but counted in every total so the accounting never
         # silently shrinks.
+        #
+        # PARSED, NOT MARKER-COUNTED (2026-11-11). This looked only for the two `---`
+        # lines, so a `description:` a YAML loader refuses passed as "parses". The parse
+        # error is the quarantine reason, so the census says what is wrong.
         if rec["has_skill_md"]:
             if not body.startswith("---\n") or "\n---\n" not in body:
                 rec["quarantined"] = "frontmatter missing or unterminated"
-                quarantined.append(name)
+            else:
+                _present, _bad = fm_judge.body_errors(body)
+                if _bad:
+                    rec["quarantined"] = "frontmatter is not valid YAML: " + "; ".join(_bad)
         else:
             rec["quarantined"] = "no SKILL.md"
-            quarantined.append(name)
+        # One entry per skill, the reason with it: a bare name said a skill was set aside
+        # and never why, which is the half a reader needs to repair it.
+        if "quarantined" in rec:
+            quarantined.append({"skill": name, "reason": rec["quarantined"]})
 
         # ANCHOR THE TOTALS TOO. The pairing block below has line-anchored since it
         # was written, and documents why: a marker quoted inside a sentence is
@@ -1072,6 +1102,8 @@ def report(c):
     p(f"|---|---|")
     p(f"| skills | {c['skill_count']} |")
     p(f"| quarantined (unparseable) | {len(c['quarantined'])} |")
+    for q in c["quarantined"]:
+        p(f"|   `{q['skill']}` | {q['reason']} |")
     p(f"| **UNPAIRED markers (sweep hazard)** | **{len(c['unpaired_markers'])}** |")
     p(f"| **UNKNOWN marker families (not in the table)** | **{len(c['unknown_marker_families'])}** |")
     p(f"| skills with no `origin:` marker | {len(c['skills_with_no_origin_marker'])} |")

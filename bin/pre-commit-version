@@ -26,7 +26,12 @@ ANCHOR = "workforce/references/version.md"
 MIRROR = "workforce/SKILL.md"
 # Shipped-but-not-manifest-listed: the installers fetch these three by fixed URL.
 EXTRA_SHIPPED = ("install", "install.ps1", "manifest.txt")
-FLAGS = ("keep", "hook", "exec", "canary")
+# Every flag manifest.txt's header defines for a SHIPPED row. `retired` names a path the install
+# deletes, so it is not shipped and is skipped below. This tuple held only the first four, so a
+# `sibling`, `exec-sibling` or `agent` row added the flag word itself as a path and its file never
+# counted as shipped (found 2026-11-11). The hook is wired to nothing (procedures/wrap.md), but a
+# hand run should still read the manifest right.
+FLAGS = ("keep", "hook", "exec", "style", "canary", "sibling", "exec-sibling", "agent")
 
 
 def git(*args):
@@ -62,6 +67,8 @@ def shipped_paths():
                 if not s or s.startswith("#"):
                     continue
                 toks = s.split()
+                if toks[0] == "retired":
+                    continue
                 out.add(toks[1] if toks[0] in FLAGS and len(toks) > 1 else toks[0])
     except OSError:
         pass

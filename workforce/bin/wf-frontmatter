@@ -1,0 +1,546 @@
+#!/usr/bin/env python3
+"""wf-frontmatter — is this `---` frontmatter block valid YAML? One answer, shared.
+
+    wf-frontmatter FILE...            every file that opens with a frontmatter block
+    wf-frontmatter --root DIR         every `*.md` under DIR
+    wf-frontmatter --stdlib ...       PyYAML ignored even where it imports
+    wf-frontmatter --agree --root .   the stdlib verdict against PyYAML's, block by block;
+                                      the planted cases are `fixtures/scripts/frontmatter-planted`
+
+THE DEFECT. Two shipped checkers reported "frontmatter parses" without parsing anything.
+`wf-conform`'s `frontmatter()` split `key: value` lines, and `bin/baseline` looked for the two
+`---` markers. `workforce/skills/code-evaluator/SKILL.md` then shipped with
+
+    description: Evaluate code ... what an AI just wrote. Commands: review (post-write), ...
+
+unquoted. Claude Code read it. PyYAML refuses it ("mapping values are not allowed here"), and so
+does Go's yaml.v3, so a harness with a strict loader could not load the skill at all. Fixed by
+quoting it in 6985840. Nothing in this repository would have caught it.
+
+ONE OWNER. `wf-conform` loads this file through `_load_sibling`, and `bin/baseline` loads it the
+same way from `workforce/bin/`. There is no second copy of the grammar.
+
+TWO TIERS, because YAML and the author disagree on two things.
+  parse   what a strict loader REFUSES. Where PyYAML imports it decides, and otherwise the
+          stdlib scanner below does. The two are held to the same verdict on every
+          frontmatter in this repository and on every planted case (`--agree`).
+  lint    valid YAML that does not mean what was written: a plain value cut at ` #`, which
+          YAML reads as the start of a comment, and a duplicate key, which PyYAML resolves
+          silently to the last one while Go's yaml.v3 v3.0.1 refuses it (`mapping key
+          "name" already defined at line 1`, measured 2026-11-11). PyYAML reports neither, so
+          the stdlib scanner reports them under both backends.
+
+WHAT THE STDLIB SCANNER COVERS, measured 2026-11-11 against PyYAML 6.0.3: the same verdict on
+all 737 frontmatter blocks in this repository and on 111 planted cases (`--agree`). It reads
+block mappings and sequences at any depth, plain, single- and double-quoted values on one or
+more lines, `|` and `>` block values, comments, anchors, aliases and tags. A `[...]` or `{...}`
+value has its brackets and quotes counted, and nothing between them judged. Over 12,570
+random one-character mutations of the repository's own blocks it disagreed with PyYAML 16
+times: 15 errors inside a `[...]` value that only PyYAML saw, and 1 `>` written at its key's own
+column, which PyYAML accepts and the scanner refuses. It also refuses an explicit `?` key.
+Hand-written frontmatter uses neither.
+
+STDLIB ONLY. No shipped script may require PyYAML: a user's machine need not have it.
+
+Exit codes
+    0  every block is valid (a file with no frontmatter block has nothing to judge)
+    1  at least one block is not
+    2  a file could not be read
+"""
+
+import os
+import re
+import sys
+
+# The block itself. Identical to `wf-conform`'s FM_RX: a `---` line, the body, a `---` line.
+FM_RX = re.compile(r"\A---\n(.*?)\n---\n", re.S)
+
+# An env switch, not a flag, so a caller that loads this file (`wf-conform`) can be driven
+# down the stdlib path by a fixture on a machine where PyYAML is installed.
+STDLIB_ENV = "WF_FRONTMATTER_STDLIB"
+
+_DQ_ESCAPES = set('0abt\tnvfre "/\\N_LP')
+_DQ_HEX = {"x": 2, "u": 4, "U": 8}
+_STD_TAGS = {"str", "int", "float", "bool", "null", "map", "seq", "binary", "timestamp",
+             "omap", "pairs", "set", "merge"}
+_ANCHOR_RX = re.compile(r"&[0-9A-Za-z_-]+")
+_BLOCK_HEADER_RX = re.compile(r"^[|>](?:[1-9][+-]?|[+-][1-9]?)?[ ]*(?:#.*)?$")
+
+
+def block(body):
+    """(present, text). `present` is False when the body does not open with `---`. A body
+    that opens with `---` and never closes it is present with text None: unterminated."""
+    body = body or ""
+    if not body.startswith("---\n"):
+        return False, None
+    if body.startswith("---\n---\n"):
+        return True, ""
+    m = FM_RX.match(body)
+    return True, (m.group(1) if m else None)
+
+
+class _Stop(Exception):
+    """The first parse error. The scanner stops there, as a YAML loader does."""
+
+
+class _Scanner:
+    """A line scanner for the block YAML that frontmatter is written in.
+
+    It never builds a value. Per line it answers two questions: does a strict loader refuse
+    this (`parse`), and does a loader read it as something other than what was typed
+    (`lint`). The stack holds one entry per open block mapping or block sequence:
+    `[column, "map" | "seq", keys seen, compact]`, where a compact sequence is one written
+    at its parent key's own column (`key:` then `- item` with no extra indent).
+
+    TABS. PyYAML refuses a tab anywhere outside a quoted value, a comment, and the content
+    of a `|` or `>` block past its indentation, including a whitespace-only line. Measured
+    on 6.0.3; the scanner holds the same line.
+    """
+
+    def __init__(self, text):
+        self.lines = [ln[:-1] if ln.endswith("\r") else ln for ln in text.split("\n")]
+        self.parse = []
+        self.lint = []
+        self.stack = []
+        self.want_child = None   # column of a `key:` or `-` whose value is on later lines
+        self.mode = None         # a value still open from an earlier line, see `continued`
+        self.mode_line = 0
+        self.anchors = set()
+
+    def fail(self, n, msg):
+        self.parse.append(f"line {n}: {msg}")
+        raise _Stop()
+
+    def warn(self, n, msg):
+        self.lint.append(f"line {n}: {msg}")
+
+    # ── scalars ───────────────────────────────────────────────────────────────
+    def _close_quote(self, s, start, q, n):
+        """Index just past the closing quote in `s` from `start`, or None if it stays open."""
+        i = start
+        while i < len(s):
+            c = s[i]
+            if q == "'":
+                if c == "'":
+                    if s[i + 1:i + 2] == "'":
+                        i += 2
+                        continue
+                    return i + 1
+            elif c == "\\":
+                e = s[i + 1:i + 2]
+                if e == "":
+                    return None  # an escaped line break: the value continues
+                if e in _DQ_HEX:
+                    digits = s[i + 2:i + 2 + _DQ_HEX[e]]
+                    if not re.fullmatch(r"[0-9A-Fa-f]{%d}" % _DQ_HEX[e], digits):
+                        self.fail(n, f"a double-quoted value has a bad `\\{e}` escape")
+                    i += 2 + _DQ_HEX[e]
+                    continue
+                if e not in _DQ_ESCAPES:
+                    self.fail(n, f"a double-quoted value has an unknown escape `\\{e}`; write "
+                                 f"`\\\\` for a backslash, or use single quotes")
+                i += 2
+                continue
+            elif c == '"':
+                return i + 1
+            i += 1
+        return None
+
+    def _after(self, rest, n):
+        """What may follow a closed quoted or bracketed value on its line: spaces, a comment."""
+        r = rest.lstrip(" ")
+        if r.startswith("\t"):
+            self.fail(n, "a tab after a value; YAML allows only spaces here")
+        if r and not r.startswith("#"):
+            self.fail(n, f"text after the closing quote or bracket ({r[:30]!r}); quote the "
+                         f"whole value")
+
+    def _flow(self, s, depth, q):
+        """(depth, index past the closing bracket or None, open quote) after scanning `s`.
+
+        Brackets are counted and quotes respected, across lines; what sits between them is
+        not judged. Hand-written frontmatter uses a flow value for a one-line list."""
+        i = 0
+        while i < len(s):
+            c = s[i]
+            if q:
+                if c == q and q == "'" and s[i + 1:i + 2] == "'":
+                    i += 2
+                    continue
+                if c == q:
+                    q = None
+                elif c == "\\" and q == '"':
+                    i += 1
+            elif c in "\"'" and s[:i].rstrip(" ")[-1:] in ("", "[", "{", ",", ":"):
+                q = c  # a quote opens a value only where a value starts, never mid-word
+            elif c in "[{":
+                depth += 1
+            elif c in "]}":
+                depth -= 1
+                if depth == 0:
+                    return 0, i + 1, None
+            elif c == "#" and i > 0 and s[i - 1] == " ":
+                break
+            i += 1
+        return depth, None, q
+
+    def _plain(self, s, n):
+        """One line of a plain (unquoted) value. True when a ` #` comment ended it."""
+        for i, c in enumerate(s):
+            if c == "\t":
+                self.fail(n, "a tab inside an unquoted value; YAML refuses it there, so quote "
+                             "the value or use spaces")
+            if c == ":" and (i + 1 == len(s) or s[i + 1] == " "):
+                self.fail(n, "an unquoted value contains `: `, which YAML reads as a nested "
+                             "mapping; put the value in quotes")
+            if c == "#" and i > 0 and s[i - 1] == " ":
+                self.warn(n, "an unquoted value contains ` #`, which YAML reads as the start "
+                             "of a comment, so the value is cut there; put the value in quotes")
+                return True
+        return False
+
+    def value(self, s, n, parent):
+        """The value after `key:` or `- `. Returns "open" when it continues on later lines
+        as a nested block. `parent` is the column a continuation line must be right of."""
+        s = s.lstrip(" ")
+        if s.startswith("\t"):
+            self.fail(n, "a tab before a value; YAML allows only spaces between `:` and it")
+        while s[:1] in ("&", "!"):
+            tok = re.match(r"\S+", s).group(0)
+            if s[0] == "&":
+                m = _ANCHOR_RX.match(s)
+                if not m or s[m.end():m.end() + 1] not in ("", " "):
+                    self.fail(n, f"`{tok}` reads as a YAML anchor, and an anchor name is letters, "
+                                 f"digits, `-` and `_` followed by a space; quote the value")
+                tok = m.group(0)
+                self.anchors.add(tok[1:])
+            elif not (tok.startswith("!!") and tok[2:] in _STD_TAGS):
+                self.fail(n, f"`{tok}` is a YAML tag a safe loader cannot build; quote the "
+                             f"value if the `!` is text")
+            s = s[len(tok):].lstrip(" ")
+            if s.startswith("\t"):
+                self.fail(n, "a tab before a value; YAML allows only spaces here")
+        if s == "" or s.startswith("#"):
+            return "open"
+        c = s[0]
+        if c in "\"'":
+            end = self._close_quote(s, 1, c, n)
+            if end is None:
+                self.mode, self.mode_line = ("quote", c), n
+            else:
+                self._after(s[end:], n)
+        elif c in "[{":
+            depth, end, q = self._flow(s, 0, None)
+            if end is None:
+                self.mode, self.mode_line = ("flow", depth, q), n
+            else:
+                self._after(s[end:], n)
+        elif c in "|>":
+            if not _BLOCK_HEADER_RX.match(s):
+                self.fail(n, f"`{c}` opens a YAML block value and must end its line; put the "
+                             f"value in quotes")
+            self.mode = ("block", parent, None)
+        elif c == "*":
+            name = re.match(r"\*(\S*)", s).group(1)
+            if name not in self.anchors:
+                self.fail(n, "an unquoted value starts with `*`, which YAML reads as a "
+                             "reference to an anchor; put the value in quotes")
+            self._after(s[1 + len(name):], n)
+        elif c in "@`%,]}":
+            self.fail(n, f"an unquoted value starts with `{c}`, which YAML reserves; put the "
+                         f"value in quotes")
+        elif c in "-?:" and s[1:2] in ("", " ", "\t"):
+            self.fail(n, f"an unquoted value starts with `{c} `, which YAML reads as "
+                         f"structure; put the value in quotes")
+        elif not self._plain(s, n):
+            self.mode = ("plain", parent)
+        return "scalar"
+
+    # ── structure ─────────────────────────────────────────────────────────────
+    def _key(self, s, n):
+        """(key, rest after the `:`) for a `key: value` line, or None when it is not one."""
+        if s[:1] in "\"'":
+            end = self._close_quote(s, 1, s[0], n)
+            if end is None:
+                return None
+            r = s[end:].lstrip(" ")
+            if r[:1] != ":" or r[1:2] not in ("", " ", "\t"):
+                return None
+            return s[1:end - 1], r[1:]
+        if s[:1] == "&":
+            m = _ANCHOR_RX.match(s)
+            rest = s[m.end():] if m else ""
+            if m and rest[:1] == ":" and rest[1:2] in ("", " "):
+                return "", rest[1:]
+            if m and rest[:1] == " ":
+                return self._key(rest.lstrip(" "), n)
+            return None
+        m = re.match(r"(.*?):(?=[ \t]|$)", s)
+        if not m or " #" in m.group(1):
+            return None
+        if "\t" in m.group(1):
+            self.fail(n, "a tab inside a key; YAML refuses it there")
+        k = m.group(1).rstrip(" ")
+        if k == "" or k[0] in "[]{},&*!|>'\"%@`#" or (k[0] in "-?" and k[1:2] in ("", " ")):
+            return None
+        return k, s[m.end():]
+
+    def entry(self, s, n, ctx):
+        """One `key: value` line in mapping context `ctx`."""
+        kv = self._key(s, n)
+        if kv is None:
+            if ctx is self.stack[0] and not ctx[2]:
+                self.fail(n, "the frontmatter is not a `key: value` mapping")
+            self.fail(n, f"expected `key: value`, found {s[:40]!r}")
+        k, rest = kv
+        if k in ctx[2]:
+            self.warn(n, f"duplicate key `{k}`: YAML keeps only the last one, and a strict "
+                         f"loader refuses the file")
+        ctx[2].add(k)
+        if self.value(rest, n, ctx[0]) == "open":
+            self.want_child = ctx[0]
+
+    def item(self, s, col, n):
+        """One `- ...` sequence entry whose dash is at column `col`."""
+        r = s[1:]
+        if r.startswith("\t"):
+            self.fail(n, "a tab after `-`; YAML allows only spaces here")
+        body = r.lstrip(" ")
+        inner = col + 1 + len(r) - len(body)
+        if body == "" or body.startswith("#"):
+            self.want_child = col
+        elif body[:1] == "-" and body[1:2] in ("", " ", "\t"):
+            self.stack.append([inner, "seq", set(), False])
+            self.item(body, inner, n)
+        elif self._key(body, n) is not None:
+            ctx = [inner, "map", set(), False]
+            self.stack.append(ctx)
+            self.entry(body, n, ctx)
+        elif self.value(body, n, col) == "open":
+            self.want_child = col
+
+    def line(self, raw, n):
+        col = len(raw) - len(raw.lstrip(" "))
+        s = raw[col:]
+        is_item = s[:1] == "-" and s[1:2] in ("", " ", "\t")
+        if not self.stack:
+            self.stack.append([col, "seq" if is_item else "map", set(), False])
+            self.first = n
+        elif self.want_child is not None:
+            parent, self.want_child = self.want_child, None
+            if col > parent and not is_item and self._key(s, n) is None:
+                # `key:` with its value on the next, deeper line: a scalar, not a block
+                self.value(s, n, parent)
+                return
+            if col > parent:
+                self.stack.append([col, "seq" if is_item else "map", set(), False])
+            elif col == parent and is_item and self.stack[-1][1] == "map":
+                self.stack.append([col, "seq", set(), True])
+        while self.stack and self.stack[-1][0] > col:
+            self.stack.pop()
+        if self.stack and self.stack[-1][3] and self.stack[-1][0] == col and not is_item:
+            self.stack.pop()
+        if not self.stack or self.stack[-1][0] != col:
+            self.fail(n, "indentation does not line up with any key above it")
+        ctx = self.stack[-1]
+        if ctx[1] == "map":
+            if is_item:
+                self.fail(n, "a `- ` list entry where a `key:` was expected")
+            self.entry(s, n, ctx)
+        else:
+            if not is_item:
+                self.fail(n, "a `key:` where a `- ` list entry was expected")
+            self.item(s, col, n)
+
+    def continued(self, raw, n):
+        """True when `raw` belongs to a value opened on an earlier line."""
+        mode = self.mode
+        if mode is None:
+            return False
+        if mode[0] == "quote":
+            s = raw.lstrip(" \t")
+            end = self._close_quote(s, 0, mode[1], n)
+            if end is not None:
+                self.mode = None
+                self._after(s[end:], n)
+            return True
+        if mode[0] == "flow":
+            depth, end, q = self._flow(raw, mode[1], mode[2])
+            if end is None:
+                self.mode = ("flow", depth, q)
+            else:
+                self.mode = None
+                self._after(raw[end:], n)
+            return True
+        lead = len(raw) - len(raw.lstrip(" "))
+        blank = raw.strip(" ") == ""
+        if mode[0] == "block":
+            # The first content line sets the block's indentation; a later line left of it
+            # ends the block, and the structure below then judges it.
+            if blank:
+                return True
+            if lead > mode[1] and (mode[2] is None or lead >= mode[2]):
+                if mode[2] is None:
+                    self.mode = ("block", mode[1], lead)
+                return True
+            self.mode = None
+            return False
+        # plain: a non-blank line right of the parent column continues it; a comment ends it
+        if blank:
+            return True
+        s = raw[lead:]
+        if lead > mode[1] and not s.startswith(("#", "\t")):
+            if self._plain(s, n):
+                self.mode = None
+            return True
+        self.mode = None
+        return False
+
+    def run(self):
+        self.first = 0
+        try:
+            for i, raw in enumerate(self.lines):
+                n = i + 1
+                if self.continued(raw, n):
+                    continue
+                if raw.strip(" ") == "":
+                    continue
+                if raw.lstrip(" ").startswith("\t"):
+                    self.fail(n, "a tab in the indentation; YAML indents with spaces only")
+                if raw.lstrip(" ").startswith("#"):
+                    continue
+                if raw.rstrip(" ") == "...":
+                    if any(r.strip(" ") and not r.lstrip(" ").startswith("#")
+                           for r in self.lines[i + 1:]):
+                        self.fail(n, "content after a `...` document end")
+                    break
+                self.line(raw, n)
+            if self.mode and self.mode[0] == "quote":
+                self.fail(self.mode_line, "a quoted value is never closed")
+            if self.mode and self.mode[0] == "flow":
+                self.fail(self.mode_line, "a `[...]` or `{...}` value is never closed")
+            if self.stack and self.stack[0][1] == "seq":
+                self.fail(self.first, "the frontmatter is a list, not a `key: value` mapping")
+        except _Stop:
+            pass
+        return self.parse, self.lint
+
+
+def stdlib_errors(text):
+    """(parse errors, lint findings) from the stdlib scanner alone."""
+    return _Scanner(text).run()
+
+
+def pyyaml_errors(text):
+    """Parse errors from PyYAML's safe loader, or None when PyYAML does not import."""
+    try:
+        import yaml
+    except ImportError:
+        return None
+    try:
+        data = yaml.safe_load(text)
+    except yaml.YAMLError as exc:
+        mark = getattr(exc, "problem_mark", None)
+        problem = getattr(exc, "problem", None) or str(exc).splitlines()[0]
+        where = f"line {mark.line + 1}: " if mark is not None else ""
+        return [f"{where}{problem} (PyYAML)"]
+    if data is not None and not isinstance(data, dict):
+        return ["line 1: the frontmatter is not a `key: value` mapping (PyYAML)"]
+    return []
+
+
+def backend():
+    """'pyyaml' when it imports and the stdlib path is not forced, else 'stdlib'."""
+    if os.environ.get(STDLIB_ENV):
+        return "stdlib"
+    try:
+        import yaml  # noqa: F401
+    except ImportError:
+        return "stdlib"
+    return "pyyaml"
+
+
+def errors(text):
+    """Every finding for one frontmatter block's text, parse errors first. [] means valid."""
+    parse, lint = stdlib_errors(text)
+    if backend() == "pyyaml":
+        parse = pyyaml_errors(text)
+    return list(parse) + list(lint)
+
+
+def body_errors(body):
+    """(present, findings) for a whole file body. Absent frontmatter has nothing to judge."""
+    present, text = block(body)
+    if not present:
+        return False, []
+    if text is None:
+        return True, ["the `---` block is never closed by a second `---` line"]
+    return True, errors(text)
+
+
+def _files(root):
+    """Every `*.md` under `root`, sorted, `.git` and bytecode caches skipped."""
+    out = []
+    for dp, dn, fns in os.walk(root):
+        dn[:] = sorted(d for d in dn if d not in (".git", "__pycache__", "node_modules"))
+        out += [os.path.join(dp, f) for f in sorted(fns) if f.endswith(".md")]
+    return out
+
+
+def main(argv):
+    import argparse
+    ap = argparse.ArgumentParser(prog="wf-frontmatter")
+    ap.add_argument("files", nargs="*")
+    ap.add_argument("--root", help="every *.md under this directory, in addition to FILEs")
+    ap.add_argument("--stdlib", action="store_true",
+                    help=f"ignore PyYAML even where it imports (same as {STDLIB_ENV}=1)")
+    ap.add_argument("--agree", action="store_true",
+                    help="compare the stdlib verdict with PyYAML's on every block; exit 1 on "
+                         "any disagreement, 2 when PyYAML does not import")
+    args = ap.parse_args(argv)
+    if args.stdlib:
+        os.environ[STDLIB_ENV] = "1"
+    paths = list(args.files) + (_files(args.root) if args.root else [])
+    if not paths:
+        ap.error("name a FILE or a --root")
+    if args.agree and pyyaml_errors("a: b\n") is None:
+        print("wf-frontmatter --agree: PyYAML does not import here, so there is nothing to "
+              "agree with", file=sys.stderr)
+        return 2
+    blocks = bad = unreadable = disagree = 0
+    for path in paths:
+        try:
+            with open(path, encoding="utf-8") as fh:
+                body = fh.read()
+        except (OSError, UnicodeDecodeError) as exc:
+            print(f"{path}: unreadable ({type(exc).__name__})")
+            unreadable += 1
+            continue
+        present, text = block(body)
+        blocks += present
+        if args.agree:
+            if text is None:
+                continue
+            ours, _lint = stdlib_errors(text)
+            theirs = pyyaml_errors(text)
+            if bool(ours) != bool(theirs):
+                disagree += 1
+                print(f"{path}: DISAGREE stdlib={ours or 'valid'} pyyaml={theirs or 'valid'}")
+            continue
+        _present, found = body_errors(body)
+        for f in found:
+            print(f"{path}: {f}")
+        bad += bool(found)
+    if args.agree:
+        print(f"wf-frontmatter --agree: {blocks} block(s) · {disagree} disagreement(s) · "
+              f"{unreadable} unreadable")
+        return 2 if unreadable else (1 if disagree else 0)
+    print(f"wf-frontmatter ({backend()}): {len(paths)} file(s) · {blocks} with frontmatter · "
+          f"{bad} not valid · {unreadable} unreadable")
+    if unreadable:
+        return 2
+    return 1 if bad else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

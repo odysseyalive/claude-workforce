@@ -1596,7 +1596,7 @@
     ]
   },
   "conform-canary-recorded": {
-    "_why": "POSITIVE half of the mismatch pair. org-config.md records INV-CANARY PASS AND platform-local.md exists with MEASURED-ON 2.1.223 matching the harness org-config records \u2014 the reconciliation has its durable record, so wf-conform passes. `not` asserts the canary-record check did not fire a failure against a healthy record. The count moved 2 \u2192 3 when INV-COMPANIONS landed (2026-08-26): this tree has an org-config.md but ZERO governed handbooks, so no audit finished here and INV-COMPANIONS emits its no-population row rather than staying silent \u2014 a check that skips must say so, or it is indistinguishable from one that passed.",
+    "_why": "POSITIVE half of the mismatch pair. org-config.md records INV-CANARY PASS AND platform-local.md exists with MEASURED-ON 2.1.223 matching the harness org-config records \u2014 the reconciliation has its durable record, so wf-conform passes. `not` asserts the canary-record check did not fire a failure against a healthy record. The count moved 2 \u2192 3 when INV-COMPANIONS landed (2026-08-26): this tree has an org-config.md but ZERO governed handbooks, so no audit finished here and INV-COMPANIONS emits its no-population row rather than staying silent \u2014 a check that skips must say so, or it is indistinguishable from one that passed. It moved 4 \u2192 6 on 2026-11-11 with the two rows about the install wf-conform runs from: its SKILL.md `version:` mirror, and the frontmatter of every SKILL.md it ships.",
     "args": [],
     "exit": 0,
     "not": [
@@ -1605,7 +1605,7 @@
     ],
     "script": "wf-conform",
     "want": [
-      "4 checks \u00b7 0 failed"
+      "6 checks \u00b7 0 failed"
     ]
   },
   "conform-canary-unavailable": {
@@ -1666,6 +1666,20 @@
     "want": [
       "1 governed",
       "0 failed"
+    ]
+  },
+  "conform-handbook-frontmatter-invalid": {
+    "_why": "NEGATIVE for the governed `frontmatter parses` row, on the stdlib judge. The handbook's `description:` is unquoted and holds `Commands: `, the shape code-evaluator/SKILL.md shipped with before 6985840. Before 2026-11-11 the row split `key: value` lines and passed this; a YAML loader refuses it. The wording asserted is wf-frontmatter's own, never PyYAML's, so the row reads the same on a machine without PyYAML.",
+    "env": {
+      "WF_FRONTMATTER_STDLIB": "1"
+    },
+    "exit": 1,
+    "script": "wf-conform",
+    "want": [
+      "1 governed",
+      "1 failed",
+      "\u2717 g.md: frontmatter parses",
+      "line 2: an unquoted value contains `: `, which YAML reads as a nested mapping"
     ]
   },
   "conform-ignored-corpus": {
@@ -2066,6 +2080,39 @@
     "want": [
       "orders a write this handbook forbids (`docs/api.md`)",
       "NEVER edit `docs/api.md`"
+    ]
+  },
+  "conform-skill-frontmatter-invalid": {
+    "_why": "NEGATIVE for the project SKILL.md frontmatter row, on the stdlib judge. `reviewer` carries the unquoted `description: ... Commands: review ...` code-evaluator shipped before 6985840, and `quoted` the same text in quotes, so the row fails one skill and passes the other. The adopted `helper` agent holds `Use for: ` and is reported as a runtime hazard without setting the exit code. `this install:` asserts the rows about the install wf-conform runs from were evaluated.",
+    "env": {
+      "WF_FRONTMATTER_STDLIB": "1"
+    },
+    "exit": 1,
+    "not": [
+      "quoted/SKILL.md"
+    ],
+    "script": "wf-conform",
+    "want": [
+      "1 failed",
+      "\u2717 .claude/skills/reviewer/SKILL.md: frontmatter parses",
+      "line 2: an unquoted value contains `: `, which YAML reads as a nested mapping",
+      "SKILL.md frontmatter: 2 project skill(s) \u00b7 1 not valid YAML (judged by stdlib)",
+      "frontmatter is not valid YAML, so a harness with a strict loader cannot load this agent",
+      "this install: ",
+      "with frontmatter that is not valid YAML"
+    ]
+  },
+  "conform-skill-frontmatter-invalid-default": {
+    "_why": "The same tree on the default judge: PyYAML where it imports, the stdlib scanner where it does not. Asserts only what both say, so it passes on either machine and fails if the row stops judging.",
+    "exit": 1,
+    "not": [
+      "quoted/SKILL.md"
+    ],
+    "script": "wf-conform",
+    "want": [
+      "1 failed",
+      "\u2717 .claude/skills/reviewer/SKILL.md: frontmatter parses",
+      "2 project skill(s) \u00b7 1 not valid YAML"
     ]
   },
   "conform-slug-is-project-mcp": {
@@ -15994,6 +16041,81 @@
       "lsof -t",
       "fuser",
       "updatedInput"
+    ]
+  },
+  "frontmatter-planted": {
+    "_why": "The stdlib judge's verdict on every planted frontmatter case, held in place. Each `<case>.md` is one shape of hand-written YAML; a name ending `-ok` is valid YAML and must never be reported, every other name must be. `wf-frontmatter --agree --root fixtures/scripts/frontmatter-planted` shows PyYAML reaching the same verdict on each (111 of 111 on 2026-11-11, PyYAML 6.0.3); `hash-comment`, `seq-item-hash` and the three `dup-key` cases are the lints PyYAML accepts and the judge reports anyway. Forced to the stdlib path so the row tests the scanner on a machine that has PyYAML.",
+    "args": [
+      "--stdlib"
+    ],
+    "exit": 1,
+    "not": [
+      "-ok.md: "
+    ],
+    "script": "wf-frontmatter",
+    "want": [
+      "wf-frontmatter (stdlib): 111 file(s) \u00b7 111 with frontmatter \u00b7 61 not valid \u00b7 0 unreadable",
+      "/alias-undefined.md: line ",
+      "/bad-dedent.md: line ",
+      "/block-dedent-inside.md: line ",
+      "/block-tab-only-line.md: line ",
+      "/colon-eol.md: line ",
+      "/colon-space.md: line ",
+      "/doc-end-then-more.md: line ",
+      "/dq-bad-escape.md: line ",
+      "/dq-hex-bad.md: line ",
+      "/dq-tab-trailing.md: line ",
+      "/dq-then-indented-map.md: line ",
+      "/dq-trailing.md: line ",
+      "/dq-unterminated.md: line ",
+      "/dup-key.md: line ",
+      "/dup-key-nested.md: line ",
+      "/flow-seq-unclosed.md: line ",
+      "/flow-tab-trailing.md: line ",
+      "/folded-after-key-text.md: line ",
+      "/hash-comment.md: line ",
+      "/ind-at.md: line ",
+      "/ind-backtick.md: line ",
+      "/ind-bang.md: line ",
+      "/ind-comma.md: line ",
+      "/ind-dash-space.md: line ",
+      "/ind-gt-text.md: line ",
+      "/ind-lbrace.md: line ",
+      "/ind-lbracket-unclosed.md: line ",
+      "/ind-percent.md: line ",
+      "/ind-pipe-text.md: line ",
+      "/ind-question-space.md: line ",
+      "/ind-rbrace.md: line ",
+      "/ind-rbracket.md: line ",
+      "/ind-star.md: line ",
+      "/key-no-space.md: line ",
+      "/key-only-colon-at-end-plain.md: line ",
+      "/not-a-mapping.md: line ",
+      "/over-indent-after-scalar-dq.md: line ",
+      "/plain-col0-continuation.md: line ",
+      "/plain-comment-line-then-more.md: line ",
+      "/plain-comment-then-indent.md: line ",
+      "/plain-multiline-colon.md: line ",
+      "/real-code-evaluator-6985840-parent.md: line ",
+      "/seq-item-colon.md: line ",
+      "/seq-item-hash.md: line ",
+      "/seq-of-maps-badindent.md: line ",
+      "/seq-of-maps-dup.md: line ",
+      "/seq-tab-after-dash.md: line ",
+      "/seq-then-key-same-indent.md: line ",
+      "/sq-unterminated.md: line ",
+      "/tab-after-colon.md: line ",
+      "/tab-before-comment.md: line ",
+      "/tab-before-hash.md: line ",
+      "/tab-blank-line.md: line ",
+      "/tab-block-content.md: line ",
+      "/tab-indent.md: line ",
+      "/tab-inside-plain.md: line ",
+      "/tab-key-colon-eol.md: line ",
+      "/tab-plain-continuation.md: line ",
+      "/tab-plain-continuation-2.md: line ",
+      "/tab-trailing.md: line ",
+      "/top-seq.md: line "
     ]
   }
 }
