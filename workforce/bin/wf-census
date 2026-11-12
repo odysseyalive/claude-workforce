@@ -110,8 +110,9 @@ RECORD_NAMES = ("deferred.md", "dispositions.md")
 # adds to them — so a prefix list here would go stale the first time one did. The store's
 # owner is `wf-ledger.STORE`, and the path is stated here rather than imported for the same
 # reason `wf-catalog.install_candidates` restates wf-seed's list: a shipped script importing
-# a sibling AT IMPORT TIME breaks whenever that sibling cannot be read. The two must agree,
-# and `bin/check` is where that is asserted.
+# a sibling AT IMPORT TIME breaks whenever that sibling cannot be read. The two must agree.
+# `bin/check` asserted it until `bin/check` was retired on 2026-10-14; nothing keeps them
+# in agreement now.
 #
 # STILL READERS, and the distinction is what a file is FOR: `directives/` (the user's own
 # words), `grounding/` and `recruiting/` (written to be read by the employee they name).
@@ -151,8 +152,9 @@ def report_rows(rows, key=None):
     can reproduce.
 
     One function rather than five `sorted(...)` calls, so the property is stated once and can be
-    broken in one place: `bin/prove` deletes the sort below and this report goes back to
-    printing whatever order the directory happened to hold.
+    broken in one place: deleting the sort below sends this report back to printing whatever
+    order the directory happened to hold (`bin/prove` did exactly that until it was
+    retired on 2026-10-14).
     """
     out = list(rows.items() if hasattr(rows, "items") else rows)
     out.sort(key=key)

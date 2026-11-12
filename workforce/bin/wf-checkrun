@@ -340,10 +340,10 @@ def load_census():
     weaker resolver nobody asked for.
     """
     # NEVER leave bytecode behind. Importing a sibling writes `__pycache__/`
-    # into the SHIPPED bin/ directory, which `bin/check` correctly reports as an
-    # undeclared file the installers would never fetch — a read-only instrument
-    # that litters the tree it inspects. Caught on the first full run after the
-    # import landed.
+    # into the SHIPPED bin/ directory, which `bin/check` reported as an
+    # undeclared file the installers would never fetch (until it was retired on
+    # 2026-10-14) — a read-only instrument that litters the tree it inspects. Caught on the
+    # first full run after the import landed.
     _prev = sys.dont_write_bytecode
     sys.dont_write_bytecode = True
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "wf-census")

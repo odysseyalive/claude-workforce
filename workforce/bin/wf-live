@@ -36,7 +36,8 @@ artifact that was wrong four times above. This reads the tree — `workforce/bin
 stored.
 
 WHAT IT IS NOT. It reports what SHIPS, never what is correct, and never whether a live
-thing works. `bin/check` (maintainer) and `/workforce verify` (host) judge conformance.
+thing works. `/workforce verify` (host) judges conformance; `bin/check` did for the maintainer until
+it was retired on 2026-10-14.
 This answers the narrower question nothing answered before: *is this thing there?*
 """
 
@@ -129,9 +130,10 @@ PROJECT_AGENT = re.compile(r"(?:\.claude/)?agents/$")
 #
 # A mention is HISTORY, and is counted rather than listed, only when BOTH hold:
 #   1. the name is one the distribution RETIRED, read from the tree's own records and never
-#      from a list kept here — `RETIRED_HOOKS` in wf-settings-apply (bin/check pins it to git
-#      history), `RETIRED_EXTERNAL` below (bin/check pins it to the `retired` rows of
-#      `manifest.txt`), and `CANARY_RX` in wf-apply, the throwaway fixture names workforce
+#      from a list kept here — `RETIRED_HOOKS` in wf-settings-apply (bin/check pinned it to git
+#      history until it was retired on 2026-10-14), `RETIRED_EXTERNAL` below (bin/check pinned it to
+#      the `retired` rows of `manifest.txt` until then), and `CANARY_RX` in wf-apply, the
+# throwaway fixture names workforce
 #      itself wrote;
 #   2. the sentence it sits in speaks of the past.
 # A name nobody retired still reports, whatever tense its sentence is in, so a cue word cannot
@@ -141,8 +143,10 @@ PROJECT_AGENT = re.compile(r"(?:\.claude/)?agents/$")
 # name the canary fixtures and the output style that shipped OUTSIDE the skill directory, but
 # `manifest.txt` is not installed, so a host's wf-live cannot read it. MEASURED 2026-09-16 in a
 # bin/dev-sandbox install: reading the manifest classified `wf-model-canary` as history in this
-# repository and as stale on the host. bin/check fails when this set and those rows disagree,
-# so it cannot drift from the authority it copies.
+# repository and as stale on the host. bin/check failed when this set and those rows disagreed
+# until it was retired on 2026-10-14; nothing keeps them in agreement now, so this set can drift
+# from
+# the authority it copies.
 RETIRED_EXTERNAL = frozenset({
     "plain-speak", "wf-canary-a", "wf-canary-b", "wf-canary-c", "wf-ceiling-probe",
     "wf-model-canary",

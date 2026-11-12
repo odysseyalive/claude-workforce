@@ -144,7 +144,8 @@ def design_record(root, kind):
 
 # A tell that a copy carries the project's own words and is never removable, whatever else
 # is true of it. BYTE-IDENTICAL to wf-conform's `IMMUTABLE_OPEN_RX` (bin/check § grammar
-# asserts all readers accept the same blocks, and the inventory row for this file must be
+# asserted all readers accept the same blocks until it was retired on 2026-10-14; nothing
+# cross-tests them now, and the inventory row for this file must be
 # updated in the same change that touches this line).
 #
 # *Written wrong first, 2026-09-10, and caught by that check rather than by review.* The
@@ -162,8 +163,9 @@ def design_record(root, kind):
 # one direction that costs the user's own words, so both fields are required and neither
 # position is.
 # Written as a LITERAL in each compile, not bound to a name and reused. `bin/check`'s
-# marker-reader extractor reads `re.compile` arguments out of the AST and can only see a
-# string literal — passing a Name made both readers here invisible to it, and an inventory
+# marker-reader extractor (retired on 2026-10-14) read `re.compile` arguments out of the
+# AST and could only see a string literal — passing a Name made both readers here invisible to it,
+# and an inventory
 # that counts zero readers in this file is a grammar guard that has stopped guarding.
 IMMUTABLE_OPEN_RX = re.compile(
     r"^<!--(?=[^>]*\borigin:\s*user\b)(?=[^>]*\bimmutable:\s*true\b)[^>]*-->$", re.M)
@@ -240,8 +242,9 @@ def install_candidates(root):
     reasons as `wf-seed._slot_candidates` — project install, maintainer source tree, then
     personal install. Stated twice in two scripts is a restated constant (Core Principle
     9a); it is duplicated here rather than imported because a shipped script importing a
-    sibling by path breaks whenever that sibling cannot be read, and `bin/check` asserts
-    the two lists agree.
+    sibling by path breaks whenever that sibling cannot be read, and `bin/check` asserted
+    the two lists agree until `bin/check` was retired on 2026-10-14. Nothing keeps them in
+    agreement now.
 
     Project candidates stay FIRST: a project-scope install must never be answered from the
     home copy, whatever version happens to sit there.
@@ -331,7 +334,8 @@ def additions_file(root, kind):
 
     The directory is derived from `install_candidates` rather than listed again — the slot
     dir is the catalogs dir's sibling, and a second hardcoded list is the restated constant
-    Core Principle 9a forbids and `bin/check` asserts against.
+    Core Principle 9a forbids, and that `bin/check` asserted against until `bin/check` was
+    retired on 2026-10-14.
     """
     slot = CATALOGS[kind]["additions"]
     if not slot:
