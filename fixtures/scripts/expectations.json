@@ -13221,141 +13221,144 @@
           "issue i62"
       ]
   },
-  "issues-context-only-message-folds-into-its-issue": {
-      "_why": "A MESSAGE THAT ONLY ADDS CONTEXT TO AN EARLIER ISSUE FOLDS INTO IT. MEASURED 2026-10-29 in mutze-studio `29c3e592`: i2 and i3 were queued follow-ups adding context to i1, the session left their `items` empty, and each sat in the index as its own issue with the hook's open fallback (`items_open 1`). `absorb_items` already folds a message whose every item carries `\"issue\": <earlier open id>`; what was missing is the checklist line telling the session to write that item. Here submit 3's line says it, and the shape it asks for \u2014 one item stating the context, `\"issue\": \"i1\"`, `\"answered\"` \u2014 written to i2's own file folds i2: `merged`, closed, its context on i1, and out of the index. Fails on the old line, which never names a context-only message; the fold itself passes on old code too.",
-      "after": {
-          ".claude/workforce/issues/index.json": {
-              "not": [
-                  "By looking at this project"
-              ],
-              "want": [
-                  "\"id\": \"i1\"",
-                  "\"id\": \"i3\""
-              ]
-          },
-          ".claude/workforce/issues/s1.json": {
-              "want": [
-                  "\"merged\": true",
-                  "{\"ask\": \"context: the project's workload is why the eGPU matters\", \"status\": \"answered\"}"
-              ]
-          }
+  "issues-context-only-message-closes-its-own-issue": {
+    "_why": "A MESSAGE THAT ONLY ADDS CONTEXT TO AN EARLIER ISSUE CLOSES ITS OWN ISSUE, AND ITS CONTEXT STAYS WHERE IT WAS SAID. MEASURED 2026-10-29 in mutze-studio `29c3e592`: i2 and i3 were queued follow-ups adding context to i1, the session left their `items` empty, and each sat in the index as its own issue with the hook's open fallback. The checklist line asks for one item stating the context, `\"issue\": \"i1\"`, `\"answered\"`. Until 1.88.0 that item moved onto i1 and i2 was folded empty (`merged`); since session `f9318dba` (2026-11-11), where folded issues showed with nothing in them, the item stays on i2 with `\"continues\": \"i1\"`, and the next submit closes i2 because its one item is finished, so it leaves the index at once. Fails on 1.88.0, which folds i2 and moves the item.",
+    "after": {
+      ".claude/workforce/issues/index.json": {
+        "not": [
+          "By looking at this project"
+        ],
+        "want": [
+          "\"id\": \"i1\"",
+          "\"id\": \"i3\""
+        ]
       },
-      "before": [
-          {
-              "script": "wf-task-tag",
-              "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"so we had a catastrophe, the Nvidia eGPU died mid render and the studio has to pick a replacement\"}"
-          },
-          {
-              "path_from": 0,
-              "path_rx": "wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
-              "write": "{\"title\": \"eGPU replacement research\", \"items\": [{\"ask\": \"pick a replacement eGPU\", \"status\": \"open\"}]}"
-          },
-          {
-              "script": "wf-task-tag",
-              "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"By looking at this project, you can see what we're running here, which is why the eGPU matters so much\"}"
-          },
-          {
-              "path_from": 2,
-              "path_rx": "wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
-              "write": "{\"items\": [{\"ask\": \"context: the project's workload is why the eGPU matters\", \"status\": \"answered\", \"issue\": \"i1\"}]}"
-          }
-      ],
-      "exit": 0,
-      "not": [
-          "Traceback"
-      ],
-      "script": "wf-task-tag",
-      "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"the egpu housing would need to be backwards compatible with the Thunderbolt 3 port on this machine\"}",
-      "want": [
-          "A message that only adds context to an earlier issue gets one item stating that context"
-      ]
+      ".claude/workforce/issues/s1.json": {
+        "not": [
+          "\"merged\": true"
+        ],
+        "want": [
+          "\"items\": [{\"ask\": \"pick a replacement eGPU\", \"status\": \"open\"}]",
+          "\"items\": [{\"ask\": \"context: the project's workload is why the eGPU matters\", \"status\": \"answered\", \"continues\": \"i1\"}]"
+        ]
+      }
+    },
+    "before": [
+      {
+        "script": "wf-task-tag",
+        "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"so we had a catastrophe, the Nvidia eGPU died mid render and the studio has to pick a replacement\"}"
+      },
+      {
+        "path_from": 0,
+        "path_rx": "wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+        "write": "{\"title\": \"eGPU replacement research\", \"items\": [{\"ask\": \"pick a replacement eGPU\", \"status\": \"open\"}]}"
+      },
+      {
+        "script": "wf-task-tag",
+        "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"By looking at this project, you can see what we're running here, which is why the eGPU matters so much\"}"
+      },
+      {
+        "path_from": 2,
+        "path_rx": "wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+        "write": "{\"items\": [{\"ask\": \"context: the project's workload is why the eGPU matters\", \"status\": \"answered\", \"issue\": \"i1\"}]}"
+      }
+    ],
+    "exit": 0,
+    "not": [
+      "Traceback"
+    ],
+    "script": "wf-task-tag",
+    "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"the egpu housing would need to be backwards compatible with the Thunderbolt 3 port on this machine\"}",
+    "want": [
+      "A message that only adds context to an earlier issue gets one item stating that context"
+    ]
   },
-  "issues-answered-continuation-of-a-closed-issue-lands-and-it-stays-closed": {
-      "_why": "A FINISHED CONTINUATION OF A CLOSED ISSUE LANDS ON IT, AND IT STAYS CLOSED. MEASURED 2026-10-29 in mutze-studio `29c3e592` on 1.82.1: i8 only added context to i7, which was already closed, and its checklist held the one item the checklist line asks for, `\"issue\": \"i7\"`, `\"answered\"`. `absorb_items` built its targets from open issues alone, so the item stayed on i8, i8 closed as an issue of its own holding it, and i7 kept its original four. Here i1 is seeded closed, i2's file holds `\"issue\": \"i1\"`, `\"answered\"`, and submit 3 absorbs it: the item is on i1 after its two, i1 is still `closed`, i2 is folded (`merged`, `items: []`), and neither is in the index. The line now says a continuation names an earlier issue, open or closed. Fails on 23daf3f, which leaves the item on i2 and folds nothing.",
-      "after": {
-          ".claude/workforce/issues/index.json": {
-              "not": [
-                  "\"id\": \"i1\"",
-                  "\"id\": \"i2\""
-              ],
-              "want": [
-                  "\"id\": \"i3\""
-              ]
-          },
-          ".claude/workforce/issues/s1.json": {
-              "once": [
-                  "\"merged\": true"
-              ],
-              "want": [
-                  "\"prompt\": \"Workforce 1.82.0 is installed, please check the two Work list fixes and reply to wf-dev with what you see\", \"state\": \"closed\", \"items\": [{\"ask\": \"index.json no longer lists the dead sessions\", \"status\": \"answered\"}, {\"ask\": \"the list shows to the producer right away\", \"status\": \"answered\"}, {\"ask\": \"context: wf-dev found why the list never showed on screen\", \"status\": \"answered\"}]",
-                  "\"prompt\": \"Your check 2 found a real bug: the hook fired, but Claude Code records that message without showing it on screen\", \"state\": \"closed\", \"items\": [], \"agents\": []"
-              ]
-          }
+  "issues-answered-continuation-stays-on-its-own-issue-and-closes": {
+    "_why": "A FINISHED CONTINUATION OF A CLOSED ISSUE STAYS ON ITS OWN ISSUE, WHICH CLOSES, AND THE EARLIER ISSUE IS NOT TOUCHED. MEASURED 2026-10-29 in mutze-studio `29c3e592`: i8 only added context to i7, which was already closed, with the one `\"issue\": \"i7\"`, `\"answered\"` item the checklist line asks for. Here i1 is seeded closed and i2's file holds `\"issue\": \"i1\"`, `\"answered\"`: at submit 3 the item is on i2 with `\"continues\": \"i1\"`, i2 is closed, i1 keeps its own two items and stays closed, and neither is in the index. Until 1.88.0 the item was appended to i1 and i2 folded empty, the shape session `f9318dba` (2026-11-11) showed as issues with nothing in them. Fails on 1.88.0.",
+    "after": {
+      ".claude/workforce/issues/index.json": {
+        "not": [
+          "\"id\": \"i1\"",
+          "\"id\": \"i2\""
+        ],
+        "want": [
+          "\"id\": \"i3\""
+        ]
       },
-      "before": [
-          {
-              "script": "wf-task-tag",
-              "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"Your check 2 found a real bug: the hook fired, but Claude Code records that message without showing it on screen\"}"
-          },
-          {
-              "path_from": 0,
-              "path_rx": "wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
-              "write": "{\"items\": [{\"ask\": \"context: wf-dev found why the list never showed on screen\", \"status\": \"answered\", \"issue\": \"i1\"}]}"
-          }
-      ],
-      "exit": 0,
-      "not": [
-          "Traceback"
-      ],
-      "script": "wf-task-tag",
-      "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"the next thing is to look at the eGPU benchmark numbers the studio sent over this morning\"}",
-      "want": [
-          "A message that only adds context to an earlier issue gets one item stating that context",
-          "an item that continues an earlier issue, open or closed, carries"
-      ]
+      ".claude/workforce/issues/s1.json": {
+        "not": [
+          "\"merged\": true"
+        ],
+        "want": [
+          "\"prompt\": \"Workforce 1.82.0 is installed, please check the two Work list fixes and reply to wf-dev with what you see\", \"state\": \"closed\", \"items\": [{\"ask\": \"index.json no longer lists the dead sessions\", \"status\": \"answered\"}, {\"ask\": \"the list shows to the producer right away\", \"status\": \"answered\"}]",
+          "\"prompt\": \"Your check 2 found a real bug: the hook fired, but Claude Code records that message without showing it on screen\", \"state\": \"closed\", \"items\": [{\"ask\": \"context: wf-dev found why the list never showed on screen\", \"status\": \"answered\", \"continues\": \"i1\"}]"
+        ]
+      }
+    },
+    "before": [
+      {
+        "script": "wf-task-tag",
+        "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"Your check 2 found a real bug: the hook fired, but Claude Code records that message without showing it on screen\"}"
+      },
+      {
+        "path_from": 0,
+        "path_rx": "wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+        "write": "{\"items\": [{\"ask\": \"context: wf-dev found why the list never showed on screen\", \"status\": \"answered\", \"issue\": \"i1\"}]}"
+      }
+    ],
+    "exit": 0,
+    "not": [
+      "Traceback"
+    ],
+    "script": "wf-task-tag",
+    "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"the next thing is to look at the eGPU benchmark numbers the studio sent over this morning\"}",
+    "want": [
+      "A message that only adds context to an earlier issue gets one item stating that context",
+      "an item that continues an earlier issue, open or closed, carries"
+    ]
   },
-  "issues-open-continuation-of-a-closed-issue-reopens-it": {
-      "_why": "AN UNFINISHED CONTINUATION OF A CLOSED ISSUE LANDS ON IT AND REOPENS IT, because new work arrived on it. The case beside `issues-answered-continuation-of-a-closed-issue-lands-and-it-stays-closed`, from the same measurement (mutze-studio `29c3e592`, i8 continuing closed i7), with the item left `open`: i1 is `open` again with the item after its two, i2 is folded (`merged`, `items: []`), the index lists i1 with its one open item, and submit 3 carries that item back as an earlier issue's open row so a later turn can finish it. Fails on 23daf3f, which leaves the item on i2, keeps i1 closed and folds nothing.",
-      "after": {
-          ".claude/workforce/issues/index.json": {
-              "not": [
-                  "\"id\": \"i2\""
-              ],
-              "want": [
-                  "\"id\": \"i1\", \"ask\": \"Workforce 1.82.0 is installed, please check the two Work list fixes and reply to wf-dev with what you see\", \"items_open\": 1, \"agents_running\": 0",
-                  "\"id\": \"i3\""
-              ]
-          },
-          ".claude/workforce/issues/s1.json": {
-              "once": [
-                  "\"merged\": true"
-              ],
-              "want": [
-                  "\"prompt\": \"Workforce 1.82.0 is installed, please check the two Work list fixes and reply to wf-dev with what you see\", \"state\": \"open\", \"items\": [{\"ask\": \"index.json no longer lists the dead sessions\", \"status\": \"answered\"}, {\"ask\": \"the list shows to the producer right away\", \"status\": \"answered\"}, {\"ask\": \"re-check that the Work list shows on screen once the fix lands\", \"status\": \"open\"}]",
-                  "\"prompt\": \"Your check 2 found a real bug: the hook fired, but Claude Code records that message without showing it on screen\", \"state\": \"closed\", \"items\": [], \"agents\": []"
-              ]
-          }
+  "issues-open-continuation-stays-open-on-its-own-issue": {
+    "_why": "AN UNFINISHED CONTINUATION OF A CLOSED ISSUE KEEPS ITS OWN ISSUE OPEN, AND THE EARLIER ISSUE STAYS CLOSED. The case beside `issues-answered-continuation-stays-on-its-own-issue-and-closes`, from the same measurement (mutze-studio `29c3e592`, i8 continuing closed i7), with the item left `open`: i2 holds the item with `\"continues\": \"i1\"` and stays open, the index lists i2 with its one open item and not i1, and submit 3 carries that item back as an earlier issue's open row so a later turn can finish it. Until 1.88.0 the item moved onto i1 and reopened it while i2 folded empty; session `f9318dba` (2026-11-11) is why the ask now stays where it was asked. Fails on 1.88.0.",
+    "after": {
+      ".claude/workforce/issues/index.json": {
+        "not": [
+          "\"id\": \"i1\""
+        ],
+        "want": [
+          "\"id\": \"i2\", \"ask\": \"Your check 2 found a real bug: the hook fired, but Claude Code records that message without showing it on screen\", \"items_open\": 1, \"agents_running\": 0",
+          "\"id\": \"i3\""
+        ]
       },
-      "before": [
-          {
-              "script": "wf-task-tag",
-              "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"Your check 2 found a real bug: the hook fired, but Claude Code records that message without showing it on screen\"}"
-          },
-          {
-              "path_from": 0,
-              "path_rx": "wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
-              "write": "{\"items\": [{\"ask\": \"re-check that the Work list shows on screen once the fix lands\", \"status\": \"open\", \"issue\": \"i1\"}]}"
-          }
-      ],
-      "exit": 0,
-      "not": [
-          "Traceback"
-      ],
-      "script": "wf-task-tag",
-      "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"the next thing is to look at the eGPU benchmark numbers the studio sent over this morning\"}",
-      "want": [
-          "holds 1 still-open item(s) from this session's earlier issues"
-      ]
+      ".claude/workforce/issues/s1.json": {
+        "not": [
+          "\"merged\": true"
+        ],
+        "want": [
+          "\"prompt\": \"Workforce 1.82.0 is installed, please check the two Work list fixes and reply to wf-dev with what you see\", \"state\": \"closed\", \"items\": [{\"ask\": \"index.json no longer lists the dead sessions\", \"status\": \"answered\"}, {\"ask\": \"the list shows to the producer right away\", \"status\": \"answered\"}]",
+          "\"prompt\": \"Your check 2 found a real bug: the hook fired, but Claude Code records that message without showing it on screen\", \"state\": \"open\", \"items\": [{\"ask\": \"re-check that the Work list shows on screen once the fix lands\", \"status\": \"open\", \"continues\": \"i1\"}]"
+        ]
+      }
+    },
+    "before": [
+      {
+        "script": "wf-task-tag",
+        "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"Your check 2 found a real bug: the hook fired, but Claude Code records that message without showing it on screen\"}"
+      },
+      {
+        "path_from": 0,
+        "path_rx": "wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+        "write": "{\"items\": [{\"ask\": \"re-check that the Work list shows on screen once the fix lands\", \"status\": \"open\", \"issue\": \"i1\"}]}"
+      }
+    ],
+    "exit": 0,
+    "not": [
+      "Traceback"
+    ],
+    "script": "wf-task-tag",
+    "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \".\", \"scratchpad_dir\": \".\", \"prompt\": \"the next thing is to look at the eGPU benchmark numbers the studio sent over this morning\"}",
+    "want": [
+      "holds 1 still-open item(s) from this session's earlier issues"
+    ]
   },
   "issues-untitled-tracked-issue-is-not-asked-for-a-title": {
       "_why": "A `tracked` ISSUE IS NOT ASKED FOR A TITLE, and the head names `\"titles\"` when it is asked for one. MEASURED 2026-10-29 in mutze-studio `29c3e592`: \"No title yet on i2, i3\" was on every message, though i2 and i3 held only the hook's fallback and are retired at the next user message's Stop (`track_message`). The peer session also read `\"titles\"` as outside the file's schema, because the head said the file holds `{\"prompt\", \"items\", \"carried\"}`. Here i1 holds an open item the session wrote and no title, so it is still named; i2 and i3 are `tracked` and are not. Fails on the old code, which names all three and leaves `\"titles\"` out of the head.",
@@ -16117,5 +16120,351 @@
       "/tab-trailing.md: line ",
       "/top-seq.md: line "
     ]
+  },
+  "issues-continuation-item-stays-on-the-issue-it-was-asked-on": {
+    "_why": "AN ITEM THAT CONTINUES AN EARLIER ISSUE STAYS ON ITS OWN MESSAGE'S ISSUE, NAMING THE ONE IT CONTINUES. MEASURED 2026-11-11 in this repository's session `f9318dba`: codex-dev's messages i26 and i28 each got one item tagged `\"issue\": \"i25\"`, `absorb_items` moved it onto i25 and folded the message (`merged`, `items: []`), so the list showed issues with nothing in them and i25 held four near-identical items. The user wants every ask visible where it was asked. Here i2's one item, `\"issue\": \"i1\"`, `\"answered\"`, stays on i2 with `\"continues\": \"i1\"`; i1 keeps its one item and nothing is folded. Fails on 1.88.0, which folds i2 and appends the item to i1.",
+    "before": [
+      {
+        "script": "wf-task-tag",
+        "stdin_raw": "{\"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"hook_event_name\": \"UserPromptSubmit\", \"prompt\": \"[agent-msg from=codex-dev 23:34Z] Long message, read it by running: agent-say show 20261111233428-1963917. To answer, run the shell command: agent-say --from cw-dev codex-dev \\\"<your reply>\\\"\"}"
+      },
+      {
+        "path_from": 0,
+        "path_rx": "/[^\\s\"]*wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+        "write": "{\"title\": \"codex-dev message 23:34\", \"items\": [{\"ask\": \"read codex-dev's message (agent-say show 20261111233428-1963917) and act on it\", \"status\": \"done\"}], \"carried\": []}"
+      },
+      {
+        "script": "wf-widen",
+        "stdin_raw": "{\"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"hook_event_name\": \"Stop\", \"transcript_path\": \"t.jsonl\", \"last_assistant_message\": \"Done, the page is republished.\"}"
+      },
+      {
+        "script": "wf-task-tag",
+        "stdin_raw": "{\"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"hook_event_name\": \"UserPromptSubmit\", \"prompt\": \"[agent-msg from=codex-dev 23:43Z] Long message, read it by running: agent-say show 20261111234314-2017439. To answer, run the shell command: agent-say --from cw-dev codex-dev \\\"<your reply>\\\"\"}"
+      },
+      {
+        "path_from": 3,
+        "path_rx": "/[^\\s\"]*wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+        "write": "{\"title\": \"codex-dev message 23:43\", \"items\": [{\"ask\": \"read codex-dev's message (agent-say show 20261111234314-2017439) and act on it\", \"status\": \"answered\", \"issue\": \"i1\"}], \"carried\": []}"
+      },
+      {
+        "script": "wf-widen",
+        "stdin_raw": "{\"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"hook_event_name\": \"Stop\", \"transcript_path\": \"t.jsonl\", \"last_assistant_message\": \"Answered codex-dev: the user chose to keep the link.\"}"
+      }
+    ],
+    "env": {
+      "WF_BLIND_SAMPLE": "0"
+    },
+    "exit": 0,
+    "not": [
+      "Traceback"
+    ],
+    "script": "wf-task-tag",
+    "stdin_raw": "{\"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"hook_event_name\": \"UserPromptSubmit\", \"prompt\": \"[agent-msg from=codex-dev 23:45Z] Long message, read it by running: agent-say show 20261111234527-2103423. To answer, run the shell command: agent-say --from cw-dev codex-dev \\\"<your reply>\\\"\"}",
+    "want": [
+      "issue i3"
+    ],
+    "after": {
+      ".claude/workforce/issues/s1.json": {
+        "want": [
+          "\"items\": [{\"ask\": \"read codex-dev's message (agent-say show 20261111233428-1963917) and act on it\", \"status\": \"done\"}]",
+          "\"items\": [{\"ask\": \"read codex-dev's message (agent-say show 20261111234314-2017439) and act on it\", \"status\": \"answered\", \"continues\": \"i1\"}]"
+        ],
+        "not": [
+          "\"merged\": true",
+          "\"items\": []"
+        ]
+      }
+    }
+  },
+  "issues-peer-pointer-is-never-an-item": {
+    "_why": "A PEER'S POINTER IS NOT AN ASK, SO IT IS NEVER AN ITEM OR A ROW. MEASURED 2026-11-11 in session `f9318dba`: i27's only item was \"Long message, read it by running: agent-say show 20261111234335-2078089. To answer, run the shell command: ...\", the envelope agent-say types into the pane, seeded by `add_issue` as the message's fallback and printed as the Work row's excerpt and the index's `ask`. The ask is in the message the pointer leads to. Here a pointer opens i1 and the session writes no list: the fallback, the row and the index all say `message from codex-dev (<id>)` and none says the boilerplate. Fails on 1.88.0, which prints the pointer text in all three.",
+    "before": [
+      {
+        "script": "wf-task-tag",
+        "stdin_raw": "{\"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"hook_event_name\": \"UserPromptSubmit\", \"prompt\": \"[agent-msg from=codex-dev 23:43Z] Long message, read it by running: agent-say show 20261111234335-2078089. To answer, run the shell command: agent-say --from cw-dev codex-dev \\\"<your reply>\\\"\"}"
+      }
+    ],
+    "env": {
+      "WF_BLIND_SAMPLE": "0"
+    },
+    "exit": 0,
+    "not": [
+      "Traceback",
+      "Long message",
+      "read it by running"
+    ],
+    "script": "wf-widen",
+    "stdin_raw": "{\"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"hook_event_name\": \"Stop\", \"transcript_path\": \"t.jsonl\", \"last_assistant_message\": \"Read it; replying to codex-dev now.\"}",
+    "want": [
+      "i1  TRACKED  [message from codex-dev (20261111234335-2078089)]"
+    ],
+    "after": {
+      ".claude/workforce/issues/s1.json": {
+        "want": [
+          "{\"ask\": \"message from codex-dev (20261111234335-2078089)\", \"status\": \"open\", \"fallback\": true}"
+        ],
+        "not": [
+          "\"ask\": \"Long message"
+        ]
+      },
+      ".claude/workforce/issues/index.json": {
+        "want": [
+          "\"ask\": \"message from codex-dev (20261111234335-2078089)\""
+        ],
+        "not": [
+          "Long message"
+        ]
+      }
+    }
+  },
+  "issues-item-marked-on-its-own-list-is-not-carried-back-open": {
+    "_why": "A STATUS THE SESSION WROTE ON ITS OWN LIST IS THE ONE THE NEXT MESSAGE SEES. MEASURED 2026-11-11 in session `f9318dba`: i27's list held one item, `\"issue\": \"i25\"`, marked `\"answered\"` that turn, and a coder was running on i27, so the fold was refused and the item went to i25 while i27 kept the hook's open fallback, the pointer text. i28's submit then carried i27 back as open. Here i2 is opened by a pointer, an agent starts on it, and its list marks its one item answered with `\"issue\": \"i1\"`: the item stays on i2 answered, and submit 3 carries nothing. Fails on 1.88.0, which carries i2's pointer fallback as an open row.",
+    "before": [
+      {
+        "script": "wf-task-tag",
+        "stdin_raw": "{\"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"hook_event_name\": \"UserPromptSubmit\", \"prompt\": \"[agent-msg from=codex-dev 23:34Z] Long message, read it by running: agent-say show 20261111233428-1963917. To answer, run the shell command: agent-say --from cw-dev codex-dev \\\"<your reply>\\\"\"}"
+      },
+      {
+        "path_from": 0,
+        "path_rx": "/[^\\s\"]*wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+        "write": "{\"title\": \"codex-dev message 23:34\", \"items\": [{\"ask\": \"read codex-dev's message (agent-say show 20261111233428-1963917) and act on it\", \"status\": \"done\"}], \"carried\": []}"
+      },
+      {
+        "script": "wf-widen",
+        "stdin_raw": "{\"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"hook_event_name\": \"Stop\", \"transcript_path\": \"t.jsonl\", \"last_assistant_message\": \"Done, the page is republished.\"}"
+      },
+      {
+        "script": "wf-task-tag",
+        "stdin_raw": "{\"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"hook_event_name\": \"UserPromptSubmit\", \"prompt\": \"[agent-msg from=codex-dev 23:43Z] Long message, read it by running: agent-say show 20261111234335-2078089. To answer, run the shell command: agent-say --from cw-dev codex-dev \\\"<your reply>\\\"\"}"
+      },
+      {
+        "script": "wf-task-tag",
+        "stdin_raw": "{\"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"hook_event_name\": \"SubagentStart\", \"agent_id\": \"a6a7cdec885ce0f63\", \"agent_type\": \"engineering-coder\"}"
+      },
+      {
+        "path_from": 3,
+        "path_rx": "/[^\\s\"]*wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+        "write": "{\"title\": \"codex-dev message 23:43b\", \"items\": [{\"ask\": \"read codex-dev's message (agent-say show 20261111234335-2078089) and act on it\", \"status\": \"answered\", \"issue\": \"i1\"}], \"carried\": []}"
+      },
+      {
+        "script": "wf-widen",
+        "stdin_raw": "{\"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"hook_event_name\": \"Stop\", \"transcript_path\": \"t.jsonl\", \"last_assistant_message\": \"Verified the review; a coder is fixing items 1, 2, 4 and 5.\"}"
+      }
+    ],
+    "env": {
+      "WF_BLIND_SAMPLE": "0"
+    },
+    "exit": 0,
+    "not": [
+      "Traceback",
+      "still-open item(s)",
+      "Long message, read it by running: agent-say show 20261111234335-2078089"
+    ],
+    "script": "wf-task-tag",
+    "stdin_raw": "{\"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"hook_event_name\": \"UserPromptSubmit\", \"prompt\": \"[agent-msg from=codex-dev 23:45Z] Long message, read it by running: agent-say show 20261111234527-2103423. To answer, run the shell command: agent-say --from cw-dev codex-dev \\\"<your reply>\\\"\"}",
+    "want": [
+      "issue i3"
+    ],
+    "after": {
+      "wf-asks.s1.i3.json": {
+        "want": [
+          "\"carried\": []"
+        ]
+      },
+      ".claude/workforce/issues/s1.json": {
+        "want": [
+          "\"items\": [{\"ask\": \"read codex-dev's message (agent-say show 20261111234335-2078089) and act on it\", \"status\": \"answered\", \"continues\": \"i1\"}]"
+        ],
+        "not": [
+          "\"ask\": \"Long message"
+        ]
+      }
+    }
+  },
+  "work-list-restore-reads-the-earlier-lists-own-marks": {
+    "_why": "THE DISPLAY NEVER PUTS BACK AS OPEN AN ITEM ITS OWN LIST ALREADY FINISHED. MEASURED 2026-11-10 in session `f9318dba`, 17:33: i3 was queued while i2's turn ran, the session marked i2's ask `answered` in i2's own list, then wrote i3's list with `\"carried\": []`; `restore_carried` rebuilt the rows from the ledger, which had not read i2's list yet, and put i2's ask back as open (\"1 are back\"). Here the same order: the restore and the still-open block read each list's own forward marks first (`late_marks`), so nothing comes back. Fails on 1.88.0, which restores i1's item as open.",
+    "before": [
+      {
+        "script": "wf-task-tag",
+        "stdin_raw": "{\"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"hook_event_name\": \"UserPromptSubmit\", \"prompt\": \"I would think the image-validator could be wrapped up into the sensory controls. What do you think?\"}"
+      },
+      {
+        "path_from": 0,
+        "path_rx": "/[^\\s\"]*wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+        "write": "{\"title\": \"image-validator into senses\", \"items\": [{\"ask\": \"could the image-validator be wrapped into the sensory controls\", \"status\": \"open\"}], \"carried\": []}"
+      },
+      {
+        "script": "wf-task-tag",
+        "stdin_raw": "{\"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"hook_event_name\": \"UserPromptSubmit\", \"prompt\": \"I think the main thing is, are we focused on individual small elements or the bigger picture when evaluating images?\"}"
+      },
+      {
+        "path_from": 0,
+        "path_rx": "/[^\\s\"]*wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+        "write": "{\"title\": \"image-validator into senses\", \"items\": [{\"ask\": \"could the image-validator be wrapped into the sensory controls\", \"status\": \"answered\"}], \"carried\": []}"
+      },
+      {
+        "path_from": 2,
+        "path_rx": "/[^\\s\"]*wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+        "write": "{\"title\": \"image eval: details vs big picture\", \"items\": [{\"ask\": \"are we focused on small elements or the bigger picture\", \"status\": \"open\", \"issue\": \"i1\"}], \"carried\": []}"
+      }
+    ],
+    "exit": 0,
+    "not": [
+      "Traceback",
+      "rows were missing",
+      "STILL OPEN FROM EARLIER MESSAGES"
+    ],
+    "script": "wf-turn-budget",
+    "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"tool_name\": \"Write\", \"tool_input\": {\"file_path\": \"${TREE}/wf-asks.s1.i2.json\"}, \"tool_response\": {}}",
+    "want": [
+      "WORK LIST  i2  image eval: details vs big picture"
+    ],
+    "after": {
+      "wf-asks.s1.i2.json": {
+        "want": [
+          "\"carried\": []"
+        ]
+      }
+    }
+  },
+  "issues-repeat-peer-delivery-opens-no-second-issue": {
+    "_why": "ONE PEER MESSAGE DELIVERED SEVERAL TIMES IS ONE ISSUE. MEASURED 2026-11-11 in session `f9318dba`: codex-dev's notice arrived three times in 0.8 s and a reworded follow-up 0.7 s later (ids ...170148, ...170149 twice, ...170150, all from agent-say process 1117998), and they opened i16 to i19. Over this machine's 457 transcripts (347 peer deliveries, compared by the body in agent-say's mailbox), the same-body repeats from one process came 0.7 to 2.2 s apart; one different message also came from one process 0.7 s apart (...170150, reworded), which is why a fold records the id rather than dropping it. So a pointer from the same sender and the same process within `REPEAT_WINDOW` seconds of a delivery already on an issue opens nothing: it is recorded under that issue's `repeats`, the turn keeps that issue's list, and the line says so. Fails on 1.88.0, which opens i2, i3 and i4.",
+    "before": [
+      {
+        "script": "wf-task-tag",
+        "stdin_raw": "{\"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"hook_event_name\": \"UserPromptSubmit\", \"prompt\": \"[agent-msg from=codex-dev 17:01Z] Long message, read it by running: agent-say show 20261111170148-1117998. To answer, run the shell command: agent-say --from cw-dev codex-dev \\\"<your reply>\\\"\"}"
+      },
+      {
+        "script": "wf-task-tag",
+        "stdin_raw": "{\"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"hook_event_name\": \"UserPromptSubmit\", \"prompt\": \"[agent-msg from=codex-dev 17:01Z] Long message, read it by running: agent-say show 20261111170149-1117998. To answer, run the shell command: agent-say --from cw-dev codex-dev \\\"<your reply>\\\"\"}"
+      },
+      {
+        "script": "wf-task-tag",
+        "stdin_raw": "{\"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"hook_event_name\": \"UserPromptSubmit\", \"prompt\": \"[agent-msg from=codex-dev 17:01Z] Long message, read it by running: agent-say show 20261111170149-1117998. To answer, run the shell command: agent-say --from cw-dev codex-dev \\\"<your reply>\\\"\"}"
+      }
+    ],
+    "exit": 0,
+    "not": [
+      "Traceback",
+      "issue i2",
+      "issue i4"
+    ],
+    "script": "wf-task-tag",
+    "stdin_raw": "{\"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"hook_event_name\": \"UserPromptSubmit\", \"prompt\": \"[agent-msg from=codex-dev 17:01Z] Long message, read it by running: agent-say show 20261111170150-1117998. To answer, run the shell command: agent-say --from cw-dev codex-dev \\\"<your reply>\\\"\"}",
+    "want": [
+      "repeats the peer message already on issue i1"
+    ],
+    "after": {
+      ".claude/workforce/issues/s1.json": {
+        "want": [
+          "\"id\": \"i1\"",
+          "\"id\": \"20261111170149-1117998\"}, {\"at\": ", "\"id\": \"20261111170150-1117998\"}]"
+        ],
+        "not": [
+          "\"id\": \"i2\""
+        ]
+      },
+      ".claude/workforce/issues/index.json": {
+        "want": [
+          "\"id\": \"i1\""
+        ],
+        "not": [
+          "\"id\": \"i2\""
+        ]
+      },
+      "wf-task-tag.s1.json": {
+        "want": [
+          "\"key\": \"i1\"",
+          "\"repeat_of\": \"i1\""
+        ]
+      }
+    }
+  },
+  "issues-same-sender-minutes-apart-opens-its-own-issue": {
+    "_why": "THE NEGATIVE OF `issues-repeat-peer-delivery-opens-no-second-issue`: the sender and the agent-say process number match, and the two are still two messages. MEASURED 2026-11-11 over this machine's transcripts: ra-root's relay sent six messages from one process (5780) between 160 s and 49 min apart, each a different text. Here two of them 160 s apart open i1 and i2. Passes on 1.88.0 as well; it fails on a repeat rule that matches the process number with no time window.",
+    "before": [
+      {
+        "script": "wf-task-tag",
+        "stdin_raw": "{\"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"hook_event_name\": \"UserPromptSubmit\", \"prompt\": \"[agent-msg from=ra-root@realamish-root 23:57Z] Long message, read it by running: agent-say show 20261111235751-5780. To answer, run the shell command: agent-say --from cw-dev ra-root@realamish-root \\\"<your reply>\\\"\"}"
+      }
+    ],
+    "exit": 0,
+    "not": [
+      "Traceback",
+      "repeats the peer message"
+    ],
+    "script": "wf-task-tag",
+    "stdin_raw": "{\"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"hook_event_name\": \"UserPromptSubmit\", \"prompt\": \"[agent-msg from=ra-root@realamish-root 00:00Z] Long message, read it by running: agent-say show 20261112000031-5780. To answer, run the shell command: agent-say --from cw-dev ra-root@realamish-root \\\"<your reply>\\\"\"}",
+    "want": [
+      "issue i2"
+    ],
+    "after": {
+      ".claude/workforce/issues/s1.json": {
+        "want": [
+          "\"id\": \"i2\""
+        ],
+        "not": [
+          "\"repeats\""
+        ]
+      }
+    }
+  },
+  "issues-repeat-inline-peer-message-opens-no-second-issue": {
+    "_why": "THE SAME RULE FOR A MESSAGE TYPED IN WHOLE, which carries no id: the same sender with the same words within `REPEAT_WINDOW` seconds of the delivery already on an issue is that delivery again. MEASURED 2026-11-11: the one identical repeat on this machine is ...170149 typed twice 0.7 s apart in `f9318dba`; an inline text repeated the same way is the same failure with no id to compare. Fails on 1.88.0, which opens i2.",
+    "before": [
+      {
+        "script": "wf-task-tag",
+        "stdin_raw": "{\"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"hook_event_name\": \"UserPromptSubmit\", \"prompt\": \"[agent-msg from=codex-dev 17:05Z] Version 2 confirmed. Both pins, the F10 resolution, and the fixed-upstream marker are the intended delta. -- To answer, run the shell command: agent-say --from cw-dev codex-dev \\\"<your reply>\\\"\"}"
+      }
+    ],
+    "exit": 0,
+    "not": [
+      "Traceback",
+      "issue i2"
+    ],
+    "script": "wf-task-tag",
+    "stdin_raw": "{\"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"hook_event_name\": \"UserPromptSubmit\", \"prompt\": \"[agent-msg from=codex-dev 17:05Z] Version 2 confirmed. Both pins, the F10 resolution, and the fixed-upstream marker are the intended delta. -- To answer, run the shell command: agent-say --from cw-dev codex-dev \\\"<your reply>\\\"\"}",
+    "want": [
+      "repeats the peer message already on issue i1"
+    ],
+    "after": {
+      ".claude/workforce/issues/s1.json": {
+        "not": [
+          "\"id\": \"i2\""
+        ],
+        "want": [
+          "\"repeats\": [{\"at\": "
+        ]
+      }
+    }
+  },
+  "issues-same-sender-other-process-seconds-apart-opens-its-own-issue": {
+    "_why": "THE OTHER NEGATIVE OF `issues-repeat-peer-delivery-opens-no-second-issue`: the same sender, inside `REPEAT_WINDOW`, a different agent-say process, so two issues. MEASURED 2026-11-11 over this machine's 457 transcripts (347 peer deliveries), comparing each delivery with the sender's previous one by the message body in agent-say's mailbox: 234 consecutive pairs are different messages, and the nearest from different processes is 6.1 s apart (tr-dev in `04212c85`, a pointer ...002909-624090 then a typed correction). The process number does not separate everything: one same-body resend came from another process 5.3 s later (ms-dev ...074224-878672 then ...074230-881146 in `2170bfbd`) and one different message from the same process 0.7 s later (...170149 then ...170150 in `f9318dba`). So a fold needs the same process or the same words, never the window alone, and the same-process case keeps the folded id under `repeats` so nothing is lost. Here two pointers from tr-dev, processes 624090 and 624101, 6 s apart, open i1 and i2. Passes on 1.88.0 as well; it fails on a rule that folds on sender and time alone.",
+    "before": [
+      {
+        "script": "wf-task-tag",
+        "stdin_raw": "{\"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"hook_event_name\": \"UserPromptSubmit\", \"prompt\": \"[agent-msg from=tr-dev 00:29Z] Long message, read it by running: agent-say show 20261111002909-624090. To answer, run the shell command: agent-say --from cw-dev tr-dev \\\"<your reply>\\\"\"}"
+      }
+    ],
+    "exit": 0,
+    "not": [
+      "Traceback",
+      "repeats the peer message"
+    ],
+    "script": "wf-task-tag",
+    "stdin_raw": "{\"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"hook_event_name\": \"UserPromptSubmit\", \"prompt\": \"[agent-msg from=tr-dev 00:29Z] Long message, read it by running: agent-say show 20261111002915-624101. To answer, run the shell command: agent-say --from cw-dev tr-dev \\\"<your reply>\\\"\"}",
+    "want": [
+      "issue i2"
+    ],
+    "after": {
+      ".claude/workforce/issues/s1.json": {
+        "want": [
+          "\"id\": \"i2\""
+        ],
+        "not": [
+          "\"repeats\""
+        ]
+      }
+    }
   }
 }
