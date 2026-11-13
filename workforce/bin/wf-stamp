@@ -137,7 +137,7 @@ first step STOPs on `DIRECTIVE-DRIFT` when the file no longer hashes to it. Noth
 the pin to the file between probes, and an extraction that appended to the file moved
 every pin on it. The mirror itself was never compared to the live skill it was extracted
 from, so a directive the user added afterwards never reached the employee, while
-`INV-DIRECTIVES` reported it covered because the sidecar stamps the SOURCE. `--directives`
+`INV-SIDECAR` reported it covered because the sidecar stamps the SOURCE. `--directives`
 now measures both, appends what the mirror lacks, and re-pins what that append moved.
 """
 
@@ -677,13 +677,16 @@ def stamp_directives(root, execute, restamp, files=None, authority_arg=None):
         print("    the counts below are the state AFTER this write, re-read from disk")
         # RE-DERIVE FROM WHAT IS NOW ON DISK, never from what was found before the
         # write. A run that had just written the missing rows used to print
-        # `unprotected 1`, and an audit reading INV-DIRECTIVES after `--execute`
+        # `unprotected 1`, and an audit reading INV-SIDECAR after `--execute`
         # concluded the write had failed.
         recorded, malformed, legacy = back, [], []
         st = evaluate_sidecar(found, scope, recorded, unread)
 
     n_blocks = sum(len(v) for v in found.values())
-    print(f"\nINV-DIRECTIVES  {n_blocks} block(s) in scope · covered {len(st['covered'])} · "
+    # INV-SIDECAR is `references/invariants.md` row 48: sacred blocks against sidecar rows.
+    # It printed as INV-DIRECTIVES until 2026-11-13, the token row 2 holds for spans
+    # EXTRACTED before a deletion, a different count over a different file.
+    print(f"\nINV-SIDECAR  {n_blocks} block(s) in scope · covered {len(st['covered'])} · "
           f"unprotected {len(st['unprotected'])} · drift {len(st['drift'])} · "
           f"missing {len(st['missing'])} · orphan {len(st['orphan'])} · "
           f"malformed {len(malformed)} · unreadable {len(unreadable)} · "
@@ -1078,7 +1081,7 @@ def mirror_pass(root, execute):
 
     THE QUESTION NOTHING ASKED (odyssey-alive row 26). `.claude/workforce/directives/<skill>.md`
     is extracted once, and the user goes on adding directives to `<skill>/SKILL.md`. The
-    sidecar stamps the SOURCE, so `INV-DIRECTIVES` reported those blocks covered, and the
+    sidecar stamps the SOURCE, so `INV-SIDECAR` reported those blocks covered, and the
     employee bound to the mirror never saw them: five on odyssey-alive (agenda, ynab) found
     by hand, and three more in `invest` measured on 2026-10-22.
 
@@ -1806,6 +1809,7 @@ def stamp_versions(root, args):
             continue
         counts["versioned"] += 1
         print(f"  + versioned   {name}  {detail}")
+    # `references/invariants.md` row 49, printed by audit Step 5d item 3.
     print(f"\nINV-VERSION  {len(targets)} handbook(s) · installed {installed} · "
           f"versioned {counts['versioned']} · owed {counts['owed']} · current {counts['current']} · "
           f"newer {counts['newer']} · adopted {counts['adopted']} · failed {counts['failed']}")

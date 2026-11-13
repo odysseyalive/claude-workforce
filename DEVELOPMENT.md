@@ -1351,7 +1351,7 @@ allows** the commit rather than blocking it — a detector ships with its fix (`
   invented); every detected ecosystem gets Dependabot coverage (add-only, never clobbering an existing
   entry). Anything it cannot deterministically pin — a wildcard with no lockfile, a bare `flask`, an
   ecosystem without pin support yet — is reported `unpinnable`, a **measured limit, not a failure**
-  (precision is a property of the detector). Prints `INV-PINS  unpinned N · pinnable M · unpinnable K ·
+  (precision is a property of the detector). Printed `INV-PINS  unpinned N · pinnable M · unpinnable K ·
   dependabot MISSING|PARTIAL|PRESENT`.
 - **The hook is a copy of `wf-pin-check` itself**, not a separate shell wrapper. `--install-hook`
   copies the script to `.claude/workforce/git-hooks/pre-commit`, chmods it, and points `core.hooksPath`

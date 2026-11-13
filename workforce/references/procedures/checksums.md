@@ -177,7 +177,8 @@ blocks need a row. `wf-protect-directives` reads the same scratch list and stays
 hook never fires on a block the sidecar has no row for. `retired/` joined the list 2026-09-16: audit
 Step 6-F lifts every span into `CATALOG-ANCHOR.md` before it archives a catalog there, so the archive
 is a copy guarded at source (apps-odyssey-alive DEF-Q-19, 8 unstamped archive blocks). It writes the canonical row, re-parses its own output
-before counting the write, and prints `INV-DIRECTIVES` with every count including the zeroes.
+before counting the write, and prints `INV-SIDECAR` (`references/invariants.md` row 48) with every
+count including the zeroes.
 
 *Until 2026-09-15 the stamp read four roots (`agents`, `skills`, `workforce/directives`,
 `workforce/personnel`) while `verify` walked all of `.claude/`. A customer host had an unchanged archive

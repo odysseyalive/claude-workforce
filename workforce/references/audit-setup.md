@@ -883,7 +883,7 @@ measures on its first attempt. This gate only settles what Step 4b will do:
 
 **This gate writes nothing and spawns nothing** — and never writes an agent definition into any
 `agents/` directory. *Until 2026-09-15 it was named "Write the canary fixtures" and put five agent files
-into the user's `.claude/agents/`, where they sat in every session's agent menu; 1.31.0 removed the
+into the user's `.claude/agents/`, where they sat in every session's agent menu; 1.30.2 removed the
 fixtures on the user's marks and left this gate describing them for three releases.* It is not a
 question and consumes no question slot.
 

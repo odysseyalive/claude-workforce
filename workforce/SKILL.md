@@ -37,7 +37,7 @@ hooks:
 `core.hooksPath` pre-commit hook keeping dependencies pinned and `dependabot.yml` present; it was
 removed with its script `wf-pin-check` on the user's explicit marks, and `references/invariants.md`
 row 21 has recorded that as RETIRED ever since. `hooks` never wired it, and nothing prints `INV-PINS`.
-**An install from before 1.31.0 is HEALED at the next session start**, not merely declared retired:
+**An install from before 1.30.2 is HEALED at the next session start**, not merely declared retired:
 removing the script stopped new installs and removed the guard from no project that already had one, so
 four repositories on one workstation were still running a frozen copy on every commit when this was
 measured on 2026-10-10. `wf-settings-apply`'s `heal_git_hooks` restores `core.hooksPath`, carries across

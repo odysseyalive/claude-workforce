@@ -188,7 +188,7 @@ project when it opened.
 
 **The same command also unwires the retired pin guard's GIT hook** (`heal_git_hooks`, the git half of
 the same heal). `wf-pin-check --install-hook` registered its guard in `git config` and in a directory
-inside the repository rather than in a settings row, so retiring the script in 1.31.0 left it running
+inside the repository rather than in a settings row, so retiring the script in 1.30.2 left it running
 on every commit in every project that already had it — MEASURED 2026-10-10, four repositories on one
 workstation. It acts only when `core.hooksPath` is EXACTLY `.claude/workforce/git-hooks`, carries every
 hook that lived only in that directory into the repository's real hooks directory before restoring the
@@ -214,7 +214,7 @@ install means the missing file proves nothing, and an unknown name means update.
 project's settings, so a project with dead rows cannot read `0 failed`. *Added 2026-09-14. This section
 only REPORTED `DEAD WIRING` and named a command to type, and `wf-conform` had no hook check, so the
 headline read `N checks · 0 failed` over dead wiring. Measured on the author's machine: six projects
-carried 38 dead rows between them, all pointing at scripts retired in 1.31.0, and three of the six read
+carried 38 dead rows between them, all pointing at scripts retired in 1.30.2, and three of the six read
 `0 failed`.*
 
 **`ORPHANED` also has a producer now, and it is not only that command.** `install` and `install.ps1`
@@ -279,7 +279,7 @@ unseen between audits. **Run `staging.md` § Phase D** and report its verdict.
 
 - **It is the `D` line of the same `wf-apply --run-canary` call** the tier canary above makes — the
   fourth headless session, whose `--agents` definition pins a model unlike the session's. No fixture is
-  registered (`platform.md` fact 24). From 1.31.0 to 2026-09-15 this subsection reported `UNAVAILABLE`,
+  registered (`platform.md` fact 24). From 1.30.2 to 2026-09-15 this subsection reported `UNAVAILABLE`,
   because `wf-model-canary` had been removed and nothing spawnable by type without being menu-visible
   existed.
 - Report one of the four Phase D outcomes: **MATCH** (the model the harness called == pin != session

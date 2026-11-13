@@ -1314,7 +1314,7 @@ def prune_dead_hooks(root, scope, execute):
     WHY THIS EXISTS: the missing half of "three paths, or it does not propagate"
     (SKILL.md § Directives, 2026-09-07). A release that deletes a hook script leaves its
     registration behind on every machine that had it. MEASURED 2026-09-09: updating to
-    1.31.0 removed eight scripts and left all eight rows in `~/.claude/settings.json`.
+    1.30.2 removed eight scripts and left all eight rows in `~/.claude/settings.json`.
 
     PROJECT SCOPE is `heal`, the same function every session start runs. USER SCOPE is
     the installer's own file — the one writer that already owns it — pruned by the same
@@ -1344,7 +1344,7 @@ def prune_dead_hooks(root, scope, execute):
 
 # OUTPUT STYLES THE DISTRIBUTION RETIRED, by the `name:` a settings `outputStyle` selects them by,
 # with the file each shipped as. `Plain Speak` shipped as `output-styles/plain-speak.md` and went
-# in 1.31.0 (manifest.txt § Retired external paths). Only these names are ever cleared: a
+# in 1.30.2 (manifest.txt § Retired external paths). Only these names are ever cleared: a
 # selection of any other style, however broken, is the user's and is left alone.
 RETIRED_OUTPUT_STYLES = {"Plain Speak": "plain-speak.md"}
 STYLE_HEAD_CHARS = 64 * 1024
@@ -1384,7 +1384,7 @@ def clear_retired_style(root, execute):
 
     DEF-Q-16, 2026-09-16. The installer's prune removes the retired `plain-speak.md` from
     `<config-root>/output-styles/` (the `retired` rows of manifest.txt), and nothing cleared the
-    `outputStyle: "Plain Speak"` that 1.20.0 through 1.30.x wrote beside it. So every host that
+    `outputStyle: "Plain Speak"` that 1.20.0 through 1.30.1 wrote beside it. So every host that
     had it kept a selection naming a style that no longer exists. `audit` Step 5h clears a project's
     selection, and a user-scope file is written by nobody but this installer path.
 
@@ -2370,7 +2370,7 @@ def heal(root, execute, quiet=False, progress=None):
 # ──────────────────────────────────────────── the GIT half of the same heal (2026-10-10)
 #
 # THE RETIRED PIN GUARD HAD TWO HALVES AND THIS FILE HEALED ONE. `wf-pin-check` was deleted
-# from the distribution in 1.31.0 (90fb341) and `RETIRED_HOOKS` above removes its SETTINGS
+# from the distribution in 1.30.2 (90fb341) and `RETIRED_HOOKS` above removes its SETTINGS
 # registration — but the guard's other half was never a settings row at all.
 # `--install-hook` pointed `core.hooksPath` at a directory INSIDE the repository and copied
 # the 48 KB script into it, so every commit in every project that ever ran it still
@@ -2895,7 +2895,7 @@ def _git_print(out, execute, quiet):
     if out["plan"] or out["failures"]:
         if not quiet:
             print(f"GIT HOOK  core.hooksPath = {PIN_HOOKS_DIR_REL} — the guard "
-                  f"wf-pin-check installed, retired in 1.31.0")
+                  f"wf-pin-check installed, retired in 1.30.2")
             for kind, _src, _dst, text in out["plan"]:
                 would, did, sign = GIT_VERBS[kind]
                 print(f"  {sign if execute else '~'} {did if execute else would} {text}")

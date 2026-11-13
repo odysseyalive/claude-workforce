@@ -393,7 +393,7 @@ per-session files the harness leaves under ids it generated. It makes **two atte
 `UNAVAILABLE` and prints `INV-CANARY` with both. On `PASS` it hands C1 and C2 to `--record-canary`, which
 prints the exact `platform-local.md` bytes, or writes them under `--execute`.
 
-*There was no instrument from 1.31.0 to 2026-09-15.* That release removed the five shipped fixtures on
+*There was no instrument from 1.30.2 to 2026-09-15.* That release removed the five shipped fixtures on
 the user's explicit marks, because a registered agent sits in every session's agent menu on the
 machine, and every audit after it returned `UNAVAILABLE` and marked every handbook `Tier ceiling:
 unverified`. The removal's constraint binds this instrument: **no step anywhere writes a canary
@@ -465,7 +465,7 @@ spawn (`platform.md` fact 24).
 3. Compare the called model against **both** the pin **and** the session model. The comparison needs
    both because a match against the pin means nothing when the session model *is* the pin.
 
-*From 1.31.0 to 2026-09-15 this phase had no instrument and reported `UNAVAILABLE`: `wf-model-canary`
+*From 1.30.2 to 2026-09-15 this phase had no instrument and reported `UNAVAILABLE`: `wf-model-canary`
 was removed with the other fixtures (`changes/1.30.2.md`), and the replacement had to be spawnable by
 type without being menu-visible. `--agents` is.*
 

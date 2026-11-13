@@ -37,7 +37,7 @@ missing line is silence, and silence is indistinguishable from a gate that never
 
 ## The set
 
-Forty-six, and the list is closed: adding a procedural invariant means adding a row here and a
+Forty-eight, and the list is closed: adding a procedural invariant means adding a row here and a
 line to the report, in the same change.
 
 *(It was ten until 2026-07-31, eleven until 2026-08-01, twelve and then thirteen on 2026-08-04, and
@@ -54,8 +54,8 @@ change. **Row 19 landed 2026-08-06 and is the first row added for a reader with 
 for a run that stopped: the removal set was enumerated by two commands and produced by none. **Row 20
 landed 2026-08-07 and is row 19's other half** — the writer was built and nothing counted whether the
 set it wrote was ever emptied. **Row 21 landed 2026-08-12 and is the first row a git pre-commit guard
-prints rather than an `audit` run**: the commit-time pin-and-dependabot guard emits `INV-PINS` on every
-commit, and `audit` and `verify` emit it too when they install and report the guard — a promise printed
+prints rather than an `audit` run**: the commit-time pin-and-dependabot guard emitted `INV-PINS` on every
+commit, and `audit` and `verify` emitted it too when they installed and reported the guard — a promise printed
 in three places, owed by the one procedure that owns the guard's lifecycle. **Row 22 landed 2026-08-19
 and is the first row owed to the evaluators** rather than to conversion, the sweep, or a guard: it is the
 application-side twin of § Forcible propagation, which already owed the catalog's *contents*; this owes
@@ -115,7 +115,7 @@ reference-wiring, and printed as `INV-SOURCES`/`INV-SEAM`.)*
 | 18 | every reduced skill kept its invocation surface, verified before and after | `INV-REMAINDER` | references/conversion-taxonomy.md |
 | 19 | every target dispositioned for removal was staged and marked, or names the rule that declined it | `INV-STAGED` | references/procedures/hire.md |
 | 20 | the marked set was emptied, or every surviving target names the precondition that refused it | `INV-SWEPT` | references/procedures/sweep.md |
-| 21 | **RETIRED, and the retirement is performed** — the commit-time pin guard was removed with `wf-pin-check` on the user's explicit marks, and an install from before 1.31.0 is HEALED at the next session start: `heal_git_hooks` restores `core.hooksPath`, carries across any hook that lived only in the guard directory, and deletes the copy (measured 2026-10-10: four repositories were still running it on every commit). The number is held rather than reused so rows 22+ keep the positions five other files cite | `INV-PINS` | references/procedures/audit.md |
+| 21 | **RETIRED, and the retirement is performed** — the commit-time pin guard was removed with `wf-pin-check` on the user's explicit marks, and an install from before 1.30.2 is HEALED at the next session start: `heal_git_hooks` restores `core.hooksPath`, carries across any hook that lived only in the guard directory, and deletes the copy (measured 2026-10-10: four repositories were still running it on every commit). The number is held rather than reused so rows 22+ keep the positions five other files cite | `INV-PINS` | references/procedures/audit.md |
 | 22 | the house rules were refreshed in every installed evaluator, or each unrefreshed one names the precondition that stopped it | `INV-HOUSERULES` | references/procedures/audit.md |
 | 23 | every core companion skill exists after the run, or names the rule that refused it | `INV-COMPANIONS` | references/audit-setup.md |
 | 24 | the dispatch run-id was minted fresh and command-prefixed, every spawn edge recorded, and no write landed in a foreign command's run dir | `INV-RUNID` | references/procedures/org.md |
@@ -141,6 +141,8 @@ reference-wiring, and printed as `INV-SOURCES`/`INV-SEAM`.)*
 | 45 | every deferred row whose fix lies in this distribution was filed to the upstream inbox in the step that wrote it | `INV-UPSTREAM` | references/procedures/audit.md |
 | 46 | every directive block in a live skill is held by its extracted mirror after the run, already or appended verbatim, or each mirror whose source edited a block is named CONFLICTED | `INV-MIRROR` | references/procedures/audit.md |
 | 47 | every governed handbook's `## Directives` pin matches the file it names after the run, re-pinned where it was stale, or each missing pin names its handbook and file | `INV-DIRPINS` | references/procedures/audit.md |
+| 48 | every sacred block in scope has a row in `.directives.sha` after the run, written for new text and counted from a re-read of the file | `INV-SIDECAR` | references/procedures/audit.md |
+| 49 | every governed handbook's `workforce-version:` and `handbook-version:` were written by `wf-stamp --versions` and read back, never by hand, or each handbook left unwritten is named | `INV-VERSION` | references/procedures/audit.md |
 
 **Row 30 landed 2026-09-03, and it is the first row added because a gate disagreed with the person it
 was built for.** Every other row here counts something the run did. This one counts whether the org can

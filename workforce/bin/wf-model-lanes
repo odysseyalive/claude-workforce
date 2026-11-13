@@ -1217,6 +1217,11 @@ def main():
         print(f"  ✗ SUPERSEDED  {f['where']}: {f['old']} → successor {f['new']} (since "
               f"{f['since']}), not yet moved — the next session start moves it, or "
               f"wf-settings-apply --root {root} --heal --execute")
+    # Both INV-SUPERSEDED lines count one population, the project's recorded choices of a
+    # superseded model ID: `--heal-superseded` the ones it moved, this plan the ones still
+    # recorded. INV-SUPERSEDED counts a property of those files, healed at every session start
+    # with no run, so it is not a run invariant and `references/invariants.md` carries no row for
+    # it; `verify` § MODEL-DRIFT reads it through `--check`.
     print(f"\nINV-SUPERSEDED  {sup['pending']} pending · {sup['kept']} kept by hand")
 
     if args.execute:

@@ -1051,7 +1051,7 @@ gate that refuses a fresh install because it cannot measure a host it has a ship
 gate that fails for a reason that is not true.
 
 *Amended 2026-09-15. Until then this step ran against fixtures Step 0.6 wrote into `.claude/agents/`, so
-`UNAVAILABLE` was structurally certain on every first audit (`platform.md` fact 3); and from 1.31.0,
+`UNAVAILABLE` was structurally certain on every first audit (`platform.md` fact 3); and from 1.30.2,
 which removed the fixtures on the user's marks, it was certain on every audit. The runner defines its
 agents per headless session and writes no agent file (`platform.md` fact 24).*
 
@@ -1508,7 +1508,9 @@ Per **governed** handbook (adopted agents stay exempt until their first amendmen
 
 3. **Stamp and re-gate.** Set `workforce-version:` to the installed version and bump
    `handbook-version:` with `"$WF/bin/wf-stamp" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --versions --execute`
-   — the producer for both fields, never a hand edit. Treat the edit as the amendment it is: the release gate re-opens
+   — the producer for both fields, never a hand edit. Print its `INV-VERSION` line
+   (`references/invariants.md` row 49) with every count, zeroes included; `failed` above zero is `NOT
+   UPHELD`, and each `newer` or `adopted` handbook is named on its own line, left unwritten. Treat the edit as the amendment it is: the release gate re-opens
    (the Off-the-Street Release Gate (`SKILL.md`) rule 6) and the handbook is re-probed, or marked
    `not probed (spawning unavailable)` DEGRADED exactly as a fresh registration would be.
 4. **The between-audit detector is `wf-conform`'s advisory rows** (echo-back, version stamp) — this
@@ -1569,10 +1571,23 @@ other, reproduced inside the patch that closed the previous instance of it. Caug
 how a fix reaches another machine: a mechanism only a human types reaches exactly the machines somebody
 typed it on (`SKILL.md` § Directives, 2026-09-07, three paths or it does not propagate).*
 
-Each `--directives` run prints **`INV-MIRROR`** and **`INV-DIRPINS`** (`references/invariants.md`
-rows 46 and 47) after `INV-DIRECTIVES`. Report both pairs with every count, zeroes included: the first
-run's shows what was appended and re-pinned, the `--restamp` run's shows the state the step leaves.
-Measured on one unmirrored skill:
+Each `--directives` run prints **`INV-SIDECAR`**, **`INV-MIRROR`** and **`INV-DIRPINS`**
+(`references/invariants.md` rows 48, 46 and 47), in that order. Report all three from both runs with
+every count, zeroes included: the first run's shows what was written, appended and re-pinned, the
+`--restamp` run's shows the state the step leaves. `INV-SIDECAR` counts sacred blocks against
+`.directives.sha` rows, re-read from disk after the write; measured on one unstamped block, before and
+after `--execute`:
+
+```
+INV-SIDECAR  1 block(s) in scope · covered 0 · unprotected 1 · drift 0 · missing 0 · orphan 0 · malformed 0 · unreadable 0 · position-keyed 0
+INV-SIDECAR  1 block(s) in scope · covered 1 · unprotected 0 · drift 0 · missing 0 · orphan 0 · malformed 0 · unreadable 0 · position-keyed 0
+```
+
+**Any count but `covered` above zero on the `--restamp` run is `NOT UPHELD`.**
+*`INV-SIDECAR` printed as `INV-DIRECTIVES` until 2026-11-13, which is row 2's token for spans extracted
+before a deletion, a different count.*
+
+`INV-MIRROR` and `INV-DIRPINS`, measured on one unmirrored skill:
 
 ```
 INV-MIRROR  1 mirror(s) with a live source · 2 source block(s) · mirrored 1 · unmirrored 0 · appended 1 · conflicted 0 · failed 0

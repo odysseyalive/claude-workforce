@@ -833,7 +833,7 @@ captures are not cited by any eval case, is reclaimable** — the row survives, 
 The exception is exactly the captures an eval case names (`procedures/audit.md` § Step 5f), which are
 ground truth and are never reaped. This is the standing answer to a `work/` tree that grows without
 bound and to the tension the eval-set rule otherwise creates by arguing those directories must be kept.
-*Both cited `evals.md`, deleted in v1.31.0, until 2026-09-14; the eval-set rules live in audit Step 5f.*
+*Both cited `evals.md`, deleted in v1.30.2, until 2026-09-14; the eval-set rules live in audit Step 5f.*
 
 ## Mode: `status`
 

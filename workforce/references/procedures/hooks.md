@@ -243,7 +243,7 @@ failing on every prompt and tool call.
 
 **At user scope `--wire-defaults` also clears a retired output style**, the same kind of residue in
 the key beside the hooks. The installer's prune removes the retired `plain-speak.md`; a user-scope
-`outputStyle: "Plain Speak"` written by 1.20.0–1.30.x stayed selected with no file behind it
+`outputStyle: "Plain Speak"` written by 1.20.0–1.30.1 stayed selected with no file behind it
 (DEF-Q-16). The key is removed only when its value is a name in `RETIRED_OUTPUT_STYLES`, no
 `output-styles/` directory the session reads holds a style by that name, and the reversal record can
 be written. The edit removes that one key character by character, re-reads the file, then appends

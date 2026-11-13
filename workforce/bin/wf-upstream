@@ -932,7 +932,10 @@ def do_list(args):
         print("  OPEN  %-34s %s" % (os.path.basename(p), title))
         if why:
             print("        %s" % why[7:].strip() if why.startswith("match:") else why)
-    print("\nINV-UPSTREAM %d open · %d resolved · %d withdrawn · %s"
+    # INV-INBOX counts the maintainer's inbox across every project, which holds with no run
+    # in progress, so it is not a run invariant and `references/invariants.md` carries no row
+    # for it. It printed as INV-UPSTREAM until 2026-11-13, row 45's token for one run's filing.
+    print("\nINV-INBOX %d open · %d resolved · %d withdrawn · %s"
           % (len(op), count("resolved"), count("withdrawn"), inbox_dir()))
     if op:
         print("Each is a defect a real project measured in THIS distribution and could not "
@@ -1148,7 +1151,10 @@ def do_recheck(args):
             print("  REFUSED   %s: %s" % (name, exc))
             continue
         print("  withdrawn %s — %s (read from %s)" % (name, why, read_from))
-    print("\nINV-UPSTREAM-RECHECK %d open · %d kept · %d %s · %d unread · %s"
+    # INV-RECHECK re-applies the harvest rule to the maintainer's inbox, not to a run, so it is
+    # not a run invariant and `references/invariants.md` carries no row for it. Until 2026-11-13
+    # its name extended row 45's INV-UPSTREAM, so a search for that token found this line too.
+    print("\nINV-RECHECK %d open · %d kept · %d %s · %d unread · %s"
           % (len(op), kept, gone, "withdrawn" if args.execute else "to withdraw", unread,
              inbox_dir()))
     if gone and not args.execute:

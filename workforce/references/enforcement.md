@@ -132,7 +132,7 @@ of that wiring. All three write through **one producer**, so the wired set canno
 prunes only the ONE settings file its scope resolves, so a personal `update` cleaned
 `~/.claude/settings.json` and never a project's file, and `verify` only reported `DEAD WIRING`. MEASURED
 2026-09-14: the census counted 38 dead rows across six projects on one workstation, pointing at
-scripts retired in 1.31.0 and failing on every prompt and tool call. The remover is now `heal` in `wf-settings-apply`, and it has three
+scripts retired in 1.30.2 and failing on every prompt and tool call. The remover is now `heal` in `wf-settings-apply`, and it has three
 callers: `--wire-defaults` (installer, `audit`), `--heal` (`verify` § Hook wiring runs it before it
 counts), and `wf-heal` at `SessionStart`, which runs in every project on first use, so a project
 heals the next time anyone opens it. It removes only a row whose script the distribution RETIRED —
