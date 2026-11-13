@@ -1569,6 +1569,22 @@ other, reproduced inside the patch that closed the previous instance of it. Caug
 how a fix reaches another machine: a mechanism only a human types reaches exactly the machines somebody
 typed it on (`SKILL.md` § Directives, 2026-09-07, three paths or it does not propagate).*
 
+Each `--directives` run prints **`INV-MIRROR`** and **`INV-DIRPINS`** (`references/invariants.md`
+rows 46 and 47) after `INV-DIRECTIVES`. Report both pairs with every count, zeroes included: the first
+run's shows what was appended and re-pinned, the `--restamp` run's shows the state the step leaves.
+Measured on one unmirrored skill:
+
+```
+INV-MIRROR  1 mirror(s) with a live source · 2 source block(s) · mirrored 1 · unmirrored 0 · appended 1 · conflicted 0 · failed 0
+INV-DIRPINS  1 pin(s) in 1 handbook(s) · current 0 · stale 0 · repinned 1 · missing 0 · failed 0
+INV-MIRROR  1 mirror(s) with a live source · 2 source block(s) · mirrored 2 · unmirrored 0 · appended 0 · conflicted 0 · failed 0
+INV-DIRPINS  1 pin(s) in 1 handbook(s) · current 1 · stale 0 · repinned 0 · missing 0 · failed 0
+```
+
+**`unmirrored`, `stale` or `failed` above zero on the `--restamp` run is `NOT UPHELD`.** `conflicted`
+and `missing` are the refusals the rows allow: each names its mirror or its handbook and file, nothing
+is written for it, and `wf-stamp` exits 1 until a person reconciles it.
+
 **`contract-stamp` is not `workforce-version:`, and step 3 above only ever set the second one.** The
 contract stamp is a sha over the normalized `## Procedure` + `## Verification` sections. It is what
 `org index`, `verify` and `review` compare a recomputation against to raise `CONTRACT-DRIFT`, and it

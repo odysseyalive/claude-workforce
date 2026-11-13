@@ -37,7 +37,7 @@ missing line is silence, and silence is indistinguishable from a gate that never
 
 ## The set
 
-Forty-four, and the list is closed: adding a procedural invariant means adding a row here and a
+Forty-six, and the list is closed: adding a procedural invariant means adding a row here and a
 line to the report, in the same change.
 
 *(It was ten until 2026-07-31, eleven until 2026-08-01, twelve and then thirteen on 2026-08-04, and
@@ -139,6 +139,8 @@ reference-wiring, and printed as `INV-SOURCES`/`INV-SEAM`.)*
 | 43 | every project copy of an evaluator the install ships was retired with its user spans lifted and its files archived, or each file that stays and each refused retirement names its reason | `INV-CATMIG` | references/procedures/audit.md |
 | 44 | every evaluator kind resolves its catalog from the install once the copies are retired, with every stale, unseeded and unresolved kind counted | `INV-CATALOG` | references/procedures/audit.md |
 | 45 | every deferred row whose fix lies in this distribution was filed to the upstream inbox in the step that wrote it | `INV-UPSTREAM` | references/procedures/audit.md |
+| 46 | every directive block in a live skill is held by its extracted mirror after the run, already or appended verbatim, or each mirror whose source edited a block is named CONFLICTED | `INV-MIRROR` | references/procedures/audit.md |
+| 47 | every governed handbook's `## Directives` pin matches the file it names after the run, re-pinned where it was stale, or each missing pin names its handbook and file | `INV-DIRPINS` | references/procedures/audit.md |
 
 **Row 30 landed 2026-09-03, and it is the first row added because a gate disagreed with the person it
 was built for.** Every other row here counts something the run did. This one counts whether the org can
@@ -299,7 +301,6 @@ Run Invariants
   INV-REMAINDER   31 promoted · 31 reduced · 4 deleted (empty remainder) · 0 surface changes
   INV-STAGED      dispositioned 1 · staged 1 · marked 1 · 0 declined
   INV-SWEPT       staged 1 · removed 1 · refused 0 · 0 uncited refusals
-  INV-PINS        unpinned 3 · pinnable 2 · unpinnable 1 · dependabot PARTIAL
   INV-HOUSERULES  2 evaluators · 2 registers refreshed · precedence present · 0 unrefreshed
   INV-COMPANIONS  6 of 6 · project-local 3/3: org (wf-companion) · operating-principles · personnel-ledger · install-scope 3/3: code-evaluator · text-eval · security-evaluator · 0 absent
   INV-EDGES       employees 9 · edges 8 · mismatched 1 · healed 1 · 0 declined
