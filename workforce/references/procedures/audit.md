@@ -2319,7 +2319,7 @@ nothing.**
 **This step no longer installs anything, and it is no longer a no-op.** It wired a commit-time
 pin-and-dependabot guard by registering `core.hooksPath`, and it did that by running `wf-pin-check
 --install-hook`. That script was removed on the user's explicit marks in the simplification release
-(`changes/1.31.0.md`), and `hooks.md` no longer carries the § The git pre-commit pin guard section this
+(`changes/1.30.2.md`), and `hooks.md` no longer carries the § The git pre-commit pin guard section this
 step and `invariants.md` row 21 (`INV-PINS`) both pointed at. Row 21 is held RETIRED, owed by this step.
 
 **Removing the script stopped new installs and removed the guard from no project that already had

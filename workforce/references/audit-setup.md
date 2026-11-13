@@ -685,7 +685,7 @@ past it — never clobber it, and never read the pool from it.
 
 *Until the simplification release this was emitted by `wf-model-budget`, a shipped script that made the
 derivation a pure function of the template. It was removed on the user's explicit marks
-(`changes/1.31.0.md`), so the rule is prose again and the reader performs the derivation. The history
+(`changes/1.30.2.md`), so the rule is prose again and the reader performs the derivation. The history
 is kept because it is the reason the rule is worded this tightly:* the sole-source rule stood as prose
 alone until 2026-08-20, when a re-audit read the project's stale section and rendered the pool the
 template had since dropped — a superseded static shown as an option, the lower-cost IC static absent,
@@ -695,7 +695,7 @@ projects. Regression fixture: `modelbudget-stale-reaudit`.
 
 **There is no mechanical floor under this rule, and that is a stated gap rather than an omission.**
 `wf-budget-guard` was a `PreToolUse` hook on `AskUserQuestion` that blocked any picker whose options
-were not the emitter's, and it went with the emitters it read (`changes/1.31.0.md`). Measured
+were not the emitter's, and it went with the emitters it read (`changes/1.30.2.md`). Measured
 2026-09-02 on a v1.8.0 install: a re-audit of `apps-odyssey-alive` read the project's stale
 `## Model statics`, rendered the retired frontier pick as a static and the current pin as
 `(Recommended)`, and never ran the script — with this paragraph and two others in front of it. That
@@ -797,7 +797,7 @@ from `references/platform.md`, and the call's header and body from § Budget que
 render both calls whole, deriving no ladder, no window and no question text from a project's own file.
 
 *Emitted by `wf-effort-budget` until the simplification release removed it on the user's explicit marks
-(`changes/1.31.0.md`).* The model half of this budget was mechanised on 2026-08-20 and the effort half was left on prose,
+(`changes/1.30.2.md`).* The model half of this budget was mechanised on 2026-08-20 and the effort half was left on prose,
 so it went on being reconstructed from a project's own file: a session rebuilding the budget questions
 reproduced the stale lane structure it found in an instantiated `org-config.md` (reported 2026-08-26).
 A lane's ladder depends on the model that lane resolved to, which is precisely the part a reader

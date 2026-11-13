@@ -466,7 +466,7 @@ spawn (`platform.md` fact 24).
    both because a match against the pin means nothing when the session model *is* the pin.
 
 *From 1.31.0 to 2026-09-15 this phase had no instrument and reported `UNAVAILABLE`: `wf-model-canary`
-was removed with the other fixtures (`changes/1.31.0.md`), and the replacement had to be spawnable by
+was removed with the other fixtures (`changes/1.30.2.md`), and the replacement had to be spawnable by
 type without being menu-visible. `--agents` is.*
 
 **The four outcomes.** The extra outcome over Phase C is `INDETERMINATE`, and it exists for the reason

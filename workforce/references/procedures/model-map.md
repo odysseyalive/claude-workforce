@@ -74,7 +74,7 @@ the reader was not thinking about. Both calls also take their header and body fr
 `org-config.template.md` § Budget question wording, so the WHOLE call is rendered from the template.
 
 *Both option sets were emitted by shipped scripts — `wf-model-budget` and `wf-effort-budget` — until the
-simplification release removed them on the user's explicit marks (`changes/1.31.0.md`). The
+simplification release removed them on the user's explicit marks (`changes/1.30.2.md`). The
 single-source rule survives them and is now carried by prose alone, which is exactly the state that
 produced the 2026-08-20 stale-pool drift `audit-setup.md` records.*
 

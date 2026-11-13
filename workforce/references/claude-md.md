@@ -153,7 +153,7 @@ call to make with a number in front of them, which is the whole of what this can
 
 **THE DURABLE CARRIER WAS REMOVED, AND NOTHING REPLACED IT.** `wf-standing-request` was a
 `UserPromptSubmit` hook that re-injected the cold-reader request every turn; it went with the two
-personnel hooks in the simplification release, on the user's explicit marks (`changes/1.31.0.md`).
+personnel hooks in the simplification release, on the user's explicit marks (`changes/1.30.2.md`).
 **The consequence is that the evacuation's precondition below cannot be satisfied by wiring anything**,
 so for a project that needs the request the generated region remains the only live carrier and the
 deletion cannot complete. That is a real block on a directive, recorded here rather than discovered by
