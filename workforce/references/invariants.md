@@ -37,7 +37,7 @@ missing line is silence, and silence is indistinguishable from a gate that never
 
 ## The set
 
-Thirty-nine, and the list is closed: adding a procedural invariant means adding a row here and a
+Forty-four, and the list is closed: adding a procedural invariant means adding a row here and a
 line to the report, in the same change.
 
 *(It was ten until 2026-07-31, eleven until 2026-08-01, twelve and then thirteen on 2026-08-04, and
@@ -115,7 +115,7 @@ reference-wiring, and printed as `INV-SOURCES`/`INV-SEAM`.)*
 | 18 | every reduced skill kept its invocation surface, verified before and after | `INV-REMAINDER` | references/conversion-taxonomy.md |
 | 19 | every target dispositioned for removal was staged and marked, or names the rule that declined it | `INV-STAGED` | references/procedures/hire.md |
 | 20 | the marked set was emptied, or every surviving target names the precondition that refused it | `INV-SWEPT` | references/procedures/sweep.md |
-| 21 | **RETIRED, and the retirement is performed** — the commit-time pin guard was removed with `wf-pin-check` on the user's explicit marks, and an install from before 1.31.0 is HEALED at the next session start: `heal_git_hooks` restores `core.hooksPath`, carries across any hook that lived only in the guard directory, and deletes the copy (measured 2026-10-10: four repositories were still running it on every commit). The number is held rather than reused so rows 22+ keep the positions five other files cite | `INV-PINS` | changes/1.31.0.md |
+| 21 | **RETIRED, and the retirement is performed** — the commit-time pin guard was removed with `wf-pin-check` on the user's explicit marks, and an install from before 1.31.0 is HEALED at the next session start: `heal_git_hooks` restores `core.hooksPath`, carries across any hook that lived only in the guard directory, and deletes the copy (measured 2026-10-10: four repositories were still running it on every commit). The number is held rather than reused so rows 22+ keep the positions five other files cite | `INV-PINS` | references/procedures/audit.md |
 | 22 | the house rules were refreshed in every installed evaluator, or each unrefreshed one names the precondition that stopped it | `INV-HOUSERULES` | references/procedures/audit.md |
 | 23 | every core companion skill exists after the run, or names the rule that refused it | `INV-COMPANIONS` | references/audit-setup.md |
 | 24 | the dispatch run-id was minted fresh and command-prefixed, every spawn edge recorded, and no write landed in a foreign command's run dir | `INV-RUNID` | references/procedures/org.md |
@@ -134,6 +134,11 @@ reference-wiring, and printed as `INV-SOURCES`/`INV-SEAM`.)*
 | 38 | every Core companion skill was force-refreshed to shipped source, or each unrefreshed one names the precondition that stopped it | `INV-CORE` | references/procedures/audit.md |
 | 39 | every file that pins a model was judged into a lane and runs that lane's selection, or is shipped, or names why it was not written | `INV-LANES` | references/procedures/audit.md |
 | 40 | every role the hire authored has a recruiter dossier, counted as freshly researched or degraded to the seed and as backed by a verified master or by none | `INV-RECRUIT` | references/procedures/hire.md |
+| 41 | every dead permission grant was counted, each one workforce owns was repaired in the run, and each one the user wrote or of an unmeasured form was left unmodified and reported | `INV-PERMS` | references/audit-setup.md |
+| 42 | every installed evaluator catalog carries its shipped additions, seeded this run or already current, or names the state that kept them out | `INV-SEED` | references/procedures/audit.md |
+| 43 | every project copy of an evaluator the install ships was retired with its user spans lifted and its files archived, or each file that stays and each refused retirement names its reason | `INV-CATMIG` | references/procedures/audit.md |
+| 44 | every evaluator kind resolves its catalog from the install once the copies are retired, with every stale, unseeded and unresolved kind counted | `INV-CATALOG` | references/procedures/audit.md |
+| 45 | every deferred row whose fix lies in this distribution was filed to the upstream inbox in the step that wrote it | `INV-UPSTREAM` | references/procedures/audit.md |
 
 **Row 30 landed 2026-09-03, and it is the first row added because a gate disagreed with the person it
 was built for.** Every other row here counts something the run did. This one counts whether the org can

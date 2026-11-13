@@ -107,7 +107,8 @@ removes, so a project reading clean on `INV-CATALOG` can still hold a dozen hand
 would break: measured 2026-09-10 on `odyssey-alive`, **13 of them**. Print the count beside
 `INV-CATALOG`, including a zero, and name the fix as `audit` Step 5d item 2c. The row is ADVISORY in
 `wf-conform` and stays advisory here — every org authored before 2026-09-10 carries the old form,
-because it is the form that shipped.
+because it is the form that shipped. `INV-CATREAD` counts a property of handbook files, not of a run,
+so it is not a run invariant and `references/invariants.md` carries no row for it.
 
 **Read-only, like every row above.** A project copy is never removed here, and a stale one is never
 refreshed here — the remedy is `audit`, or `wf-catalog --migrate` to see what a migration would do.

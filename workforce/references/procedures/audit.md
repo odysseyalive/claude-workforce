@@ -2166,7 +2166,7 @@ appended, § Seeding step 1b). It keys on the **single insertion-point blocker**
 missing machine-owned region is created here, a foreign anchor or foreign skill ownership never stops it,
 and the supersession register — which guards only the VENDORED append — never withholds workforce's own
 additions. A catalog it reports `unappendable` is immutable end to end, and it names the file and the
-spans. Print its `INV-SEED` line, including the zeroes.
+spans. Print its `INV-SEED` line (`references/invariants.md` row 42), including the zeroes.
 
 A catalog it reports `retired` is a copy `--migrate` has already retired, and that is the finished
 state, not a skip: the kind resolves to the install and the install carries the additions. The
@@ -2236,7 +2236,8 @@ same audit and this step then completes. **Duplicated registrations are their ow
 `odyssey-alive` carried `chain-image-eval.sh` twice on `PostToolUse` before this step existed, which is
 the double activation this migration exists to end rather than to create.
 
-**Report `INV-CATMIG`, then re-run `wf-catalog` and report `INV-CATALOG`.** The run is not finished
+**Report `INV-CATMIG`, then re-run `wf-catalog` and report `INV-CATALOG`** (`references/invariants.md`
+rows 43 and 44). The run is not finished
 until every kind reads `install`. A kind still reading `project` after this step is a defect in the
 step, not a state to report.
 
@@ -2303,7 +2304,7 @@ nothing.**
 pin-and-dependabot guard by registering `core.hooksPath`, and it did that by running `wf-pin-check
 --install-hook`. That script was removed on the user's explicit marks in the simplification release
 (`changes/1.31.0.md`), and `hooks.md` no longer carries the § The git pre-commit pin guard section this
-step and `invariants.md` row 21 both pointed at.
+step and `invariants.md` row 21 (`INV-PINS`) both pointed at. Row 21 is held RETIRED, owed by this step.
 
 **Removing the script stopped new installs and removed the guard from no project that already had
 one.** MEASURED 2026-10-10 across one workstation's projects: four repositories still had
@@ -2675,7 +2676,9 @@ the only way to tell whether a change helped — which is the whole argument for
 
 **Print the Run Invariants block first** (`references/invariants.md`). **Every row that file
 enumerates**, present including the zeroes, before any finding — the count lives there and is not
-restated here, which is how this line came to say "ten" while the table held eleven.
+restated here, which is how this line came to say "ten" while the table held eleven. One row prints
+elsewhere: `INV-PERMS` goes last, with the permission findings `audit-setup.md` § Permissions places
+there on the user's directive.
 
 **`INV-DEFERRED` is among them** (`references/deferred.md`): rows carried in, discharged, added, and
 AGED, with the arithmetic balanced against the queue on disk. An audit that adds work to a backlog
@@ -2826,7 +2829,8 @@ indistinguishable from a queue nobody classified.
 ### The another-repository rows LEAVE — `wf-upstream`, run in the same step that writes them
 
 **Every row whose fix lies in this distribution is filed where a workforce maintainer's own session will
-read it.** Run it immediately after `deferred.md` is written, and print its `INV-UPSTREAM` line:
+read it.** Run it immediately after `deferred.md` is written, and print its `INV-UPSTREAM` line
+(`references/invariants.md` row 45):
 
 ```
 "$WF/bin/wf-upstream" --root "${CLAUDE_PROJECT_DIR:-$PWD}"            # report

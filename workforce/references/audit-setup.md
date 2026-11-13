@@ -1100,8 +1100,8 @@ WF="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/workforce"; [ -d "$WF" ] || WF="<
 "$WF/bin/wf-permissions" --root "<project>" --apply
 ```
 
-Print its `INV-PERMS` line — `dead · repaired · left · suspect` — with the permission findings
-reported **last, after the audit completes**, per the user directive above.
+Print its `INV-PERMS` line (`references/invariants.md` row 41) — `dead · repaired · left · suspect` —
+with the permission findings reported **last, after the audit completes**, per the user directive above.
 
 | | |
 |---|---|
