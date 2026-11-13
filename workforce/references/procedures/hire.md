@@ -108,10 +108,12 @@ The run prints **`INV-RECRUIT`** — a dossier for every role authored, and how 
 researched versus degraded to the seed (`references/invariants.md`):
 
 ```
-INV-RECRUIT  dossiers 5 · web 4 · seed 1
+INV-RECRUIT  dossiers 5 · web 4 · seed 1 · peers 3 · none verified 2
 ```
 
 `web + seed` equals `dossiers`; a `seed` count above zero names the roles flagged for re-research.
+`peers + none verified` also equals `dossiers`. `peers` counts dossiers with at least one verified
+master, and `none verified` counts the rest, every seed dossier included (`recruiter.md` § The masters).
 
 ## Step 3b — Author its records, if it has any
 

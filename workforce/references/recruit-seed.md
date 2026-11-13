@@ -14,7 +14,8 @@ These are baseline quality bars for the role families a common web or app build 
 gives a role its `## Responsibilities`, `## Competencies` (which feed the `wf-skill-match` keywords),
 `## Quality bar`, and `## Failure modes to gate against` (which feed the handbook's `## Verification`).
 The bars are deliberately set to a real professional standard, not a floor — a degraded hire is still
-held to something worth holding it to.
+held to something worth holding it to. The seed names no masters, so a dossier built from it writes
+`## Masters` as `none verified (seed: research unavailable)` (`recruiter.md` § The masters).
 
 **A role that does not fit a family below is authored from its researched competencies once the network
 returns.** Do not force a role into the nearest family and call it researched; the seed covers the

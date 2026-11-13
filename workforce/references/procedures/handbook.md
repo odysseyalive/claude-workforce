@@ -78,7 +78,22 @@ right titles and the wrong jobs. Full mechanism: `references/recruiter.md`.
 3. **Wire the dossier into the handbook.** Its `## Failure modes to gate against` become `## Verification`
    bar entries, set to the researched **standard**, never a floor. Its `## Matched skills` become
    `## Procedure` steps — employees INVOKE skills (`handbook-templates.md`), the existing pattern.
-4. **Report the source.** State `web` or `seed` so a cold reader knows the bar's provenance, and print
+4. **Write the opening from the dossier, then back it with the masters.** On a hire, the `You are`
+   opening is written after the research. It sketches how a practitioner of this craft works, and it
+   takes positions the dossier's `## Masters` actually hold. `## Backed by peers` then quotes one or
+   two of them (`handbook-templates.md` § IC). Each quote's `backs:` line names the exact phrase of the
+   opening it supports. The quote is chosen to fit the sketch; the sketch is never bent to fit a quote.
+   On a refresh or a conversion the existing opening stands, because hand-authored text is never
+   reworded. Quote masters who back its phrases, or write `none verified`. Before a quote goes in,
+   re-fetch its source and find the quoted words on the page; this matters most for a cached dossier,
+   whose fetch was not yours. A quote that no longer matches is dropped and moved to the dossier's
+   `## Rejected`. A dossier whose
+   `## Masters` reads `none verified`, and every seed dossier, gives `none verified` here too. The
+   section states the two precedence rules (`recruiter.md` § The masters): the user's directives
+   outrank the masters, and a master never stands alone as a citation. Every `## Verification` bar
+   entry rests on the dossier's Quality bar or failure modes. A master may stand beside that entry,
+   never in its place.
+5. **Report the source.** State `web` or `seed` so a cold reader knows the bar's provenance, and print
    the candidate chosen — winning skills, model/effort tier, and any budget receipt (`recruiter.md`
    § The governing principle). A `seed`-sourced bar is flagged for re-research when connectivity returns.
 

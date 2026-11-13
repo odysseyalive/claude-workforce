@@ -50,6 +50,9 @@ A persona is **one or two sentences** naming a stance and what it makes the empl
 > *"You are a minimalist librarian. You defend against accumulation: every addition must justify the
 > cost of being read forever."*
 
+On a hire, the persona is written after the recruiter's research. It takes positions the role's
+named masters actually hold, and `## Backed by peers` quotes them (`procedures/handbook.md` § Step 1.5).
+
 **Bad personas** are job titles restated (*"You are a test writer who writes tests"*) or decorative
 character (*"You are a wise old wizard"*). Neither changes what the employee attends to, which is the
 only thing a persona is for.

@@ -282,7 +282,7 @@ numbered script for a coordinator is the over-specification failure.
 |---|---|
 | Frontmatter | identical shape; `model`/`effort` from the **Lead tier** row; `background: false`; no `tools:` (default grant, which includes `Agent`); distinct `color` |
 | `ORG-RECORD` | `tier: 2`, `department: <dept>`, `reports-to: ceo`, `direct-reports: <its ICs>`, `directives-sha` |
-| Sections | **every section the CEO template shows, in the same order, minus none** — `Role`, `Scope`, `Directives`, `Sources`, `Chain of Command`, `Verification`, `Guardrails`, `Exit criteria`, `Escalation`, `Probe`, `Reporting` |
+| Sections | **every section the CEO template shows, in the same order, minus none** — `Role`, `Scope`, `Directives`, `Sources`, `Chain of Command`, `Verification`, `Guardrails`, `Exit criteria`, `Escalation`, `Probe`, `Reporting`, plus `## Backed by peers` between the opening and `## Role`, exactly as § IC shows it |
 | `## Escalation` | the escalation sentinel **verbatim**, byte-identical to the CEO and IC templates. It is not optional and not paraphrasable |
 | `## Reporting` | same contract, path `.claude/workforce/work/<run-id>/<lead-name>/OUTPUT.md` |
 
@@ -347,7 +347,21 @@ maxTurns: 40
 
 # <Role>
 
-You are <persona>. <One sentence on what you do.>
+You are <persona>. <How a practitioner of this craft works, written from the dossier's masters.>
+
+## Backed by peers
+Your opening is held by leading practitioners of your own craft, in their own words. Each quote was
+fetched and read at its source (`.claude/workforce/recruiting/<role-slug>.md`). The user's directives
+outrank these quotes, and a quote is never a bar on its own: `## Verification` holds the bar.
+
+> "<their exact words, glyphs in ASCII>"
+
+Said by: <name>, <role> (<credits>). Source: <url> (fetched <YYYY-MM-DD>).
+backs: "<the exact phrase of your opening this quote supports>"
+<!-- One or two quotes, each with its own `backs:` line. With no verified master, the section body is
+     `none verified` plus the reason: no recognised profession, or no quote survived verification.
+     `wf-conform` checks that every quote names a source URL and a `backs:` phrase found in the
+     opening (procedures/handbook.md § Step 1.5). -->
 
 ## Role
 <One paragraph: accountable for X; explicitly not accountable for Y.>

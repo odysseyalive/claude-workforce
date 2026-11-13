@@ -68,6 +68,7 @@ Staging only. Zero spawns, zero registration, no agent budget consumed. Determin
 | Every path the handbook **reads** resolves on disk | **BLOCK** — the top cold-start failure. Read § Three checks that fail on conformant handbooks |
 | Every tool the body **uses** is in the default grant or loaded via `ToolSearch` in the procedure (or in an explicit `tools:` when present), and `Grep`/`Glob` are never assumed | **BLOCK** — fact 4. *Uses*, not *mentions* — see below |
 | Sections present and in order per `procedure-for-procedures.md` | **BLOCK** |
+| `## Backed by peers`, where present, reads `none verified` or gives every quote a source URL and a `backs:` phrase its opening contains | **BLOCK**: a peer quote nobody can trace, or one backing words the opening never says. Absence is not checked (`procedures/handbook.md` § Step 1.5) |
 | `## Verification` names a runnable check, not a judgment | **BLOCK** |
 | `## Probe` present | **BLOCK** — a handbook that cannot say how to check itself is not releasable |
 | Every guardrail contains a literal NEVER / MUST NOT / STOP | **BLOCK** — the executor override depends on quoting one |

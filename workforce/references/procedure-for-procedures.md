@@ -40,6 +40,9 @@ ORG-RECORD block          machine-owned org metadata (HTML comments)
 | `## Probe` | ✔ | ✔ | A self-contained task and the shape of a correct result |
 | `## Reporting` | ✔ | ✔ | Where the artifact goes, what is returned |
 
+`## Backed by peers` is outside this order. It is optional, and where present it sits between the
+`You are` opening and `## Role` (`handbook-templates.md` § IC).
+
 Leads get no `## Procedure`. That is deliberate: their job is judgment, and a numbered script for a
 coordinator is the over-specification failure. ICs get one because their work is mechanical and their
 context is cold.

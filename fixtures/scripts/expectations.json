@@ -1927,6 +1927,48 @@
       "0 failed"
     ]
   },
+  "conform-peers-backed": {
+    "_why": "POSITIVE half of the Backed-by-peers set (procedures/handbook.md \u00a7 Step 1.5). One quote with a source URL and a `backs:` phrase that WRAPS across a line of the opening, so whitespace folding is exercised. `not` keeps the row from firing on a correct section; conform-peers-no-backs and conform-peers-phrase-absent are the same handbook with one line changed, and prove the row runs.",
+    "exit": 0,
+    "script": "wf-conform",
+    "want": [
+      "1 governed",
+      "0 failed"
+    ],
+    "not": [
+      "Backed-by-peers"
+    ]
+  },
+  "conform-peers-no-backs": {
+    "_why": "NEGATIVE: conform-peers-backed with its `backs:` line removed. A peer quote that names no phrase of the opening is an endorsement of nothing in particular, so the row blocks.",
+    "exit": 1,
+    "script": "wf-conform",
+    "want": [
+      "\u2717 g.md: every Backed-by-peers quote names its source and the phrase it backs",
+      "quote 1 has no `backs:` line"
+    ]
+  },
+  "conform-peers-none-verified": {
+    "_why": "POSITIVE: a role with no verified master writes `none verified` and no quote. That is a measurement, not a gap, so the row passes.",
+    "exit": 0,
+    "script": "wf-conform",
+    "want": [
+      "1 governed",
+      "0 failed"
+    ],
+    "not": [
+      "Backed-by-peers"
+    ]
+  },
+  "conform-peers-phrase-absent": {
+    "_why": "NEGATIVE: conform-peers-backed with a `backs:` phrase the opening never says. The quote claims to back words the employee was never given, so the row blocks.",
+    "exit": 1,
+    "script": "wf-conform",
+    "want": [
+      "\u2717 g.md: every Backed-by-peers quote names its source and the phrase it backs",
+      "which the opening does not contain"
+    ]
+  },
   "conform-ownership-contested": {
     "_why": "Finding #10a: an owner named in one handbook and denied in another. No per-handbook check can see it — each of these three files is internally perfect, and a cold reader of any one alone reports nothing. Both firing forms are here and they are classified differently on purpose. EXCLUSIVE fails: `docs-writer` is told `docs/**` is its own (`you own these`) and `api-engineer` claims the same tree, which leaves no reading under which both are right. DISPUTED advises: `site-editor` sends `site/**` to `api-engineer` while `docs-writer` claims it, and an org may also overlap a tree with an aspect of it on purpose — measured across eight live orgs before the split was chosen.",
     "exit": 1,

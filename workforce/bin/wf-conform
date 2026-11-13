@@ -712,6 +712,50 @@ def section(body, heading):
     return m.group(1) if m else None
 
 
+# `## Backed by peers` (handbook-templates.md § IC; procedures/handbook.md § Step 1.5).
+# A quote opens with `> "`. Its `backs:` line names the phrase of the opening it
+# supports. `It backs, in your opening:` is the same field in the form the first org
+# to carry the section wrote before the template named it (mutze-studio, 28
+# handbooks, 2026-11-04); refusing it would fail a correct handbook on its spelling.
+PEER_QUOTE_RX = re.compile(r'^>\s*"', re.M)
+PEER_BACKS_RX = re.compile(r'^(?:backs:|It backs, in your opening:)\s*"(.+)"', re.M | re.I)
+
+
+def peers_problems(body, peers):
+    """What is wrong with a present `## Backed by peers`, as a list; empty when nothing is.
+
+    The opening is the text between the `# <Role>` title and the first `## ` heading,
+    after the frontmatter. Both sides of the comparison are folded the same way:
+    whitespace collapsed, case lowered, quote marks dropped. A phrase that wraps
+    across a line is still that phrase, and quoting one mid-sentence lowers its first
+    letter and turns its inner double quotes to single ones. Measured on the first
+    org that carried the section: 2 of 29 correct `backs:` lines, across 28
+    handbooks, differed from their opening in exactly those two ways (mutze-studio
+    composer and script-writer).
+    """
+    def fold(t):
+        return " ".join(t.lower().replace('"', "").replace("'", "").split())
+
+    rest = FM_RX.sub("", body, count=1)
+    m = re.search(r"^# [^\n]*\n(.*?)(?=^## |\Z)", rest, re.S | re.M)
+    opening = fold(m.group(1) if m else "")
+    starts = [q.start() for q in PEER_QUOTE_RX.finditer(peers)]
+    if not starts:
+        return [] if "none verified" in peers.lower() else [
+            "the section holds neither a quote nor `none verified`"]
+    out = []
+    for i, s in enumerate(starts, 1):
+        block = peers[s:starts[i] if i < len(starts) else len(peers)]
+        if not re.search(r"https?://", block):
+            out.append(f"quote {i} names no source URL")
+        backs = PEER_BACKS_RX.search(block)
+        if not backs:
+            out.append(f"quote {i} has no `backs:` line")
+        elif not fold(backs.group(1)) or fold(backs.group(1)) not in opening:
+            out.append(f"quote {i} backs \"{backs.group(1)}\", which the opening does not contain")
+    return out
+
+
 def read(path, res):
     try:
         with open(path, encoding="utf-8") as fh:
@@ -1030,6 +1074,20 @@ def check_handbook(path, body, res, ceiling, floors=None):
                     f"every entry), or name the source by the channel it is actually "
                     f"read through. ADVISORY: this row blocks nothing",
                 )
+
+    # `## Backed by peers` — OPTIONAL, and NOT IN `SECTIONS`, for the reason the Sources
+    # rows above give: it post-dates every deployed handbook, so absence is silent.
+    # PRESENT, it is checked and the row BLOCKS, because a quote that names no source,
+    # or claims to back words the opening never says, is a peer endorsement nobody can
+    # trace. A handbook without the section never reaches this row; the one org that
+    # carried it first is read in its own `It backs, in your opening:` form (PEER_BACKS_RX).
+    _peers = section(body, "## Backed by peers")
+    if _peers is not None:
+        _pp = peers_problems(body, _peers)
+        res.add(not _pp, f"{n}: every Backed-by-peers quote names its source and the phrase it backs",
+                "; ".join(_pp) + ". Each quote carries a source URL and a `backs:` line "
+                "quoting a phrase of the `You are` opening exactly, or the section reads "
+                "`none verified` (procedures/handbook.md § Step 1.5)")
 
     # ADVISORY, and the message has said so since it was written. `procedure-for-procedures.md`
     # § The handbook length ceiling: "over the ceiling is never a refusal and never
