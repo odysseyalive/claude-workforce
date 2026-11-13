@@ -19,8 +19,9 @@ were lost.
 
 WHY `--personal` EXISTS, and why it is a flag rather than the default. Skills resolve
 personal before project, so the personal install shadows everything this script builds
-and goes stale the moment source changes. `bin/check` fails on that drift and names two
-remedies — and MEASURED 2026-08-04, in maintainer mode BOTH are wrong:
+and goes stale the moment source changes. `bin/check` failed on that drift and named two
+remedies until it was retired on 2026-10-14, and nothing reports the drift now — and
+MEASURED 2026-08-04, in maintainer mode BOTH remedies are wrong:
 
   "re-run the installer"        `install` fetches from raw.githubusercontent.com/main.
                                 With unpushed local changes it overwrites the personal
@@ -30,17 +31,18 @@ remedies — and MEASURED 2026-08-04, in maintainer mode BOTH are wrong:
                                 deleting it removes `/workforce` from every OTHER
                                 project on the machine.
 
-The gap was blocking, not cosmetic: `bin/prove` refuses on a red baseline, and this
-drift IS a red baseline — so the project's proof-by-breaking discipline had no working
+The gap was blocking, not cosmetic: `bin/prove` refused on a red baseline, and this
+drift WAS a red baseline — so the project's proof-by-breaking discipline had no working
 tool behind it again, for the second recorded time, from a different cause.
 
 It stays a FLAG because CLAUDE.md is right that aiming a delete-then-rebuild outside
 the repo is not a default worth having. A deliberate gesture is exactly what the
 doctrine asked for; what was missing was any gesture at all.
 
-This reads manifest.txt, so it fails the same way an installer would if the
-manifest and the tree disagree — which is the point. `bin/check` asserts that
-agreement separately.
+This reads manifest.txt, so it fails the same way an installer would if a row names
+a file the tree lacks — which is the point. The other direction, a shipped file with no
+row, was asserted by `bin/check` until it was retired on 2026-10-14; nothing asserts it
+now.
 """
 
 import os
@@ -268,9 +270,9 @@ copied = 0
 
 # The manifest flags — `exec`, `hook`, `canary` — and the on-disk checks are handled
 # once, in `manifest_entries()` above, because the runtime-first scan needs the parsed
-# list before anything is deleted. manifest.txt says re-adding a flag means re-adding
-# its handling to bin/check AND bin/sync in the same change; that handling now has one
-# home in this file rather than being inlined in the copy loop.
+# list before anything is deleted. A flag added to manifest.txt needs its handling here
+# in the same change (bin/check also needed it, until it was retired on 2026-10-14); that
+# handling has one home in this file rather than being inlined in the copy loop.
 for s, executable in ENTRIES:
     for target in targets:
         dest = os.path.join(target, s[len(PREFIX):])
@@ -304,7 +306,8 @@ def _sync_owns(target, skill):
     independent review reproduced it — a `SKILL.md` carrying an
     `origin: user | immutable: true` block, gone after one `--personal` run, with no
     message. Three things make that the worst place for the gap: `--personal` aims at the
-    live `~/.claude/skills`, `bin/check`'s own failure text prescribes this command, and
+    live `~/.claude/skills`, `bin/check`'s own failure text prescribed this command until it
+    was retired on 2026-10-14, and
     `bin/dev-sandbox` builds its sandbox with it — so the sandbox exercised sync and never
     `install`, which is how a critical installer bug survived a green test.
     """

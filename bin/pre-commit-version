@@ -10,12 +10,14 @@ Why it exists: the installers pull `main` HEAD, so every commit to a shipped fil
 effectively a release. A shipped change that rides on an unchanged version number
 makes `update`/`version` report a number that no longer describes the bytes on disk —
 the "version blindness" this hook removes. The rule is therefore literal: touch a
-shipped file, advance the number. `bin/check` carries the complementary static guard
-(the SKILL.md mirror equals the anchor); this carries the one it cannot express
-statelessly (the number moved *forward* in this commit).
+shipped file, advance the number. `wf-conform` carries the complementary static guard
+(its row "this install: SKILL.md `version:` mirrors WORKFORCE-VERSION", run by `verify`;
+`bin/check` held it until it was retired on 2026-10-14); this carries the one a static
+check cannot express (the number moved *forward* in this commit).
 
 Fails OPEN on any internal error (prints a warning, exits 0): a crashing hook must
-never wedge every commit, and `bin/check` is the backstop at verify/CI time.
+never wedge every commit. Nothing backs up the forward-move rule when it does: `bin/check`
+was the backstop until it was retired on 2026-10-14, and `wf-conform` checks only the mirror.
 """
 import os
 import re
@@ -112,7 +114,7 @@ def main():
     if ot is not None and nt is not None and nt <= ot:
         die("WORKFORCE-VERSION went {} -> {}: it must ADVANCE, not move backward.".format(old, new))
 
-    # Mirror must match the anchor in the same commit, or bin/check fails afterward.
+    # Mirror must match the anchor in the same commit, or wf-conform's mirror row fails afterward.
     staged_mirror = git("show", ":" + MIRROR)
     if staged_mirror.returncode == 0:
         mir = parse_mirror(staged_mirror.stdout)

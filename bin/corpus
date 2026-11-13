@@ -5,7 +5,7 @@
     bin/corpus list                        what is snapshotted, and when
     bin/corpus run [name ...]              run every case, diff against the goldens
     bin/corpus run --accept                re-record the goldens instead of diffing
-    bin/corpus run --quiet                 one line unless something fails (bin/check's form)
+    bin/corpus run --quiet                 one line unless something fails
 
 WHY THIS EXISTS — measured 2026-09-25, on the release the day before.
 
@@ -22,8 +22,9 @@ WHY THIS EXISTS — measured 2026-09-25, on the release the day before.
     registered under two layouts, and citations between all of it. That is the input this
     distribution actually runs on, and until now nothing here had ever seen one.
 
-THE CORPUS IS LOCAL-ONLY AND NEVER COMMITTED. `corpus/` is gitignored, and `bin/check`
-asserts that nothing under it is tracked — this repository is PUBLIC, and a snapshot holds
+THE CORPUS IS LOCAL-ONLY AND NEVER COMMITTED. `corpus/` is gitignored, which keeps it out of
+a plain `git add`; `bin/check` asserted that nothing under it is tracked until it was retired
+on 2026-10-14, and nothing asserts it now — this repository is PUBLIC, and a snapshot holds
 another project's handbooks, prompts and notes verbatim. A machine with no snapshots is not
 a machine with a failing gate: `run` reports SKIPPED and exits 0, so a fresh clone and
 every other developer stay green.
@@ -35,8 +36,9 @@ argument to any case.
 
 THE CASES ARE DERIVED, NOT INVENTED. Every row in `CASES` cites the line of
 `references/procedures/audit.md` or `references/audit-setup.md` where the audit makes that
-call in display mode, and `bin/check` re-reads each citation: a procedure that stops making
-a call, or renames its script, fails this list rather than silently leaving it behind.
+call in display mode. `bin/check` re-read each citation until it was retired on 2026-10-14,
+so a procedure that stopped making a call, or renamed its script, failed this list. Nothing
+re-reads them now: `bin/corpus list` prints each citation, and checking it is by hand.
 """
 
 import argparse
@@ -57,9 +59,10 @@ TREE, GOLDEN, PROV = "tree", "golden", "SNAPSHOT.md"
 # display-mode: no `--execute`, no `--apply`, no `--capture`, no `--stamp`. `rc` is the exit
 # code a HEALTHY run gives — `wf-companion --objective` exits 1 on a placeholder objective by
 # design, and `wf-catalog --grep` exits 1 on no match, so "nonzero" is not the failure signal.
-# `cite` is a file:line where the audit's own procedure NAMES this script, and `bin/check` reads
-# each one back: a procedure that stops naming a script, or renames it, fails there rather than
-# leaving this list measuring one author's memory of the audit. Where the audit only ever calls a
+# `cite` is a file:line where the audit's own procedure NAMES this script. `bin/check` read each
+# one back until it was retired on 2026-10-14, so a procedure that stopped naming a script, or
+# renamed it, failed there rather than leaving this list measuring one author's memory of the
+# audit. Nothing reads them back now. Where the audit only ever calls a
 # script in write mode — `wf-permissions --apply`, `wf-settings-apply --execute` — the citation is
 # that line and the case still runs the DISPLAY form, because a display run is the only form it is
 # safe to point at a snapshot. `wf-ledger` was dropped for the opposite reason: no audit procedure
@@ -318,7 +321,7 @@ def do_snapshot(paths):
         if os.path.exists(dest):
             shutil.rmtree(dest)
         os.makedirs(dest)
-        # `.git` and `__pycache__` are excluded for the reason `bin/prove` excludes them: a
+        # `.git` and `__pycache__` are excluded for the reason `bin/prove` excluded them: a
         # nested `.git` is not snapshot content, and a `.pyc` is never source.
         shutil.copytree(os.path.join(src, ".claude"), os.path.join(dest, ".claude"),
                         symlinks=True,
@@ -331,8 +334,8 @@ def do_snapshot(paths):
             fh.write("# corpus snapshot — %s\n\n"
                      "- source: `%s`\n- taken: %s\n- files: %d\n"
                      "- workforce: %s\n\n"
-                     "LOCAL ONLY. `corpus/` is gitignored and `bin/check` asserts nothing "
-                     "under it is tracked: this holds another project's own words, and this "
+                     "LOCAL ONLY. `corpus/` is gitignored and nothing under it may be "
+                     "tracked: this holds another project's own words, and this "
                      "repository is public.\n%s"
                      % (name, src, time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), n,
                         _version(),
@@ -385,7 +388,7 @@ def build_install():
     """A THROWAWAY HOME with a fresh install of THIS checkout: `(sandbox, home, config)`.
 
     THE OPERATOR'S HOME IS NOT AN INPUT, and leaving it as one made three cases diff against
-    themselves. MEASURED while wiring this into `bin/check`, which runs with a temp `HOME`:
+    themselves. MEASURED while wiring this into `bin/check`, which ran with a temp `HOME`:
     `wf-census` counted the operator's own `~/.claude/agents/` and printed `image-validator: 2
     in-skill copies` that a temp-HOME run did not, and `wf-context` charged `3,853 B
     /home/francis/lab/CLAUDE.md` — a file in the directory ABOVE this repository, belonging to

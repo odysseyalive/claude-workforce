@@ -41,8 +41,9 @@ another function reads; it cannot see WHICH BRANCH of the writer the reader reli
 
 DANGLING is an edge whose far end does not exist: a registration, load or run naming no
 script, a use naming no top-level definition, or a hand-off file something reads and nothing
-writes. `bin/check` fails on one. KNOWN_DANGLING holds any kept on record, with its reason,
-and each is printed on every run rather than hidden.
+writes. Nothing fails on one: `bin/check` did until it was retired on 2026-10-14, and this
+map exits 0. KNOWN_DANGLING holds any kept on record, with its reason, and each is printed on
+every run rather than hidden.
 
 Exit code is always 0: a map, not a gate.
 """
@@ -76,14 +77,17 @@ def _src(path):
 # These four lived here until 2026-09-16, and the shipped registry kept the file-level rule they
 # replaced, so every host's `wf-live` reported `wf-asks` "acted on by NOTHING" while `bin/check`
 # (reading this file) passed. The rule is enforcement of a shipped directive, so the copy that
-# ships is the one copy; this file and `bin/check`'s actor check read it from there.
+# ships is the one copy; this file reads it from there, as `bin/check`'s actor check did until
+# it was retired on 2026-10-14.
 def _load_live():
     from importlib.machinery import SourceFileLoader
     import importlib.util
     loader = SourceFileLoader("_wf_live_roles", os.path.join(ROOT, BIN, "wf-live"))
     spec = importlib.util.spec_from_loader(loader.name, loader)
     mod = importlib.util.module_from_spec(spec)
-    # NEVER LEAVE A __pycache__ BESIDE A SHIPPED SCRIPT: `bin/check` fails on the residue.
+    # NEVER LEAVE A __pycache__ BESIDE A SHIPPED SCRIPT: it is an undeclared file in the shipped
+    # tree. `bin/check` failed on the residue until it was retired on 2026-10-14; `.gitignore`
+    # keeps it out of a commit, and nothing else catches it now.
     prior, sys.dont_write_bytecode = sys.dont_write_bytecode, True
     try:
         loader.exec_module(mod)

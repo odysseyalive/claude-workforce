@@ -36,8 +36,11 @@
 #              the record itself — see § Retired external paths at the foot of this file
 #
 # THIS LIST IS THE FLAG SET, and it is complete. Both installers branch on every flag in
-# it, every reader that strips a flag must strip them all, and `bin/check` fails when an
-# installer or this header lacks one the bash installer parses. `sibling`, `exec-sibling`
+# it, and every reader that strips a flag must strip them all. Nothing checks that now:
+# `bin/check` failed when an installer or this header lacked a flag the bash installer
+# parses, until it was retired on 2026-10-14. The readers to keep in step by hand are the
+# `case` arms in `install`, `$script:ManifestFlags` in `install.ps1`, `manifest_entries()`
+# in `bin/sync` and `FLAGS` in `bin/pre-commit-version`. `sibling`, `exec-sibling`
 # and `agent` were missing from both this header and install.ps1 from 2026-09-10 to
 # 2026-09-14, and the port fetched every such row as a 404. `canary` went undocumented
 # here from the day it was added until 2026-09-07 while five rows used it, and
@@ -239,8 +242,10 @@ workforce/references/org-config.template.md
 # corpus, distilled and cited from OWASP/PayloadsAllTheThings/semgrep rather than copied;
 # and the whole `ui-design` skill, written for workforce (`origin: workforce`)
 # or carried from this user's own sibling project, never imported from claude-enforcer.
-# `bin/check` keys its VENDORED exemption on exactly these names, so a file filed wrong
-# either escapes the authoring rules or is frozen by a read-only contract it never had.
+# `bin/check` keyed its VENDORED exemption on exactly these names until it was retired on
+# 2026-10-14. Nothing reads this filing now; it is a convention, and a file filed wrong is
+# edited under the wrong contract: freed from the authoring rules, or frozen by a read-only
+# contract it never had.
 sibling workforce/skills/text-eval/SKILL.md
 sibling workforce/skills/text-eval/references/version.md
 sibling workforce/skills/text-eval/references/text-tells.md
@@ -294,7 +299,10 @@ sibling workforce/skills/security-evaluator/references/native-tool-map.md
 # (carried from the sibling project, rules reworded nowhere) and `rendered-checks.md` grade a page
 # that exists, while `direction.md` and `ergonomics-catalog.md` — both authored here 2026-10-08 —
 # decide the direction before one does. All four carry the same `ui-design-ref-version` anchor, which
-# is what `wf-catalog` reads for the ui kind and what `bin/check` asserts they agree on.
+# is what `wf-catalog` reads for the ui kind. `wf-catalog` reads the first file carrying it
+# and does not compare them; the agreement is checked by `ui-design/SKILL.md` § Verification
+# (`grep -L 'ui-design-ref-version: <N>' references/*.md`, expect no output), run by hand.
+# `bin/check` asserted it automatically until it was retired on 2026-10-14.
 sibling workforce/skills/ui-design/SKILL.md
 sibling workforce/skills/ui-design/references/version.md
 sibling workforce/skills/ui-design/references/design-quality-catalog.md
@@ -316,10 +324,12 @@ sibling workforce/skills/ui-design/references/ergonomics-catalog.md
 # lets `update` alone carry it to every project.
 #
 # Its `SKILL.md` is workforce's own prose and stays under every authoring rule. Do not
-# restate the provenance heading from the evaluator block above here: `bin/check` pins that
-# literal and a second copy in this file makes the assertion vacuous, which is how this
-# comment came to be written. The VENDORED exemption already excludes every `SKILL.md` by
-# name, so nothing about the exemption changes for blueprint.
+# restate the provenance heading from the evaluator block above here: `bin/check` pinned that
+# literal until it was retired on 2026-10-14, and a second copy in this file made the
+# assertion vacuous, which is how this comment came to be written. Nothing pins it now; one
+# copy is still the convention, so a search for the heading finds the block it heads. The
+# VENDORED filing above already lists every `SKILL.md` as authored here, so nothing about
+# it changes for blueprint.
 sibling workforce/skills/blueprint/SKILL.md
 
 # ── shared-artifact — the second SIBLING that is not an evaluator ─────────────
@@ -342,12 +352,15 @@ sibling workforce/skills/blueprint/SKILL.md
 #
 # `template.html` is the only non-markdown file shipped into a sibling skill. It is DATA the
 # skill tells its reader to copy, it is not executable, and it declares no flag beyond
-# `sibling` for that reason. `bin/check` runs the shipped hook against it and requires it to
-# satisfy the floor the hook enforces: a template that fails its own gate teaches the defect.
+# `sibling` for that reason. It must satisfy the floor `wf-artifact-style` enforces: a
+# template that fails its own gate teaches the defect. `bin/check` ran the hook against it
+# until it was retired on 2026-10-14, and no fixture does; check it by hand by piping
+# `{"tool_input":{"file_path":"<path to template.html>"}}` into the hook and expecting no
+# output.
 #
 # Everything here is workforce's own prose and stays under every authoring rule. The
-# provenance headings in the evaluator block above are pinned literals and are deliberately
-# not restated here, for the reason that block's own closing paragraph gives.
+# provenance headings in the evaluator block above are deliberately not restated here,
+# for the reason the blueprint block's closing paragraph gives.
 sibling workforce/skills/shared-artifact/SKILL.md
 sibling workforce/skills/shared-artifact/references/house-style.md
 sibling workforce/skills/shared-artifact/references/template.html
@@ -463,7 +476,9 @@ workforce/references/claude-md.md
 # Destination is derived from the source directory, the same mapping the live flags
 # use: `workforce/canary/*` -> the agents directory, `workforce/output-styles/*` ->
 # the output-styles directory. A retired path outside those two prefixes is a
-# manifest error and `bin/check` fails on it rather than guessing.
+# manifest error. Both installers refuse to guess a destination for it: each prints
+# "Prune: retired path '<path>' has no known destination; skipped." and seeds no path.
+# Nothing fails on it; `bin/check` did until it was retired on 2026-10-14.
 #
 # A row is added here when a `canary` or `style` row is removed, in the same commit.
 # Rows are never deleted: a host can be arbitrarily old, and a list that forgets an

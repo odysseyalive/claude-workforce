@@ -216,9 +216,10 @@ def _git_fixture(tree, g, env):
                       may, so neither does.
       `links`       — symlinks CREATED at run time, path -> target, both tree-relative, and
                       `${HOOKS}` in either resolves to that same hooks directory. A
-                      DANGLING link cannot be checked in: `bin/check` requires every
-                      tracked fixture link to resolve to something git carries, because one
-                      that does not is dangling in every fresh clone. A link whose target
+                      DANGLING link cannot be checked in, because one that git does not
+                      carry the target of is dangling in every fresh clone. `bin/check`
+                      required every tracked fixture link to resolve until it was retired
+                      on 2026-10-14; nothing checks it now. A link whose target
                       is deliberately absent is exactly what a write-through-a-symlink case
                       needs, so it is made here instead.
       `commit`      — one commit of everything, which is the only way a case can see the
@@ -616,10 +617,11 @@ def _left_alone(rel, expect, snap, path):
 def touching(relpath, cases):
     """The cases a change to `relpath` can alter, or None when no case executes it.
 
-    `bin/prove` runs `bin/check` once per mutation, and this suite is the slowest thing in
-    it, so a prove child asks for the cases its one mutated file can reach instead of all
-    of them. The full suite still runs in every plain `bin/check`, and in prove's own
-    baseline before the first case, so nothing a narrowed child skips goes unrun.
+    Written for `bin/prove`, which ran `bin/check` once per mutation until both were retired
+    on 2026-10-14: this suite was the slowest thing in it, so a prove child asked for the
+    cases its one mutated file could reach instead of all of them. `wf-map --tests` now
+    prints this selection for a changed file. Nothing re-runs the full suite behind a
+    narrowed run any more; `bin/check` and prove's own baseline did until 2026-10-14.
 
       bin/script-conformance, fixtures/scripts/expectations.json   every case
       fixtures/scripts/<case>/...                                   that case

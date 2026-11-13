@@ -41,8 +41,8 @@ NOTIFICATION keep-rule and the tag's `enforced` marker for deletion while the as
 both.*
 
 **The corpus is the store the other five could not be.** Each of them measures a tree this project
-authored — a fixture states the case its author thought of, and a `bin/check` assertion states the rule
-its author knew to write down. **1.71.0 passed 1,411 checks and 726 prove cases, shipped, and on the
+authored — a fixture states the case its author thought of, and a `bin/check` assertion stated the rule
+its author knew to write down, until `bin/check` was retired on 2026-10-14. **1.71.0 passed 1,411 checks and 726 prove cases, shipped, and on the
 first real org it was pointed at left 505 false readers; its new `--house-rules` producer crashed with
 `NameError: name 'body' is not defined` on every project that already carried a region.** Neither was
 reachable from anything in this repository, because a real org is 31 skills, 1,511 files, five evaluator
@@ -57,7 +57,8 @@ bin/corpus run --case catalog-migrate  # one case
 bin/corpus run --accept                # re-record the goldens
 ```
 
-**`corpus/` is gitignored and `bin/check` asserts nothing under it is tracked.** This repository is
+**`corpus/` is gitignored, and nothing under it may be tracked.** `bin/check` asserted that until it was
+retired on 2026-10-14; nothing asserts it now. This repository is
 public and a snapshot is somebody's private working material; `fixtures/` is where a committed tree
 belongs. On a machine with no snapshots `bin/corpus run` prints one SKIPPED line and exits 0, so a fresh
 clone stays green — the corpus is a local instrument, not a shared one.
@@ -78,7 +79,7 @@ expected output.
 `wf-preflight` reports which env vars could override an employee's frontmatter, so `CLAUDE_EFFORT=high`
 went into the golden and `CLAUDE_EFFORT=medium` came out of the next run: `corpus run` FAILED with no
 code change. **A known false fire is not shippable** — a suite that fires on the operator's shell is one
-nobody keeps green. `bin/check` therefore runs the corpus TWICE, under two deliberately different
+nobody keeps green. `bin/check` therefore ran the corpus TWICE until it was retired on 2026-10-14, under two deliberately different
 sessions' worth of environment, because one run answers "did the behaviour change" and only the pair
 answers "can this suite tell". `PYTHONHASHSEED` is deliberately NOT pinned: a fixed seed would have
 hidden the `wf-census` row-order defect this corpus found on its first run.*
@@ -92,9 +93,9 @@ release is 1.72.0.`, the same fact ending a sentence, and only a run at a differ
 it.*
 
 **The case list is derived, not invented.** Every row cites the `audit.md` or `audit-setup.md` line
-where the audit makes that call in display mode, and `bin/check` re-reads each citation: a procedure
-that stops making a call, or renames its script, fails there rather than leaving the corpus measuring
-this project's memory of the audit.
+where the audit makes that call in display mode. `bin/check` re-read each citation until it was retired
+on 2026-10-14, so a procedure that stopped making a call, or renamed its script, failed there rather than
+leaving the corpus measuring this project's memory of the audit. Nothing re-reads them now.
 
 *Proven against 1.70.0 (`f2c5c64`) in a scratch worktree with the goldens from HEAD: 8 of 27 cases
 differ, and `catalog-migrate`'s diff is the false-reader defect itself — 1.70.0 counted

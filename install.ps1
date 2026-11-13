@@ -276,8 +276,9 @@ function Install-ClaudeWorkforce {
     # this port knew six of the nine and took a `sibling`, `exec-sibling` or `agent` row's
     # whole text as its path, fetching `$RepoUrl/sibling workforce/skills/...`, so every
     # Windows install failed to fetch all five evaluators and their agents. The fetch, prune
-    # and verify passes all parse through ConvertFrom-ManifestLine, and `bin/check` reads this
-    # table against the case arms in `install`.
+    # and verify passes all parse through ConvertFrom-ManifestLine. `bin/check` read this
+    # table against the case arms in `install` until it was retired on 2026-10-14; nothing
+    # compares them now, so a flag added to one installer is added to the other by hand.
     $script:ManifestFlags = [ordered]@{
         'keep'         = 'keep'
         'hook'         = 'hook'
