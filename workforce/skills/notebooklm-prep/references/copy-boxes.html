@@ -1,0 +1,69 @@
+<!-- notebooklm-prep-snippet-version: 1 -->
+<!-- The "For NotebookLM" section for a shared-artifact page: three copy boxes in a fixed
+     order, the one-line paste instruction above them, and the copy script. Copied from the
+     page the user approved on 2026-11-16 ("that was perfect"), with its content replaced by
+     CAPITALISED placeholders and its two inline styles turned into classes.
+
+     It is NOT a page. It has no tokens, no dark-mode blocks and no <title>, and it must not
+     gain any: it is pasted into a page built from shared-artifact's template.html, which
+     carries all of those, and every colour below is one of that template's tokens. Three
+     parts, each pasted in a different place:
+
+       PART 1  the CSS: paste these rules inside the page's existing <style> element
+       PART 2  the section: paste inside <main>, and add the rail entry to nav.toc
+       PART 3  the script: paste after the closing </div> of .wrap, beside rail-highlight
+
+     Text inside a <textarea> is HTML: write & as &amp; and < as &lt;, or the box shows
+     something other than what NotebookLM should receive. -->
+
+<!-- PART 1: CSS -->
+<style>
+/* NotebookLM copy boxes */
+.copybox { margin: 0 0 22px; }
+.copybar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.copybar .lbl { font: 600 14px/1.3 var(--f-body); }
+.copybtn { font: 600 13px/1 var(--f-body); color: var(--paper); background: var(--accent); border: 0; border-radius: 6px; padding: 9px 14px; cursor: pointer; }
+.copybtn:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.copybox textarea { width: 100%; min-height: 260px; resize: vertical; font: 400 13px/1.55 var(--f-mono); color: var(--ink); background: var(--code-bg); border: 1px solid var(--rule); border-radius: 8px; padding: 12px 14px; }
+.copybox textarea.refs { min-height: 220px; }
+.copybox textarea.prompt { min-height: 140px; }
+.copybox .status { font-size: 13px; color: var(--muted); min-height: 1.2em; margin-top: 4px; }
+.copybox .count { font-size: 13px; color: var(--muted); margin-top: 6px; }
+</style>
+
+<!-- PART 2: the rail entry, then the section -->
+<li><a href="#notebooklm"><span>NN</span>For NotebookLM</a></li>
+
+<section id="notebooklm">
+  <div class="sec-head"><span class="sec-num">NN</span><h2>For NotebookLM</h2><span class="kicker">Paste into a new notebook, then generate the podcast</span></div>
+  <p class="summary">Paste the first box in as a text source. Add each link in the second box as a separate website source. Then paste the third box into the Audio Overview's Customize field before you generate the podcast.</p>
+  <div class="copybox">
+    <div class="copybar"><span class="lbl">1. SOURCE TEXT LABEL</span><button class="copybtn" type="button" data-copy="nb-text">Copy SOURCE TEXT LABEL</button></div>
+    <textarea id="nb-text" readonly aria-label="SOURCE TEXT LABEL for NotebookLM">THE SOURCE TEXT: A CONTEXT PARAGRAPH, THEN THE MATERIAL IN ORDER, AS PLAIN PROSE.</textarea>
+    <div class="status" id="nb-text-status" aria-live="polite"></div>
+  </div>
+  <div class="copybox">
+    <div class="copybar"><span class="lbl">2. References</span><button class="copybtn" type="button" data-copy="nb-refs">Copy references</button></div>
+    <textarea id="nb-refs" class="refs" readonly aria-label="Reference links for NotebookLM">ONE CHECKED URL PER LINE</textarea>
+    <div class="status" id="nb-refs-status" aria-live="polite"></div>
+  </div>
+  <div class="copybox">
+    <div class="copybar"><span class="lbl">3. Podcast prompt</span><button class="copybtn" type="button" data-copy="nb-prompt">Copy podcast prompt</button></div>
+    <textarea id="nb-prompt" class="prompt" readonly aria-label="Podcast prompt for NotebookLM Audio Overview">THE AUDIO OVERVIEW PROMPT, UNDER 500 CHARACTERS</textarea>
+    <div class="status" id="nb-prompt-status" aria-live="polite"></div>
+    <p class="count">MEASURED COUNT characters, short enough for the Customize box.</p>
+  </div>
+</section>
+
+<!-- PART 3: the copy script. The page is fully readable without it; it only adds the
+     buttons' behaviour. A blocked clipboard selects the text and asks for Ctrl+C. -->
+<script id="copy-boxes">
+document.querySelectorAll('.copybtn').forEach(btn => btn.addEventListener('click', () => {
+  const box = document.getElementById(btn.dataset.copy);
+  const status = document.getElementById(btn.dataset.copy + '-status');
+  const fallback = () => { box.focus(); box.select(); status.textContent = 'Text selected. Press Ctrl+C (or Cmd+C) to copy.'; };
+  try {
+    navigator.clipboard.writeText(box.value).then(() => { status.textContent = 'Copied.'; }, fallback);
+  } catch (e) { fallback(); }
+}));
+</script>

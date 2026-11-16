@@ -152,10 +152,10 @@ Updating replaces the skill wholesale. Nothing you edit lives inside it, so ther
 It syncs and stops; it never inspects your org, so its cost doesn't grow with how much you've
 staffed. To check the org against the new release, run `/workforce verify` afterward.
 
-**Update is the whole path.** Installing puts nine skills on your machine, not one. You get
+**Update is the whole path.** Installing puts ten skills on your machine, not one. You get
 `workforce` itself plus four evaluators (`text-eval`, `code-evaluator`, `security-evaluator`,
 `ui-design`), each one complete with the catalog it grades against and the agents it
-runs. The sixth is `blueprint`, which writes a plan as a file, cites its evidence, and never starts the work. The seventh is `shared-artifact`, the house style for any page you publish as a shareable link, and a hook applies it on its own so you never have to ask for it. The eighth is `records-code-map`, which tells an agent where things are in your code. The ninth is `timezone`: type `/timezone` to pick the zone Claude Code shows its times in, without running an audit. They sit side by side in your skills directory and every project on the machine reaches them.
+runs. The sixth is `blueprint`, which writes a plan as a file, cites its evidence, and never starts the work. The seventh is `shared-artifact`, the house style for any page you publish as a shareable link, and a hook applies it on its own so you never have to ask for it. The eighth is `records-code-map`, which tells an agent where things are in your code. The ninth is `timezone`: type `/timezone` to pick the zone Claude Code shows its times in, without running an audit. The tenth is `notebooklm-prep`: ask for anything to be prepped for NotebookLM and it hands you the source text, the checked links and the podcast prompt as three parts, each ready to paste. They sit side by side in your skills directory and every project on the machine reaches them.
 When an evaluator's catalog changes, `/workforce update` is all you run. You never re-audit a project
 to collect a change. Earlier versions copied them into each project instead, which meant an update
 reached none of them.

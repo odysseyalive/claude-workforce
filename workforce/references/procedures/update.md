@@ -223,9 +223,9 @@ makes the working directory the project is step 4's rule — run it from the roo
 with a bootstrap prompt. Both installers dropped that check with the evacuation directive; the prose
 outlived it by six weeks.*
 
-### The four evaluators come with it, and so do `blueprint`, `shared-artifact`, `records-code-map` and `timezone`
+### The four evaluators come with it, and so do `blueprint`, `shared-artifact`, `records-code-map`, `timezone` and `notebooklm-prep`
 
-**`update` installs nine skills, not one.** `text-eval`, `code-evaluator`, `security-evaluator`
+**`update` installs ten skills, not one.** `text-eval`, `code-evaluator`, `security-evaluator`
 and `ui-design` ship as SIBLINGS of `skills/workforce/` — each complete, carrying the
 corpus it grades against and the agents it runs — and the same rows register those agents where the
 host reads them. That is the whole of the 2026-09-10 directive: *"All I have to do is update
@@ -253,6 +253,12 @@ settings file holds it, user scope included (`hooks.md` § Healing, `PRIOR_MATCH
 settings so Claude Code shows its times in the user's zone, and it ships the first `exec-sibling`
 script, `wf-timezone`, which `audit` Step 0.2 calls for its time zone question
 (`manifest.txt` § timezone). Neither is an evaluator or a catalog.
+
+**`notebooklm-prep` rides them too.** It formats material for NotebookLM as three copy boxes in a
+fixed order: source text, checked reference links, and the Audio Overview prompt. Its `description`
+is its trigger; no hook loads it. Its `references/copy-boxes.html` is a fragment pasted into a
+`shared-artifact` page, not a page of its own (`manifest.txt` § notebooklm-prep). It is not an
+evaluator or a catalog.
 
 **A skill this installer did not write is never overwritten.** Ownership is decided once per skill,
 on its `SKILL.md`, against `.installed-external` as that record stood BEFORE the run — a project's

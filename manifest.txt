@@ -350,7 +350,8 @@ sibling workforce/skills/blueprint/SKILL.md
 # Its own `shared-artifact-ref-version` anchor is for this skill's internal use and names a
 # recipe, not a catalog kind.
 #
-# `template.html` is the only non-markdown file shipped into a sibling skill. It is DATA the
+# `template.html` was the first non-markdown file shipped into a sibling skill (the second
+# is `notebooklm-prep`'s `copy-boxes.html`, below). It is DATA the
 # skill tells its reader to copy, it is not executable, and it declares no flag beyond
 # `sibling` for that reason. It must satisfy the floor `wf-artifact-style` enforces: a
 # template that fails its own gate teaches the defect. `bin/check` ran the hook against it
@@ -396,6 +397,27 @@ sibling workforce/skills/records-code-map/SKILL.md
 # installed beside it (`<skills-root>/workforce/bin/`). The mechanism is `platform.md` § Fact 27.
 sibling workforce/skills/timezone/SKILL.md
 exec-sibling workforce/skills/timezone/bin/wf-timezone
+
+# ── notebooklm-prep — the SIBLING that formats material for NotebookLM ────────
+#
+# User request, 2026-11-16, relayed from a peer session: *"create a new skill that gets
+# distributed with the base skills, that formats a notebooklm entry just like you did in this
+# doc? So if anyone asks you to prep a notebooklm for a podcast, workforce will automatically
+# use this method in the future."* Of the page it copies: *"that was perfect."* Same install
+# mechanism as the siblings above, for the same reason. No hook loads it: its `description`
+# is the trigger, which is how every sibling but `shared-artifact` is reached.
+#
+# `references/copy-boxes.html` is the second non-markdown file shipped into a sibling, after
+# `shared-artifact`'s `template.html`, and the same filing applies: DATA the skill tells its
+# reader to copy, not executable, so plain `sibling`. It is a fragment pasted INTO a page
+# built from that template, so it carries no tokens and no dark-mode block of its own and
+# must never gain them. Check it by hand: paste its three parts into a copy of
+# `template.html`, pipe `{"tool_input":{"file_path":"<that copy>"}}` into
+# `wf-artifact-style`, and expect no output. Not an evaluator and not a catalog: its
+# `notebooklm-prep-snippet-version` anchor is internal, and it is registered in neither
+# `wf-catalog` nor `wf-conform`.
+sibling workforce/skills/notebooklm-prep/SKILL.md
+sibling workforce/skills/notebooklm-prep/references/copy-boxes.html
 
 # ── Procedures ────────────────────────────────────────────────────────────────
 workforce/references/procedures/audit.md

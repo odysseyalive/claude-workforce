@@ -102,3 +102,5 @@ projector slides where a narrow layout means nothing.
 - [references/house-style.md](references/house-style.md) — the recipe: tokens, dark-mode
   contract, typography, the binder layout, headings that pop, content order, sharing hygiene
 - [references/template.html](references/template.html) — the neutral starter, placeholders only
+- A "For NotebookLM" section, or any page that preps material for NotebookLM, is built by the
+  `notebooklm-prep` skill, from its `references/copy-boxes.html`
