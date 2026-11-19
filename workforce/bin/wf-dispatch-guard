@@ -40,8 +40,9 @@ config root (memory files, plans, installed skills), inside the host's session t
 (`<tmp>/claude-<uid>/`, where the scratchpad is) or the payload's `scratchpad_dir`, inside
 `.claude/workforce/` (work orders and hand-offs, which are written BEFORE the spawn), or named
 `wf-asks.*` (the asks checklist). A Bash command whose own words name a path outside the
-project or one of those places, or a `mktemp` directory, is not read as a project edit, because
-its target cannot be resolved from its text. That errs toward allowing: a missed edit costs
+project or one of those places (a `../` path resolved against the payload's `cwd`), or a
+`mktemp` directory, or that runs with its `cwd` outside the project, is not read as a project
+edit, because its target cannot be resolved from its text. That errs toward allowing: a missed edit costs
 nothing that was not already the case before this hook; a wrong deny costs the user a
 round-trip.
 
@@ -53,7 +54,9 @@ target. The first draft got 10 wrong (`~/.codex`, `~/.config/hypr`, `~/.local/st
 `mktemp -d`, sibling projects), and the outside-path rule above is what removed them. On
 `a933f135` it denies the first project edit of both of that session's turns and all 6 of its
 long foreground calls. No turn in the corpus made its first change in the same response as its
-first spawn, which is the case the transcript cannot show (below).
+first spawn, which is the case the transcript cannot show (below). RE-REPLAYED after the
+review fixes (perl argument switches, stdin and stdout-buffer writes, `..` paths; 2,287 turns,
+11,081 Bash calls): 696 and 227 denials, the identical set of fired turns as before the fixes.
 
 A TURN is everything after the newest user row in the main transcript that is not a tool
 result and not a host-written meta row. An agent is spawned when an assistant row in the turn
@@ -84,10 +87,16 @@ _UNSAFE = re.compile(r"[^A-Za-z0-9_.-]")
 HEREDOC = re.compile(r"<<-?[ \t]*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\1[^\n]*\n(.*?)^[ \t]*\2[ \t]*$",
                      re.S | re.M)
 QUOTED = re.compile(r"'[^']*'|\"(?:\\.|[^\"\\])*\"")
+# An `i` in a switch bundle is in-place, except in a perl switch that takes the rest of its
+# word as an argument: `-MDigest::MD5`, `-MList::Util`, `-Ilib`, `-d:Trace`, `-F,`, `-xdir`
+# all hold an `i` and edit nothing. Reviewed 2026-11-19: each was denied as a project edit.
 IN_PLACE = re.compile(r"(?:^|[\s;&|(`])(?:g?sed|perl)\s+(?:[^\s;&|]+\s+)*?"
-                      r"(?:-[A-Za-z]*i[^\s]*|--in-place\S*)(?=\s|$)", re.M)
+                      r"(?:-(?![MmIdDFx])[A-Za-z]*i[^\s]*|--in-place\S*)(?=\s|$)", re.M)
 INTERPRETER = re.compile(r"(?:^|[\s;&|(`/])(?:python[0-9.]*|node|ruby|perl)\b")
-WRITES = re.compile(r"(?<!stdout)(?<!stderr)\.write\(|\bwrite_(?:text|bytes)\(|writeFileSync|"
+# A write to a standard stream or a child's stdin pipe is not a file change:
+# `sys.stdout.buffer.write(`, `proc.stdin.write(` (reviewed 2026-11-19, both were denied).
+WRITES = re.compile(r"(?<!stdout)(?<!stderr)(?<!stdin)(?<!stdout\.buffer)(?<!stderr\.buffer)"
+                    r"\.write\(|\bwrite_(?:text|bytes)\(|writeFileSync|"
                     r"\bopen\([^)\n]*['\"][wax]b?\+?['\"]")
 REDIRECT = re.compile(r"(?<![0-9&>])>>?[ \t]*(?!&|[ \t]*/dev/)[^\s;&|<>]+|\btee\s+(?!/dev/)\S")
 INLINE_SCRIPT = re.compile(r"(?:python[0-9.]*|node|ruby|perl)\s+(?:-\S+\s+)*?-[ce]\s")
@@ -154,28 +163,45 @@ def path_exempt(path, payload, project):
 PATH_TOKEN = re.compile(r"(?<![\w.:/~$}\\-])(?:~|\$HOME|\$\{HOME\})?/[\w.@%+-][\w./@%+-]*")
 PATH_LITERAL = re.compile(r"['\"]((?:~|\$HOME|\$\{HOME\})?/[\w.@%+-]+(?:/[\w.@%+-]*)*)['\"]")
 HOME_PREFIX = re.compile(r"\A(?:~|\$HOME|\$\{HOME\})")
+# A path that climbs out of the shell's directory: `..`, `../sibling/app.sh`.
+PARENT_TOKEN = re.compile(r"(?<![\w.:/~$}\\-])\.\.(?:/[\w.@%+-]*)*(?![\w.@%+-])")
+# The first change of directory in a command, and its target.
+CHDIR = re.compile(r"(?:^|[\s;&|(])(?:cd|pushd)(?![\w-])(?:\s+([^\s;&|)]+))?")
 
 
-def named_paths(command):
-    code = HEREDOC.sub("\n", command)
-    yield from PATH_TOKEN.findall(QUOTED.sub(" ", code))
-    yield from PATH_LITERAL.findall(command)
+def parent_paths(code):
+    """The `..` paths whose base is the payload's `cwd`: those before the command's first
+    `cd`, and that `cd`'s own target. After it the base is unknown, and every replayed
+    command that climbed after a `cd` stayed inside the project (`cd .claude/agents &&
+    ... ../workforce/...`, `cd <deep dir>; ... > ../notes.txt`), so those stay project edits."""
+    m = CHDIR.search(code)
+    head = code[:m.start()] + " " + (m.group(1) or "") if m else code
+    return PARENT_TOKEN.findall(head)
 
 
 def names_elsewhere(command, payload, project):
     """True when the command names any place outside the project, or an exempt one inside
-    it, or a `mktemp` directory, so it is not read as a project edit. A Bash command's
-    target cannot be resolved from its text, so any such mention lets it through: replayed
-    over this machine's transcripts, the commands it let through were edits to `~/.codex`,
-    `~/.config/hypr`, `~/.local/state`, a `mktemp -d` and sibling projects."""
+    it, or a `mktemp` directory, or runs in a shell whose directory is outside the project,
+    so it is not read as a project edit. A Bash command's target cannot be resolved from its
+    text, so any such mention lets it through: replayed over this machine's transcripts, the
+    commands it let through were edits to `~/.codex`, `~/.config/hypr`, `~/.local/state`, a
+    `mktemp -d` and sibling projects. A `..` path is resolved against the shell's own
+    directory, the payload's `cwd` (`parent_paths`): a `sed -i ... ../sibling/app.sh` edits
+    the sibling, not the project."""
     if "wf-asks." in command or ".claude/workforce/" in command or "mktemp" in command:
         return True
+    cwd = payload.get("cwd")
+    cwd = cwd if isinstance(cwd, str) and os.path.isabs(cwd) else project
+    if not _under(_real(cwd), _real(project)):
+        return True
     home = os.path.expanduser("~")
-    for token in named_paths(command):
+    code = QUOTED.sub(" ", HEREDOC.sub("\n", command))
+    for token in PATH_TOKEN.findall(code) + PATH_LITERAL.findall(command):
         token = HOME_PREFIX.sub(lambda _m: home, token)
         if not token.startswith("/dev/") and path_exempt(token, payload, project):
             return True
-    return False
+    return any(path_exempt(os.path.join(cwd, t), payload, project)
+               for t in parent_paths(code))
 
 
 def file_change(payload, project):

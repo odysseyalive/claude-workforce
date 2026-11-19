@@ -16691,5 +16691,68 @@
       "permissionDecision",
       "hookSpecificOutput"
     ]
+  },
+  "dispatch-guard-non-project-bash-never-denied": {
+    "_why": "ZERO KNOWN WRONG FIRES, REVIEW OF 7bf6b6b (2026-11-19). Each of these was denied as the turn's first project edit and edits nothing in the project: a perl switch that takes the rest of its word (`-MDigest::MD5`, `-Ilib`) holds an `i` and was read as `-i`; a write to a child's stdin pipe or to `sys.stdout.buffer` was read as a file write; and `sed -i` on `../sibling/app.sh` edits a sibling project, resolved against the payload's `cwd`. Each step would be this turn's first change, so each would be the one denied.",
+    "exit": 0,
+    "script": "wf-dispatch-guard",
+    "before": [
+      {
+        "script": "wf-dispatch-guard",
+        "stdin_raw": "{\"session_id\": \"fx\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}/scratch\", \"transcript_path\": \"${TREE}/transcript.jsonl\", \"hook_event_name\": \"PreToolUse\", \"permission_mode\": \"default\", \"tool_name\": \"Bash\", \"tool_input\": {\"command\": \"perl -MDigest::MD5 -ne 'print' app.sh\", \"description\": \"d\"}}",
+        "not": [
+          "permissionDecision"
+        ]
+      },
+      {
+        "script": "wf-dispatch-guard",
+        "stdin_raw": "{\"session_id\": \"fx\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}/scratch\", \"transcript_path\": \"${TREE}/transcript.jsonl\", \"hook_event_name\": \"PreToolUse\", \"permission_mode\": \"default\", \"tool_name\": \"Bash\", \"tool_input\": {\"command\": \"perl -Ilib -e 'print 1' app.sh\", \"description\": \"d\"}}",
+        "not": [
+          "permissionDecision"
+        ]
+      },
+      {
+        "script": "wf-dispatch-guard",
+        "stdin_raw": "{\"session_id\": \"fx\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}/scratch\", \"transcript_path\": \"${TREE}/transcript.jsonl\", \"hook_event_name\": \"PreToolUse\", \"permission_mode\": \"default\", \"tool_name\": \"Bash\", \"tool_input\": {\"command\": \"python3 - <<'EOF'\\nimport subprocess\\np = subprocess.Popen(['cat'], stdin=subprocess.PIPE)\\np.stdin.write(b'x')\\nEOF\", \"description\": \"d\"}}",
+        "not": [
+          "permissionDecision"
+        ]
+      },
+      {
+        "script": "wf-dispatch-guard",
+        "stdin_raw": "{\"session_id\": \"fx\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}/scratch\", \"transcript_path\": \"${TREE}/transcript.jsonl\", \"hook_event_name\": \"PreToolUse\", \"permission_mode\": \"default\", \"tool_name\": \"Bash\", \"tool_input\": {\"command\": \"python3 - <<'EOF'\\nimport sys\\nsys.stdout.buffer.write(open('app.sh', 'rb').read())\\nEOF\", \"description\": \"d\"}}",
+        "not": [
+          "permissionDecision"
+        ]
+      }
+    ],
+    "stdin_raw": "{\"session_id\": \"fx\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}/scratch\", \"transcript_path\": \"${TREE}/transcript.jsonl\", \"hook_event_name\": \"PreToolUse\", \"permission_mode\": \"default\", \"tool_name\": \"Bash\", \"tool_input\": {\"command\": \"sed -i 's/hello/hi/' ../sibling/app.sh\", \"description\": \"d\"}}",
+    "not": [
+      "permissionDecision",
+      "hookSpecificOutput"
+    ]
+  },
+  "dispatch-guard-narrowed-patterns-still-deny": {
+    "_why": "The other half of the review's fixes: narrowing the in-place, write and parent-path patterns must not let a real project edit through. A perl in-place edit behind a `-M` switch is still the turn's first change and is denied once; `..` after a `cd` is not resolved against the payload's `cwd` (every replayed command that climbed after a `cd` stayed in the project), so this heredoc writer stays a project edit.",
+    "exit": 0,
+    "script": "wf-dispatch-guard",
+    "env": {
+      "CLAUDE_PROJECT_DIR": "${TREE}"
+    },
+    "before": [
+      {
+        "script": "wf-dispatch-guard",
+        "stdin_raw": "{\"session_id\": \"fx\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}/scratch\", \"transcript_path\": \"${TREE}/transcript.jsonl\", \"hook_event_name\": \"PreToolUse\", \"permission_mode\": \"default\", \"tool_name\": \"Bash\", \"tool_input\": {\"command\": \"perl -Mstrict -pi -e 's/hello/hi/' app.sh\", \"description\": \"d\"}}",
+        "want": [
+          "\"permissionDecision\": \"deny\"",
+          "Denied once"
+        ]
+      }
+    ],
+    "stdin_raw": "{\"session_id\": \"fx2\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}/scratch\", \"transcript_path\": \"${TREE}/transcript.jsonl\", \"hook_event_name\": \"PreToolUse\", \"permission_mode\": \"default\", \"tool_name\": \"Bash\", \"tool_input\": {\"command\": \"cd sub && python3 - <<'EOF' > ../app.sh\\nprint('hi')\\nEOF\", \"description\": \"d\"}}",
+    "want": [
+      "\"permissionDecision\": \"deny\"",
+      "Denied once"
+    ]
   }
 }
