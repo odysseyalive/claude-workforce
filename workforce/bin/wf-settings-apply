@@ -271,6 +271,15 @@ SHIPPED_HOOKS = {
     # the server's exfiltration guards. `WebFetch` alone: the hook runs for no other tool.
     # Fires on a subagent's call too, measured 2026-11-10 (script header).
     "wf-webfetch-guard": ("PreToolUse", "WebFetch"),
+    # THE MAIN SESSION STAYS FREE FOR THE NEXT MESSAGE, ENFORCED AT THE CALL. User, 2026-11-19:
+    # "the current session is free to take on more tasks, instead of having the actual request
+    # queued". MEASURED in tmux-revive `a933f135`: the submit context's dispatch sentence was
+    # ignored, every edit was made inline through Bash, and foreground Bash calls with
+    # 520000-920000 ms timeouts left the user's messages Queued. Main session only (no
+    # `agent_id`): it denies a foreground Bash call whose `timeout` exceeds the host's 120000
+    # ms default, and denies ONCE the first file change of a turn that spawned no agent, the
+    # retry allowed. Bash is in the matcher because that session's edits were all Bash.
+    "wf-dispatch-guard": ("PreToolUse", "Bash|Edit|Write|MultiEdit|NotebookEdit"),
 }
 
 # MATCHERS A SHIPPED HOOK USED TO BE REGISTERED ON, by SHIPPED_HOOKS name. Presence is decided

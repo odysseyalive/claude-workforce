@@ -16554,5 +16554,142 @@
         ]
       }
     }
+  },
+  "dispatch-guard-long-foreground-bash-denied": {
+    "_why": "THE QUEUE, MEASURED. tmux-revive `a933f135` (2026-11-19, no org): `timeout 900 bash test/panel.sh` ran in the main session's foreground with a 920000 ms timeout, and the user's next two messages sat Queued behind it. A main-session Bash call asking for more than the host's 120000 ms default without `run_in_background` is denied, and the reason names the re-issue and, with no org, the plain subagent.",
+    "exit": 0,
+    "script": "wf-dispatch-guard",
+    "stdin_raw": "{\"session_id\": \"fx\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}/scratch\", \"transcript_path\": \"${TREE}/transcript.jsonl\", \"hook_event_name\": \"PreToolUse\", \"permission_mode\": \"default\", \"tool_name\": \"Bash\", \"tool_input\": {\"command\": \"timeout 900 bash test/panel.sh </dev/null\", \"description\": \"d\", \"timeout\": 920000}}",
+    "want": [
+      "\"permissionDecision\": \"deny\"",
+      "920000 ms timeout",
+      "`run_in_background: true`",
+      "plain `general-purpose` subagent"
+    ]
+  },
+  "dispatch-guard-long-bash-background-allowed": {
+    "_why": "The remedy the deny names must pass: the same long call with `run_in_background: true` holds nothing, because the host reports its exit and the turn can end.",
+    "exit": 0,
+    "script": "wf-dispatch-guard",
+    "stdin_raw": "{\"session_id\": \"fx\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}/scratch\", \"transcript_path\": \"${TREE}/transcript.jsonl\", \"hook_event_name\": \"PreToolUse\", \"permission_mode\": \"default\", \"tool_name\": \"Bash\", \"tool_input\": {\"command\": \"timeout 900 bash test/panel.sh </dev/null\", \"description\": \"d\", \"timeout\": 920000, \"run_in_background\": true}}",
+    "not": [
+      "permissionDecision",
+      "hookSpecificOutput"
+    ]
+  },
+  "dispatch-guard-subagent-is-exempt": {
+    "_why": "Long work is what a subagent is for. A payload carrying `agent_id` (platform.md fact 22a: present inside a subagent, absent on the main thread) passes both halves untouched: a long foreground call and a first edit alike.",
+    "exit": 0,
+    "script": "wf-dispatch-guard",
+    "before": [
+      {
+        "script": "wf-dispatch-guard",
+        "stdin_raw": "{\"session_id\": \"fx\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}/scratch\", \"transcript_path\": \"${TREE}/transcript.jsonl\", \"hook_event_name\": \"PreToolUse\", \"permission_mode\": \"default\", \"tool_name\": \"Bash\", \"tool_input\": {\"command\": \"timeout 900 bash test/panel.sh </dev/null\", \"description\": \"d\", \"timeout\": 920000}, \"agent_id\": \"a1b2c3d4e5\", \"agent_type\": \"general-purpose\"}",
+        "not": [
+          "permissionDecision"
+        ]
+      }
+    ],
+    "stdin_raw": "{\"session_id\": \"fx\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}/scratch\", \"transcript_path\": \"${TREE}/transcript.jsonl\", \"hook_event_name\": \"PreToolUse\", \"permission_mode\": \"default\", \"tool_name\": \"Edit\", \"tool_input\": {\"file_path\": \"${TREE}/app.sh\", \"old_string\": \"hello\", \"new_string\": \"hi\"}, \"agent_id\": \"a1b2c3d4e5\", \"agent_type\": \"general-purpose\"}",
+    "not": [
+      "permissionDecision",
+      "hookSpecificOutput"
+    ]
+  },
+  "dispatch-guard-first-change-denied-once": {
+    "_why": "DENY ONCE, RETRY ALLOWED. The first file change of a main-session turn that spawned no agent is denied with the dispatch named; the identical retry passes, so a genuine few-line fix costs one round-trip and a deliberate inline turn is never stopped twice.",
+    "exit": 0,
+    "script": "wf-dispatch-guard",
+    "before": [
+      {
+        "script": "wf-dispatch-guard",
+        "stdin_raw": "{\"session_id\": \"fx\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}/scratch\", \"transcript_path\": \"${TREE}/transcript.jsonl\", \"hook_event_name\": \"PreToolUse\", \"permission_mode\": \"default\", \"tool_name\": \"Edit\", \"tool_input\": {\"file_path\": \"${TREE}/app.sh\", \"old_string\": \"hello\", \"new_string\": \"hi\"}}",
+        "want": [
+          "\"permissionDecision\": \"deny\"",
+          "Denied once",
+          "plain `general-purpose` subagent",
+          "re-issue this exact call"
+        ]
+      }
+    ],
+    "stdin_raw": "{\"session_id\": \"fx\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}/scratch\", \"transcript_path\": \"${TREE}/transcript.jsonl\", \"hook_event_name\": \"PreToolUse\", \"permission_mode\": \"default\", \"tool_name\": \"Edit\", \"tool_input\": {\"file_path\": \"${TREE}/app.sh\", \"old_string\": \"hello\", \"new_string\": \"hi\"}}",
+    "not": [
+      "permissionDecision",
+      "hookSpecificOutput"
+    ]
+  },
+  "dispatch-guard-bash-heredoc-writer-denied-with-org": {
+    "_why": "THE MEASURED EDITS WERE BASH. Every project edit in `a933f135` was a `python3 - <<'EOF' ... open(p,'w')` writer or a `sed -i`; its only `Write` calls went to the scratchpad. A heredoc fed to an interpreter that writes a file is a file change, and in a project with an org chart the reason names the chart's employee rather than the plain subagent.",
+    "exit": 0,
+    "script": "wf-dispatch-guard",
+    "stdin_raw": "{\"session_id\": \"fx\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}/scratch\", \"transcript_path\": \"${TREE}/transcript.jsonl\", \"hook_event_name\": \"PreToolUse\", \"permission_mode\": \"default\", \"tool_name\": \"Bash\", \"tool_input\": {\"command\": \"python3 - <<'EOF'\\np='app.sh'\\ns=open(p).read()\\nopen(p,'w').write(s.replace('hello','hi'))\\nEOF\", \"description\": \"d\"}}",
+    "want": [
+      "\"permissionDecision\": \"deny\"",
+      ".claude/workforce/org-chart.md",
+      "whose description fits"
+    ],
+    "not": [
+      "plain `general-purpose` subagent"
+    ]
+  },
+  "dispatch-guard-bookkeeping-never-denied": {
+    "_why": "ZERO KNOWN WRONG FIRES. The main session's own bookkeeping is never stopped, in a turn that has spawned nothing: a scratchpad file, the asks checklist (`wf-asks.*`), a memory file under the config root, a work order under `.claude/workforce/` written BEFORE its spawn, and a Bash heredoc appended to a file outside the project (HOME is inside this tree, so the outside file is under `/etc`). Each step would be this turn's first change, so each would be the one denied.",
+    "exit": 0,
+    "script": "wf-dispatch-guard",
+    "env": {
+      "HOME": "${TREE}/home"
+    },
+    "before": [
+      {
+        "script": "wf-dispatch-guard",
+        "stdin_raw": "{\"session_id\": \"fx\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}/scratch\", \"transcript_path\": \"${TREE}/transcript.jsonl\", \"hook_event_name\": \"PreToolUse\", \"permission_mode\": \"default\", \"tool_name\": \"Write\", \"tool_input\": {\"file_path\": \"${TREE}/scratch/notes.md\", \"content\": \"x\"}}",
+        "not": [
+          "permissionDecision"
+        ]
+      },
+      {
+        "script": "wf-dispatch-guard",
+        "stdin_raw": "{\"session_id\": \"fx\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}/scratch\", \"transcript_path\": \"${TREE}/transcript.jsonl\", \"hook_event_name\": \"PreToolUse\", \"permission_mode\": \"default\", \"tool_name\": \"Write\", \"tool_input\": {\"file_path\": \"${TREE}/wf-asks.fx.json\", \"content\": \"[]\"}}",
+        "not": [
+          "permissionDecision"
+        ]
+      },
+      {
+        "script": "wf-dispatch-guard",
+        "stdin_raw": "{\"session_id\": \"fx\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}/scratch\", \"transcript_path\": \"${TREE}/transcript.jsonl\", \"hook_event_name\": \"PreToolUse\", \"permission_mode\": \"default\", \"tool_name\": \"Write\", \"tool_input\": {\"file_path\": \"${TREE}/home/.claude/projects/p/memory/MEMORY.md\", \"content\": \"x\"}}",
+        "not": [
+          "permissionDecision"
+        ]
+      },
+      {
+        "script": "wf-dispatch-guard",
+        "stdin_raw": "{\"session_id\": \"fx\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}/scratch\", \"transcript_path\": \"${TREE}/transcript.jsonl\", \"hook_event_name\": \"PreToolUse\", \"permission_mode\": \"default\", \"tool_name\": \"Write\", \"tool_input\": {\"file_path\": \"${TREE}/.claude/workforce/work/r1/engineering-coder/ORDER.md\", \"content\": \"x\"}}",
+        "not": [
+          "permissionDecision"
+        ]
+      },
+      {
+        "script": "wf-dispatch-guard",
+        "stdin_raw": "{\"session_id\": \"fx\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}/scratch\", \"transcript_path\": \"${TREE}/transcript.jsonl\", \"hook_event_name\": \"PreToolUse\", \"permission_mode\": \"default\", \"tool_name\": \"Bash\", \"tool_input\": {\"command\": \"sed -n 1,5p app.sh && git commit -q -F - <<'EOF'\\nsed -i is mentioned in this message\\nEOF\", \"description\": \"d\"}}",
+        "not": [
+          "permissionDecision"
+        ]
+      }
+    ],
+    "stdin_raw": "{\"session_id\": \"fx\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}/scratch\", \"transcript_path\": \"${TREE}/transcript.jsonl\", \"hook_event_name\": \"PreToolUse\", \"permission_mode\": \"default\", \"tool_name\": \"Bash\", \"tool_input\": {\"command\": \"cat >> /etc/xdg/hypr/looknfeel.lua <<'EOF'\\nx = 1\\nEOF\", \"description\": \"d\"}}",
+    "not": [
+      "permissionDecision",
+      "hookSpecificOutput"
+    ]
+  },
+  "dispatch-guard-turn-that-spawned-is-allowed": {
+    "_why": "A turn that has already handed a job to an agent decided deliberately, so its own edits are not stopped: the transcript's turn, after the newest real user row, holds an `Agent` call.",
+    "exit": 0,
+    "script": "wf-dispatch-guard",
+    "stdin_raw": "{\"session_id\": \"fx\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}/scratch\", \"transcript_path\": \"${TREE}/transcript.jsonl\", \"hook_event_name\": \"PreToolUse\", \"permission_mode\": \"default\", \"tool_name\": \"Edit\", \"tool_input\": {\"file_path\": \"${TREE}/app.sh\", \"old_string\": \"hello\", \"new_string\": \"hi\"}}",
+    "not": [
+      "permissionDecision",
+      "hookSpecificOutput"
+    ]
   }
 }
