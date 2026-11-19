@@ -223,9 +223,9 @@ makes the working directory the project is step 4's rule — run it from the roo
 with a bootstrap prompt. Both installers dropped that check with the evacuation directive; the prose
 outlived it by six weeks.*
 
-### The four evaluators come with it, and so do `blueprint`, `shared-artifact`, `records-code-map`, `timezone` and `notebooklm-prep`
+### The four evaluators come with it, and so do `blueprint`, `shared-artifact`, `records-code-map`, `timezone`, `notebooklm-prep` and `working-files`
 
-**`update` installs ten skills, not one.** `text-eval`, `code-evaluator`, `security-evaluator`
+**`update` installs eleven skills, not one.** `text-eval`, `code-evaluator`, `security-evaluator`
 and `ui-design` ship as SIBLINGS of `skills/workforce/` — each complete, carrying the
 corpus it grades against and the agents it runs — and the same rows register those agents where the
 host reads them. That is the whole of the 2026-09-10 directive: *"All I have to do is update
@@ -259,6 +259,13 @@ fixed order: source text, checked reference links, and the Audio Overview prompt
 is its trigger; no hook loads it. Its `references/copy-boxes.html` is a fragment pasted into a
 `shared-artifact` page, not a page of its own (`manifest.txt` § notebooklm-prep). It is not an
 evaluator or a catalog.
+
+**`working-files` rides them too.** It decides where a working file goes: a throwaway one to the
+session scratchpad, one a restart must not lose to `.claude/workforce/jobs/<job-id>/` with a JOB.md
+to resume from, and the job folder is deleted when the job is done. Its `description` is its
+trigger. The noticing half is `wf-heal` at `SessionStart`, which lists the folders other sessions
+left for the model to offer the user resume or delete, and deletes nothing (`manifest.txt`
+§ working-files). It is not an evaluator or a catalog.
 
 **A skill this installer did not write is never overwritten.** Ownership is decided once per skill,
 on its `SKILL.md`, against `.installed-external` as that record stood BEFORE the run — a project's

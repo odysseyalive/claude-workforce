@@ -420,6 +420,20 @@ exec-sibling workforce/skills/timezone/bin/wf-timezone
 sibling workforce/skills/notebooklm-prep/SKILL.md
 sibling workforce/skills/notebooklm-prep/references/copy-boxes.html
 
+# ── working-files — the SIBLING that decides where a working file goes ────────
+#
+# User request, 2026-11-19 (issue i2): *"allow CLaude Code to use the tmp directory, but
+# instruct claude to keep a secondary temporary directory for important files within the
+# working project so that they may be easily resumed after a restart"*, and *"a system of
+# cleaning up the temporary files when the job is complete or when starting a new job,
+# noticing old temporary files and requesting to clean them up. It would have to be a new
+# skill that gets distributed with the base workforce."* Same install mechanism as the
+# siblings above. Its `description` is the trigger for choosing where a file goes. The
+# noticing half rides `wf-heal` at `SessionStart` (`jobs_context`), which lists the job
+# folders under `.claude/workforce/jobs/` that other sessions left and deletes nothing.
+# Not an evaluator and not a catalog; registered in neither `wf-catalog` nor `wf-conform`.
+sibling workforce/skills/working-files/SKILL.md
+
 # ── Procedures ────────────────────────────────────────────────────────────────
 workforce/references/procedures/audit.md
 workforce/references/procedures/org.md
