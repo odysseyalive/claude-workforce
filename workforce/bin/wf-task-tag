@@ -958,6 +958,15 @@ MAX_CARRIED = 20
 # ask matches itself rather than nothing.
 CARRY_ASK = 200
 
+# HOW MANY OPEN ITEMS OF THIS PROJECT'S EARLIER SESSIONS ONE TURN CARRIES AND SHOWS, newest
+# issue first with any issue an agent is working ahead of the rest (`earlier_sessions`). The
+# user, 2026-11-21: "I've opened multiple to-do items on tr-dev, but they don't seem to be
+# showing under the work list." Every /clear or restart is a new session id and a new ledger
+# file, so the list showed this session's issues alone while `index.json` still listed the
+# rest. Ten, half of `DISPLAY_MAX`: a project with dozens of stale issues gets ten rows and a
+# count of the others, never the whole pile on every message.
+ELSEWHERE_MAX = 10
+
 # HOW MANY STATED INTENTIONS ONE ISSUE KEEPS UNDER `noted`, newest last (`note_intentions`).
 # They are advisory and nothing judges them, so the bound only keeps the file readable.
 MAX_NOTED = 10
@@ -1304,9 +1313,10 @@ def prune_dead_rows(d, sessions, sid, live=None):
 
     READ-ONLY, and for a live session only for a row showing an issue at zero and zero or an
     injected ask, so the cost is paid once per dead row; for a dead one, once per dead session
-    still listed. The other session's file is never written — it may be live, and its own
+    still listed. The other session's file is never written HERE — it may be live, and its own
     next save rewrites its own row from that file, so a resumed session gets back every row
-    this dropped. A key that is not one filename component, or a file this account cannot
+    this dropped. The one writer of another session's file is `absorb_elsewhere`, a mark the
+    session made on that file's own item, and never while the registry lists its owner live. A key that is not one filename component, or a file this account cannot
     read as its own, leaves its row exactly as it was.
     """
     for key, row in list(sessions.items()):
@@ -1635,9 +1645,7 @@ def over_when_dead(iss):
     the next user message's Stop. A session that is not running has no next message; if it is
     resumed, its own save lists the issue again from its file.
     """
-    over = dict(iss, agents=[dict(a, state="returned") if a.get("state") == "running" else a
-                             for a in issue_agents(iss)])
-    return judge_issue(over)[0] in ("closed", "tracked")
+    return judge_issue(agents_over(iss))[0] in ("closed", "tracked")
 
 
 def heal_empty(led):
@@ -1755,9 +1763,14 @@ def carry_forward(led, skip=None):
     `skip` IS THIS MESSAGE'S OWN ISSUE, which has no items yet and would be carrying itself.
     An id that is not one bare name is dropped rather than carried, because the write-back
     takes it back as the name of the issue to touch.
+
+    AN ISSUE AN AGENT IS WORKING COMES FIRST (`working_label`), newest first among each kind,
+    so a run of new messages never pushes it past `MAX_CARRIED` and off the list the user
+    reads (user, 2026-11-21: "it's really no good if I can't see what's currently being
+    worked on, when I add more tasks to the list").
     """
     rows = []
-    for iss in reversed(open_issues(led)):
+    for iss in sorted(reversed(open_issues(led)), key=lambda i: not working_label(i)):
         iid = iss.get("id")
         if not bare_name(iid) or iid == skip:
             continue
@@ -1823,13 +1836,31 @@ def carried_items(cl):
     a walk of the ledger's issues and their items, on every message and every Stop. Reading
     the same number back that `carry_forward` wrote is the bound, and it drops nothing the
     hook put there.
+
+    THIS SESSION'S ROWS ONLY. A row naming a `"session"` is an earlier session's
+    (`carry_elsewhere`), and its issue id is that session's: `i4` is a different issue in
+    every ledger, so a reader of this list that took it would mark this session's own `i4`.
+    Those rows are `elsewhere_items`' to read.
     """
     rows = cl.get("carried") if isinstance(cl, dict) else None
     if not isinstance(rows, list):
         return []
-    return [r for r in rows[:MAX_CARRIED]
-            if isinstance(r, dict) and bare_name(r.get("issue"))
-            and isinstance(r.get("ask"), str) and r["ask"].strip()]
+    return [r for r in rows[:MAX_CARRIED + ELSEWHERE_MAX]
+            if isinstance(r, dict) and "session" not in r and bare_name(r.get("issue"))
+            and isinstance(r.get("ask"), str) and r["ask"].strip()][:MAX_CARRIED]
+
+
+def elsewhere_items(cl):
+    """The carried rows of EARLIER SESSIONS on a checklist: `carried_items`' rule for a row
+    that also names its `"session"`, validated as the one filename component it will be
+    joined into (`absorb_elsewhere` writes that session's file)."""
+    rows = cl.get("carried") if isinstance(cl, dict) else None
+    if not isinstance(rows, list):
+        return []
+    return [r for r in rows[:MAX_CARRIED + ELSEWHERE_MAX]
+            if isinstance(r, dict) and bare_name(r.get("session"))
+            and bare_name(r.get("issue")) and isinstance(r.get("ask"), str)
+            and r["ask"].strip()][:ELSEWHERE_MAX]
 
 
 def absorb_carried(led, rows):
@@ -1870,6 +1901,194 @@ def absorb_carried(led, rows):
                     landed += 1
             break
     return landed
+
+
+def working_label(iss, dead=False):
+    """`working (<agent type>, ...)` for an issue an agent is RUNNING on, or "".
+
+    WHAT THE WORK LIST SAYS IN PLACE OF A BARE `open` (user, 2026-11-21: "it's really no good
+    if I can't see what's currently being worked on, when I add more tasks to the list").
+    DISPLAY ONLY, never written into a row's `status`: `absorb_carried` lands any unfinished
+    status it is handed, and this one would then outlive the agent on the ledger. A type
+    nobody can name is said as `agent` (`name_labelled`'s refusal). `dead` is an earlier
+    session the registry shows gone, whose `running` entries are over (`over_when_dead`), so
+    it says nothing.
+    """
+    if dead:
+        return ""
+    types = []
+    for a in issue_agents(iss):
+        t = a.get("agent_type") if bare_name(a.get("agent_type")) else "agent"
+        if a.get("state") == "running" and t not in types:
+            types.append(t)
+    return "working (%s)" % ", ".join(types) if types else ""
+
+
+def shown_status(status, label):
+    """The status a work-list row prints: the item's own words, with `label`
+    (`working_label`) in place of a bare `open`, or beside any other unfinished word."""
+    st = plain_text(status, 40) or "open"
+    if not label or item_done({"status": st}):
+        return st
+    return label if st.lower() == "open" else f"{st}, {label}"
+
+
+def earlier_sessions(payload):
+    """This project's OTHER sessions' open issues, `[(session, issue, dead)]`, an issue an
+    agent is working first and newest first after that.
+
+    THE INDEX NAMES THEM AND THE FILE DECIDES. `index.json` (`refresh_index`) lists the
+    sessions holding open work, already pruned of what `prune_dead_rows` found finished:
+    MEASURED 2026-11-21 in tmux-revive, `c6040b20` i7 is open in its file on its fallback
+    alone and absent from the index, and it is not shown. An issue is taken only when its
+    session key is one filename component (`bare_name`), the index lists its id, and that
+    session's own file, read through `read_json_nofollow`, still holds it open and not
+    `stale`. At most `MAX_SESSION_RECORDS` sessions are read, the newest the index lists.
+
+    A SESSION THE REGISTRY SHOWS RUNNING IS SKIPPED. It is a parallel session, not an earlier
+    one: its own hooks rewrite its file, so a mark landed there is a lost update. `dead` is
+    True when the registry answered, so every session kept is one it shows gone. `None` from
+    `live_sessions` (no registry, or one not to be believed) reads every other session as
+    earlier, so a host without `/proc` still lists the user's open work.
+    """
+    d = issues_dir(payload)
+    idx = read_json_nofollow(os.path.join(d, "index.json")) if d else None
+    sessions = idx.get("sessions") if isinstance(idx, dict) else None
+    if not isinstance(sessions, dict):
+        return []
+    sid = session_component(payload)
+    others = [k for k in sessions if k != sid and bare_name(k)][-MAX_SESSION_RECORDS:]
+    live = live_sessions(sid) if others else None
+    out = []
+    for key in others:
+        if live is not None and key in live:
+            continue
+        row = sessions[key]
+        listed = row.get("open") if isinstance(row, dict) else None
+        listed = {r.get("id") for r in listed if isinstance(r, dict)
+                  and bare_name(r.get("id"))} if isinstance(listed, list) else set()
+        led = read_json_nofollow(os.path.join(d, f"{key}.json"))
+        if not listed or not isinstance(led, dict) or not isinstance(led.get("issues"), list):
+            continue
+        out += [(key, iss, live is not None) for iss in open_issues(led)
+                if bare_name(iss.get("id")) and iss["id"] in listed and not stale(iss)]
+    out.sort(key=lambda r: str(r[1].get("opened_at") or ""), reverse=True)
+    out.sort(key=lambda r: not working_label(r[1], r[2]))
+    return out
+
+
+def _elsewhere_open(payload, marks=None):
+    """Every unfinished item of `earlier_sessions`, in its order, as
+    `(session, issue, dead, ask, status)`. `marks` maps `(session, issue id, ask)` to the
+    status a checklist file already gave that row, which wins over the ledger's, so an item
+    this turn finished is neither carried again nor shown."""
+    for key, iss, dead in earlier_sessions(payload):
+        for item in issue_items(iss):
+            ask = item["ask"][:CARRY_ASK]
+            st = (marks or {}).get((key, iss["id"], ask)) or item.get("status")
+            st = st.strip()[:40] if isinstance(st, str) and st.strip() else "open"
+            if not item_done(item) and not item_done({"status": st}):
+                yield key, iss, dead, ask, st
+
+
+def carry_elsewhere(payload, marks=None):
+    """The open items of earlier sessions as carried rows, each naming its `"session"`,
+    at most `ELSEWHERE_MAX`, and how many more are open: `(rows, more)`.
+
+    THE SESSION ID IS THE KEY THAT MAKES THE ROW ADDRESSABLE. Issue ids restart at `i1` in
+    every session — tmux-revive's `ed0d294b` and `c6040b20` each have an open `i4` — so a
+    row is `(session, issue, ask)`, and `absorb_elsewhere` takes the session back as the
+    name of the file to write."""
+    rows, more = [], 0
+    for key, iss, _dead, ask, st in _elsewhere_open(payload, marks):
+        if len(rows) >= ELSEWHERE_MAX:
+            more += 1
+        else:
+            rows.append({"session": key, "issue": iss["id"], "ask": ask, "status": st})
+    return rows, more
+
+
+def agents_over(iss):
+    """A copy of `iss` with every `running` agent read as `returned`: what a session that is
+    no longer running holds, since a subagent cannot outlive the session that spawned it.
+    The record itself is never changed."""
+    return dict(iss, agents=[dict(a, state="returned") if a.get("state") == "running" else a
+                             for a in issue_agents(iss)])
+
+
+def absorb_elsewhere(payload, rows):
+    """Write each EARLIER SESSION's carried row's status back onto that session's own
+    ledger, close the issues it finished, and take them off `index.json`. How many landed.
+
+    `absorb_carried`'S CONTRACT, ON THE FILE THE ROW'S `"session"` NAMES: status only, onto an
+    item already there, on an issue still open — never an append, a reorder or a reopen. A
+    row counts only when `earlier_sessions` shows its `(session, issue)` NOW, which is what
+    bounds the write: the key is one filename component the index lists, never this session
+    and never one the registry shows running, so a row the session edited cannot aim this
+    write at any other file or at a live session's.
+
+    CLOSED HERE, because nothing else will judge that ledger: its own `Stop` does not run
+    again. A session the registry shows gone is judged with its `running` agents over
+    (`agents_over`, `over_when_dead`'s reading); one it cannot speak for is judged as it is,
+    so an issue whose agent may still be running is held rather than closed under it.
+
+    THE INDEX ROW IS EDITED, NOT REBUILT. `refresh_index` builds a row from every open issue
+    in a file, which would list again what `prune_dead_rows` dropped (`c6040b20` i7 above).
+    So a closed id leaves the row, a touched id's `items_open` is recounted, and an emptied
+    row takes its session off the index.
+    """
+    shown = {(key, iss["id"]): dead for key, iss, dead in earlier_sessions(payload)} \
+        if rows else {}
+    rows = [r for r in rows if (r["session"], r["issue"]) in shown]
+    d = issues_dir(payload)
+    landed = 0
+    for key in sorted({r["session"] for r in rows}):
+        p = os.path.join(d, f"{key}.json")
+        led = read_json_nofollow(p)
+        if not isinstance(led, dict) or not isinstance(led.get("issues"), list):
+            continue
+        its = [r for r in rows if r["session"] == key]
+        n = absorb_carried(led, its)
+        if not n:
+            continue
+        touched, closed = {r["issue"] for r in its}, set()
+        for iss in open_issues(led):
+            iid = iss.get("id")
+            if (bare_name(iid) and iid in touched
+                    and judge_issue(agents_over(iss) if shown[(key, iid)] else iss)[0]
+                    == "closed"):
+                close_finished(iss)
+                closed.add(iid)
+        if write_json_atomic(p, led):
+            landed += n
+            edit_index_row(d, key, led, touched, closed)
+    return landed
+
+
+def edit_index_row(d, key, led, touched, closed):
+    """`absorb_elsewhere`'s edit of session `key`'s row in `index.json`: every id in `closed`
+    leaves it, every id in `touched` still open has its `items_open` recounted from `led`,
+    and a row left empty takes the session off the index. Nothing else in the file moves."""
+    p = os.path.join(d, "index.json")
+    idx = read_json_nofollow(p) or {}
+    sessions = idx.get("sessions")
+    row = sessions.get(key) if isinstance(sessions, dict) else None
+    if not isinstance(row, dict) or not isinstance(row.get("open"), list):
+        return
+    now = {i["id"]: i for i in open_issues(led) if bare_name(i.get("id"))}
+    kept = []
+    for r in row["open"]:
+        iid = r.get("id") if isinstance(r, dict) else None
+        if bare_name(iid) and iid in closed:
+            continue
+        if bare_name(iid) and iid in touched and iid in now:
+            r["items_open"] = len([x for x in issue_items(now[iid]) if not item_done(x)])
+        kept.append(r)
+    if kept:
+        row["open"] = kept
+    else:
+        sessions.pop(key, None)
+    write_json_atomic(p, {"sessions": sessions})
 
 
 # THE MOST PER-MESSAGE LISTS ONE STOP RE-READS for marks written after their own turn ended,
@@ -2702,6 +2921,11 @@ CARRIED_LINE = ("\"carried\" holds %d still-open item(s) from this session's ear
                 "\"dropped\" when this turn finishes or withdraws it and leave the rest as "
                 "they are; only a carried row's status is read back, onto the issue it "
                 "names, and that issue closes once its items are all finished.")
+# AN EARLIER SESSION'S ROWS ARE THE SAME CHORE, said in one more sentence, since their ids
+# are only unique beside the session that holds them (`carry_elsewhere`).
+ELSEWHERE_LINE = ("\"carried\" also holds %d open item(s) from this project's earlier "
+                  "sessions, each naming its \"session\" beside its issue id; mark one the "
+                  "same way, and the mark closes it in that session's own ledger.")
 # SEVERAL OPEN ITEMS ARE PARTITIONED, NOT QUEUED. MEASURED 2026-11-02 in runpod-claude-gateway
 # `89bbc493`: the user sent about twelve asks while a turn ran (installers, README and images,
 # Docker packaging, setup and update commands), they touched disjoint files, and the session
@@ -2868,15 +3092,19 @@ def _show_checklist(payload, d, name, sid):
     iid = rec.get("issue") if bare_name(rec.get("issue")) else ""
     title = checklist_title(cl)
     lines = ["WORK LIST  " + "  ".join(x for x in (iid, title) if x)]
+    # THIS MESSAGE'S OWN ROWS SAY WHO IS ON THEM TOO, from its issue on the ledger.
+    mine = next((i for i in open_issues(load_ledger(at)) if iid and i.get("id") == iid), None)
+    label = working_label(mine) if mine is not None else ""
     for it in items:
-        st = plain_text(it.get("status"), 40) or "open"
-        lines.append(f"  {st}  {plain_text(it['ask'], CARRY_ASK)}")
+        lines.append(f"  {shown_status(it.get('status'), label)}  "
+                     f"{plain_text(it['ask'], CARRY_ASK)}")
     others = open_elsewhere(at, d, rec, cl, records)
     if others:
         lines.append(ALSO_OPEN)
     for oid, otitle, rows in others:
         lines.append("  " + "  ".join(x for x in (oid, otitle) if x))
         lines += [f"    {st}  {ask}" for st, ask in rows]
+    lines += earlier_sessions_lines(at, cl)
     text = "\n".join(lines)
     digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
     memo_path = os.path.join(d, SHOWN_NAME % sid)
@@ -2938,10 +3166,19 @@ def restore_carried(at, path, rec, cl):
             if (r["issue"], r["ask"][:CARRY_ASK]) not in have
             and (own is None or issue_number(r["issue"]) < issue_number(own))]
     back = back[:max(0, MAX_CARRIED - len(kept))]
-    if not back:
+    # AN EARLIER SESSION'S ROWS COME BACK THE SAME WAY, keyed by their session too, and the
+    # ones the session kept are kept: rewriting `carried` from this session's rows alone
+    # would drop them (`carry_elsewhere`).
+    far = elsewhere_items(cl)
+    seen = {(r["session"], r["issue"], r["ask"][:CARRY_ASK]) for r in far}
+    far_back = [r for r in carry_elsewhere(at)[0]
+                if (r["session"], r["issue"], r["ask"]) not in seen]
+    far_back = far_back[:max(0, ELSEWHERE_MAX - len(far))]
+    if not back and not far_back:
         return 0
-    cl["carried"] = kept + back
-    return len(back) if write_json_atomic(path, cl) else 0
+    cl["carried"] = kept + back + far + far_back
+    n = len(back) + len(far_back)
+    return n if write_json_atomic(path, cl) else 0
 
 
 def issue_number(iid):
@@ -2987,6 +3224,10 @@ def open_elsewhere(at, d, rec, cl, records):
             for r in (carry_forward(led, skip=own) if open_issues(led) else carried_items(cl))
             if r["issue"] not in live]
     rows += [(rid, it.get("status"), it["ask"]) for rid, its in live.items() for it in its]
+    # AN ISSUE AN AGENT IS WORKING IS LISTED FIRST AND COUNTED FIRST, so the cap below never
+    # drops it for newer asks, and its open rows say who is on it (`working_label`).
+    working = {i["id"]: working_label(i) for i in open_issues(led) if bare_name(i.get("id"))}
+    rows.sort(key=lambda r: not working.get(r[0]))
     groups, seen, n = {}, set(), 0
     for gid, st, ask in rows:
         st = plain_text(st, 40) or "open"
@@ -2995,9 +3236,44 @@ def open_elsewhere(at, d, rec, cl, records):
             continue
         seen.add(key)
         n += 1
-        groups.setdefault(gid, []).append((st, plain_text(ask, CARRY_ASK)))
-    order = sorted(groups, key=lambda g: (len(g), g))
+        groups.setdefault(gid, []).append((shown_status(st, working.get(gid)),
+                                           plain_text(ask, CARRY_ASK)))
+    order = sorted(groups, key=lambda g: (not working.get(g), len(g), g))
     return [(g, titles.get(g) or "", groups[g]) for g in order]
+
+
+# THIS PROJECT'S EARLIER SESSIONS' OPEN WORK, SHOWN AFTER THIS SESSION'S (`ELSEWHERE_MAX`).
+ALSO_EARLIER = "OPEN FROM EARLIER SESSIONS"
+MORE_EARLIER = "  +%d more open item(s) from earlier sessions, not listed"
+
+
+def earlier_sessions_lines(at, cl):
+    """The `ALSO_EARLIER` block under a work list, or [] when no earlier session holds open
+    work: each issue as `<session, first 8> <id>  <title>` with its open items under it, an
+    issue an agent is working first (`earlier_sessions`), at most `ELSEWHERE_MAX` items and
+    a count of the rest.
+
+    THE SAME ROWS `carry_elsewhere` HANDS THE SESSION, in the same order, so what the user
+    sees is what the session can mark. The list's own carried statuses win over the
+    ledgers', as they do in `open_elsewhere`: they are this turn's marks, landed at its Stop."""
+    marks = {(r["session"], r["issue"], r["ask"][:CARRY_ASK]): r.get("status")
+             for r in elsewhere_items(cl)}
+    groups, n, more = {}, 0, 0
+    for key, iss, dead, ask, st in _elsewhere_open(at, marks):
+        if n >= ELSEWHERE_MAX:
+            more += 1
+            continue
+        n += 1
+        g = groups.setdefault((key, iss["id"]), (plain_text(iss.get("title"), TITLE_MAX),
+                                                 working_label(iss, dead), []))
+        g[2].append((shown_status(st, g[1]), plain_text(ask, CARRY_ASK)))
+    if not groups:
+        return []
+    lines = [ALSO_EARLIER]
+    for (key, iid), (title, _label, rows) in groups.items():
+        lines.append("  " + "  ".join(x for x in (f"{key[:8]} {iid}", title) if x))
+        lines += [f"    {st}  {ask}" for st, ask in rows]
+    return lines + ([MORE_EARLIER % more] if more else [])
 
 
 def previous_checklist(payload, tag=None):
@@ -3098,6 +3374,9 @@ def start_checklist(payload, prev=None, earlier=(), notes=None):
         inline = led.get(INLINE_KEY)
         cl = read_json_nofollow(p) or {}
         landed = absorb_carried(led, carried_items(cl))
+        # AN EARLIER SESSION'S ROW LANDS IN ITS OWN SESSION'S FILE, which that call saves;
+        # this ledger is not touched by it, so it is not counted here (`absorb_elsewhere`).
+        absorb_elsewhere(payload, elsewhere_items(cl))
         landed += absorb_titles(led, checklist_titles(cl))
         if prev is not None:
             absorb_items(led, prev.get("issue"), checklist_items(cl), checklist_title(cl))
@@ -3127,7 +3406,8 @@ def start_checklist(payload, prev=None, earlier=(), notes=None):
         # this message's own issue is skipped rather than carrying itself. A repeat skips the
         # issue it repeats, whose items are on that issue's own list.
         skip = issue_id or (repeat.get("id") if repeat is not None else None)
-        carried = carry_forward(led, skip=skip)
+        # AND THIS PROJECT'S EARLIER SESSIONS' OPEN ITEMS AFTER THEM (`carry_elsewhere`).
+        carried = carry_forward(led, skip=skip) + carry_elsewhere(payload)[0]
         untitled = untitled_issues(led, skip=skip)
     except OSError:
         pass
@@ -3169,7 +3449,7 @@ def start_checklist(payload, prev=None, earlier=(), notes=None):
     if isinstance(payload.get("peer"), dict):
         record["peer"] = payload["peer"]
     # THE SUBMIT SAID `PARTITION_LINE` (`earlier_lines`), so the display does not say it again.
-    if len(carried) >= PARTITION_MIN:
+    if len([r for r in carried if "session" not in r]) >= PARTITION_MIN:
         record["partition"] = True
     p = checklist_path(payload, record)
     if not write_json_atomic(p, {"prompt": prompt[:2000], "items": [],
@@ -3285,8 +3565,13 @@ def earlier_lines(carried, untitled, inline=None):
     """The sentences about this session's EARLIER issues, each said only when it has something
     to name, and each with its leading space. One builder for both checklist variants.
     `inline` is the ledger's `INLINE_KEY` mark, said only ahead of the partition line."""
-    said = len(carried) >= PARTITION_MIN
-    return ((" " + CARRIED_LINE % len(carried) if carried else "")
+    # AN EARLIER SESSION'S ROWS NEVER REACH `PARTITION_LINE`: a new session told to fan out
+    # agents over another session's stale backlog would be working what nobody asked of it.
+    own = [r for r in carried if "session" not in r]
+    far = len(carried) - len(own)
+    said = len(own) >= PARTITION_MIN
+    return ((" " + CARRIED_LINE % len(own) if own else "")
+            + (" " + ELSEWHERE_LINE % far if far else "")
             + (" " + inline_line(inline) if said and inline_line(inline) else "")
             + (" " + PARTITION_LINE if said else "")
             + (" " + TITLES_LINE % ", ".join(untitled) if untitled else ""))
@@ -3329,7 +3614,9 @@ def carry_only_checklist(p, carried, untitled, inline=None):
 
     A TURN WITH NO CARRIED ROWS AND NO UNTITLED ISSUE IS UNCHANGED: no file, no line, no
     record. A short reply to a session holding nothing open is the common case, and it stays
-    free.
+    free. AN EARLIER SESSION'S OPEN ITEM IS A CARRIED ROW TOO (`carry_elsewhere`), so in a
+    project whose index lists open work from earlier sessions every such turn gets the file
+    and the line, which is the user's choice of 2026-11-21: that work on every turn's list.
     """
     if not carried and not untitled:
         return "", None

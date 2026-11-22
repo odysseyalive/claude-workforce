@@ -3798,6 +3798,9 @@ def ledger_verdict(payload, decided):
     # Stop's ISSUES line already shows them (`TT.absorb_titles`).
     earlier = checklist(payload)[0] or {}
     TT.absorb_carried(led, TT.carried_items(earlier))
+    # AN EARLIER SESSION'S CARRIED ROW LANDS IN THAT SESSION'S OWN FILE, by the `"session"`
+    # the row names, and closes there (`TT.absorb_elsewhere`); this ledger is not touched.
+    TT.absorb_elsewhere(payload, TT.elsewhere_items(earlier))
     TT.absorb_titles(led, TT.checklist_titles(earlier))
     # AND THEN THE MESSAGE IS TRACKED, AFTER THE CARRY SO A FALLBACK THE SESSION MARKED IS NOT
     # SUPERSEDED OVER ITS MARK. Only at the Stop that ends a USER message's turn, which is the

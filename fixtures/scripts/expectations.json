@@ -16885,5 +16885,226 @@
       "permissionDecision",
       "hookSpecificOutput"
     ]
+  },
+  "work-list-shows-earlier-sessions-open-issues": {
+    "_why": "USER-REPORTED 2026-11-21: \"I've opened multiple to-do items on tr-dev, but they don't seem to be showing under the work list.\" The list read only this session's ledger, and every /clear or restart is a new session id: tmux-revive's index.json listed 7 open issues across 4 earlier sessions that session ed0d294b never showed. Session e1 leaves i1 open with a titled item; s1's work list now ends with an OPEN FROM EARLIER SESSIONS block naming e1's issue and item, and the session's write of \"carried\": [] does not lose the row: it is put back keyed by its session. Fails on 1.89.0's hook, which shows s1's own list alone.",
+    "before": [
+      {
+        "script": "wf-task-tag",
+        "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"e1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"prompt\": \"The fold key is missing from the bottom tray when it is available, please put it back where it was.\"}"
+      },
+      {
+        "path_from": 0,
+        "path_rx": "/[^\\s\"]*wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+        "write": "{\"title\": \"Fold key in tray\", \"items\": [{\"ask\": \"put the fold key back in the tray\", \"status\": \"open\"}], \"carried\": []}"
+      },
+      {
+        "script": "wf-task-tag",
+        "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"e1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"prompt\": \"ok\"}"
+      },
+      {
+        "script": "wf-task-tag",
+        "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"prompt\": \"Make the status bar show the hostname of the remote pane when it is focused, and keep it short.\"}",
+        "want": [
+          "also holds 1 open item(s) from this project's earlier sessions"
+        ]
+      },
+      {
+        "path_from": 3,
+        "path_rx": "/[^\\s\"]*wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+        "write": "{\"title\": \"Remote hostname\", \"items\": [{\"ask\": \"show the remote hostname\", \"status\": \"open\"}], \"carried\": []}"
+      }
+    ],
+    "script": "wf-turn-budget",
+    "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"tool_name\": \"Write\", \"tool_input\": {\"file_path\": \"${TREE}/wf-asks.s1.i1.json\"}, \"tool_response\": {}}",
+    "exit": 0,
+    "want": [
+      "WORK LIST  i1  Remote hostname",
+      "OPEN FROM EARLIER SESSIONS\\n  e1 i1  Fold key in tray\\n    open  put the fold key back in the tray"
+    ],
+    "not": [
+      "Traceback",
+      "more open item(s) from earlier sessions"
+    ],
+    "after": {
+      "wf-asks.s1.i1.json": {
+        "want": [
+          "\"session\": \"e1\", \"issue\": \"i1\", \"ask\": \"put the fold key back in the tray\""
+        ]
+      }
+    }
+  },
+  "work-list-earlier-sessions-cap-says-how-many-more": {
+    "_why": "A PROJECT WITH DOZENS OF STALE ISSUES MUST NOT FLOOD EVERY LIST (work order, 2026-11-21). An earlier session holds twelve open items; the block lists ELSEWHERE_MAX (10), in their order, and says how many more exist. Fails if the cap is removed (items 11 and 12 printed) or if the count line is dropped.",
+    "before": [
+      {
+        "script": "wf-task-tag",
+        "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"e1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"prompt\": \"The fold key is missing from the bottom tray when it is available, please put it back where it was.\"}"
+      },
+      {
+        "path_from": 0,
+        "path_rx": "/[^\\s\"]*wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+        "write": "{\"title\": \"Twelve asks\", \"items\": [{\"ask\": \"ask number 1\", \"status\": \"open\"}, {\"ask\": \"ask number 2\", \"status\": \"open\"}, {\"ask\": \"ask number 3\", \"status\": \"open\"}, {\"ask\": \"ask number 4\", \"status\": \"open\"}, {\"ask\": \"ask number 5\", \"status\": \"open\"}, {\"ask\": \"ask number 6\", \"status\": \"open\"}, {\"ask\": \"ask number 7\", \"status\": \"open\"}, {\"ask\": \"ask number 8\", \"status\": \"open\"}, {\"ask\": \"ask number 9\", \"status\": \"open\"}, {\"ask\": \"ask number 10\", \"status\": \"open\"}, {\"ask\": \"ask number 11\", \"status\": \"open\"}, {\"ask\": \"ask number 12\", \"status\": \"open\"}], \"carried\": []}"
+      },
+      {
+        "script": "wf-task-tag",
+        "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"e1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"prompt\": \"ok\"}"
+      },
+      {
+        "script": "wf-task-tag",
+        "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"prompt\": \"Make the status bar show the hostname of the remote pane when it is focused, and keep it short.\"}"
+      },
+      {
+        "path_from": 3,
+        "path_rx": "/[^\\s\"]*wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+        "write": "{\"title\": \"Remote hostname\", \"items\": [{\"ask\": \"show the remote hostname\", \"status\": \"open\"}], \"carried\": []}"
+      }
+    ],
+    "script": "wf-turn-budget",
+    "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"tool_name\": \"Write\", \"tool_input\": {\"file_path\": \"${TREE}/wf-asks.s1.i1.json\"}, \"tool_response\": {}}",
+    "exit": 0,
+    "want": [
+      "OPEN FROM EARLIER SESSIONS\\n  e1 i1  Twelve asks\\n    open  ask number 1\\n",
+      "    open  ask number 10\\n  +2 more open item(s) from earlier sessions, not listed"
+    ],
+    "not": [
+      "Traceback",
+      "ask number 11",
+      "ask number 12"
+    ]
+  },
+  "work-list-earlier-session-mark-closes-in-its-own-ledger": {
+    "_why": "AN EARLIER SESSION'S ISSUE IS CLOSED THE WAY THIS SESSION'S ARE: by marking its carried row. The row names its \"session\", because issue ids restart in every session (tmux-revive's ed0d294b and c6040b20 each have an open i4). Here e1's i1 and s1's own i1 hold the SAME ask; s1 marks e1's row done and leaves its own open. At the Stop, e1's ledger closes i1 and e1 leaves index.json, and s1's own i1 is untouched. Fails if `carried_items` reads the session-qualified row as this session's (s1's i1 is marked done) or if the mark never reaches e1's file.",
+    "before": [
+      {
+        "script": "wf-task-tag",
+        "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"e1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"prompt\": \"The fold key is missing from the bottom tray when it is available, please put it back where it was.\"}"
+      },
+      {
+        "path_from": 0,
+        "path_rx": "/[^\\s\"]*wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+        "write": "{\"title\": \"Fold key in tray\", \"items\": [{\"ask\": \"put the fold key back in the tray\", \"status\": \"open\"}], \"carried\": []}"
+      },
+      {
+        "script": "wf-task-tag",
+        "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"e1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"prompt\": \"ok\"}"
+      },
+      {
+        "script": "wf-task-tag",
+        "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"prompt\": \"Please also put the fold key back in the tray for the remote panes, the same way the local ones do it.\"}"
+      },
+      {
+        "path_from": 3,
+        "path_rx": "/[^\\s\"]*wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+        "write": "{\"title\": \"Remote fold key\", \"items\": [{\"ask\": \"put the fold key back in the tray\", \"status\": \"open\"}], \"carried\": []}"
+      },
+      {
+        "script": "wf-task-tag",
+        "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"prompt\": \"And while you are there, check that the tray still fits on a narrow terminal of eighty columns wide.\"}",
+        "want": [
+          "also holds 1 open item(s) from this project's earlier sessions"
+        ]
+      },
+      {
+        "path_from": 5,
+        "path_rx": "/[^\\s\"]*wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+        "write": "{\"title\": \"Narrow tray\", \"items\": [{\"ask\": \"check the tray fits in eighty columns\", \"status\": \"open\"}], \"carried\": [{\"issue\": \"i1\", \"ask\": \"put the fold key back in the tray\", \"status\": \"open\"}, {\"session\": \"e1\", \"issue\": \"i1\", \"ask\": \"put the fold key back in the tray\", \"status\": \"done\"}]}"
+      }
+    ],
+    "script": "wf-widen",
+    "stdin_raw": "{\"hook_event_name\": \"Stop\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"transcript_path\": \"t.jsonl\", \"last_assistant_message\": \"The fold key is back in the tray.\"}",
+    "exit": 0,
+    "not": [
+      "Traceback"
+    ],
+    "after": {
+      ".claude/workforce/issues/e1.json": {
+        "want": [
+          "\"state\": \"closed\"",
+          "\"closed_at\"",
+          "\"ask\": \"put the fold key back in the tray\", \"status\": \"done\""
+        ]
+      },
+      ".claude/workforce/issues/s1.json": {
+        "want": [
+          "\"ask\": \"put the fold key back in the tray\", \"status\": \"open\""
+        ],
+        "not": [
+          "done_at"
+        ]
+      },
+      ".claude/workforce/issues/index.json": {
+        "want": [
+          "\"s1\""
+        ],
+        "not": [
+          "e1.json"
+        ]
+      }
+    }
+  },
+  "work-list-says-who-is-working-and-lists-it-first": {
+    "_why": "USER, 2026-11-21: \"it's really no good if I can't see what's currently being worked on, when I add more tasks to the list.\" An open row whose issue has a running agent says `working (<agent type>)` in place of `open`, in all three blocks, and that issue is listed first: s1's i2 (engineering-coder) before i1, and e1's i1 (engineering-coder) before e1's newer i2. Fails on 1.89.0's hook, which prints `open` and orders by id and age alone.",
+    "before": [
+      {
+        "script": "wf-task-tag",
+        "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"e1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"prompt\": \"The fold key is missing from the bottom tray when it is available, please put it back where it was.\"}"
+      },
+      {
+        "script": "wf-task-tag",
+        "stdin_raw": "{\"hook_event_name\": \"SubagentStart\", \"session_id\": \"e1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"agent_id\": \"a9\", \"agent_type\": \"engineering-coder\"}"
+      },
+      {
+        "script": "wf-task-tag",
+        "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"e1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"prompt\": \"The idle colour should be the same gray as the rest of the status bar, not the bright green it is now.\"}"
+      },
+      {
+        "script": "wf-task-tag",
+        "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"prompt\": \"Please make the first change to the pane titles so that they show the user name too.\"}"
+      },
+      {
+        "path_from": 3,
+        "path_rx": "/[^\\s\"]*wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+        "write": "{\"title\": \"First\", \"items\": [{\"ask\": \"first ask\", \"status\": \"open\"}], \"carried\": []}"
+      },
+      {
+        "script": "wf-task-tag",
+        "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"prompt\": \"Please make the second change to the status bar so that it shows the hostname of the pane.\"}"
+      },
+      {
+        "script": "wf-task-tag",
+        "stdin_raw": "{\"hook_event_name\": \"SubagentStart\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"agent_id\": \"a1\", \"agent_type\": \"engineering-coder\"}"
+      },
+      {
+        "path_from": 5,
+        "path_rx": "/[^\\s\"]*wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+        "write": "{\"title\": \"Second\", \"items\": [{\"ask\": \"second ask\", \"status\": \"open\"}], \"carried\": []}"
+      },
+      {
+        "script": "wf-task-tag",
+        "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"prompt\": \"Please make the third change to the help menu so that it lists the fold key at the top.\"}"
+      },
+      {
+        "script": "wf-task-tag",
+        "stdin_raw": "{\"hook_event_name\": \"SubagentStart\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"agent_id\": \"a3\", \"agent_type\": \"general-purpose\"}"
+      },
+      {
+        "path_from": 8,
+        "path_rx": "/[^\\s\"]*wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+        "write": "{\"title\": \"Third\", \"items\": [{\"ask\": \"third ask\", \"status\": \"open\"}, {\"ask\": \"third ask, done half\", \"status\": \"done\"}], \"carried\": []}"
+      }
+    ],
+    "script": "wf-turn-budget",
+    "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"tool_name\": \"Write\", \"tool_input\": {\"file_path\": \"${TREE}/wf-asks.s1.i3.json\"}, \"tool_response\": {}}",
+    "exit": 0,
+    "want": [
+      "WORK LIST  i3  Third\\n  working (general-purpose)  third ask\\n  done  third ask, done half",
+      "STILL OPEN FROM EARLIER MESSAGES\\n  i2  Second\\n    working (engineering-coder)  second ask\\n  i1  First\\n    open  first ask",
+      "OPEN FROM EARLIER SESSIONS\\n  e1 i1\\n    working (engineering-coder)  The fold key is missing",
+      "  e1 i2\\n    open  The idle colour"
+    ],
+    "not": [
+      "Traceback"
+    ]
   }
 }
