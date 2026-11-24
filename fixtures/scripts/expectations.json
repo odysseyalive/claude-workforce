@@ -17407,5 +17407,178 @@
       "see e1 i2",
       "see s1 i1"
     ]
+  },
+  "peer-reply-foreign-marker-is-the-reply-marker": {
+    "_why": "WORK ORDER 2026-11-23, MEASURED live: tr-dev answered `re: b59b3de3/i3` with `re: 26dc3176/i5`, its own id, so the reply opened an issue on the receiving side. A marker naming a session outside this project is the sender's: it is recorded on the issue its message opens as that sender's reply marker, and the turn's guidance says the reply to tr-dev starts with it, verbatim. Fails on c934ef9, which records nothing and also tells the session to start with its own marker.",
+    "script": "wf-task-tag",
+    "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"prompt\": \"[agent-msg from=tr-dev 07:10Z] re: b59b3de3/i3 Your pane hook drops the hostname when the session is remote, please check the status bar rule for that case.\"}",
+    "exit": 0,
+    "want": [
+      "The reply to \\\"tr-dev\\\" through agent-say starts with \\\"re: b59b3de3/i3\\\", verbatim",
+      "A reply carries the marker the message it answers arrived with"
+    ],
+    "not": [
+      "Traceback",
+      "carried no marker"
+    ],
+    "after": {
+      ".claude/workforce/issues/s1.json": {
+        "want": [
+          "\"reply_markers\": {\"tr-dev\": \"b59b3de3/i3\"}"
+        ]
+      }
+    }
+  },
+  "peer-reply-no-marker-uses-own-marker": {
+    "_why": "WORK ORDER 2026-11-23: a peer message with no marker records nothing, and the guidance tells the session to start its reply to that sender with its own `re: s1/i1`, beside the rule that a reply carries the marker the message it answers arrived with. Fails on c934ef9, whose line named no reply marker for the sender.",
+    "script": "wf-task-tag",
+    "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"prompt\": \"[agent-msg from=pw-dev 07:12Z] The eBay listing sync stalls after the bot wall page, can you look at the retry path in your scraper?\"}",
+    "exit": 0,
+    "want": [
+      "The message from \\\"pw-dev\\\" carried no marker, so the reply to it through agent-say starts with this issue's own, \\\"re: s1/i1\\\".",
+      "starts with \\\"re: s1/i1\\\", so the peer's reply"
+    ],
+    "not": [
+      "Traceback",
+      "The reply to \\\"pw-dev\\\"",
+      "\"reply_markers\""
+    ],
+    "after": {
+      ".claude/workforce/issues/s1.json": {
+        "not": [
+          "\"reply_markers\""
+        ]
+      }
+    }
+  },
+  "peer-reply-own-marker-continues-and-is-the-reply-marker": {
+    "_why": "WORK ORDER 2026-11-23: a peer reply whose header marker names THIS session continues that issue as c934ef9 does (no i2, the reply is i1's open item), and the guidance now names the marker it arrived with, `re: s1/i1`, for the reply back. Fails on c934ef9, whose continuation line names no marker.",
+    "before": [
+      {
+        "script": "wf-task-tag",
+        "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"prompt\": \"please reach out to pw-dev and find out what is causing the ebay bot wall issue and program around it.\"}"
+      },
+      {
+        "path_from": 0,
+        "path_rx": "/[^\\s\"]*wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+        "write": "{\"title\": \"eBay bot wall\", \"items\": [{\"ask\": \"reach out to pw-dev\", \"status\": \"answered\"}, {\"ask\": \"program around it\", \"status\": \"open\"}], \"carried\": []}"
+      },
+      {
+        "script": "wf-widen",
+        "stdin_raw": "{\"hook_event_name\": \"Stop\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"transcript_path\": \"t.jsonl\", \"last_assistant_message\": \"Done.\"}"
+      }
+    ],
+    "script": "wf-task-tag",
+    "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"prompt\": \"[agent-msg from=pw-dev 06:01Z re=s1/i1] Long message, read it by running: agent-say show 20261124060134-2427050. To answer, run the shell command: agent-say reply pw-dev\"}",
+    "exit": 0,
+    "want": [
+      "continues i1 and opens no issue of its own",
+      "The reply to \\\"pw-dev\\\" through agent-say starts with \\\"re: s1/i1\\\", verbatim"
+    ],
+    "not": [
+      "Traceback",
+      "issue i2"
+    ],
+    "after": {
+      ".claude/workforce/issues/s1.json": {
+        "want": [
+          "\"replies\""
+        ],
+        "not": [
+          "\"id\": \"i2\"",
+          "\"reply_markers\""
+        ]
+      }
+    }
+  },
+  "peer-reply-foreign-marker-continues-the-issue-that-recorded-it": {
+    "_why": "WORK ORDER 2026-11-23: under the rule a thread keeps its opener's marker, so tr-dev, which opened the thread with `re: b59b3de3/i3`, sends its next message with that same marker. It continues the issue that recorded it from tr-dev (i1), opens no i2, and the reply is again told to start with `re: b59b3de3/i3`. Fails on c934ef9, which opens i2 for it.",
+    "before": [
+      {
+        "script": "wf-task-tag",
+        "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"prompt\": \"[agent-msg from=tr-dev 07:10Z] re: b59b3de3/i3 Your pane hook drops the hostname when the session is remote, please check the status bar rule for that case.\"}"
+      },
+      {
+        "path_from": 0,
+        "path_rx": "/[^\\s\"]*wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+        "write": "{\"title\": \"Remote hostname\", \"items\": [{\"ask\": \"check the status bar rule\", \"status\": \"open\"}], \"carried\": []}"
+      },
+      {
+        "script": "wf-widen",
+        "stdin_raw": "{\"hook_event_name\": \"Stop\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"transcript_path\": \"t.jsonl\", \"last_assistant_message\": \"Done.\"}"
+      }
+    ],
+    "script": "wf-task-tag",
+    "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"prompt\": \"[agent-msg from=tr-dev 07:20Z re=b59b3de3/i3] Long message, read it by running: agent-say show 20261124072001-1111111. To answer, run the shell command: agent-say reply tr-dev\"}",
+    "exit": 0,
+    "want": [
+      "continues i1 and opens no issue of its own",
+      "The reply to \\\"tr-dev\\\" through agent-say starts with \\\"re: b59b3de3/i3\\\", verbatim"
+    ],
+    "not": [
+      "Traceback",
+      "issue i2"
+    ],
+    "after": {
+      ".claude/workforce/issues/s1.json": {
+        "want": [
+          "\"replies\""
+        ],
+        "not": [
+          "\"id\": \"i2\""
+        ]
+      }
+    }
+  },
+  "work-list-items-reach-an-agent-whose-meta-file-came-late": {
+    "_why": "WORK ORDER 2026-11-23, MEASURED in this repository's session b59b3de3 on Claude Code 2.1.331: agent a0d76516's order opened `Issue: i5 items 1`, but its SubagentStart hook ended at 07:18:27.528 and the harness's meta file for it was born at 07:18:27.785, so the hook read no toolUseId, linked the agent to the newest issue and recorded no items. Here SubagentStart runs with no meta file (a1 lands on i2), the meta file is then written, and a1's first own tool call (wf-turn-budget PostToolUse; a1's handbook carries maxTurns, since only a capped agent gets the state directory the re-read is claimed in) reads the order again: a1 moves to i1 holding item 2 alone. Fails on c934ef9, where a1 stays on i2 and its `second ask` row says working.",
+    "before": [
+      {
+        "script": "wf-task-tag",
+        "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"prompt\": \"Please make the first change to the pane titles so that they show the user name too.\"}"
+      },
+      {
+        "path_from": 0,
+        "path_rx": "/[^\\s\"]*wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+        "write": "{\"title\": \"First\", \"items\": [{\"ask\": \"first item\", \"status\": \"open\"}, {\"ask\": \"second item\", \"status\": \"open\"}, {\"ask\": \"third item\", \"status\": \"open\"}], \"carried\": []}"
+      },
+      {
+        "script": "wf-turn-budget",
+        "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"tool_name\": \"Write\", \"tool_input\": {\"file_path\": \"${TREE}/wf-asks.s1.i1.json\"}, \"tool_response\": {}}"
+      },
+      {
+        "script": "wf-task-tag",
+        "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"prompt\": \"Please make the second change to the status bar so that it shows the hostname of the pane.\"}"
+      },
+      {
+        "script": "wf-task-tag",
+        "stdin_raw": "{\"hook_event_name\": \"SubagentStart\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"transcript_path\": \"${TREE}/t.jsonl\", \"agent_id\": \"a1\", \"agent_type\": \"engineering-coder\"}"
+      },
+      {
+        "path": "s1/subagents/agent-a1.meta.json",
+        "write": "{\"agentType\": \"engineering-coder\", \"description\": \"pane titles\", \"toolUseId\": \"toolu_01A\"}"
+      },
+      {
+        "script": "wf-turn-budget",
+        "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"transcript_path\": \"${TREE}/t.jsonl\", \"agent_id\": \"a1\", \"agent_type\": \"engineering-coder\", \"tool_name\": \"Read\", \"tool_input\": {\"file_path\": \"${TREE}/x\"}, \"tool_response\": {}}"
+      },
+      {
+        "path_from": 3,
+        "path_rx": "/[^\\s\"]*wf-asks\\.[A-Za-z0-9_.-]+?\\.json",
+        "write": "{\"title\": \"Second\", \"items\": [{\"ask\": \"second ask\", \"status\": \"open\"}], \"carried\": []}"
+      }
+    ],
+    "script": "wf-turn-budget",
+    "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"tool_name\": \"Write\", \"tool_input\": {\"file_path\": \"${TREE}/wf-asks.s1.i2.json\"}, \"tool_response\": {}}",
+    "exit": 0,
+    "want": [
+      "WORK LIST  i2  Second\\n  open  second ask",
+      "  i1  First\\n    open  first item\\n    working (engineering-coder)  second item\\n    open  third item"
+    ],
+    "not": [
+      "Traceback",
+      "working (engineering-coder)  second ask",
+      "working (engineering-coder)  first item"
+    ]
   }
 }

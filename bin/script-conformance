@@ -57,7 +57,7 @@ ROW_KEYS = {"script", "exit", "args", "env", "want", "after", "chmod", "concurre
 AFTER_KEYS = {"want", "once", "absent", "unchanged", "inserted_only", *NEGATIVE_KEYS}
 GIT_KEYS = {"init", "hooks_from", "commit", "config", "links", "corrupt_index"}
 STEP_KEYS = {"script", "stdin_raw", "want", *NEGATIVE_KEYS}
-WRITE_STEP_KEYS = {"write", "path_from", "path_rx"}
+WRITE_STEP_KEYS = {"write", "path_from", "path_rx", "path"}
 
 
 def _unknown_keys(spec, allowed, where):
@@ -433,12 +433,28 @@ def _run_in(tree, script, spec):
     # the asks checklist a running turn writes around a queued submit. The case does not
     # spell the path: it is the first match of `path_rx` in step `path_from`'s output, the
     # path that hook told the session, so each release is tested at the path it told.
+    #
+    # A `write` STEP WITH A LITERAL `path` IS THE HARNESS WRITING A FILE BETWEEN TWO EVENTS,
+    # added 2026-11-23 for the agent meta file measured to be born after `SubagentStart` ran:
+    # the file a hook reads has to be absent at one step and present at the next. The path is
+    # relative and must stay inside the tree.
     _outs = []
     for _i, _step in enumerate(spec.get("before") or []):
         if isinstance(_step, dict) and "write" in _step:
             _bad = _unknown_keys(_step, WRITE_STEP_KEYS, f"before[{_i}]")
             if _bad:
                 return False, "; ".join(_bad)
+            if "path" in _step:
+                _rel = _step["path"]
+                _dest = os.path.normpath(os.path.join(tree, str(_rel)))
+                if (not isinstance(_rel, str) or os.path.isabs(_rel)
+                        or not _dest.startswith(os.path.normpath(tree) + os.sep)):
+                    return False, f"before[{_i}] path {_rel!r} is not inside the tree"
+                os.makedirs(os.path.dirname(_dest), exist_ok=True)
+                with open(_dest, "w", encoding="utf-8") as _fh:
+                    _fh.write(_step["write"])
+                _outs.append("")
+                continue
             _from = _step.get("path_from")
             _m = (re.search(_step.get("path_rx") or "", _outs[_from])
                   if isinstance(_from, int) and 0 <= _from < len(_outs) else None)

@@ -181,9 +181,9 @@ def peer_request(prompt):
 # THE ISSUE A PEER'S MESSAGE CONTINUES: `re: <session>/<issue>`, the first 8 characters of a
 # session id and an issue id there. MEASURED 2026-11-23 in odyssey-alive `6d306850`: i7 sent
 # pw-dev a request, and pw-dev's six replies opened i8 to i13, one issue each. The hook's
-# guidance has the session start every agent-say message with its own marker
-# (`start_checklist`), and a peer's message carrying one continues that issue
-# (`continued_issue`). TWO PLACES, because 5 of those 6 replies were a pointer ("Long message,
+# guidance has a new thread start with the session's own marker and a reply with the marker
+# the message it answers arrived with (`agent_say_line`), and a peer's message carrying one
+# continues that issue (`continued_issue`). TWO PLACES, because 5 of those 6 replies were a pointer ("Long message,
 # read it by running: agent-say show ..."), whose body this hook never sees: in the bracketed
 # header as `re=<session>/<issue>`, inside the 40 characters `PEER_HEADER` allows after the
 # name, which agent-say has to write there; or at the start of the body as `re: ...`.
@@ -1673,13 +1673,75 @@ def repeat_of(led, payload, now=None):
 
 def continued_issue(led, payload):
     """The issue of THIS session a peer's marker (`peer_marker`, kept as `peer_re`) names, or
-    None. Closed or open: a reply to a request this session sent continues it either way."""
+    None. Closed or open: a reply to a request this session sent continues it either way.
+
+    A FOREIGN MARKER CONTINUES THE ISSUE THAT RECORDED IT FROM THE SAME SENDER
+    (`reply_marker`). The thread's marker is its opener's: a peer that opened a thread with
+    `re: <its session>/<its issue>` gets replies carrying that marker, and so sends its own
+    next message with it too, since a reply carries the marker the message it answers
+    arrived with. Without this, that next message opened an issue here every time."""
+    mark = payload.get("peer_re")
+    if not (isinstance(mark, (list, tuple)) and len(mark) == 2):
+        return None
+    if names_session(mark[0], session_component(payload)):
+        return next((i for i in led.get("issues", []) if isinstance(i, dict)
+                     and i.get("id") == mark[1]), None)
+    text, who = foreign_marker(payload), peer_sender(payload.get("peer") or {})
+    if not (text and who):
+        return None
+    return next((i for i in reversed(led.get("issues", [])) if isinstance(i, dict)
+                 and reply_marker(i, who) == text), None)
+
+
+# WHOSE ID A MARKER CARRIES (oa-work's rule, adopted 2026-11-23): a NEW thread carries the
+# sender's own `re: <session>/<issue>`; a REPLY carries the marker the message it answers
+# arrived with, the recipient's, verbatim. MEASURED 2026-11-23: tr-dev answered
+# `re: b59b3de3/i3` with `re: 26dc3176/i5`, and pw-dev answered oa-work with
+# `re: cc906fe7/i7`, each its own id, so each reply opened an issue on the receiving side.
+# A foreign marker is therefore recorded on the issue its message opens or continues, per
+# sender, and the turn's guidance names it for the reply (`agent_say_line`).
+MARK_TEXT = re.compile(r"[A-Za-z0-9_-]{1,36}/i\d{1,4}")
+REPLY_MARKERS_MAX = 8
+
+
+def foreign_marker(payload):
+    """A peer's marker as `<session>/<issue>` when it names a session outside this project:
+    not this one and not one ledger of this project's (`other_session_issue`). Else None."""
     mark = payload.get("peer_re")
     if not (isinstance(mark, (list, tuple)) and len(mark) == 2
-            and names_session(mark[0], session_component(payload))):
+            and isinstance(payload.get("peer"), dict)):
         return None
-    return next((i for i in led.get("issues", []) if isinstance(i, dict)
-                 and i.get("id") == mark[1]), None)
+    text = f"{mark[0]}/{mark[1]}"
+    if (not MARK_TEXT.fullmatch(text) or names_session(mark[0], session_component(payload))
+            or other_session_issue(payload)):
+        return None
+    return text
+
+
+def reply_marker(iss, who):
+    """The marker issue `iss` recorded for sender `who` (`record_reply_marker`), or None.
+    Validated where it is read: the ledger is a file in the project, and this is said back
+    to the session."""
+    got = iss.get("reply_markers") if isinstance(iss, dict) else None
+    text = got.get(who) if isinstance(got, dict) and who else None
+    return text if isinstance(text, str) and MARK_TEXT.fullmatch(text) else None
+
+
+def record_reply_marker(iss, payload):
+    """Record a peer's foreign marker on `iss` as its reply marker for that sender, newest
+    last, at most `REPLY_MARKERS_MAX` senders. True when the record changed."""
+    text, who = foreign_marker(payload), peer_sender(payload.get("peer") or {})
+    if not (isinstance(iss, dict) and text and who):
+        return False
+    old = iss.get("reply_markers")
+    old = {k: v for k, v in old.items() if isinstance(k, str) and isinstance(v, str)} \
+        if isinstance(old, dict) else {}
+    if old.get(who) == text:
+        return False
+    old.pop(who, None)
+    old[who] = text
+    iss["reply_markers"] = dict(list(old.items())[-REPLY_MARKERS_MAX:])
+    return True
 
 
 def continue_issue(iss, payload):
@@ -2669,6 +2731,40 @@ def link_agent(payload, led):
     return iss.get("id")
 
 
+def relink_agent(payload, led):
+    """Read a running agent's order again at its own tool call, and put its entry on the
+    issue the order names, holding the items it names (`spawn_order`, `held_items`).
+    `(issue id, settled)`: the id when the ledger changed, else None; `settled` False only
+    while the harness's meta file for the agent is not on disk yet, so the caller tries again.
+
+    THE META FILE CAN BE WRITTEN AFTER `SubagentStart` HAS RUN. MEASURED 2026-11-23 in this
+    repository's session `b59b3de3`, Claude Code 2.1.331: agent `a0d76516`'s order opened
+    `Issue: i5 items 1`; its `SubagentStart` hook ended by 07:18:27.528, and the meta file
+    was born at 07:18:27.785, so `spawn_order` read no `toolUseId` and no description, the
+    agent went to the newest open issue, and its entry had no `items`. `wf-turn-budget`
+    calls this at the agent's own tool calls (`relink_once`), when the file is there."""
+    aid = agent_component(payload)
+    if not aid:
+        return None, True
+    if agent_meta(payload, aid) is None:
+        return None, False
+    named, numbers = spawn_order(payload, aid)
+    target = {i.get("id"): i for i in open_issues(led)}.get(named)
+    src, entry = newest_entry(led, aid)
+    if target is None or entry is None or entry.get("state") != "running":
+        return None, True
+    changed = False
+    if src is not target:
+        src["agents"] = [a for a in src.get("agents") or [] if a is not entry]
+        target.setdefault("agents", []).append(entry)
+        changed = True
+    held = held_items(target, numbers)
+    if held and entry.get("items") != held:
+        entry["items"] = held
+        changed = True
+    return (target.get("id") if changed else None), True
+
+
 # THE LINE AN ORDER NAMES ITS ISSUE ON, and the items of that issue's list it holds:
 # `Issue: i4` or `Issue: i4 items 2, 3`, at the start of a line of the Agent prompt. ANCHORED,
 # because an order opens with the user's words quoted verbatim and those can mention an id in
@@ -2695,7 +2791,9 @@ def spawn_order(payload, aid):
     2026-11-23 over the 25 spawns of odyssey-alive `6d306850`: this event's own row in each
     agent's transcript is stamped 0.3 s to 42 s after the call's row. Whether the call's row
     is always ON DISK by this event is not measured, so when it is not found the task
-    description is read for the same line, and then nothing is named (`current_issue`)."""
+    description is read for the same line, and then nothing is named (`current_issue`).
+    THE META FILE ITSELF CAN BE MISSING AT THIS EVENT (measured, `relink_agent`), which is
+    why the agent's own tool calls read the order again."""
     meta = agent_meta(payload, aid) or {}
     texts = []
     tid = meta.get("toolUseId")
@@ -3694,7 +3792,7 @@ def start_checklist(payload, prev=None, earlier=(), notes=None):
     # turn that wrote it has ended. `wf-widen`'s Stop does this too, one event earlier, so an
     # issue finished during a turn closes on that turn's Stop; this is the half that holds
     # when no Stop fired.
-    issue_id, repeat, cont = None, None, None
+    issue_id, repeat, cont, iss = None, None, None, None
     carried, untitled, inline = [], [], None
     try:
         led = load_ledger(payload)
@@ -3737,6 +3835,10 @@ def start_checklist(payload, prev=None, earlier=(), notes=None):
         issue_id = iss.get("id") if iss else None
         if iss is not None and link is not None:
             note_reply_elsewhere(payload, link, issue_id)
+        # A MARKER NAMING A SESSION OUTSIDE THIS PROJECT IS THE SENDER'S: it is what the reply
+        # to that sender carries (`record_reply_marker`, `agent_say_line`).
+        if record_reply_marker(iss if iss is not None else cont, payload):
+            landed += 1
         if iss is not None or prev is not None or landed:
             save_ledger(payload, led)
         # BUILT AFTER THE ABSORB AND AFTER THIS MESSAGE'S ISSUE EXISTS, so it reflects what
@@ -3821,12 +3923,8 @@ def start_checklist(payload, prev=None, earlier=(), notes=None):
             + (f" These items belong to issue {issue_id} in this project's issue ledger, "
                "which keeps them after this turn ends and keeps every earlier open issue "
                "beside them." + SPAWN_LINE % (issue_id, issue_id, issue_id)
-               + AGENT_SAY_LINE % (session_component(payload)[:8], issue_id, issue_id)
+               + agent_say_line(payload, iss)
                if issue_id else "")
-            + (FOREIGN_MARK_LINE % (payload["peer_re"][0], payload["peer_re"][1])
-               if payload.get("peer_re") and not other_session_issue(payload)
-               and not names_session(payload["peer_re"][0], session_component(payload))
-               else "")
             + earlier_lines(carried, untitled, inline)
             + (dispatch_line(payload, issue_id) if issue_id else "")), record
 
@@ -3935,14 +4033,54 @@ SPAWN_LINE = (" An agent spawned for it has a line \"Issue: %s\" in its prompt, 
               "the order written: that links it to issue %s and puts its name on those rows "
               "alone, and its result is recorded there. A spawn with no such line is linked "
               "to the newest open issue.")
-# A MESSAGE TO A PEER CARRIES ITS ISSUE, so the reply continues it (`MARK_HEADER`).
-AGENT_SAY_LINE = (" A message this session sends a peer with agent-say about this work starts "
-                  "with \"re: %s/%s\", so the peer's reply continues %s instead of opening "
-                  "an issue of its own.")
-# A PEER'S MESSAGE MARKED FOR AN ISSUE THAT IS NOT IN THIS PROJECT IS THE SENDER'S: the reply
-# carries the marker back, so it lands on the sender's issue.
-FOREIGN_MARK_LINE = (" The message is marked \"re: %s/%s\", an issue of the sender's: an "
-                     "agent-say reply to it starts with that marker, not with this issue's.")
+# WHOSE ID A MARKER CARRIES, said on every issue line, so both sides of a thread read the same
+# rule (`MARK_TEXT` has the measurement): a new thread carries the sender's own marker, and a
+# reply carries the one the message it answers arrived with.
+AGENT_SAY_LINE = (" A new thread this session opens with a peer through agent-say about this "
+                  "work starts with \"re: %s/%s\", so the peer's reply, which carries that "
+                  "marker back, continues %s. A reply carries the marker the message it "
+                  "answers arrived with, the recipient's, verbatim; only a new thread carries "
+                  "the sender's own.")
+# ...AND THE REPLY TO THIS TURN'S PEER, by name: the marker the issue recorded for that
+# sender (`reply_marker`), or the one its message carried when that names this session.
+REPLY_MARK_LINE = (" The reply to \"%s\" through agent-say starts with \"re: %s\", verbatim: "
+                   "the marker their message arrived with, so it lands on the issue that "
+                   "marker names.")
+# ...or, when its message carried none, this issue's own, which makes the reply a new thread.
+REPLY_OWN_LINE = (" The message from \"%s\" carried no marker, so the reply to it through "
+                  "agent-say starts with this issue's own, \"re: %s/%s\".")
+# A POINTER'S BODY IS NOT SEEN HERE (`MARK_HEADER`), so a marker it opens with is unknown.
+REPLY_POINTER = (" If the message it points to opens with \"re: <session>/<issue>\", the reply "
+                 "starts with that marker instead.")
+
+
+def agent_say_line(payload, iss):
+    """The marker sentences for a turn on issue `iss`: the reply to this turn's peer first,
+    when a peer sent it, then the rule and this session's own marker (`AGENT_SAY_LINE`).
+    "" for an issue without this hook's id. The reply marker is, in order: the one `iss`
+    recorded for the sender (`reply_marker`); the one the message carried when it names this
+    session; else this issue's own, and the message carried none. A marker naming another
+    session of THIS project (`other_session_issue`) names no reply marker: the rule and the
+    own marker alone, as before."""
+    iid = _issue_id(iss)
+    if not iid:
+        return ""
+    s8 = session_component(payload)[:8]
+    line = AGENT_SAY_LINE % (s8, iid, iid)
+    peer = payload.get("peer")
+    who = peer_sender(peer) if isinstance(peer, dict) else ""
+    if not who:
+        return line
+    mark = payload.get("peer_re")
+    mine = (f"{mark[0]}/{mark[1]}" if isinstance(mark, (list, tuple)) and len(mark) == 2
+            and names_session(mark[0], session_component(payload)) else None)
+    got = reply_marker(iss, who) or (mine if mine and MARK_TEXT.fullmatch(mine) else None)
+    if got:
+        return REPLY_MARK_LINE % (who, got) + line
+    if mark:
+        return line
+    return (REPLY_OWN_LINE % (who, s8, iid)
+            + (REPLY_POINTER if pointer_id(payload.get("prompt")) else "") + line)
 # A PEER'S REPLY THAT CONTINUES AN ISSUE OF THIS SESSION (`continued_issue`).
 CONTINUE_LINE = (" This message from \"%s\" carries issue %s's marker, so it continues %s and "
                  "opens no issue of its own: \"items\" holds %s's list, with this reply as "
@@ -3975,10 +4113,13 @@ def continue_checklist(payload, cont, prev, earlier, carried, untitled, inline):
     cid = cont.get("id")
     who = peer_sender(payload.get("peer") or {})
     reply = (fallback_item(payload.get("prompt"), peer=payload.get("peer")) or {}).get("ask", "")
-    said = CONTINUE_LINE % (who, cid, cid, cid, reply)
+    # THE REPLY'S MARKER IS SAID HERE TOO (`agent_say_line`): a continued thread is still
+    # answered with the marker its peer's message arrived with.
+    said = CONTINUE_LINE % (who, cid, cid, cid, reply) + agent_say_line(payload, cont)
     live = live_list(payload, cid, prev, earlier)
     if live is not None:
-        return (CONTINUE_LIVE % (who, cid, cid, reply)).strip(), live
+        return ((CONTINUE_LIVE % (who, cid, cid, reply)).strip()
+                + agent_say_line(payload, cont)), live
     prompt = payload.get("prompt") or ""
     record = {"prompt": prompt[:2000], "ended": False, "issue": cid, "key": cid}
     if isinstance(payload.get("peer"), dict):

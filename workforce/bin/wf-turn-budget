@@ -1013,6 +1013,37 @@ def last_claim(path, marker, rounds):
     return ""
 
 
+# ── the order an agent's spawn named, read where it is on disk ───────────────
+# `SubagentStart` links an agent to the issue its order names, from the harness's meta file
+# for it, and MEASURED 2026-11-23 that file can be born after the hook has run
+# (`wf-task-tag`'s `relink_agent` has the timings): the agent then sits on the newest issue
+# with no items. Its own tool calls come after the file exists, so the order is read again
+# there. ONCE PER AGENT through a claim file; a call that still finds no meta file leaves a
+# second claim so the next call settles it either way, which bounds the sibling's load
+# (`_task_tag`) at two per agent.
+RELINK_MARK = "relinked"
+RELINK_TRY = "relink-tried"
+
+
+def relink_once(payload, path):
+    """Run `wf-task-tag`'s `relink_agent` for this agent once, claimed in its state
+    directory `path`, saving when it moved anything. Always 0; never raises."""
+    if not path or os.path.exists(os.path.join(path, RELINK_MARK)):
+        return 0
+    settled = True
+    try:
+        mod = _task_tag()
+        led = mod.load_ledger(payload)
+        issue, settled = mod.relink_agent(payload, led)
+        if issue:
+            mod.save_ledger(payload, led)
+    except Exception:
+        pass
+    if settled or not claim(path, RELINK_TRY):
+        claim(path, RELINK_MARK)
+    return 0
+
+
 def mark_running(payload):
     """Put this agent back to `running` on its issue after a resume."""
     return _ledger_write(payload, lambda mod, led: mod.agent_resumed(payload, led))
@@ -1188,6 +1219,11 @@ def main():
         session_id = "no-session"
     tpath = agent_transcript(payload, session_id, agent_id)
     path = state_dir(payload, session_id, agent_id)
+    # A CAPPED AGENT'S ORDER IS READ AGAIN HERE (`relink_once`), in the state directory this
+    # hook keeps for it anyway: an uncapped agent gets no directory and no file (the
+    # `turn-budget-*-silent` rows), and an order naming an issue is an employee's, which
+    # carries a cap.
+    relink_once(payload, path)
 
     if path:
         state = read_state(path)
