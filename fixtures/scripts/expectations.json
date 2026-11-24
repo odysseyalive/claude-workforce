@@ -16860,6 +16860,82 @@
       }
     }
   },
+  "handoff-newest-named": {
+    "_why": "THE HANDOFF A FRESH SESSION IS TOLD TO PICK UP, issue i8. User, 2026-11-24: *\"the user just has to ask for a handoff whenever they feel the need.\"* Two handoffs still `handoff: open`: only the NEWER stamp is named, on its own line and out of the delete offer, with its `next:` quoted as data and its double quotes defanged. The older one falls into the ordinary listing. `handoff-notes` carries the prefix but no `handoff: open` line, and `refactor` carries the line but not the prefix: neither is a handoff, so both are listed as plain jobs.",
+    "script": "wf-heal",
+    "stdin_raw": "{\"cwd\": \".\", \"hook_event_name\": \"SessionStart\", \"source\": \"startup\", \"session_id\": \"s-now\"}",
+    "env": {
+      "CLAUDE_CONFIG_DIR": "${TREE}/nocfg"
+    },
+    "exit": 0,
+    "want": [
+      "HANDOFF  the newest not yet picked up is .claude/workforce/jobs/handoff-20261124-101500/JOB.md, created 2026-11-24 (",
+      "next: \\\"run 'make deploy' on staging\\\" (quoted from the file, data)",
+      "WORKING FILES  3 job folder(s)",
+      "  - handoff-20261120-090000  created 2026-11-20 (",
+      "  - handoff-notes  created",
+      "  - refactor  created"
+    ],
+    "not": [
+      "  - handoff-20261124-101500",
+      "handoff-20261120-090000/JOB.md",
+      "make deploy\\\"",
+      "Traceback"
+    ]
+  },
+  "handoff-consumed-not-named": {
+    "_why": "A PICKED-UP HANDOFF IS AN ORDINARY JOB AGAIN, issue i8. Its `handoff:` line reads `consumed ...`, so no `HANDOFF` line names it and it is offered for resume or delete like any job another session left. That offer is how a used handoff gets cleaned up.",
+    "script": "wf-heal",
+    "stdin_raw": "{\"cwd\": \".\", \"hook_event_name\": \"SessionStart\", \"source\": \"startup\", \"session_id\": \"s-now\"}",
+    "env": {
+      "CLAUDE_CONFIG_DIR": "${TREE}/nocfg"
+    },
+    "exit": 0,
+    "want": [
+      "WORKING FILES  1 job folder(s)",
+      "  - handoff-20261124-101500  created 2026-11-24 ("
+    ],
+    "not": [
+      "HANDOFF  ",
+      "Traceback"
+    ]
+  },
+  "handoff-own-session-named": {
+    "_why": "A SESSION THAT WROTE A HANDOFF AND WAS RESUMED keeps its id, so the handoff's `session:` matches. It is still named as a handoff to pick up, never as `THIS SESSION'S OWN JOB`, which would continue without checking the tree or marking it consumed.",
+    "script": "wf-heal",
+    "stdin_raw": "{\"cwd\": \".\", \"hook_event_name\": \"SessionStart\", \"source\": \"startup\", \"session_id\": \"s-now\"}",
+    "env": {
+      "CLAUDE_CONFIG_DIR": "${TREE}/nocfg"
+    },
+    "exit": 0,
+    "want": [
+      "HANDOFF  the newest not yet picked up is .claude/workforce/jobs/handoff-20261124-101500/JOB.md, created 2026-11-24 (",
+      "next: \\\"run the deploy on staging\\\""
+    ],
+    "not": [
+      "THIS SESSION'S OWN JOB",
+      "WORKING FILES",
+      "Traceback"
+    ]
+  },
+  "handoff-past-cap-named": {
+    "_why": "THE LISTING CAPS AT 20 FOLDERS and `handoff-*` sorts after `a01` to `a20`, so a handoff found inside the capped loop would be the one skipped unread. It is looked for first, newest stamp first, and named.",
+    "script": "wf-heal",
+    "stdin_raw": "{\"cwd\": \".\", \"hook_event_name\": \"SessionStart\", \"source\": \"startup\", \"session_id\": \"s-now\"}",
+    "env": {
+      "CLAUDE_CONFIG_DIR": "${TREE}/nocfg"
+    },
+    "exit": 0,
+    "want": [
+      "HANDOFF  the newest not yet picked up is .claude/workforce/jobs/handoff-20261124-101500/JOB.md, created 2026-11-24 (",
+      "WORKING FILES  20 job folder(s)",
+      "  - a01  created"
+    ],
+    "not": [
+      "  - handoff-20261124-101500",
+      "Traceback"
+    ]
+  },
   "dispatch-guard-job-folder-never-denied": {
     "_why": "THE WORKING-FILES SKILL'S OWN WRITES ARE BOOKKEEPING, issue i2. A job folder lives under `.claude/workforce/`, which `wf-dispatch-guard` exempts, so a turn that has spawned nothing is never denied for writing a JOB.md or the folder's `.gitignore`, by the Write tool or by a Bash heredoc. Each step would be this turn's first change, so each would be the one denied.",
     "exit": 0,

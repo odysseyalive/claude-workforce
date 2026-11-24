@@ -223,9 +223,9 @@ makes the working directory the project is step 4's rule — run it from the roo
 with a bootstrap prompt. Both installers dropped that check with the evacuation directive; the prose
 outlived it by six weeks.*
 
-### The four evaluators come with it, and so do `blueprint`, `shared-artifact`, `records-code-map`, `timezone`, `notebooklm-prep` and `working-files`
+### The four evaluators come with it, and so do `blueprint`, `shared-artifact`, `records-code-map`, `timezone`, `notebooklm-prep`, `working-files` and `handoff`
 
-**`update` installs eleven skills, not one.** `text-eval`, `code-evaluator`, `security-evaluator`
+**`update` installs twelve skills, not one.** `text-eval`, `code-evaluator`, `security-evaluator`
 and `ui-design` ship as SIBLINGS of `skills/workforce/` — each complete, carrying the
 corpus it grades against and the agents it runs — and the same rows register those agents where the
 host reads them. That is the whole of the 2026-09-10 directive: *"All I have to do is update
@@ -266,6 +266,14 @@ to resume from, and the job folder is deleted when the job is done. Its `descrip
 trigger. The noticing half is `wf-heal` at `SessionStart`, which lists the folders other sessions
 left for the model to offer the user resume or delete, and deletes nothing (`manifest.txt`
 § working-files). It is not an evaluator or a catalog.
+
+**`handoff` rides them too.** Asked for a handoff in any wording, a session writes one JOB.md in a
+fixed shape: the goal, the commits, what is uncommitted and whether on purpose, what is running and
+whether it is safe to lose, the open items, the decisions waiting on the user and the exact next step.
+Asked to pick up, a later session checks each claim against the tree, says what changed, marks it
+consumed and continues. A handoff is a `working-files` job folder, `jobs/handoff-<stamp>/`, so it
+needs no second mechanism; `wf-heal` names the newest unconsumed one at `SessionStart` on one line
+(`manifest.txt` § handoff). It is not an evaluator or a catalog.
 
 **A skill this installer did not write is never overwritten.** Ownership is decided once per skill,
 on its `SKILL.md`, against `.installed-external` as that record stood BEFORE the run — a project's

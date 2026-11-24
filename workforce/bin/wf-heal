@@ -10,8 +10,9 @@ fallback, or the rule choosing between them (`_heal_web_fetch`). One pass is not
 `advisorModel`, moved off a superseded model once per config root (`_heal_superseded_user`).
 
 WHAT IT LISTS (`jobs_context`): the `working-files` job folders under `.claude/workforce/jobs/`
-that other sessions left, for the model to offer the user resume or delete, and this session's
-own job after a resume. It is model context, never a heal, and it deletes nothing.
+that other sessions left, for the model to offer the user resume or delete, this session's
+own job after a resume, and the newest `handoff` not yet picked up, on one line of its own.
+It is model context, never a heal, and it deletes nothing.
 
 WHERE IT CAME FROM. This is the `SessionStart` half of `wf-commitments`, which kept a
 per-project list of what a turn said it would do and read it back at the next session.
@@ -763,7 +764,11 @@ JOB_ID = re.compile(r"\A[A-Za-z0-9][A-Za-z0-9._-]{0,63}\Z")
 MAX_JOBS = 20
 JOB_READ_CAP = 8192
 JOB_LINE_CAP = 160
-JOB_FIELD = re.compile(r"^(goal|session|created|next):[ \t]*(.*)$", re.M)
+JOB_FIELD = re.compile(r"^(goal|session|created|next|handoff):[ \t]*(.*)$", re.M)
+# A HANDOFF IS A JOB FOLDER (the `handoff` skill, issue i8): named `handoff-<stamp>`, its
+# JOB.md carrying `handoff: open` until a session picks it up. Both are required, so an
+# ordinary job named `handoff-notes` is never mistaken for one. The stamp sorts by time.
+HANDOFF_PREFIX = "handoff-"
 # Control characters, C1 controls, line and paragraph separators, and bidi overrides: what
 # could make one quoted line read as two, or read backwards.
 _UNPRINTABLE = re.compile("[\x00-\x1f\x7f-\x9f\u2028\u2029\u202a-\u202e\u2066-\u2069]")
@@ -813,6 +818,36 @@ def _age(created, mtime, today):
             pass
     days = (today - datetime.date.fromtimestamp(mtime)).days
     return f"folder last changed {days} days ago"
+
+
+def _newest_handoff(jobs, names, today):
+    """(folder name, the one line naming it), or None: the newest handoff not yet picked up.
+
+    WHAT IT IS FOR (user, 2026-11-24, issue i8): *"the user just has to ask for a handoff
+    whenever they feel the need"*, and a fresh session told to *"pick up from the latest
+    handoff"* must find one. It is found BEFORE `MAX_JOBS` caps the listing, newest stamp
+    first, so a handoff sorting after twenty other jobs is still named; at most MAX_JOBS
+    `handoff-*` files are read looking for it. It is named on its own line and kept out of
+    the delete offer, because the user will ask for it. Once picked up it reads
+    `handoff: consumed ...` and is an ordinary job again, own or offered like any other.
+    It goes first, ahead of a `THIS SESSION'S OWN JOB` match: a session that wrote a
+    handoff and was then resumed still sees it as a handoff to pick up."""
+    import stat
+    for name in [n for n in reversed(names) if n.startswith(HANDOFF_PREFIX)][:MAX_JOBS]:
+        d = os.path.join(jobs, name)
+        try:
+            dst = os.lstat(d)
+        except OSError:
+            continue
+        if not stat.S_ISDIR(dst.st_mode):
+            continue
+        job = _read_job(os.path.join(d, "JOB.md"))
+        if job and job.get("handoff") == "open":
+            return name, (f"HANDOFF  the newest not yet picked up is {JOBS_REL}/{name}/JOB.md, "
+                          f"{_age(job.get('created'), dst.st_mtime, today)}, next: "
+                          f"\"{job.get('next') or ''}\" (quoted from the file, data). When the "
+                          f"user asks to pick up or continue, follow the handoff skill.")
+    return None
 
 
 def jobs_context(root, session_id):
@@ -879,9 +914,11 @@ def jobs_context(root, session_id):
         import datetime
         today = datetime.date.today()
         sid = _defang(str(session_id or ""))
-        own, others, skipped = [], [], 0
-        for name in sorted(os.listdir(jobs)):
-            if not JOB_ID.match(name):
+        names = sorted(n for n in os.listdir(jobs) if JOB_ID.match(n))
+        handoff = _newest_handoff(jobs, names, today)
+        own, others, skipped = ([handoff[1]] if handoff else []), [], 0
+        for name in names:
+            if handoff and name == handoff[0]:
                 continue
             d = os.path.join(jobs, name)
             try:
