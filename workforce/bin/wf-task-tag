@@ -178,6 +178,35 @@ def peer_request(prompt):
     return body, {k: flat_sender(attrs.get(k)) for k in ("from", "from-name")}
 
 
+# THE ISSUE A PEER'S MESSAGE CONTINUES: `re: <session>/<issue>`, the first 8 characters of a
+# session id and an issue id there. MEASURED 2026-11-23 in odyssey-alive `6d306850`: i7 sent
+# pw-dev a request, and pw-dev's six replies opened i8 to i13, one issue each. The hook's
+# guidance has the session start every agent-say message with its own marker
+# (`start_checklist`), and a peer's message carrying one continues that issue
+# (`continued_issue`). TWO PLACES, because 5 of those 6 replies were a pointer ("Long message,
+# read it by running: agent-say show ..."), whose body this hook never sees: in the bracketed
+# header as `re=<session>/<issue>`, inside the 40 characters `PEER_HEADER` allows after the
+# name, which agent-say has to write there; or at the start of the body as `re: ...`.
+MARK_HEADER = re.compile(r"\bre=([A-Za-z0-9_-]{1,36})/(i\d{1,4})\b")
+MARK_BODY = re.compile(r"\A\s*re:\s*([A-Za-z0-9_-]{1,36})/(i\d{1,4})\b")
+
+
+def peer_marker(prompt, body):
+    """`(session prefix, issue id)` a peer's message names in its header or at the start of
+    its `body`, or None."""
+    n = PEER_HEADER.match(prompt) if isinstance(prompt, str) else None
+    m = MARK_HEADER.search(prompt[n.start(1):n.end()]) if n else None
+    m = m or (MARK_BODY.match(body) if isinstance(body, str) else None)
+    return (m.group(1), m.group(2)) if m else None
+
+
+def names_session(prefix, key):
+    """Whether a marker's session `prefix` names session `key`: its start, at least eight
+    characters of it, or all of a shorter one."""
+    return (isinstance(prefix, str) and isinstance(key, str) and key.startswith(prefix)
+            and len(prefix) >= min(8, len(key)))
+
+
 def flat_sender(text):
     """One sender field, flattened to one line and capped: it is another session's words."""
     return " ".join(text.split())[:200] if isinstance(text, str) else ""
@@ -1313,11 +1342,17 @@ def prune_dead_rows(d, sessions, sid, live=None):
 
     READ-ONLY, and for a live session only for a row showing an issue at zero and zero or an
     injected ask, so the cost is paid once per dead row; for a dead one, once per dead session
-    still listed. The other session's file is never written HERE — it may be live, and its own
-    next save rewrites its own row from that file, so a resumed session gets back every row
-    this dropped. The one writer of another session's file is `absorb_elsewhere`, a mark the
-    session made on that file's own item, and never while the registry lists its owner live. A key that is not one filename component, or a file this account cannot
-    read as its own, leaves its row exactly as it was.
+    still listed. A live session's file is never written here — its own next save rewrites
+    its own row from that file, so a resumed session gets back every row this dropped.
+
+    A DEAD SESSION'S FINISHED ISSUES ARE CLOSED IN ITS OWN FILE (`close_dead`), the ones
+    `judge_issue` calls `closed` with its agents over (`agents_over`): no open item and
+    nothing running. User, 2026-11-23, on `4e381c9f` i1, a month open at zero and zero:
+    such an issue "closes at the next read". The registry has to show the session gone,
+    which is the bound `absorb_elsewhere` writes under too; a `tracked` issue, held by the
+    hook's fallback alone, still has an open item and is only dropped from the index. A key
+    that is not one filename component, or a file this account cannot read as its own,
+    leaves its row exactly as it was.
     """
     for key, row in list(sessions.items()):
         rows = row.get("open") if isinstance(row, dict) else None
@@ -1334,11 +1369,25 @@ def prune_dead_rows(d, sessions, sid, live=None):
             continue
         empty = {i.get("id") for i in other["issues"]
                  if stale(i) or (dead and over_when_dead(i))}
+        if dead:
+            close_dead(os.path.join(d, f"{key}.json"), other)
         kept = [r for r in rows if not (isinstance(r, dict) and r.get("id") in empty)]
         if kept:
             row["open"] = kept
         else:
             sessions.pop(key, None)
+
+
+def close_dead(path, led):
+    """Close, in a DEAD session's own ledger at `path`, every open issue `judge_issue` calls
+    `closed` once its agents are over (`agents_over`), and write the file. How many.
+    `prune_dead_rows` is the one caller, and only for a session the registry shows gone."""
+    n = 0
+    for iss in open_issues(led):
+        if bare_name(iss.get("id")) and judge_issue(agents_over(iss))[0] == "closed":
+            close_finished(iss)
+            n += 1
+    return n if n and write_json_atomic(path, led) else 0
 
 
 def issue_items(iss):
@@ -1447,7 +1496,8 @@ def open_issues(led):
 
 
 def current_issue(led):
-    """The issue a newly spawned agent belongs to: the NEWEST open one.
+    """The issue a newly spawned agent belongs to when its order names none
+    (`spawn_order`): the NEWEST open one.
 
     NEWEST, because an agent is dispatched by the turn that is running now, and that turn
     is working the issue its own message opened. Oldest-first would link a coder to work
@@ -1458,7 +1508,7 @@ def current_issue(led):
     return opened[-1] if opened else None
 
 
-def add_issue(payload, led):
+def add_issue(payload, led, link=None):
     """Append an issue for THIS user message and return it, or None when the message opens
     no work.
 
@@ -1490,8 +1540,47 @@ def add_issue(payload, led):
     # or the index can tell it from a message the user typed here.
     if isinstance(payload.get("peer"), dict):
         iss["peer"] = payload["peer"]
+    # THE SAME ASK OPEN IN ANOTHER SESSION OF THIS PROJECT IS NAMED, NEVER MERGED
+    # (`related_issue`); a peer's reply marked for another session names that one.
+    see = link or related_issue(payload, ask_text(prompt, payload.get("peer")))
+    if see:
+        iss["see"] = {"session": see[0], "issue": see[1]}
     led.setdefault("issues", []).append(iss)
     return iss
+
+
+def related_issue(payload, ask):
+    """`(session, issue id)` of an OPEN issue in another session of this project whose ask is
+    the same as `ask`, or None.
+
+    THE SIMILARITY IS `note_intentions`' OWN: `_note_key` equal, or one contained in the
+    other. THE SHORTER HAS TO BE `CHECKLIST_MIN_WORDS` LONG. MEASURED 2026-11-23 over the
+    1,249 issues in this machine's ledgers: 469 cross-session pairs are equal or contained,
+    and 468 of them are a slash command of two or three words, `/agenda today` on 30 days
+    or `/workforce dev wrap`, the same command on a different day and not the same ask. The
+    one pair of twelve words or more is one peer notice delivered to two sessions of
+    `university`, which is the same ask. Newest session first, as the index lists them."""
+    k = _note_key(ask or "")
+    if len(k.split()) < CHECKLIST_MIN_WORDS:
+        return None
+    d = issues_dir(payload)
+    idx = read_json_nofollow(os.path.join(d, "index.json")) if d else None
+    sessions = idx.get("sessions") if isinstance(idx, dict) else None
+    if not isinstance(sessions, dict):
+        return None
+    sid = session_component(payload)
+    for key in reversed([k2 for k2 in sessions if k2 != sid and bare_name(k2)]
+                        [-MAX_SESSION_RECORDS:]):
+        led = read_json_nofollow(os.path.join(d, f"{key}.json"))
+        if not isinstance(led, dict) or not isinstance(led.get("issues"), list):
+            continue
+        for iss in reversed(open_issues(led)):
+            o = _note_key(ask_text(iss.get("prompt"), iss.get("peer")))
+            short, long_ = sorted((k, o), key=len)
+            if (bare_name(iss.get("id")) and len(short.split()) >= CHECKLIST_MIN_WORDS
+                    and short in long_):
+                return key, iss["id"]
+    return None
 
 
 def fallback_item(prompt, status="open", peer=None):
@@ -1580,6 +1669,76 @@ def repeat_of(led, payload, now=None):
             if last and now - max(last) <= REPEAT_WINDOW:
                 return iss
     return None
+
+
+def continued_issue(led, payload):
+    """The issue of THIS session a peer's marker (`peer_marker`, kept as `peer_re`) names, or
+    None. Closed or open: a reply to a request this session sent continues it either way."""
+    mark = payload.get("peer_re")
+    if not (isinstance(mark, (list, tuple)) and len(mark) == 2
+            and names_session(mark[0], session_component(payload))):
+        return None
+    return next((i for i in led.get("issues", []) if isinstance(i, dict)
+                 and i.get("id") == mark[1]), None)
+
+
+def continue_issue(iss, payload):
+    """Put a peer's reply on the issue it continues: the issue is reopened, the reply is its
+    open item in the hook's fallback form, and the delivery is recorded under `replies`."""
+    if iss.get("state") == "closed":
+        reopen_issue(iss)
+    item = fallback_item(payload.get("prompt"), peer=payload.get("peer"))
+    if item and all(i["ask"] != item["ask"] for i in issue_items(iss)):
+        iss.setdefault("items", []).append(item)
+    ptr = pointer_id(payload.get("prompt"))
+    row = {"at": utc_now(), "from": peer_sender(payload.get("peer") or {}),
+           **({"id": ptr[2]} if ptr else {})}
+    add_reply(iss, row)
+
+
+def add_reply(iss, row):
+    """Record one peer reply on `iss` under `replies`, newest last, at most `REPEATS_MAX`."""
+    old = iss.get("replies")
+    iss["replies"] = ([r for r in old if isinstance(r, dict)] if isinstance(old, list)
+                      else []) + [row]
+    iss["replies"] = iss["replies"][-REPEATS_MAX:]
+
+
+def other_session_issue(payload):
+    """`(session, issue id)` for a peer's marker naming ANOTHER session of this project, or
+    None. The session is the one ledger in this project's issues directory its prefix names,
+    and only when exactly one does; the name is listed, never joined from the marker."""
+    mark = payload.get("peer_re")
+    d = issues_dir(payload)
+    if not (isinstance(mark, (list, tuple)) and len(mark) == 2 and d):
+        return None
+    sid = session_component(payload)
+    try:
+        keys = [n[:-5] for n in os.listdir(d) if n.endswith(".json") and n != "index.json"]
+    except OSError:
+        return None
+    keys = [k for k in keys if k != sid and bare_name(k) and names_session(mark[0], k)]
+    return (keys[0], mark[1]) if len(keys) == 1 else None
+
+
+def note_reply_elsewhere(payload, ref, iid):
+    """Record on another session's issue `ref` that its peer's reply landed here, on `iid`,
+    under `replies`. NEVER while the registry shows that session running: its own hooks
+    rewrite its file, so a write here would be a lost update (`absorb_elsewhere`'s rule)."""
+    key, other = ref
+    live = live_sessions(session_component(payload))
+    if live is not None and key in live:
+        return False
+    p = os.path.join(issues_dir(payload), f"{key}.json")
+    led = read_json_nofollow(p)
+    iss = next((i for i in led.get("issues", []) if isinstance(i, dict)
+                and i.get("id") == other), None) if isinstance(led, dict) else None
+    if iss is None:
+        return False
+    row = {"at": utc_now(), "from": peer_sender(payload.get("peer") or {}),
+           "session": session_component(payload), "issue": iid}
+    add_reply(iss, row)
+    return write_json_atomic(p, led)
 
 
 def note_repeat(iss, payload):
@@ -1718,10 +1877,16 @@ def absorb_items(led, issue_id, items, title=""):
     # own issue open rather than reopening the earlier one. A `merged` issue an older release
     # folded is unfolded when its message's list is absorbed again.
     known = {i.get("id") for i in led.get("issues", []) if isinstance(i, dict) and i is not own}
+    # A FALLBACK HANDED BACK STAYS ONE: a continuation's list (`continue_checklist`) carries
+    # the issue's own fallback items marked so, and only a mark matching one still there is
+    # kept, so no item the session wrote can make itself the hook's.
+    fallbacks = {i["ask"] for i in issue_items(own) if i.get("fallback") is True}
     mine = []
     for it in items:
         row = {"ask": it["ask"],
                "status": it["status"] if isinstance(it.get("status"), str) else "open"}
+        if it.get("fallback") is True and it["ask"] in fallbacks:
+            row["fallback"] = True
         link = it.get("issue")
         if isinstance(link, str) and link != issue_id and link in known:
             row["continues"] = link
@@ -1903,7 +2068,7 @@ def absorb_carried(led, rows):
     return landed
 
 
-def working_label(iss, dead=False):
+def working_label(iss, dead=False, item=None):
     """`working (<agent type>, ...)` for an issue an agent is RUNNING on, or "".
 
     WHAT THE WORK LIST SAYS IN PLACE OF A BARE `open` (user, 2026-11-21: "it's really no good
@@ -1913,15 +2078,46 @@ def working_label(iss, dead=False):
     nobody can name is said as `agent` (`name_labelled`'s refusal). `dead` is an earlier
     session the registry shows gone, whose `running` entries are over (`over_when_dead`), so
     it says nothing.
+
+    `item` ASKS FOR ONE ROW'S LABEL: only the agents that hold that item. MEASURED 2026-11-23
+    in odyssey-alive `6d306850`: i4's five rows each read `working (engineering-site,
+    platform-lead)`, though each agent held some of them. An agent whose spawn named items
+    (`spawn_order`) holds the ones whose `item_key` it recorded; one that named none, or
+    whose keys match no item the issue holds now (the list was reworded), holds every row,
+    which is the per-issue label. With no `item`, every running agent counts.
     """
-    if dead:
+    if dead or not isinstance(iss, dict):
         return ""
+    have = {item_key(x) for x in issue_items(iss)} if item is not None else set()
+    want = item_key(item) if item is not None else None
     types = []
     for a in issue_agents(iss):
         t = a.get("agent_type") if bare_name(a.get("agent_type")) else "agent"
+        held = [k for k in a.get("items") or [] if isinstance(k, str) and k in have] \
+            if isinstance(a.get("items"), list) else []
+        if want is not None and held and want not in held:
+            continue
         if a.get("state") == "running" and t not in types:
             types.append(t)
     return "working (%s)" % ", ".join(types) if types else ""
+
+
+def see_ref(iss):
+    """`(session, issue id)` of the other session's issue `iss` asks the same thing as
+    (`related_issue`, `peer_marker`), or None. Both halves are validated as bare names where
+    they are read, since the ledger is a file in the project."""
+    ref = iss.get("see") if isinstance(iss, dict) else None
+    if (isinstance(ref, dict) and bare_name(ref.get("session"))
+            and isinstance(ref.get("issue"), str) and CHECKLIST_KEY.fullmatch(ref["issue"])):
+        return ref["session"], ref["issue"]
+    return None
+
+
+def see_label(iss):
+    """`see <session, first 8> <id>` for an issue linked to another session's (`see_ref`),
+    or "". Display only: the two issues stay two issues, each closed where it lives."""
+    ref = see_ref(iss)
+    return f"see {ref[0][:8]} {ref[1]}" if ref else ""
 
 
 def shown_status(status, label):
@@ -2008,11 +2204,26 @@ def carry_elsewhere(payload, marks=None):
     return rows, more
 
 
-def agents_over(iss):
+def agents_over(iss, now=None):
     """A copy of `iss` with every `running` agent read as `returned`: what a session that is
     no longer running holds, since a subagent cannot outlive the session that spawned it.
-    The record itself is never changed."""
-    return dict(iss, agents=[dict(a, state="returned") if a.get("state") == "running" else a
+    The record itself is never changed.
+
+    A `handoff` MARK OLDER THAN `HANDOFF_STALE_AFTER` IS OVER TOO, the age at which the spawn
+    guard already stops believing it (`held_by`). MEASURED 2026-11-23 in odyssey-alive:
+    `4e381c9f` i1, `/agenda today` of 2026-10-23, no item and two agents cut a month earlier,
+    was still on `index.json` at `items_open: 0, agents_running: 0`, because `judge_issue`
+    holds an issue with no items over a cut agent and nothing could ever resume it. The
+    user, 2026-11-23: an issue with no open items and no running agents closes. A fresh mark
+    still holds, so a session that died a minute ago keeps its resume."""
+    now = time.time() if now is None else now
+
+    def over(a):
+        at = a.get("handoff_at")
+        return a.get("state") == "running" or (
+            a.get("state") == "handoff"
+            and not (isinstance(at, int) and 0 <= now - at <= HANDOFF_STALE_AFTER))
+    return dict(iss, agents=[dict(a, state="returned") if over(a) else a
                              for a in issue_agents(iss)])
 
 
@@ -2439,19 +2650,94 @@ def link_agent(payload, led):
     if not aid:
         return None
     task = agent_task(payload, aid)
-    # THE ISSUE THE TASK NAMES, when it names an open one, and only then the newest: an agent
-    # started for i11 while the user is already on i23 belongs to i11 (measured 2026-10-14).
-    iss = issue_named(led, task) or current_issue(led)
+    # THE ISSUE THE ORDER NAMES (`spawn_order`), then the one the task description names,
+    # and only then the newest: an agent started for i11 while the user is already on i23
+    # belongs to i11 (measured 2026-10-14).
+    named, numbers = spawn_order(payload, aid)
+    opened = {i.get("id"): i for i in open_issues(led)}
+    iss = opened.get(named) or issue_named(led, task) or current_issue(led)
     if iss is None:
         return None
+    held = held_items(iss, numbers) if iss is opened.get(named) else []
     for a in issue_agents(iss):
         if a.get("agent_id") == aid:
             a["state"] = "running"
             return iss.get("id")
     iss.setdefault("agents", []).append(
         {"agent_id": aid, "agent_type": str(payload.get("agent_type") or ""),
-         "state": "running", "judgment": None})
+         "state": "running", "judgment": None, **({"items": held} if held else {})})
     return iss.get("id")
+
+
+# THE LINE AN ORDER NAMES ITS ISSUE ON, and the items of that issue's list it holds:
+# `Issue: i4` or `Issue: i4 items 2, 3`, at the start of a line of the Agent prompt. ANCHORED,
+# because an order opens with the user's words quoted verbatim and those can mention an id in
+# passing; a free scan for `i4` would link an agent to whatever the user happened to cite.
+# MEASURED 2026-11-23 in odyssey-alive `6d306850`: i5 "VIP rotation" holds business-analyst,
+# claude, platform-lead twice and business-books, and some of them served i4, because each
+# spawn went to the newest open issue. Every one of that session's 25 Agent prompts opened
+# `REQUEST (verbatim):`, so a line of the order's own is where the id goes.
+SPAWN_ISSUE = re.compile(
+    r"^[ \t>*_-]*issue[ \t]*:[ \t]*(i\d{1,4})\b(?:[ \t]*[,;(]?[ \t]*items?[ \t]*:?[ \t]*"
+    r"(\d{1,3}(?:[ \t]*,[ \t]*\d{1,3}){0,19}))?", re.I | re.M)
+# HOW MUCH OF THE ORDER IS SEARCHED for that line, and how far back the transcript is.
+SPAWN_PROMPT_MAX = 8000
+SPAWN_SCAN_LINES = 400
+
+
+def spawn_order(payload, aid):
+    """`(issue id, [item numbers])` an agent's order names on its `SPAWN_ISSUE` line, or
+    `(None, [])`.
+
+    `SubagentStart` CARRIES NO PROMPT (platform.md fact 22b (d)). The harness's meta file for
+    the agent names the `toolUseId` of the Agent call that started it, and the main
+    transcript holds that call with its `prompt`, so the order is read from there. MEASURED
+    2026-11-23 over the 25 spawns of odyssey-alive `6d306850`: this event's own row in each
+    agent's transcript is stamped 0.3 s to 42 s after the call's row. Whether the call's row
+    is always ON DISK by this event is not measured, so when it is not found the task
+    description is read for the same line, and then nothing is named (`current_issue`)."""
+    meta = agent_meta(payload, aid) or {}
+    texts = []
+    tid = meta.get("toolUseId")
+    if isinstance(tid, str) and _AGENT_TYPE_OK.match(tid):
+        lines = transcript_lines_of(payload.get("transcript_path"))[-SPAWN_SCAN_LINES:]
+        texts.append(call_prompt(lines, tid))
+    texts.append(meta.get("description"))
+    for text in texts:
+        m = SPAWN_ISSUE.search(text[:SPAWN_PROMPT_MAX]) if isinstance(text, str) else None
+        if m:
+            nums = [int(n) for n in re.findall(r"\d+", m.group(2) or "")]
+            return m.group(1).lower(), nums
+    return None, []
+
+
+def call_prompt(lines, tool_use_id):
+    """The `prompt` of the tool call `tool_use_id` in transcript `lines`, or None."""
+    for line in reversed(lines):
+        if tool_use_id not in line:
+            continue
+        try:
+            row = json.loads(line)
+        except ValueError:
+            continue
+        c = (row.get("message") or {}).get("content") if isinstance(row, dict) else None
+        for b in c if isinstance(c, list) else []:
+            if (isinstance(b, dict) and b.get("type") == "tool_use" and b.get("id") == tool_use_id
+                    and isinstance(b.get("input"), dict)):
+                p = b["input"].get("prompt")
+                return p if isinstance(p, str) else None
+    return None
+
+
+def held_items(iss, numbers):
+    """The `item_key`s of the items numbered `numbers` (from 1, in the list's order) on `iss`.
+    A number past the end names nothing; none left means the agent holds the whole issue."""
+    items = issue_items(iss)
+    out = []
+    for n in numbers:
+        if 1 <= n <= len(items) and item_key(items[n - 1]) not in out:
+            out.append(item_key(items[n - 1]))
+    return out
 
 
 def agent_returned(payload, led, judgment, delivered=False, cut=True):
@@ -2576,8 +2862,8 @@ def held_by(led, agent_type):
     """
     if not isinstance(led, dict) or not isinstance(agent_type, str) or not agent_type:
         return []
-    # ONLY THE CURRENT ISSUE HOLDS A ROLE. A spawn is linked to the newest open issue
-    # (`current_issue`), so a cut agent on an OLDER issue is holding different work, and a
+    # ONLY THE CURRENT ISSUE HOLDS A ROLE. A spawn whose order names no issue is linked to the
+    # newest open issue (`current_issue`; `spawn_order` for one that names it), so a cut agent on an OLDER issue is holding different work, and a
     # fresh agent of its role now is a new order, not a replacement. The measured defect
     # (trial e2e3) re-spawned in the same turn, on the same issue, and is still refused.
     # The older issue's cut agent is still named for resume by the main `Stop`.
@@ -3071,6 +3357,35 @@ def checklist_display(payload):
     return ""
 
 
+def sync_list(at, iid, cl):
+    """Land the list's items and titles on the ledger NOW, when they differ from it, and
+    return the ledger. Only onto issue `iid` while it is open.
+
+    WHAT THE SESSION WROTE MID-TURN WAS ON DISK ONLY IN THE SCRATCHPAD UNTIL THE STOP.
+    MEASURED 2026-11-23 in odyssey-alive `6d306850`: i15's title, its split items and an item
+    found along the way reached the ledger at the Stop, and until then the ledger and
+    `index.json` held the hook's unsplit fallback, which is what another session reads under
+    OPEN FROM EARLIER SESSIONS. This display already reads the list to show it, so it lands
+    it here, through the same absorbs the Stop runs (`absorb_items`, `absorb_titles`), and
+    the ledger says what the user was just shown. Nothing is judged or closed here: that
+    stays the Stop's, so the issue an agent spawned next is linked to does not move.
+    Written only when something changed, since a spawn's `SubagentStart` writes this file
+    too."""
+    led = load_ledger(at)
+    if not iid or not isinstance(cl, dict) or not any(
+            i.get("id") == iid for i in open_issues(led)):
+        return led
+    before = json.dumps(led, sort_keys=True)
+    absorb_items(led, iid, checklist_items(cl), checklist_title(cl))
+    absorb_titles(led, checklist_titles(cl))
+    if json.dumps(led, sort_keys=True) != before:
+        try:
+            save_ledger(at, led)
+        except OSError:
+            pass
+    return led
+
+
 def _show_checklist(payload, d, name, sid):
     """`checklist_display` for one named file in directory `d`, or "": `SHOW_LIST` and the
     list, led by `PARTITION_LINE` when the list is the one that first reaches the count."""
@@ -3086,17 +3401,18 @@ def _show_checklist(payload, d, name, sid):
         return ""
     cl = read_json_nofollow(os.path.join(d, name))
     restored = restore_carried(at, os.path.join(d, name), rec, cl)
+    iid = rec.get("issue") if bare_name(rec.get("issue")) else ""
+    led = sync_list(at, iid, cl)
     items = checklist_items(cl)[:DISPLAY_MAX]
     if not items:
         return RESTORED % restored if restored else ""
-    iid = rec.get("issue") if bare_name(rec.get("issue")) else ""
     title = checklist_title(cl)
-    lines = ["WORK LIST  " + "  ".join(x for x in (iid, title) if x)]
-    # THIS MESSAGE'S OWN ROWS SAY WHO IS ON THEM TOO, from its issue on the ledger.
-    mine = next((i for i in open_issues(load_ledger(at)) if iid and i.get("id") == iid), None)
-    label = working_label(mine) if mine is not None else ""
+    mine = next((i for i in open_issues(led) if iid and i.get("id") == iid), None)
+    lines = ["WORK LIST  " + "  ".join(x for x in (iid, title, see_label(mine)) if x)]
+    # THIS MESSAGE'S OWN ROWS SAY WHO IS ON THEM TOO, from its issue on the ledger, each row
+    # only the agents that hold it (`working_label`).
     for it in items:
-        lines.append(f"  {shown_status(it.get('status'), label)}  "
+        lines.append(f"  {shown_status(it.get('status'), working_label(mine, item=it))}  "
                      f"{plain_text(it['ask'], CARRY_ASK)}")
     others = open_elsewhere(at, d, rec, cl, records)
     if others:
@@ -3226,7 +3542,9 @@ def open_elsewhere(at, d, rec, cl, records):
     rows += [(rid, it.get("status"), it["ask"]) for rid, its in live.items() for it in its]
     # AN ISSUE AN AGENT IS WORKING IS LISTED FIRST AND COUNTED FIRST, so the cap below never
     # drops it for newer asks, and its open rows say who is on it (`working_label`).
-    working = {i["id"]: working_label(i) for i in open_issues(led) if bare_name(i.get("id"))}
+    # Each row names only the agents that hold it (`working_label`'s `item`).
+    byid = {i["id"]: i for i in open_issues(led) if bare_name(i.get("id"))}
+    working = {k: working_label(i) for k, i in byid.items()}
     rows.sort(key=lambda r: not working.get(r[0]))
     groups, seen, n = {}, set(), 0
     for gid, st, ask in rows:
@@ -3236,10 +3554,11 @@ def open_elsewhere(at, d, rec, cl, records):
             continue
         seen.add(key)
         n += 1
-        groups.setdefault(gid, []).append((shown_status(st, working.get(gid)),
-                                           plain_text(ask, CARRY_ASK)))
+        label = working_label(byid.get(gid), item={"ask": ask})
+        groups.setdefault(gid, []).append((shown_status(st, label), plain_text(ask, CARRY_ASK)))
     order = sorted(groups, key=lambda g: (not working.get(g), len(g), g))
-    return [(g, titles.get(g) or "", groups[g]) for g in order]
+    return [(g, "  ".join(x for x in (titles.get(g), see_label(byid.get(g))) if x), groups[g])
+            for g in order]
 
 
 # THIS PROJECT'S EARLIER SESSIONS' OPEN WORK, SHOWN AFTER THIS SESSION'S (`ELSEWHERE_MAX`).
@@ -3264,14 +3583,22 @@ def earlier_sessions_lines(at, cl):
             more += 1
             continue
         n += 1
-        g = groups.setdefault((key, iss["id"]), (plain_text(iss.get("title"), TITLE_MAX),
-                                                 working_label(iss, dead), []))
-        g[2].append((shown_status(st, g[1]), plain_text(ask, CARRY_ASK)))
+        g = groups.setdefault((key, iss["id"]), (plain_text(iss.get("title"), TITLE_MAX), []))
+        g[1].append((shown_status(st, working_label(iss, dead, {"ask": ask})),
+                     plain_text(ask, CARRY_ASK)))
     if not groups:
         return []
+    # AN ISSUE OF THIS SESSION THAT ASKS THE SAME THING SAYS SO ON BOTH SIDES (`see_label`).
+    back = {}
+    for i in open_issues(load_ledger(at)):
+        ref = see_ref(i)
+        if ref and bare_name(i.get("id")):
+            back.setdefault(ref, i["id"])
+    sid = session_component(at)
     lines = [ALSO_EARLIER]
-    for (key, iid), (title, _label, rows) in groups.items():
-        lines.append("  " + "  ".join(x for x in (f"{key[:8]} {iid}", title) if x))
+    for (key, iid), (title, rows) in groups.items():
+        see = f"see {sid[:8]} {back[(key, iid)]}" if (key, iid) in back else ""
+        lines.append("  " + "  ".join(x for x in (f"{key[:8]} {iid}", title, see) if x))
         lines += [f"    {st}  {ask}" for st, ask in rows]
     return lines + ([MORE_EARLIER % more] if more else [])
 
@@ -3367,7 +3694,7 @@ def start_checklist(payload, prev=None, earlier=(), notes=None):
     # turn that wrote it has ended. `wf-widen`'s Stop does this too, one event earlier, so an
     # issue finished during a turn closes on that turn's Stop; this is the half that holds
     # when no Stop fired.
-    issue_id, repeat = None, None
+    issue_id, repeat, cont = None, None, None
     carried, untitled, inline = [], [], None
     try:
         led = load_ledger(payload)
@@ -3397,15 +3724,26 @@ def start_checklist(payload, prev=None, earlier=(), notes=None):
         if repeat is not None:
             note_repeat(repeat, payload)
             landed += 1
-        iss = add_issue(payload, led) if repeat is None else None
+        # A PEER'S REPLY MARKED FOR AN ISSUE OF THIS SESSION CONTINUES IT (`continued_issue`);
+        # one marked for another session of this project opens an issue here that names it,
+        # and that session's issue records the reply (`note_reply_elsewhere`).
+        cont = continued_issue(led, payload) if repeat is None else None
+        if cont is not None:
+            continue_issue(cont, payload)
+            landed += 1
+        link = (other_session_issue(payload)
+                if repeat is None and cont is None and payload.get("peer_re") else None)
+        iss = add_issue(payload, led, link) if repeat is None and cont is None else None
         issue_id = iss.get("id") if iss else None
+        if iss is not None and link is not None:
+            note_reply_elsewhere(payload, link, issue_id)
         if iss is not None or prev is not None or landed:
             save_ledger(payload, led)
         # BUILT AFTER THE ABSORB AND AFTER THIS MESSAGE'S ISSUE EXISTS, so it reflects what
         # is open NOW: an item the last turn finished is not handed back to this one, and
         # this message's own issue is skipped rather than carrying itself. A repeat skips the
         # issue it repeats, whose items are on that issue's own list.
-        skip = issue_id or (repeat.get("id") if repeat is not None else None)
+        skip = issue_id or next((x.get("id") for x in (repeat, cont) if x is not None), None)
         # AND THIS PROJECT'S EARLIER SESSIONS' OPEN ITEMS AFTER THEM (`carry_elsewhere`).
         carried = carry_forward(led, skip=skip) + carry_elsewhere(payload)[0]
         untitled = untitled_issues(led, skip=skip)
@@ -3427,14 +3765,13 @@ def start_checklist(payload, prev=None, earlier=(), notes=None):
         if isinstance(notes, dict):
             notes["repeat_of"] = rid
         said = REPEAT_LINE % (peer_sender(payload["peer"]), rid, rid)
-        live = next((r for r in [prev] + [e.get("checklist") for e in earlier
-                                          if isinstance(e, dict)]
-                     if isinstance(r, dict) and r.get("issue") == rid and not r.get("ended")
-                     and os.path.exists(checklist_path(payload, r))), None)
+        live = live_list(payload, rid, prev, earlier)
         if live is not None:
             return said.strip(), live
         line, record = carry_only_checklist(bare, carried, untitled, inline)
         return (said.strip() + (" " + line if line else "")), record
+    if cont is not None:
+        return continue_checklist(payload, cont, prev, earlier, carried, untitled, inline)
     # Injected text opens no list of its own: it is not the user's ask. IT STILL CARRIES,
     # when this session has earlier open items — see `carry_only_checklist`, which is where
     # the measured hand-back case is written down.
@@ -3483,8 +3820,13 @@ def start_checklist(payload, prev=None, earlier=(), notes=None):
                if isinstance(payload.get("peer"), dict) else "")
             + (f" These items belong to issue {issue_id} in this project's issue ledger, "
                "which keeps them after this turn ends and keeps every earlier open issue "
-               "beside them; an agent spawned now is linked to that issue and its result is "
-               "recorded there." if issue_id else "")
+               "beside them." + SPAWN_LINE % (issue_id, issue_id, issue_id)
+               + AGENT_SAY_LINE % (session_component(payload)[:8], issue_id, issue_id)
+               if issue_id else "")
+            + (FOREIGN_MARK_LINE % (payload["peer_re"][0], payload["peer_re"][1])
+               if payload.get("peer_re") and not other_session_issue(payload)
+               and not names_session(payload["peer_re"][0], session_component(payload))
+               else "")
             + earlier_lines(carried, untitled, inline)
             + (dispatch_line(payload, issue_id) if issue_id else "")), record
 
@@ -3585,6 +3927,71 @@ def inline_line(mark):
         return ""
     ids = [i for i in mark.get("issues") or [] if bare_name(i)][:MAX_CARRIED]
     return INLINE_LINE % (mark["items"], ", ".join(ids)) if ids else ""
+
+
+# WHICH ISSUE A SPAWN SERVES, said where the issue is named (`SPAWN_ISSUE`, `spawn_order`).
+SPAWN_LINE = (" An agent spawned for it has a line \"Issue: %s\" in its prompt, or \"Issue: %s "
+              "items 2, 3\" when it holds only those items of this list, counted from 1 in "
+              "the order written: that links it to issue %s and puts its name on those rows "
+              "alone, and its result is recorded there. A spawn with no such line is linked "
+              "to the newest open issue.")
+# A MESSAGE TO A PEER CARRIES ITS ISSUE, so the reply continues it (`MARK_HEADER`).
+AGENT_SAY_LINE = (" A message this session sends a peer with agent-say about this work starts "
+                  "with \"re: %s/%s\", so the peer's reply continues %s instead of opening "
+                  "an issue of its own.")
+# A PEER'S MESSAGE MARKED FOR AN ISSUE THAT IS NOT IN THIS PROJECT IS THE SENDER'S: the reply
+# carries the marker back, so it lands on the sender's issue.
+FOREIGN_MARK_LINE = (" The message is marked \"re: %s/%s\", an issue of the sender's: an "
+                     "agent-say reply to it starts with that marker, not with this issue's.")
+# A PEER'S REPLY THAT CONTINUES AN ISSUE OF THIS SESSION (`continued_issue`).
+CONTINUE_LINE = (" This message from \"%s\" carries issue %s's marker, so it continues %s and "
+                 "opens no issue of its own: \"items\" holds %s's list, with this reply as "
+                 "its open item \"%s\". Mark that item when the reply is handled, and add "
+                 "anything new it asks to the same list.")
+
+# ...AND WHEN THAT ISSUE'S OWN TURN IS STILL WRITING ITS LIST, the list is the running turn's,
+# so the reply is not written into it here: the session adds it, or the absorb of that list
+# would replace the reply's item on the issue.
+CONTINUE_LIVE = (" This message from \"%s\" carries issue %s's marker, so it continues %s and "
+                 "opens no issue of its own. %s's list is still open in this turn: add this "
+                 "reply to it as an item, \"%s\", and mark it when the reply is handled.")
+
+
+def live_list(payload, iid, prev, earlier):
+    """The record of issue `iid`'s list when a turn no `Stop` has ended is still writing it
+    and its file is on disk, or None: a repeat and a continuation hand that list back rather
+    than write over it."""
+    return next((r for r in [prev] + [e.get("checklist") for e in earlier if isinstance(e, dict)]
+                 if isinstance(r, dict) and r.get("issue") == iid and not r.get("ended")
+                 and os.path.exists(checklist_path(payload, r))), None)
+
+
+def continue_checklist(payload, cont, prev, earlier, carried, untitled, inline):
+    """The file and the line for a turn a peer's reply opened on issue `cont`: that issue's
+    list, its items already in it, keyed to it, so what the session adds lands on it and
+    nothing it held is lost when the list is absorbed (`absorb_items` replaces). A list of
+    that issue still being written by a running turn is handed back as it is, the way a
+    repeat's is (`start_checklist`)."""
+    cid = cont.get("id")
+    who = peer_sender(payload.get("peer") or {})
+    reply = (fallback_item(payload.get("prompt"), peer=payload.get("peer")) or {}).get("ask", "")
+    said = CONTINUE_LINE % (who, cid, cid, cid, reply)
+    live = live_list(payload, cid, prev, earlier)
+    if live is not None:
+        return (CONTINUE_LIVE % (who, cid, cid, reply)).strip(), live
+    prompt = payload.get("prompt") or ""
+    record = {"prompt": prompt[:2000], "ended": False, "issue": cid, "key": cid}
+    if isinstance(payload.get("peer"), dict):
+        record["peer"] = payload["peer"]
+    items = [dict({"ask": i["ask"], "status": i.get("status") or "open"},
+                  **({"fallback": True} if i.get("fallback") is True else {}))
+             for i in issue_items(cont)]
+    p = checklist_path(payload, record)
+    if not write_json_atomic(p, {"prompt": prompt[:2000], "title": plain_text(
+            cont.get("title"), TITLE_MAX), "items": items, "carried": carried}):
+        return "", None
+    return (checklist_head(p, untitled) + "." + said
+            + earlier_lines(carried, untitled, inline)), record
 
 
 def carry_only_checklist(p, carried, untitled, inline=None):
@@ -4142,7 +4549,9 @@ def main():
     # the ask a user's message would give it, and the sender rides along as `peer`.
     _peer = peer_request(payload.get("prompt"))
     if _peer:
-        payload = dict(payload, prompt=_peer[0], peer=_peer[1])
+        _mark = peer_marker(payload.get("prompt"), _peer[0])
+        payload = dict(payload, prompt=_peer[0], peer=_peer[1],
+                       **({"peer_re": _mark} if _mark else {}))
 
     # CLEAR LAST TURN'S WIDEN FLAG FIRST, and do it before anything can return early.
     # The flag tells the widening agent to go open a sense; one left behind would send
