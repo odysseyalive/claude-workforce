@@ -223,9 +223,9 @@ makes the working directory the project is step 4's rule — run it from the roo
 with a bootstrap prompt. Both installers dropped that check with the evacuation directive; the prose
 outlived it by six weeks.*
 
-### The four evaluators come with it, and so do `blueprint`, `shared-artifact`, `records-code-map`, `timezone`, `notebooklm-prep`, `working-files` and `handoff`
+### The four evaluators come with it, and so do `blueprint`, `shared-artifact`, `records-code-map`, `timezone`, `notebooklm-prep`, `working-files`, `handoff` and `build-as-you-go`
 
-**`update` installs twelve skills, not one.** `text-eval`, `code-evaluator`, `security-evaluator`
+**`update` installs thirteen skills, not one.** `text-eval`, `code-evaluator`, `security-evaluator`
 and `ui-design` ship as SIBLINGS of `skills/workforce/` — each complete, carrying the
 corpus it grades against and the agents it runs — and the same rows register those agents where the
 host reads them. That is the whole of the 2026-09-10 directive: *"All I have to do is update
@@ -274,6 +274,12 @@ Asked to pick up, a later session checks each claim against the tree, says what 
 consumed and continues. A handoff is a `working-files` job folder, `jobs/handoff-<stamp>/`, so it
 needs no second mechanism; `wf-heal` names the newest unconsumed one at `SessionStart` on one line
 (`manifest.txt` § handoff). It is not an evaluator or a catalog.
+
+**`build-as-you-go` rides them too.** It is a playbook for one shareable page built in a live
+dialogue: one change per turn on the same link, the order the page grows in, a read-only research
+brief, the privacy rules and the checks before each publish. The page's style stays
+`shared-artifact`'s. It ships no script; its browser check is a snippet in the skill
+(`manifest.txt` § build-as-you-go). It is not an evaluator or a catalog.
 
 **A skill this installer did not write is never overwritten.** Ownership is decided once per skill,
 on its `SKILL.md`, against `.installed-external` as that record stood BEFORE the run — a project's
