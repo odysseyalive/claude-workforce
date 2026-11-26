@@ -62,11 +62,12 @@ dropped, and each candidate class was counted against the total.
   `chooser-describes-removed-decision-is-silent` and
   `chooser-neither-needs-your-input-is-silent`.
 
-  AND `codes` SHIPPED WRONG THREE TIMES MORE, all live on 2026-11-25: a work-list marker
-  (`re=b59b3de3/i15`), a sentence naming "answer keys like `S = skip`", and a latency
-  table ("58–62 ms, median 12–14 ms"). The three narrowings sit with `_LEGEND`, each
-  pinned by its row, and `chooser-reply-single-legend-blocks` is the plain ask they must
-  leave standing.
+  AND `codes` SHIPPED WRONG FOUR TIMES MORE, all live on 2026-11-25: a work-list marker
+  (`re=b59b3de3/i15`), a sentence naming "answer keys like `S = skip`", a latency table
+  ("58–62 ms, median 12–14 ms"), and a report describing the fix ("answer with them; a
+  bare "1-4 accept, 5-6 S""). The narrowings sit with `_LEGEND`, each pinned by its row,
+  and `chooser-reply-single-legend-blocks` and `chooser-pair-with-closing-question-blocks`
+  are the plain asks they must leave standing.
 
   DROPPED  offer     6.45%   (229 turns)  "want me to …?", "should I …?", "let me know"
            at the end of a reply. Over budget by more than four times, and the
@@ -147,10 +148,11 @@ TAIL = 600
 # so it counts only next to a reply verb, or repeated — a pair of mappings in one clause
 # is a key, and a key exists to be answered in.
 #
-# IT FIRED WRONG THREE TIMES LIVE, 2026-11-25, and each narrowing below is one of them.
+# IT FIRED WRONG FOUR TIMES LIVE, 2026-11-25, and the narrowings below are what fixed it.
 # The September corpus that measured this class is gone from disk, so the re-read was of
-# every match in the transcripts that remain: 13 across 10,493 assistant texts, 3 of them
-# turn-ending fires, and no true fire among the 13. Each fire is pinned by a row.
+# every match in the transcripts that remain: 14 of 10,499 assistant texts, 4 of them
+# turn-ending fires, and no true fire among the 14. After these narrowings: 0 and 0.
+# Each fire is pinned by a row.
 #   · A VALUE IS A WHOLE WORD. "cpu-dev's reply carried `re=b59b3de3/i15`" read `re=b`,
 #     a key and the first letter of a hex id, as a legend. `S = skip` and `C=no-agent`
 #     still count; `re=b59b3de3` does not, and neither does an all-letter id such as
@@ -164,15 +166,35 @@ TAIL = 600
 #     with, using, in, by, as, a colon, an opening quote or the legend itself, and a noun
 #     is followed by a noun (keys) or a verb (carried)
 #     (`chooser-answer-keys-example-is-silent`).
+#   · A PRONOUN OBJECT IS A DESCRIPTION. "the reply also tells you to answer with them; a
+#     bare "1-4 accept, 5-6 S"" is prose about this rule, and `answer with them` passes
+#     the instruction test above. An instruction names what to answer with; `them`, `it`
+#     and `this` point back at something already said
+#     (`chooser-answer-with-them-is-silent`).
+#   · A PAIR COUNTS ONLY IN A REPLY THAT ASKS. Two legends in one clause are a key only
+#     when the same tail also carries an instruction verb (`ASKS`, anywhere in TAIL) or
+#     ends on a question to the reader. Every remaining corpus match was a pair in a
+#     report that asked nothing: month-day dates ("the 10-31 handoff, the 10-29
+#     handoff"), counts ("12–15 panes … 2–3 steps"), a quoted question ("body = this
+#     file, face = which file?") (`chooser-month-day-dates-is-silent`). The cost, stated:
+#     a bare "1-4 accept, 5-6 S" with no instruction and no closing question no longer
+#     blocks (`chooser-pair-with-closing-question-blocks` is the floor it keeps).
+#   · A RANGE AFTER `$` IS A PRICE. "$30–58 a month on Thunder, $52–97 on RunPod"
+#     (`chooser-dollar-ranges-is-silent`).
 _UNIT = (r"(?:ms|secs?|seconds?|mins?|minutes?|hrs?|hours?|days?|weeks?|months?|years?"
          r"|[kmgt]i?b|px|fps|percent)\b")
-_LEGEND = (r"\b\d{1,2}\s*[-–]\s*\d{1,2}\s+(?!" + _UNIT + r")[A-Za-z]{1,12}\b"
+_LEGEND = (r"(?<!\$)\b\d{1,2}\s*[-–]\s*\d{1,2}\s+(?!" + _UNIT + r")[A-Za-z]{1,12}\b"
            r"|(?<![\w-])[A-Za-z]{1,4}\s*=\s*[A-Za-z]+\b(?!/)")
-CODES = re.compile(
-    r"\b(?:reply|respond|answer|send back)\b"
-    r"(?=\s*(?:with|using|in|by|as)\b|\s*[:`\"“']|\s+(?:" + _LEGEND + r"))"
-    r"[^\n]{0,120}?(?:" + _LEGEND + r")"
-    r"|(?:" + _LEGEND + r")[^\n]{0,30}?,[^\n]{0,30}?(?:" + _LEGEND + r")", re.I)
+_ASK = (r"\b(?:reply|respond|answer|send back)\b"
+        r"(?=\s*(?:with|using|in|by|as)\b(?!\s+(?:them|it|this|that|these|those)\b)"
+        r"|\s*[:`\"“']|\s+(?:" + _LEGEND + r"))")
+ASKS = re.compile(_ASK, re.I)
+CODES = re.compile(_ASK + r"[^\n]{0,120}?(?:" + _LEGEND + r")", re.I)
+PAIR = re.compile(
+    r"(?:" + _LEGEND + r")[^\n]{0,30}?,[^\n]{0,30}?(?:" + _LEGEND + r")", re.I)
+# The reply's last words are a question. Read with quotes masked, so a question being
+# quoted ("… which file?" in plain terms) is not the reply asking one.
+CLOSING_QUESTION = re.compile(r"\?[\s*_`)\]]*$")
 
 # ── CLASS 2: THE TURN SAYS IT IS PARKED ON THE USER ──────────────────────────────
 # The nouns are the user's own: a decision, an answer, a call. "Waiting on the gate" or
@@ -259,16 +281,20 @@ def parked(reply):
     """The classes this reply trips, with the words that tripped each. [] when none."""
     tail = (reply or "")[-TAIL:]
     hits = []
+    masked = TL._QUOTED.sub(lambda q: " " * len(q.group(0)), tail)
     m = CODES.search(tail)
+    if not m and (ASKS.search(tail) or CLOSING_QUESTION.search(masked.rstrip())):
+        m = PAIR.search(tail)
     if m:
         hits.append(("codes", m.group(0).strip()))
     # A QUOTED PHRASE IS A LABEL, NOT A PARK, and the mask is `wf-turn-ledger`'s own —
     # the same one the universal-claim trigger uses, for the same reason. MEASURED: two
     # of the 36 `waiting` fires were a turn REPORTING that it had left rows marked
     # “needs your call”, which is a finished piece of work being named, not a
-    # question being put. Masking is applied here only: the `codes` class reads legends
-    # that are written in backticks on purpose.
-    for seg in _SENTENCE.split(TL._QUOTED.sub(lambda m: " " * len(m.group(0)), tail)):
+    # question being put. The `codes` class reads the UNMASKED tail, because legends are
+    # written in quotes and backticks on purpose; it uses the mask only to ask whether the
+    # reply ends on a question of its own.
+    for seg in _SENTENCE.split(masked):
         if LATER.search(seg):
             continue
         # EVERY MATCH IN THE SENTENCE, not the first one. A sentence can describe a
