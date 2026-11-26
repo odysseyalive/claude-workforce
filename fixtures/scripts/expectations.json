@@ -18276,5 +18276,313 @@
         ]
       }
     }
+  },
+  "conform-mandated-clauses-189": {
+    "_why": "amishwbf.com W4 (2026-11-21): the 1.89 IC template made two more clauses word-for-word mandatory, the `## Sources` `Skill(records-code-map)` line (2 lines) and the `## Reporting` command-prefix refusal (4 lines), and Step 5d inserts both. MANDATED_CLAUSES did not list them, so the length row counted them as authored and ordered a split of text no author wrote; `interworx-auditor` went 174 against 172. This handbook is 174 lines and carries both clauses at their template extent, so with them discounted it is 168 and the ceiling row is silent; on b96469e it reads 174 and fires. Its control, conform-mandated-clauses-189-control, pins the discount itself (6 clause lines) on a handbook that stays over.",
+    "script": "wf-conform",
+    "exit": 0,
+    "want": [
+      "1 governed",
+      "0 failed"
+    ],
+    "not": [
+      "within the 172-line ceiling",
+      "`/workforce audit` performs it",
+      "\u2717 "
+    ]
+  },
+  "conform-mandated-clauses-189-control": {
+    "_why": "The control for conform-mandated-clauses-189: the same handbook at 180 lines, so with the 6 clause lines discounted it is still 174, over 172. The ceiling row MUST fire here, or the discount is silencing the row rather than subtracting six lines.",
+    "script": "wf-conform",
+    "exit": 0,
+    "want": [
+      "~ g.md: within the 172-line ceiling",
+      "174 lines, against 172; 6 line(s) / "
+    ],
+    "not": [
+      "\u2717 "
+    ]
+  },
+  "web-grant-pattern-not-a-use": {
+    "_why": "amishwbf.com W2 (2026-11-21): `legacy-export`'s Verification bar FM9 is a grep whose pattern names every fetch tool, `^tools:.*(WebFetch|web_fetch|WebSearch|...)`, the check that NONE is granted. It carries no prohibition word, so `fetches()` read it as a page fetch and a 2026-11-19 SessionStart heal granted `mcp__playwright-mcp, WebFetch, WebSearch` and turned FM9 red. This handbook carries that bar and its one-tool `.*WebFetch` form and no fetch step, so `--execute` must leave it byte for byte and print no heal; on b96469e it writes all three tools.",
+    "script": "wf-web-grant",
+    "args": [
+      "--execute"
+    ],
+    "exit": 0,
+    "want": [
+      "web fetch: playwright-mcp ABSENT"
+    ],
+    "not": [
+      "exporter.md",
+      "healed",
+      "Traceback"
+    ],
+    "after": {
+      ".claude/agents/exporter.md": {
+        "unchanged": true
+      }
+    }
+  },
+  "web-grant-fetch-step-heals": {
+    "_why": "The control for web-grant-pattern-not-a-use: a Procedure step that fetches with `mcp__playwright-mcp__web_fetch`, beside a second step whose grep pattern carries an alternation bar, must still be nominated and healed. A fix that stopped reading fetch tools at all would pass the pattern case and fail this one.",
+    "script": "wf-web-grant",
+    "args": [
+      "--execute"
+    ],
+    "exit": 0,
+    "want": [
+      "healed  researcher.md  +mcp__playwright-mcp; +WebFetch; +WebSearch; rule line added to `## Guardrails`"
+    ],
+    "after": {
+      ".claude/agents/researcher.md": {
+        "want": [
+          "tools: Read, Write, Bash, mcp__playwright-mcp, WebFetch, WebSearch",
+          "<!-- origin: workforce | modifiable: true | web-fetch -->"
+        ]
+      }
+    }
+  },
+  "conform-catread-kept-files": {
+    "_why": "amishwbf.com W1 (2026-11-21): INV-CATREAD flagged three citations the migration never empties, and healing any of them would break a read that works: an OUT scope line naming the INSTALL path `~/.claude/skills/security-evaluator/`, `.claude/skills/code-evaluator/CATALOG-ANCHOR.md` (kept by design), and two project-only files under `text-eval/references/` that exist and ship nowhere. `keeper.md` carries all three and must be silent; on b96469e it reads `3 citation(s)`. `reader.md` is the control in the same tree: a glob over a catalog directory, and a `${CLAUDE_PROJECT_DIR}` path to a project file that the fake install at `acct/` ships byte for byte, which the migration DOES remove. Both must still be reported, so a fix that silenced the detector fails here.",
+    "script": "wf-conform",
+    "env": {
+      "CLAUDE_CONFIG_DIR": "${TREE}/acct"
+    },
+    "exit": 0,
+    "want": [
+      "2 governed",
+      "0 failed",
+      "~ reader: catalog read grounded on a literal path (2 citation(s))",
+      "INV-CATREAD: 2 handbook(s) \u00b7 1 on a literal catalog path \u00b7 1 resolver-form or no citation"
+    ],
+    "not": [
+      "~ keeper: catalog read",
+      "Traceback"
+    ]
+  },
+  "stampdir-interface-lifted": {
+    "_why": "amishwbf.com W5 (2026-11-21): a 2026-08-10 audit wrote `## Interface` by hand right after the opener of five `origin: user | immutable: true` blocks, after their mirrors were extracted, so `wf-stamp --directives` read all five CONFLICTED with no heal and the project moved them out by hand. This block is that shape, with a sidecar stamped on the polluted block as the project's was. `--execute` must lift the section to just above the opener, verbatim, leave the block equal to the mirror's byte for byte, move the sidecar row in the same write (`drift 0`), and never write the mirror. On b96469e it reports CONFLICTED and exits 1.",
+    "script": "wf-stamp",
+    "args": [
+      "--directives",
+      "--execute"
+    ],
+    "exit": 0,
+    "want": [
+      "+ LIFTED      .claude/skills/exporter/SKILL.md:12  `## Interface` (9 lines) moved out of the user block",
+      "conflicted 0 \u00b7 failed 0 \u00b7 lifted 1",
+      "mirrored 1 \u00b7 unmirrored 0",
+      "drift 0 \u00b7 missing 0"
+    ],
+    "not": [
+      "CONFLICTED",
+      "Traceback"
+    ],
+    "after": {
+      ".claude/skills/exporter/SKILL.md": {
+        "once": [
+          "## Interface\n\nThe judgment that decides *whether* an export is warranted lives in the handbook.\n\n| Row | |\n|---|---|\n| `Invoke` | `/exporter` |\n| `Returns` | a CSV of active products, streamed |\n| `Fails` | a non-200 is a fault to report, never a retry loop |\n\n<!-- origin: user | added: 2026-02-11 | immutable: true -->\n## Directives\n\n> **Only share the export URL over a secure channel. HTTPS only.**\n\n*\u2014 Added 2026-02-11, source: CLAUDE.md extraction*\n<!-- /origin -->"
+        ],
+        "not": [
+          "immutable: true -->\n## Interface"
+        ]
+      },
+      ".claude/workforce/directives/exporter.md": {
+        "unchanged": true
+      }
+    }
+  },
+  "stampdir-interface-lifted-two-in-one-file": {
+    "_why": "Code review of 53d91b5: `mirror_pass` kept the lifted digests in a map keyed by file, so a SKILL.md with TWO user blocks each carrying an inserted `## Interface` kept only the last (old, new) pair. Both sections were lifted, but the sidecar row stamped on the first polluted block never moved, and every later run reported that file as DRIFT. Both rows must move in the same write: `lifted 2` with `drift 0`. On 53d91b5 it reports `drift 1`.",
+    "script": "wf-stamp",
+    "args": [
+      "--directives",
+      "--execute"
+    ],
+    "exit": 0,
+    "want": [
+      "+ LIFTED      .claude/skills/exporter/SKILL.md:12  `## Interface` (9 lines) moved out of the user block",
+      "+ LIFTED      .claude/skills/exporter/SKILL.md:30  `## Interface` (5 lines) moved out of the user block",
+      "conflicted 0 \u00b7 failed 0 \u00b7 lifted 2",
+      "covered 4 \u00b7 unprotected 0 \u00b7 drift 0 \u00b7 missing 0"
+    ],
+    "not": [
+      "DRIFT",
+      "CONFLICTED",
+      "Traceback"
+    ],
+    "after": {
+      ".claude/skills/exporter/SKILL.md": {
+        "not": [
+          "immutable: true -->\n## Interface"
+        ]
+      },
+      ".claude/workforce/directives/exporter.md": {
+        "unchanged": true
+      }
+    }
+  },
+  "stampdir-interface-user-edit-stays": {
+    "_why": "The control for stampdir-interface-lifted: the same block with the inserted `## Interface`, and the user's own text ALSO differing from the mirror by one space. Lifting the section no longer reproduces the mirror's block, so this is a real edit of a directive: it must stay CONFLICTED and nothing may be written, the skill file included. A lift gated on anything looser than byte equality fails here.",
+    "script": "wf-stamp",
+    "args": [
+      "--directives",
+      "--execute"
+    ],
+    "exit": 1,
+    "want": [
+      "CONFLICTED",
+      "conflicted 1",
+      "lifted 0"
+    ],
+    "not": [
+      "LIFTED",
+      "Traceback"
+    ],
+    "after": {
+      ".claude/skills/exporter/SKILL.md": {
+        "unchanged": true
+      },
+      ".claude/workforce/directives/exporter.md": {
+        "unchanged": true
+      }
+    }
+  },
+  "catalog-restore-retired-image": {
+    "_why": "amishwbf.com W3 (2026-11-21): Step 6-F archived the project's image-eval corpus to `.claude/workforce/retired/image-eval-<stamp>/` on 2026-09-25 because the install shipped it, then 1.88.0 stopped shipping the kind, so the corpus was in neither place a reader looks and `--kind image` exits 2. `--restore-retired image --execute` must put the archived `references/` back, byte for byte, and must NOT restore the archived `SKILL.md`, which would bring back a `/image-eval` the user removed. On b96469e the flag does not exist.",
+    "script": "wf-catalog",
+    "args": [
+      "--restore-retired",
+      "image",
+      "--execute"
+    ],
+    "exit": 0,
+    "want": [
+      "1 archived reference file(s) in .claude/workforce/retired/image-eval-20260925T184620Z, 1 absent",
+      "restored  .claude/skills/image-eval/references/image-tells.md"
+    ],
+    "not": [
+      "Traceback",
+      "SKILL.md"
+    ],
+    "after": {
+      ".claude/skills/image-eval/references/image-tells.md": {
+        "want": [
+          "| EXIF Software tag names a generator | I-04 |"
+        ]
+      },
+      ".claude/skills/image-eval/SKILL.md": {
+        "absent": true
+      },
+      ".claude/skills/image-eval/CATALOG-ANCHOR.md": {
+        "unchanged": true
+      }
+    }
+  },
+  "catalog-restore-retired-own-copy": {
+    "_why": "The gate on catalog-restore-retired-image. This project's image-eval already holds its own corpus (`references/watercolor.md`) beside an old archive, and 1.88.0 says a project's own image skill is the project's and is never written to. The restore must write nothing: the archived file stays out, and the live one is left byte for byte.",
+    "script": "wf-catalog",
+    "args": [
+      "--restore-retired",
+      "image",
+      "--execute"
+    ],
+    "exit": 0,
+    "want": [
+      "image: .claude/skills/image-eval/references already holds its own corpus; nothing to restore"
+    ],
+    "not": [
+      "restored",
+      "Traceback"
+    ],
+    "after": {
+      ".claude/skills/image-eval/references/image-tells.md": {
+        "absent": true
+      },
+      ".claude/skills/image-eval/references/watercolor.md": {
+        "unchanged": true
+      }
+    }
+  },
+  "catalog-restore-retired-link-read": {
+    "_why": "Security review of e4820ae: the restore walked the archive and copied every entry with `shutil.copy2`, which follows a link. A cloned project's archive can carry `references/stolen.md -> ../../../../../secret.txt` (here a file outside the archive standing in for `~/.ssh/id_rsa`), and the restore put that file's bytes into the project. A linked entry must be skipped and named, never read, and the real file beside it still restored. On e4820ae `stolen.md` is written with the secret in it.",
+    "script": "wf-catalog",
+    "args": [
+      "--restore-retired",
+      "image",
+      "--execute"
+    ],
+    "exit": 0,
+    "want": [
+      "skipped  .claude/workforce/retired/image-eval-20260925T184620Z/references/stolen.md — a link in the archive is never followed",
+      "1 archived reference file(s) in .claude/workforce/retired/image-eval-20260925T184620Z, 1 absent",
+      "restored  .claude/skills/image-eval/references/image-tells.md"
+    ],
+    "not": [
+      "Traceback",
+      "TOKEN=",
+      "restored  .claude/skills/image-eval/references/stolen.md"
+    ],
+    "after": {
+      ".claude/skills/image-eval/references/stolen.md": {
+        "absent": true
+      },
+      ".claude/skills/image-eval/references/image-tells.md": {
+        "want": [
+          "| EXIF Software tag names a generator | I-04 |"
+        ]
+      },
+      "secret.txt": {
+        "unchanged": true
+      }
+    }
+  },
+  "catalog-restore-retired-link-out": {
+    "_why": "Security review of e4820ae: the copy loop checked only whether the file's own parent was a link, after `makedirs` had already run. The live copy's `references/sub` is a link to `outside/`, a directory beside the skills root, and the archive holds `references/sub/deeper/notes.md`, so `makedirs` made `outside/deeper/` and the copy wrote `outside/deeper/notes.md` out of the project's skills. Every path written must hold no link from the project root down, checked before any directory is made: that file is refused by name, the exit is 1, and the real file beside it is still restored. On e4820ae it writes `outside/deeper/notes.md` and exits 0.",
+    "script": "wf-catalog",
+    "args": [
+      "--restore-retired",
+      "image",
+      "--execute"
+    ],
+    "exit": 1,
+    "want": [
+      "2 archived reference file(s) in .claude/workforce/retired/image-eval-20260925T184620Z, 2 absent",
+      "restored  .claude/skills/image-eval/references/image-tells.md",
+      "! .claude/skills/image-eval/references/sub/deeper/notes.md not restored: a link in its path leaves the project"
+    ],
+    "not": [
+      "Traceback",
+      "restored  .claude/skills/image-eval/references/sub/deeper/notes.md"
+    ],
+    "after": {
+      "outside/deeper": {
+        "absent": true
+      },
+      "outside/README.txt": {
+        "unchanged": true
+      },
+      ".claude/skills/image-eval/references/image-tells.md": {
+        "want": [
+          "| EXIF Software tag names a generator | I-04 |"
+        ]
+      }
+    }
+  },
+  "conform-retired-kind-read": {
+    "_why": "amishwbf.com W3 (2026-11-21): `design-critic` reads the image catalog through `--kind image`, on a continuation line that names only the flag, and audit Step 5d item 2c said such a citation was 'NOT healed and not flagged'. wf-conform must name it, with the restore command, because this tree holds the archive. `healed.md` is the control: a hand-healed handbook whose line only SAYS `wf-catalog --kind image` now exits, which must not be flagged. On b96469e no row names either.",
+    "script": "wf-conform",
+    "exit": 0,
+    "want": [
+      "2 governed",
+      "0 failed",
+      "~ critic: reads the retired `image` catalog through `--kind image`",
+      "Run `wf-catalog --restore-retired image --execute`, then rewrite the read to `.claude/skills/image-eval/references`"
+    ],
+    "not": [
+      "~ healed: reads the retired",
+      "Traceback"
+    ]
   }
 }

@@ -10,6 +10,9 @@
     wf-catalog --root <tree> --migrate --kind code   one kind alone, display or execute
     wf-catalog --root <tree> --house-rules       what the house-rules refresh would propagate
     wf-catalog --root <tree> --house-rules --execute  propagate it (audit Step 4 / Step 6-E)
+    wf-catalog --root <tree> --restore-retired image [--execute]
+                                                 put a retired kind's archived references back
+                                                 (audit Step 5d item 2c)
 
 WHY THIS EXISTS, and it is a measurement rather than a preference.
 
@@ -2589,6 +2592,120 @@ RETIRED_KINDS = {
              "judges whether an image fulfils the ask where it is shown, `senses.md`). A "
              "project's own image skill is read directly, never through this resolver.",
 }
+# The project skill directory each retired kind's copy lived in.
+RETIRED_SKILLS = {"image": "image-eval"}
+
+
+def retired_state(root, kind):
+    """(live references dir, newest retirement archive or None, live holds corpus).
+
+    A PROJECT WHOSE COPY WENT TO THE INSTALL WAS STRANDED BY THE KIND'S REMOVAL. Step 6-F
+    archived the copy's corpus into `.claude/workforce/retired/<skill>-<stamp>/` because the
+    install shipped it; 1.88.0 then stopped shipping it, so the corpus was in neither place a
+    reader looks. MEASURED on amishwbf.com (W3, 2026-11-21): `image-eval` held only its
+    `CATALOG-ANCHOR.md`, the archive held `references/image-tells.md`, and two handbooks read
+    `wf-catalog --kind image`, which exits 2."""
+    skill = RETIRED_SKILLS[kind]
+    live = os.path.join(root, ".claude", "skills", skill)
+    base = os.path.join(root, ".claude", "workforce", "retired")
+    try:
+        arcs = sorted(d for d in os.listdir(base)
+                      if re.fullmatch(re.escape(skill) + r"-\d{8}T\d{6}Z", d)
+                      and os.path.isdir(os.path.join(base, d, "references")))
+    except OSError:
+        arcs = []
+    refs = os.path.join(live, "references")
+    has = os.path.isdir(refs) and corpus_bearing(refs)
+    return refs, (os.path.join(base, arcs[-1]) if arcs else None), has
+
+
+def restore_retired(root, kind, execute):
+    """Put a retired kind's archived reference files back into the project's own copy.
+
+    THE REMOVAL'S PREMISE IS GONE, SO THE REMOVAL IS UNDONE. Step 6-F took these files out
+    only because the install shipped them byte for byte, and the install no longer ships the
+    kind. Gated on BOTH an archive and a live copy holding no corpus: a project's own image
+    skill that was never retired, or one that already reads again, is the project's and is
+    not touched (1.88.0). Only `references/` comes back. The archived `SKILL.md` would bring
+    back a `/image-eval` the user removed, so it stays in the archive. An existing file is
+    never overwritten, and a link is never written through."""
+    if kind not in RETIRED_SKILLS:
+        print("--restore-retired: %r is not a retired kind (retired: %s)"
+              % (kind, ", ".join(sorted(RETIRED_SKILLS))), file=sys.stderr)
+        return 2
+    refs, arc, has = retired_state(root, kind)
+    rel = os.path.relpath(refs, root)
+    if has:
+        print("%s: %s already holds its own corpus; nothing to restore" % (kind, rel))
+        return 0
+    if not arc:
+        print("%s: no retirement archive under .claude/workforce/retired/; nothing to restore"
+              % kind)
+        return 0
+    src = os.path.join(arc, "references")
+    # NO LINK IS READ AND NONE IS WRITTEN THROUGH. The archive and the live copy are trees in
+    # the project, and a cloned project can carry any link in either. Read side: an archive
+    # whose path holds a link is refused whole, a linked file or directory inside it is
+    # skipped and named, and a source is opened O_NOFOLLOW, because `references/x.md ->
+    # ~/.ssh/id_rsa` would put that file's bytes into the project. Write side: the path to
+    # each restored file must hold no link from the project root down, checked before any
+    # directory is made, and the file is created O_EXCL|O_NOFOLLOW, because a `references/sub
+    # -> /elsewhere` link would take `makedirs` and the copy out of the project. Both checks
+    # are `unlinked()`: a path resolves to itself under the resolved root, or it holds a link.
+    real_root = os.path.realpath(root)
+
+    def unlinked(p):
+        return os.path.realpath(p) == os.path.join(real_root, os.path.relpath(p, root))
+
+    if not unlinked(src):
+        print("  ! %s holds a link; not read" % os.path.relpath(src, root), file=sys.stderr)
+        return 1
+    files, links = [], []
+    for d, ds, fs in os.walk(src):
+        for x in list(ds):
+            if os.path.islink(os.path.join(d, x)):
+                ds.remove(x)
+                links.append(os.path.relpath(os.path.join(d, x), src))
+        for f in fs:
+            (links if os.path.islink(os.path.join(d, f)) else files).append(
+                os.path.relpath(os.path.join(d, f), src))
+    files.sort()
+    for f in sorted(links):
+        print("  skipped  %s — a link in the archive is never followed"
+              % os.path.join(os.path.relpath(src, root), f))
+    todo = [f for f in files if not os.path.lexists(os.path.join(refs, f))]
+    print("%s: %d archived reference file(s) in %s, %d absent from %s"
+          % (kind, len(files), os.path.relpath(arc, root), len(todo), rel))
+    if not execute:
+        for f in todo:
+            print("  would restore  %s" % os.path.join(rel, f))
+        print("Re-run with --execute to restore them.")
+        return 1 if todo else 0
+    nofollow = getattr(os, "O_NOFOLLOW", 0)
+    bad = 0
+    for f in todo:
+        out = os.path.join(refs, f)
+        try:
+            if not unlinked(out):
+                raise OSError(0, "a link in its path leaves the project")
+            os.makedirs(os.path.dirname(out), exist_ok=True)
+            with os.fdopen(os.open(os.path.join(src, f), os.O_RDONLY | nofollow), "rb") as fh:
+                data = fh.read()
+            ofd = os.open(out, os.O_WRONLY | os.O_CREAT | os.O_EXCL | nofollow, 0o644)
+            try:
+                with os.fdopen(ofd, "wb") as fh:
+                    fh.write(data)
+            except BaseException:
+                os.unlink(out)
+                raise
+            print("  restored  %s" % os.path.join(rel, f))
+        except OSError as exc:
+            bad += 1
+            print("  ! %s not restored: %s" % (os.path.join(rel, f), exc.strerror),
+                  file=sys.stderr)
+    print("Readers now read %s at its path. A handbook citing `--kind %s` still exits 2 until "
+          "audit Step 5d item 2c rewrites it." % (rel, kind))
+    return 1 if bad else 0
 
 
 def main():
@@ -2596,7 +2713,32 @@ def main():
                  next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--kind=")), None))
     if _kind in RETIRED_KINDS:
         print("wf-catalog: --kind %s: %s" % (_kind, RETIRED_KINDS[_kind]), file=sys.stderr)
+        # SAY WHERE THE READ GOES NOW. An employee that hits this exit needs the path, not
+        # the history, and a stranded project needs the command that un-strands it.
+        _root = next((sys.argv[i + 1] for i, a in enumerate(sys.argv[:-1]) if a == "--root"),
+                     os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd())
+        if _kind in RETIRED_SKILLS:
+            refs, arc, has = retired_state(os.path.abspath(_root), _kind)
+            rel = os.path.relpath(refs, os.path.abspath(_root))
+            if has:
+                print("wf-catalog: this project's own copy is at %s; read it there." % rel,
+                      file=sys.stderr)
+            elif arc:
+                print("wf-catalog: this project's copy was archived to %s when the install "
+                      "still shipped it. Restore it with `wf-catalog --restore-retired %s "
+                      "--execute`, then read %s at its path (audit Step 5d item 2c)."
+                      % (os.path.relpath(arc, os.path.abspath(_root)), _kind, rel),
+                      file=sys.stderr)
         return 2
+    _rr = next((sys.argv[i + 1] for i, a in enumerate(sys.argv[:-1])
+                if a == "--restore-retired"), None)
+    if _rr is not None:
+        _root = next((sys.argv[i + 1] for i, a in enumerate(sys.argv[:-1]) if a == "--root"),
+                     os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd())
+        if not os.path.isdir(os.path.join(_root, ".claude")):
+            print("wf-catalog: %s carries no .claude/" % _root, file=sys.stderr)
+            return 2
+        return restore_retired(os.path.abspath(_root), _rr, "--execute" in sys.argv)
     ap = argparse.ArgumentParser(add_help=True)
     ap.add_argument("--root", default=os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd())
     ap.add_argument("--kind", choices=sorted(CATALOGS))

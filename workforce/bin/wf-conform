@@ -452,6 +452,12 @@ MANDATED_CLAUSES = (
     ("Guardrails", "never leave a background shell or process running"),
     ("Reporting", "write the output.md incrementally"),
     ("Reporting", "say the state, not the journey"),
+    # Both template-mandated since 1.89.0 and inserted by Step 5d, and left out of this
+    # list until amishwbf.com's W4 (2026-11-21): `interworx-auditor` went to 174 lines
+    # against 172 with these 6 lines counted as authored, and the split ordered was of
+    # text no author wrote.
+    ("Sources", "skill(records-code-map)"),
+    ("Reporting", "if the run dir you were handed carries a command-prefix"),
 )
 _LIST_ITEM_RX = re.compile(r"^\s*(?:[-*+]|\d+[a-z]?[.)])\s+")
 
@@ -3138,7 +3144,42 @@ CATALOG_KIND = {
 }
 CATALOG_PATH_RX = re.compile(
     r"\.claude/skills/(text-eval|code-evaluator|security-evaluator|ui-design"
-    r"|design-eval)\b")
+    r"|design-eval)\b((?:/[^\s`'\"()|<>]*)?)")
+# A path under the HOME config root is the install, which the migration never touches; the
+# project's own copy is the only thing it empties. `${CLAUDE_PROJECT_DIR}/.claude/skills/…`
+# is still a project path and still a finding.
+_INSTALL_PREFIX_RX = re.compile(r"(?:~|\$HOME|\$\{HOME\})/$")
+
+
+def _catread_kept(skill, tail, ctx):
+    """Is this citation one the migration leaves readable? The three measured on amishwbf.com
+    (W1, 2026-11-21) were all reported, and healing any of them would have broken a read
+    that works. The set is `wf-catalog`'s own, never a second list here:
+
+    a file `classify` keeps by construction (a top-level `NON_CORPUS` file such as
+    `CATALOG-ANCHOR.md`, anything under `agents/` or `hooks/`), or a project file that exists
+    and is not a copy of a shipped one, which `cited_project_files` keeps in place for
+    exactly the reader citing it. A directory, a glob, a file already gone and a file the
+    install ships byte for byte are all still findings."""
+    rel = tail.strip("/").rstrip(".,;:")
+    if not rel or any(c in rel for c in "*?[{"):
+        return False
+    parts = rel.split("/")
+    # A `..` part names a file outside the evaluator's directory, which no reading of the
+    # migration keeps: the citation stays a finding, and nothing above the skill is read.
+    if ".." in parts:
+        return False
+    cat = ctx["cat"]
+    if (len(parts) == 1 and parts[0] in cat.NON_CORPUS) or parts[0] in ("agents", "hooks"):
+        return True
+    path = os.path.join(ctx["root"], ".claude", "skills", skill, *parts)
+    if not os.path.isfile(path):
+        return False
+    kind = CATALOG_KIND[skill]
+    if kind not in ctx["shipped"]:
+        ctx["shipped"][kind] = cat.install_index(ctx["root"], kind)[1]
+    body = cat.norm(cat.slurp(path))
+    return bool(body) and body not in ctx["shipped"][kind]
 
 
 def check_catalog_read(n, body, res, tally):
@@ -3165,8 +3206,13 @@ def check_catalog_read(n, body, res, tally):
     for line in body.splitlines():
         if "wf-catalog" in line:
             continue
-        m = CATALOG_PATH_RX.search(line)
-        if m:
+        # EVERY CITATION ON THE LINE, not the first: `voice-editor.md:145` on amishwbf.com
+        # names two project-only files on one Sources line.
+        for m in CATALOG_PATH_RX.finditer(line):
+            if _INSTALL_PREFIX_RX.search(line[:m.start()]):
+                continue
+            if "cat" in tally and _catread_kept(m.group(1), m.group(2), tally):
+                continue
             hits.append((m.group(0), m.group(1), line.strip() in sources))
     if not hits:
         tally["clean"] += 1
@@ -3187,6 +3233,41 @@ def check_catalog_read(n, body, res, tally):
         "empty, so this read resolves and returns nothing. This is "
         f"{where}. See `references/evaluators.md` § An IC READS the catalog; the fix is "
         "`audit` Step 5d item 2c. ADVISORY: this row blocks nothing")
+
+
+def check_retired_kind_read(n, body, res, cat, root):
+    """A handbook reading a catalog kind `wf-catalog` no longer serves, by `--kind <kind>`.
+
+    MEASURED ON amishwbf.com (W3, 2026-11-21): `swatch-engineer` and `design-critic` read the
+    image catalog through `wf-catalog --kind image`, which has exited 2 since 1.88.0 removed
+    the kind, and `audit` Step 5d item 2c said an image citation was "NOT healed and not
+    flagged". The project's copy had gone to the install on 2026-09-25, so the corpus was in
+    neither place. The match is `--kind <kind>` itself, not the `wf-catalog` token: one of
+    the two measured lines is a continuation that names only the flag. ADVISORY."""
+    rx = re.compile(r"--kind[ =]+(" + "|".join(map(re.escape, sorted(cat.RETIRED_KINDS)))
+                    + r")\b")
+    # A line SAYING the read is gone is a healed handbook explaining itself, not a read:
+    # `swatch-engineer` on the same project, healed by hand, says "`wf-catalog --kind image`
+    # now exits with an error" twice.
+    gone = re.compile(r"\b(?:exits|retired|removed|no longer)\b", re.I)
+    kinds = sorted({m.group(1) for line in body.splitlines() if not gone.search(line)
+                    for m in rx.finditer(line)})
+    for kind in kinds:
+        refs, arc, has = cat.retired_state(root, kind) if kind in cat.RETIRED_SKILLS \
+            else (None, None, False)
+        rel = os.path.relpath(refs, root) if refs else None
+        if has:
+            then = f"this project's own copy is at `{rel}`; rewrite the read to that path"
+        elif arc:
+            then = (f"this project's copy was archived to `{os.path.relpath(arc, root)}`. Run "
+                    f"`wf-catalog --restore-retired {kind} --execute`, then rewrite the read "
+                    f"to `{rel}`")
+        else:
+            then = "no copy of it is left here, so route the step to the jury or drop it"
+        res.advise(
+            f"{n}: reads the retired `{kind}` catalog through `--kind {kind}`",
+            f"`wf-catalog --kind {kind}` exits 2: {cat.RETIRED_KINDS[kind]} So {then}. The fix "
+            "is `audit` Step 5d item 2c. ADVISORY: this row blocks nothing")
 
 
 DESIGN_RECORD_RX = re.compile(r"\.claude/design/direction\.md")
@@ -4461,6 +4542,7 @@ def main():
     # Every anchor key `wf-catalog` declares, corpus and additions slot alike, mapped to its
     # kind — read from its table, so a sixth catalog is pinned-checked the day it ships.
     _cat = _load_sibling("wf-catalog")
+    _catread.update(root=root, cat=_cat, shipped={})
     _pin_keys = {}
     for _k, _spec in _cat.CATALOGS.items():
         _pin_keys[_spec["anchor"]] = (_k, "corpus")
@@ -4485,6 +4567,7 @@ def main():
             org_edge_map[_name] = org_edges(_name, body)
             check_anti_gaslight(_name, body, res)
             check_catalog_read(_name, body, res, _catread)
+            check_retired_kind_read(_name, body, res, _cat, root)
             check_design_direction(_name, body, res, _direct)
             check_catalog_pins(_name, body, res, _pins)
             # GOVERNED ONLY, and deliberately outside `check_handbook` for that reason:
