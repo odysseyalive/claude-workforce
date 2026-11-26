@@ -14,7 +14,8 @@ appear (`want`), and substrings that must NOT (`not`, `must_not` or `reject` —
 spellings of one assertion, all read). A stdin-driven script (the hook) takes
 `stdin_file` (a path inside the fixture, wrapped as a PostToolUse payload) or
 `stdin_raw`. A script that reads the process environment takes `env`: a map of
-variable name to value, where `null` UNSETS the variable in the child.
+variable name to value, where `null` UNSETS the variable in the child. A case about
+file age takes `mtime`: a map of path inside the tree to its age in seconds.
 
 **Exit code and output are both checked.** A script that exits correctly while
 reporting the wrong thing is the failure this project keeps finding — a report that
@@ -51,7 +52,7 @@ BIN = os.path.join(ROOT, "workforce", "bin")
 # carrying any key nothing here reads FAILS THAT ROW by name. A fourth spelling can
 # be invented, but it can no longer be ignored. Measured 2026-09-13.
 NEGATIVE_KEYS = ("not", "must_not", "reject")
-ROW_KEYS = {"script", "exit", "args", "env", "want", "after", "chmod", "concurrent",
+ROW_KEYS = {"script", "exit", "args", "env", "want", "after", "chmod", "concurrent", "mtime",
             "subst", "hardlink", "git", "before",
             "stdin_file", "stdin_raw", "_why", *NEGATIVE_KEYS}
 AFTER_KEYS = {"want", "once", "absent", "unchanged", "inserted_only", *NEGATIVE_KEYS}
@@ -484,6 +485,20 @@ def _run_in(tree, script, spec):
         if _bad:
             return False, "; ".join(_bad)
         _outs.append(_sp.stdout)
+
+    # `mtime` AGES A FILE: a map of path inside the tree to seconds before now, applied after
+    # every step above. Git keeps no mtimes, so a checked-out tree's are in whatever order the
+    # checkout wrote them, and two writes a moment apart can share one. Added 2026-11-25 for
+    # `wf-account-sync`, which copies a file only over an OLDER one.
+    _t_now = _sc_time.time()
+    for _rel, _age in (spec.get("mtime") or {}).items():
+        _fp = os.path.normpath(os.path.join(tree, _rel))
+        if not _fp.startswith(os.path.normpath(tree) + os.sep) or not isinstance(_age, int):
+            return False, f"mtime {_rel!r}: not a path inside the tree with an int age"
+        try:
+            os.utime(_fp, (_t_now - _age, _t_now - _age), follow_symlinks=False)
+        except OSError as _e:
+            return False, f"mtime {_rel!r}: {_e}"
 
     # `unchanged` AND `inserted_only` ARE ABOUT WHAT A WRITER LEFT ALONE, so they compare
     # against the file as it stood just before the script ran (after `subst`, `chmod` and

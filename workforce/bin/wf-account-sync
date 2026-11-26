@@ -1,0 +1,346 @@
+#!/usr/bin/env python3
+"""wf-account-sync — bring a second Claude account's copy of a project's memory and the
+workforce install up to date from the account that wrote a handoff.
+
+    wf-account-sync --from <config dir> [--to <config dir>] [--root <project>]
+    wf-account-sync --from <config dir> ... --execute
+
+Display by default: it reads both sides and prints what it would copy, skip and back up.
+`--execute` writes. `--to` defaults to this session's account, `$CLAUDE_CONFIG_DIR` or
+`~/.claude`; `--root` defaults to `$CLAUDE_PROJECT_DIR` or the working directory.
+
+WHY IT EXISTS (issue i10, from the mutze-studio producer, 2026-11-25): *"when we do a
+handoff that the work involved isn't account-centric but could be reawoken effectively
+through a different user account all-together"*. One machine ran two accounts on one repo,
+`~/.claude` and `~/.claude-brooke` (a `claude-brooke` wrapper setting CLAUDE_CONFIG_DIR).
+The second account was missing 7 memory files, held 5 stale ones, and had an older workforce
+install without `handoff`, `working-files` and `build-as-you-go`, so its own `wf-heal` could
+not name the handoff at session start. The sync was done by hand with `rsync -a`.
+
+WHAT IT COPIES, and nothing else:
+  * `projects/<slug>/memory/**`, the per-account project memory. The slug is Claude Code's
+    store name for the project path, `/` and `.` becoming `-` (`wf-runlength.store_name`
+    records the same observed heuristic).
+  * `skills/workforce/**`, the workforce install itself.
+  * every file the source install's `.installed-external` records under the source config
+    dir: the sibling skills and agent registrations the installer wrote. The record is the
+    list, so a new stock skill needs no change here.
+Credentials and auth files are never in that set, and a name that looks like one is
+refused even inside it. A link is never followed or written through, on either side.
+
+THE RULE PER FILE. Identical bytes: nothing to do. Absent in the target: copied. Present
+and different: copied only when the target's copy is OLDER; a newer target file is kept and
+named, because it holds work the source does not have. Equal mtimes with different bytes
+cannot be ordered and are kept too. Copies keep their mtime, so a second run copies nothing.
+A sibling skill the target has but its own record does not list is the target's own and is
+kept, the ownership rule `install` and `bin/sync` apply.
+
+BEFORE IT WRITES, every target file it is about to replace is copied into
+`<to>/backups/account-sync-<stamp>/`, with `SYNC.log` listing every action, so the new
+files can be removed and the replaced ones put back. The target's `.installed-external` is
+never copied over: its rows name paths in the target, so the source's rows are rewritten to
+the target's root and merged in, for files the target now holds.
+
+ONLY A CONFIG DIR DIRECTLY IN $HOME NAMED `.claude*` IS ACCEPTED, on either side: `~/.claude`,
+`~/.claude-brooke`. The path is resolved with realpath first, so neither a link nor `..` can
+reach past the rule. Handoff pick-up passes a JOB.md's `account:` value as `--from`, and what
+this copies is the workforce install's own scripts, so without the rule a handoff file could
+point the live install at any folder's code (user decision, issue i10, 2026-11-25).
+
+Exit: 0 done (or displayed), 1 a write failed, 2 refused (bad arguments, a config dir outside
+$HOME/.claude*, the same account on both sides, a config dir that is missing).
+"""
+
+import argparse
+import os
+import re
+import secrets
+import stat
+import sys
+import time
+
+RECORD = ".installed-external"
+SKIP_DIRS = {"__pycache__"}
+# A file name a credential is kept under is never copied, wherever it sits. Matched on the
+# whole name, so a memory note that merely mentions auth is still a lesson to carry.
+SECRET = re.compile(r"^(\.?credentials(\.json)?|auth\.json|\.env(\..*)?|.*\.(pem|key))$", re.I)
+# The process umask, read once: `os.umask` can only be read by setting it.
+UMASK = os.umask(0o077)
+os.umask(UMASK)
+NOFOLLOW = getattr(os, "O_NOFOLLOW", 0)  # absent on Windows, as wf-heal and wf-task-tag allow
+
+
+def store_name(project):
+    """Claude Code's `projects/` directory name for a project path (heuristic, observed)."""
+    return os.path.abspath(project).replace("/", "-").replace(".", "-")
+
+
+def has_link(root, rel):
+    """True when any component of `root/rel` below `root` is a symlink."""
+    path = root
+    for part in rel.split(os.sep):
+        path = os.path.join(path, part)
+        if os.path.islink(path):
+            return True
+        if not os.path.exists(path):
+            return False
+    return False
+
+
+def walk(root, rel_dir):
+    """Every regular file under `root/rel_dir`, as paths relative to `root`. Links skipped."""
+    out = []
+    top = os.path.join(root, rel_dir)
+    if not os.path.isdir(top) or has_link(root, rel_dir):
+        return out
+    for d, dirs, files in os.walk(top):
+        dirs[:] = sorted(x for x in dirs
+                         if x not in SKIP_DIRS and not os.path.islink(os.path.join(d, x)))
+        for f in sorted(files):
+            p = os.path.join(d, f)
+            if os.path.isfile(p) and not os.path.islink(p):
+                out.append(os.path.relpath(p, root))
+    return out
+
+
+def read_record(cfg):
+    got = read_regular(os.path.join(cfg, "skills", "workforce", RECORD))
+    text = got[0].decode("utf-8", "replace") if got else ""
+    return [ln.strip() for ln in text.splitlines() if ln.strip()]
+
+
+def recorded(src, lines):
+    """The record's rows under `src`, relative to it, outside skills/workforce itself."""
+    out = []
+    for line in lines:
+        p = os.path.normpath(line)
+        if not p.startswith(src + os.sep):
+            continue
+        rel = os.path.relpath(p, src)
+        if not rel.startswith(os.path.join("skills", "workforce") + os.sep):
+            out.append(rel)
+    return out
+
+
+def read_regular(path):
+    """(bytes, stat) of the regular file at `path`, or None.
+
+    THE OPENED FILE IS CHECKED, NOT THE NAME: `O_NOFOLLOW` refuses a link at the name, and
+    `fstat` on the fd refuses anything but a regular file. A check on the path and a later
+    open of it leave a moment in which the name can be swapped for a link."""
+    try:
+        fd = os.open(path, os.O_RDONLY | NOFOLLOW | getattr(os, "O_NONBLOCK", 0))
+    except OSError:
+        return None
+    try:
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode):
+            return None
+        chunks = []
+        while True:
+            b = os.read(fd, 1 << 20)
+            if not b:
+                return b"".join(chunks), st
+            chunks.append(b)
+    finally:
+        os.close(fd)
+
+
+def same_bytes(a, b):
+    ra, rb = read_regular(a), read_regular(b)
+    return bool(ra and rb) and ra[0] == rb[0]
+
+
+def plan(src, dst, memory_rel, wanted):
+    """[(action, why, rel)] for every file in `wanted`, plus target-only memory files."""
+    dst_record = set(read_record(dst))
+    owns = {}
+    rows = []
+    for rel in wanted:
+        s, d = os.path.join(src, rel), os.path.join(dst, rel)
+        parts = rel.split(os.sep)
+        if SECRET.match(parts[-1]):
+            rows.append(("REFUSE", "could hold a credential, never copied", rel))
+            continue
+        if has_link(src, rel) or not os.path.isfile(s):
+            rows.append(("SKIP", "source is a link or not a file", rel))
+            continue
+        if has_link(dst, rel) or (os.path.lexists(d) and not os.path.isfile(d)):
+            rows.append(("SKIP", "target is a link or not a file", rel))
+            continue
+        if parts[0] == "skills" and len(parts) > 2 and parts[1] != "workforce":
+            skill = os.path.join(dst, "skills", parts[1])
+            if skill not in owns:
+                marker = os.path.join(skill, "SKILL.md")
+                owns[skill] = not os.path.isfile(marker) or marker in dst_record
+            if not owns[skill]:
+                rows.append(("KEEP", "the target's own skill, not recorded as installed", rel))
+                continue
+        if not os.path.exists(d):
+            rows.append(("COPY", "new", rel))
+        elif same_bytes(s, d):
+            rows.append(("SAME", "", rel))
+        else:
+            sm, dm = os.stat(s).st_mtime_ns, os.stat(d).st_mtime_ns
+            if dm > sm:
+                rows.append(("SKIP", "target is newer, kept; merge it by hand", rel))
+            elif dm == sm:
+                rows.append(("SKIP", "same mtime, different bytes, kept", rel))
+            else:
+                rows.append(("COPY", "target older", rel))
+    have = set(wanted)
+    for rel in walk(dst, memory_rel):
+        if rel not in have:
+            rows.append(("KEEP", "only in the target", rel))
+    return rows
+
+
+def place(dest, data, st=None):
+    """Write `data` to `dest` through a NEW temp file beside it, then rename over.
+
+    The temp name is random and created `O_CREAT | O_EXCL | O_NOFOLLOW`, so nothing already
+    at a name, a planted link included, is ever opened or written through. `st` carries the
+    source's mode and times, so a second run finds identical bytes and copies nothing. With
+    no `st` the file gets the mode a plain `open(..., "w")` gives, 0666 less the umask. The
+    mode and times are set on the open fd, and a temp file left by any failure is removed."""
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
+    tmp = f"{dest}.wf-account-sync.{secrets.token_hex(6)}.tmp"
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | NOFOLLOW, 0o600)
+    try:
+        try:
+            view = memoryview(data)
+            while view:
+                view = view[os.write(fd, view):]
+            if st is not None:
+                os.fchmod(fd, stat.S_IMODE(st.st_mode) & 0o777)
+                os.utime(fd, ns=(st.st_atime_ns, st.st_mtime_ns))
+            else:
+                os.fchmod(fd, 0o666 & ~UMASK)
+        finally:
+            os.close(fd)
+        os.replace(tmp, dest)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
+def copy_in(s, d):
+    """Copy the regular file at `s` to `d`, refusing when `s` is no longer one."""
+    got = read_regular(s)
+    if got is None:
+        raise OSError(f"{s} is no longer a regular file; not copied")
+    place(d, *got)
+
+
+def main():
+    ap = argparse.ArgumentParser(prog="wf-account-sync",
+                                 description=__doc__.split("\n\n")[0])
+    ap.add_argument("--from", dest="src", required=True, help="the account that wrote the work")
+    ap.add_argument("--to", dest="dst",
+                    default=os.environ.get("CLAUDE_CONFIG_DIR") or os.path.expanduser("~/.claude"))
+    ap.add_argument("--root", default=os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd())
+    ap.add_argument("--execute", action="store_true", help="write; default is display only")
+    a = ap.parse_args()
+
+    src = os.path.realpath(os.path.expanduser(a.src))
+    dst = os.path.realpath(os.path.expanduser(a.dst))
+    home = os.path.realpath(os.path.expanduser("~"))
+    for name, p in (("--from", src), ("--to", dst)):
+        if os.path.dirname(p) != home or not os.path.basename(p).startswith(".claude"):
+            print(f"REFUSED: {name} {p} is not a directory directly in $HOME ({home}) whose "
+                  f"name starts with .claude.", file=sys.stderr)
+            return 2
+        if not os.path.isdir(p):
+            print(f"REFUSED: {name} {p} is not a directory.", file=sys.stderr)
+            return 2
+    if src == dst:
+        print(f"REFUSED: --from and --to are the same account, {src}.", file=sys.stderr)
+        return 2
+    if not os.path.isdir(os.path.join(src, "skills")) and not os.path.isdir(
+            os.path.join(src, "projects")):
+        print(f"REFUSED: {src} has no skills/ or projects/, so it is not a Claude config dir.",
+              file=sys.stderr)
+        return 2
+
+    memory_rel = os.path.join("projects", store_name(a.root), "memory")
+    src_record = read_record(src)
+    wanted = list(dict.fromkeys(
+        walk(src, memory_rel)
+        + [r for r in walk(src, os.path.join("skills", "workforce"))
+           if os.path.basename(r) != RECORD]
+        + recorded(src, src_record)))
+
+    rows = plan(src, dst, memory_rel, wanted)
+    # A record reached through a link is not written: the link points outside the target.
+    # The sibling skills it would list are then not copied either, or the next run would
+    # find them unrecorded and keep them as the target's own, never updated again.
+    rec_rel = os.path.join("skills", "workforce", RECORD)
+    record_linked = has_link(dst, rec_rel)
+    if record_linked:
+        sibling = set(recorded(src, src_record))
+        rows = [("SKIP", "the target's record is reached through a link", rel)
+                if act == "COPY" and rel in sibling else (act, why, rel)
+                for act, why, rel in rows]
+    copies = [r for r in rows if r[0] == "COPY"]
+    replaced = [r for r in copies if r[1] != "new"]
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    backup = os.path.join(dst, "backups", f"account-sync-{stamp}")
+
+    # The target's record, with the source's rows rewritten to the target root, for files
+    # the target holds after this run (copied now, or already identical).
+    landed = {r[2] for r in rows if r[0] in ("COPY", "SAME")}
+    old_record = read_record(dst)
+    add = [os.path.join(dst, rel) for rel in recorded(src, src_record) if rel in landed]
+    new_record = list(dict.fromkeys(old_record + add))
+    record_rows = 0 if record_linked else len(new_record) - len(old_record)
+
+    print(f"wf-account-sync  from {src}")
+    print(f"                 to   {dst}")
+    print(f"                 project {os.path.abspath(a.root)}, memory at {memory_rel}"
+          + ("" if os.path.isdir(os.path.join(src, memory_rel)) else " (none in the source)"))
+    for act, why, rel in rows:
+        if act != "SAME":
+            print(f"  {act:<7}{rel}" + (f"  ({why})" if why else ""))
+    n = {k: sum(1 for r in rows if r[0] == k) for k in ("COPY", "SAME", "SKIP", "KEEP", "REFUSE")}
+    print(f"summary: {n['COPY']} to copy ({len(copies) - len(replaced)} new, {len(replaced)} "
+          f"replacing an older file), {n['SAME']} identical, {n['SKIP']} skipped, "
+          f"{n['KEEP']} kept, {n['REFUSE']} refused; record: {record_rows} row(s) to add"
+          + (" (the target's record is reached through a link, so it is not written)"
+             if record_linked else ""))
+
+    if not a.execute:
+        print(f"backup: would be {backup} ({len(replaced)} file(s))" if replaced or record_rows
+              else "backup: none needed")
+        print("DISPLAY ONLY: nothing was written. Run again with --execute to copy.")
+        return 0
+    if not copies and not record_rows:
+        print("nothing to write.")
+        return 0
+
+    try:
+        if has_link(dst, "backups"):
+            raise OSError(f"{dst}/backups is a link; no backup written through it")
+        os.makedirs(backup, exist_ok=False)
+        for _act, _why, rel in replaced:
+            copy_in(os.path.join(dst, rel), os.path.join(backup, rel))
+        if record_rows and os.path.isfile(os.path.join(dst, rec_rel)):
+            copy_in(os.path.join(dst, rec_rel), os.path.join(backup, rec_rel))
+        place(os.path.join(backup, "SYNC.log"), (f"from {src}\nto {dst}\n" + "".join(
+            f"{act}\t{why}\t{rel}\n" for act, why, rel in rows)).encode("utf-8"))
+        for _act, _why, rel in copies:
+            copy_in(os.path.join(src, rel), os.path.join(dst, rel))
+        if record_rows:
+            place(os.path.join(dst, rec_rel), ("\n".join(new_record) + "\n").encode("utf-8"))
+    except OSError as exc:
+        print(f"FAILED: {exc}. Backup so far: {backup}", file=sys.stderr)
+        return 1
+    print(f"backup: {backup} ({len(replaced)} file(s), SYNC.log lists every action)")
+    print(f"copied: {len(copies)} file(s); record: {record_rows} row(s) added")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

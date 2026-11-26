@@ -4035,23 +4035,29 @@ SPAWN_LINE = (" An agent spawned for it has a line \"Issue: %s\" in its prompt, 
               "to the newest open issue.")
 # WHOSE ID A MARKER CARRIES, said on every issue line, so both sides of a thread read the same
 # rule (`MARK_TEXT` has the measurement): a new thread carries the sender's own marker, and a
-# reply carries the one the message it answers arrived with.
+# reply carries the one the message it answers arrived with. THE MARKER GOES ALONE ON THE
+# FIRST LINE: agent-say 1.2.56 copies it into the header only when the first line is exactly
+# `re: <8 lowercase hex>/i<1-4 digits>`. Measured 2026-11-25: mutze-dev wrote
+# `re: 43c2a56a/i18 — Thanks…` on one line, no header marker was sent, and the reply did not
+# thread. "Starts with" was the wording that produced it.
 AGENT_SAY_LINE = (" A new thread this session opens with a peer through agent-say about this "
-                  "work starts with \"re: %s/%s\", so the peer's reply, which carries that "
-                  "marker back, continues %s. A reply carries the marker the message it "
+                  "work puts \"re: %s/%s\" alone on its first line and starts the message on "
+                  "the next line, so the peer's reply, which carries that marker back, "
+                  "continues %s. A reply carries the marker the message it "
                   "answers arrived with, the recipient's, verbatim; only a new thread carries "
                   "the sender's own.")
 # ...AND THE REPLY TO THIS TURN'S PEER, by name: the marker the issue recorded for that
 # sender (`reply_marker`), or the one its message carried when that names this session.
-REPLY_MARK_LINE = (" The reply to \"%s\" through agent-say starts with \"re: %s\", verbatim: "
-                   "the marker their message arrived with, so it lands on the issue that "
-                   "marker names.")
+REPLY_MARK_LINE = (" The reply to \"%s\" through agent-say puts \"re: %s\", verbatim, alone "
+                   "on its first line and starts the message on the next line: the marker "
+                   "their message arrived with, so it lands on the issue that marker names.")
 # ...or, when its message carried none, this issue's own, which makes the reply a new thread.
 REPLY_OWN_LINE = (" The message from \"%s\" carried no marker, so the reply to it through "
-                  "agent-say starts with this issue's own, \"re: %s/%s\".")
+                  "agent-say puts this issue's own, \"re: %s/%s\", alone on its first line "
+                  "and starts the message on the next line.")
 # A POINTER'S BODY IS NOT SEEN HERE (`MARK_HEADER`), so a marker it opens with is unknown.
 REPLY_POINTER = (" If the message it points to opens with \"re: <session>/<issue>\", the reply "
-                 "starts with that marker instead.")
+                 "puts that marker alone on its first line instead.")
 
 
 def agent_say_line(payload, iss):

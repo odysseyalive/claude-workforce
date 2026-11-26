@@ -17347,7 +17347,7 @@
         "script": "wf-task-tag",
         "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"prompt\": \"please reach out to pw-dev and find out what is causing the ebay bot wall issue and program around it.\"}",
         "want": [
-          "starts with \\\"re: s1/i1\\\"",
+          "puts \\\"re: s1/i1\\\" alone on its first line and starts the message on the next line",
           "a line \\\"Issue: i1\\\" in its prompt"
         ]
       },
@@ -17490,7 +17490,7 @@
     "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"prompt\": \"[agent-msg from=tr-dev 07:10Z] re: b59b3de3/i3 Your pane hook drops the hostname when the session is remote, please check the status bar rule for that case.\"}",
     "exit": 0,
     "want": [
-      "The reply to \\\"tr-dev\\\" through agent-say starts with \\\"re: b59b3de3/i3\\\", verbatim",
+      "The reply to \\\"tr-dev\\\" through agent-say puts \\\"re: b59b3de3/i3\\\", verbatim, alone on its first line and starts the message on the next line",
       "A reply carries the marker the message it answers arrived with"
     ],
     "not": [
@@ -17511,13 +17511,14 @@
     "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"prompt\": \"[agent-msg from=pw-dev 07:12Z] The eBay listing sync stalls after the bot wall page, can you look at the retry path in your scraper?\"}",
     "exit": 0,
     "want": [
-      "The message from \\\"pw-dev\\\" carried no marker, so the reply to it through agent-say starts with this issue's own, \\\"re: s1/i1\\\".",
-      "starts with \\\"re: s1/i1\\\", so the peer's reply"
+      "The message from \\\"pw-dev\\\" carried no marker, so the reply to it through agent-say puts this issue's own, \\\"re: s1/i1\\\", alone on its first line and starts the message on the next line.",
+      "puts \\\"re: s1/i1\\\" alone on its first line and starts the message on the next line, so the peer's reply"
     ],
     "not": [
       "Traceback",
       "The reply to \\\"pw-dev\\\"",
-      "\"reply_markers\""
+      "\"reply_markers\"",
+      "If the message it points to"
     ],
     "after": {
       ".claude/workforce/issues/s1.json": {
@@ -17549,7 +17550,7 @@
     "exit": 0,
     "want": [
       "continues i1 and opens no issue of its own",
-      "The reply to \\\"pw-dev\\\" through agent-say starts with \\\"re: s1/i1\\\", verbatim"
+      "The reply to \\\"pw-dev\\\" through agent-say puts \\\"re: s1/i1\\\", verbatim, alone on its first line and starts the message on the next line"
     ],
     "not": [
       "Traceback",
@@ -17589,7 +17590,7 @@
     "exit": 0,
     "want": [
       "continues i1 and opens no issue of its own",
-      "The reply to \\\"tr-dev\\\" through agent-say starts with \\\"re: b59b3de3/i3\\\", verbatim"
+      "The reply to \\\"tr-dev\\\" through agent-say puts \\\"re: b59b3de3/i3\\\", verbatim, alone on its first line and starts the message on the next line"
     ],
     "not": [
       "Traceback",
@@ -17688,6 +17689,507 @@
       "home/.claude-brooke/skills/workforce/.installed-external": {
         "want": ["/home/.claude-brooke/agents/deadcode-gardener.md\n", "/home/.claude-brooke/skills/handoff/SKILL.md\n"],
         "not": ["/home/.claude/", "/agents.bak/", "/borrowed/", "/../", "retired-helper"]
+      }
+    }
+  },
+  "account-sync-display-writes-nothing": {
+    "_why": "Issue i10, 2026-11-25: two config dirs on one repo. Display mode names every file it would copy, keeps a newer target file, a target link, the target's own skill and a target-only memory file, refuses a recorded credential file, never lists a source link or a skill the record does not name, and writes nothing.",
+    "script": "wf-account-sync",
+    "env": {
+      "HOME": "${TREE}"
+    },
+    "args": [
+      "--from",
+      "${TREE}/.claude-a",
+      "--to",
+      "${TREE}/.claude-b",
+      "--root",
+      "/work/repo"
+    ],
+    "subst": [
+      ".claude-a/skills/workforce/.installed-external",
+      ".claude-b/skills/workforce/.installed-external"
+    ],
+    "mtime": {
+      ".claude-a/projects/-work-repo/memory/stale.md": 100,
+      ".claude-b/projects/-work-repo/memory/stale.md": 200,
+      ".claude-a/projects/-work-repo/memory/MEMORY.md": 200,
+      ".claude-b/projects/-work-repo/memory/MEMORY.md": 100,
+      ".claude-a/skills/workforce/SKILL.md": 100,
+      ".claude-b/skills/workforce/SKILL.md": 200
+    },
+    "exit": 0,
+    "want": [
+      "COPY   projects/-work-repo/memory/new-lesson.md  (new)",
+      "COPY   projects/-work-repo/memory/stale.md  (target older)",
+      "SKIP   projects/-work-repo/memory/MEMORY.md  (target is newer, kept; merge it by hand)",
+      "SKIP   projects/-work-repo/memory/linked.md  (target is a link or not a file)",
+      "KEEP   projects/-work-repo/memory/brooke-only.md  (only in the target)",
+      "COPY   skills/workforce/SKILL.md  (target older)",
+      "COPY   skills/handoff/SKILL.md  (new)",
+      "KEEP   skills/blueprint/SKILL.md  (the target's own skill, not recorded as installed)",
+      "REFUSE skills/handoff/.credentials.json  (could hold a credential, never copied)",
+      "summary: 5 to copy (3 new, 2 replacing an older file)",
+      "DISPLAY ONLY: nothing was written."
+    ],
+    "not": [
+      "Traceback",
+      "srclink",
+      "omarchy",
+      "COPY   .credentials.json",
+      "COPY   skills/handoff/.credentials.json"
+    ],
+    "after": {
+      ".claude-b/projects/-work-repo/memory/new-lesson.md": {
+        "absent": true
+      },
+      ".claude-b/projects/-work-repo/memory/stale.md": {
+        "want": [
+          "TARGET version"
+        ]
+      },
+      ".claude-b/skills/handoff/SKILL.md": {
+        "absent": true
+      }
+    }
+  },
+  "account-sync-execute-copies-newer-only": {
+    "_why": "Issue i10: --execute copies only where the target has nothing newer, backs up what it replaces, never writes through a target link, never copies a credential file, and rewrites the source's .installed-external rows to the target root. Fails when the mtime rule is dropped: the target's newer MEMORY.md is overwritten.",
+    "script": "wf-account-sync",
+    "env": {
+      "HOME": "${TREE}"
+    },
+    "args": [
+      "--from",
+      "${TREE}/.claude-a",
+      "--to",
+      "${TREE}/.claude-b",
+      "--root",
+      "/work/repo",
+      "--execute"
+    ],
+    "subst": [
+      ".claude-a/skills/workforce/.installed-external",
+      ".claude-b/skills/workforce/.installed-external"
+    ],
+    "mtime": {
+      ".claude-a/projects/-work-repo/memory/stale.md": 100,
+      ".claude-b/projects/-work-repo/memory/stale.md": 200,
+      ".claude-a/projects/-work-repo/memory/MEMORY.md": 200,
+      ".claude-b/projects/-work-repo/memory/MEMORY.md": 100,
+      ".claude-a/skills/workforce/SKILL.md": 100,
+      ".claude-b/skills/workforce/SKILL.md": 200
+    },
+    "exit": 0,
+    "want": [
+      "COPY   projects/-work-repo/memory/new-lesson.md  (new)",
+      "COPY   projects/-work-repo/memory/stale.md  (target older)",
+      "SKIP   projects/-work-repo/memory/MEMORY.md  (target is newer, kept; merge it by hand)",
+      "SKIP   projects/-work-repo/memory/linked.md  (target is a link or not a file)",
+      "KEEP   projects/-work-repo/memory/brooke-only.md  (only in the target)",
+      "COPY   skills/workforce/SKILL.md  (target older)",
+      "COPY   skills/handoff/SKILL.md  (new)",
+      "KEEP   skills/blueprint/SKILL.md  (the target's own skill, not recorded as installed)",
+      "REFUSE skills/handoff/.credentials.json  (could hold a credential, never copied)",
+      "(2 file(s), SYNC.log lists every action)",
+      "copied: 5 file(s); record: 1 row(s) added"
+    ],
+    "not": [
+      "Traceback",
+      "srclink",
+      "omarchy",
+      "COPY   .credentials.json",
+      "COPY   skills/handoff/.credentials.json"
+    ],
+    "after": {
+      ".claude-b/projects/-work-repo/memory/new-lesson.md": {
+        "want": [
+          "a lesson the target lacks"
+        ]
+      },
+      ".claude-b/projects/-work-repo/memory/stale.md": {
+        "want": [
+          "SOURCE version"
+        ]
+      },
+      ".claude-b/projects/-work-repo/memory/MEMORY.md": {
+        "want": [
+          "target index, written later"
+        ],
+        "not": [
+          "source index"
+        ]
+      },
+      "outside.txt": {
+        "want": [
+          "must stay"
+        ],
+        "not": [
+          "source body"
+        ]
+      },
+      ".claude-b/projects/-work-repo/memory/srclink.md": {
+        "absent": true
+      },
+      ".claude-b/skills/handoff/.credentials.json": {
+        "absent": true
+      },
+      ".claude-b/.credentials.json": {
+        "absent": true
+      },
+      ".claude-b/skills/omarchy/SKILL.md": {
+        "absent": true
+      },
+      ".claude-b/skills/blueprint/SKILL.md": {
+        "want": [
+          "TARGET OWN"
+        ]
+      },
+      ".claude-b/skills/workforce/SKILL.md": {
+        "want": [
+          "SOURCE install"
+        ]
+      },
+      ".claude-b/skills/workforce/.installed-external": {
+        "want": [
+          "/.claude-b/skills/text-eval/SKILL.md",
+          "/.claude-b/skills/handoff/SKILL.md"
+        ],
+        "not": [
+          "/.claude-a/skills/"
+        ]
+      }
+    }
+  },
+  "account-sync-in-step-copies-nothing": {
+    "_why": "Issue i10: a target already in step with the source is a no-op under --execute: nothing copied, no backup made, the target's own skill kept.",
+    "script": "wf-account-sync",
+    "env": {
+      "HOME": "${TREE}"
+    },
+    "args": [
+      "--from",
+      "${TREE}/.claude-a",
+      "--to",
+      "${TREE}/.claude-b",
+      "--root",
+      "/work/repo",
+      "--execute"
+    ],
+    "subst": [
+      ".claude-a/skills/workforce/.installed-external",
+      ".claude-b/skills/workforce/.installed-external"
+    ],
+    "exit": 0,
+    "want": [
+      "summary: 0 to copy (0 new, 0 replacing an older file)",
+      "nothing to write."
+    ],
+    "not": [
+      "Traceback",
+      "backup: /",
+      "COPY "
+    ]
+  },
+  "account-sync-refuses-same-account": {
+    "_why": "Issue i10: --from and --to naming one config dir is refused before anything is read.",
+    "script": "wf-account-sync",
+    "env": {
+      "HOME": "${TREE}"
+    },
+    "args": [
+      "--from",
+      "${TREE}/.claude-a",
+      "--to",
+      "${TREE}/.claude-a/skills/.."
+    ],
+    "exit": 2,
+    "want": [
+      "REFUSED: --from and --to are the same account"
+    ],
+    "not": [
+      "Traceback",
+      "summary:"
+    ]
+  },
+  "account-sync-temp-link-not-followed": {
+    "_why": "Issue i10, coordinator order 2026-11-25: a link planted at the name a copy's temp file used to take, `<dest>.wf-account-sync.tmp`, is never opened or written through. The temp file is a new random name created O_CREAT|O_EXCL|O_NOFOLLOW. Fails on the first staged script, whose copy2 onto the fixed name wrote the source lesson into outside.txt and renamed the link over the destination.",
+    "script": "wf-account-sync",
+    "env": {
+      "HOME": "${TREE}"
+    },
+    "args": [
+      "--from",
+      "${TREE}/.claude-a",
+      "--to",
+      "${TREE}/.claude-b",
+      "--root",
+      "/work/repo",
+      "--execute"
+    ],
+    "subst": [
+      ".claude-a/skills/workforce/.installed-external",
+      ".claude-b/skills/workforce/.installed-external"
+    ],
+    "mtime": {
+      ".claude-a/projects/-work-repo/memory/stale.md": 100,
+      ".claude-b/projects/-work-repo/memory/stale.md": 200,
+      ".claude-a/projects/-work-repo/memory/MEMORY.md": 200,
+      ".claude-b/projects/-work-repo/memory/MEMORY.md": 100,
+      ".claude-a/skills/workforce/SKILL.md": 100,
+      ".claude-b/skills/workforce/SKILL.md": 200
+    },
+    "exit": 0,
+    "want": [
+      "copied: 5 file(s); record: 1 row(s) added"
+    ],
+    "not": [
+      "Traceback",
+      "FAILED"
+    ],
+    "after": {
+      "outside.txt": {
+        "want": [
+          "must stay"
+        ],
+        "not": [
+          "a lesson the target lacks"
+        ]
+      },
+      ".claude-b/projects/-work-repo/memory/new-lesson.md": {
+        "want": [
+          "a lesson the target lacks"
+        ]
+      }
+    }
+  },
+  "account-sync-record-temp-link-not-followed": {
+    "_why": "Issue i10, coordinator order 2026-11-25: the record write goes through the same O_EXCL temp-file helper, so a link planted at `.installed-external.wf-account-sync.tmp` is never written through. Fails on the first staged script, whose open(..., 'w') of that fixed name wrote the merged record into outside.txt.",
+    "script": "wf-account-sync",
+    "env": {
+      "HOME": "${TREE}"
+    },
+    "args": [
+      "--from",
+      "${TREE}/.claude-a",
+      "--to",
+      "${TREE}/.claude-b",
+      "--root",
+      "/work/repo",
+      "--execute"
+    ],
+    "subst": [
+      ".claude-a/skills/workforce/.installed-external",
+      ".claude-b/skills/workforce/.installed-external"
+    ],
+    "mtime": {
+      ".claude-a/projects/-work-repo/memory/stale.md": 100,
+      ".claude-b/projects/-work-repo/memory/stale.md": 200,
+      ".claude-a/projects/-work-repo/memory/MEMORY.md": 200,
+      ".claude-b/projects/-work-repo/memory/MEMORY.md": 100,
+      ".claude-a/skills/workforce/SKILL.md": 100,
+      ".claude-b/skills/workforce/SKILL.md": 200
+    },
+    "exit": 0,
+    "want": [
+      "copied: 5 file(s); record: 1 row(s) added"
+    ],
+    "not": [
+      "Traceback",
+      "FAILED"
+    ],
+    "after": {
+      "outside.txt": {
+        "want": [
+          "must stay"
+        ],
+        "not": [
+          "/skills/handoff/SKILL.md"
+        ]
+      },
+      ".claude-b/skills/workforce/.installed-external": {
+        "want": [
+          "/.claude-b/skills/handoff/SKILL.md"
+        ]
+      }
+    }
+  },
+  "account-sync-record-through-linked-dir-not-written": {
+    "_why": "Issue i10, 2026-11-25: a target whose skills/workforce is a link to a directory outside it gets no record write. Every workforce file under the link is skipped as a link, and the merged .installed-external is not written through it either, and the line says why. The recorded sibling skill it would list is skipped too, or the next run would keep it as the target's own, unrecorded and never updated. Fails on the script before this row, which opened the record's temp file through the linked directory and renamed it over the record there.",
+    "script": "wf-account-sync",
+    "env": {
+      "HOME": "${TREE}"
+    },
+    "args": [
+      "--from",
+      "${TREE}/.claude-a",
+      "--to",
+      "${TREE}/.claude-b",
+      "--root",
+      "/work/repo",
+      "--execute"
+    ],
+    "subst": [
+      ".claude-a/skills/workforce/.installed-external",
+      "elsewhere/.installed-external"
+    ],
+    "exit": 0,
+    "want": [
+      "SKIP   skills/workforce/SKILL.md  (target is a link or not a file)",
+      "record: 0 row(s) to add (the target's record is reached through a link, so it is not written)",
+      "SKIP   skills/handoff/SKILL.md  (the target's record is reached through a link)",
+      "copied: 1 file(s); record: 0 row(s) added"
+    ],
+    "not": [
+      "Traceback",
+      "FAILED"
+    ],
+    "after": {
+      "elsewhere/.installed-external": {
+        "unchanged": true
+      },
+      "elsewhere/SKILL.md": {
+        "unchanged": true
+      }
+    }
+  },
+  "account-sync-refuses-from-outside-home": {
+    "_why": "Issue i10, user decision 2026-11-25: --from and --to are accepted only as a directory directly in $HOME whose name starts with .claude, resolved with realpath first. Handoff pick-up passes a JOB.md's account: value as --from, so without the rule a handoff file could point the live install at any folder's scripts. A real config dir outside $HOME is refused with exit 2 and nothing is copied. Fails on the staged script before the rule, which copied the outside folder's skills/workforce/SKILL.md and its newer memory into the target.",
+    "script": "wf-account-sync",
+    "env": {
+      "HOME": "${TREE}/home"
+    },
+    "args": [
+      "--from",
+      "${TREE}/cfg",
+      "--to",
+      "${TREE}/home/.claude-b",
+      "--root",
+      "/work/repo",
+      "--execute"
+    ],
+    "mtime": {
+      "cfg/projects/-work-repo/memory/MEMORY.md": 100,
+      "home/.claude-b/projects/-work-repo/memory/MEMORY.md": 200
+    },
+    "exit": 2,
+    "want": [
+      "REFUSED: --from /",
+      "/cfg is not a directory directly in $HOME (",
+      "/home) whose name starts with .claude."
+    ],
+    "not": [
+      "Traceback",
+      "summary:",
+      "copied:"
+    ],
+    "after": {
+      "home/.claude-b/skills/workforce/SKILL.md": {
+        "absent": true
+      },
+      "home/.claude-b/backups": {
+        "absent": true
+      },
+      "home/.claude-b/projects/-work-repo/memory/MEMORY.md": {
+        "want": [
+          "target index, must stay"
+        ],
+        "not": [
+          "a lesson from outside"
+        ]
+      }
+    }
+  },
+  "account-sync-refuses-from-through-link": {
+    "_why": "Issue i10, user decision 2026-11-25: a link directly in $HOME named .claude-link that points at a folder outside $HOME is resolved first and refused, so a name that passes the rule cannot carry a target that does not. Fails on the staged script before the rule, which copied the linked folder's skills/workforce/SKILL.md into the target, and on a rule that checks the name as given without realpath.",
+    "script": "wf-account-sync",
+    "env": {
+      "HOME": "${TREE}/home"
+    },
+    "args": [
+      "--from",
+      "${TREE}/home/.claude-link",
+      "--to",
+      "${TREE}/home/.claude-b",
+      "--root",
+      "/work/repo",
+      "--execute"
+    ],
+    "exit": 2,
+    "want": [
+      "REFUSED: --from /",
+      "/cfg is not a directory directly in $HOME ("
+    ],
+    "not": [
+      "Traceback",
+      "summary:",
+      "copied:",
+      ".claude-link is not"
+    ],
+    "after": {
+      "home/.claude-b/skills/workforce/SKILL.md": {
+        "absent": true
+      },
+      "home/.claude-b/backups": {
+        "absent": true
+      }
+    }
+  },
+  "account-sync-refuses-to-outside-home-via-dotdot": {
+    "_why": "Issue i10, user decision 2026-11-25: the rule binds --to as well, and `..` is resolved before it is checked, so `$HOME/.claude-b/../../out` is refused as the folder it names. Nothing is written there. Fails on the staged script before the rule, which copied the source install into out/, and on a rule that only checks the path as given starts with $HOME/.claude.",
+    "script": "wf-account-sync",
+    "env": {
+      "HOME": "${TREE}/home"
+    },
+    "args": [
+      "--from",
+      "${TREE}/home/.claude-a",
+      "--to",
+      "${TREE}/home/.claude-b/../../out",
+      "--root",
+      "/work/repo",
+      "--execute"
+    ],
+    "exit": 2,
+    "want": [
+      "REFUSED: --to /",
+      "/out is not a directory directly in $HOME ("
+    ],
+    "not": [
+      "Traceback",
+      "summary:",
+      "copied:"
+    ],
+    "after": {
+      "out/skills/workforce/SKILL.md": {
+        "absent": true
+      },
+      "out/backups": {
+        "absent": true
+      },
+      "home/.claude-b/skills/workforce/SKILL.md": {
+        "absent": true
+      }
+    }
+  },
+  "peer-reply-pointer-no-marker-names-the-pointed-message-marker": {
+    "_why": "Issue i10, 2026-11-25: a peer's pointer (\"Long message, read it by running: agent-say show <id>.\") with no `re=` in its header. The hook never sees the body the pointer leads to, so after the line naming this issue's own marker it says that a marker the pointed-to message opens with is the one the reply carries instead (`REPLY_POINTER`). Deterministic: the pointer is read from the prompt alone, and a fresh tree holds no earlier delivery to fold it into. Fails on a script that drops the `pointer_id` sentence; `peer-reply-no-marker-uses-own-marker` forbids it for a message that is not a pointer.",
+    "script": "wf-task-tag",
+    "stdin_raw": "{\"hook_event_name\": \"UserPromptSubmit\", \"session_id\": \"s1\", \"cwd\": \"${TREE}\", \"scratchpad_dir\": \"${TREE}\", \"prompt\": \"[agent-msg from=pw-dev 07:12Z] Long message, read it by running: agent-say show 20261124071200-2427050. To answer, run the shell command: agent-say reply pw-dev\"}",
+    "exit": 0,
+    "want": [
+      "The message from \\\"pw-dev\\\" carried no marker, so the reply to it through agent-say puts this issue's own, \\\"re: s1/i1\\\", alone on its first line and starts the message on the next line. If the message it points to opens with \\\"re: <session>/<issue>\\\", the reply puts that marker alone on its first line instead."
+    ],
+    "not": [
+      "Traceback",
+      "The reply to \\\"pw-dev\\\"",
+      "Long message, read it by running"
+    ],
+    "after": {
+      ".claude/workforce/issues/s1.json": {
+        "not": [
+          "\"reply_markers\""
+        ]
       }
     }
   }
