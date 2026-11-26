@@ -321,12 +321,15 @@ authored-body half where they do not belong — measured as +9 lines on an IC an
 of it text the contract requires. When a new section is made mandatory, it grows the allowance. A
 ceiling that counts required text against an author's budget is measuring the contract and blaming
 the writer. **`wf-conform` applies this**: the clauses `audit` Step 5d inserts — `## Sources`' two
-fixed paragraphs, the tool-not-held and close-out `## Guardrails` lines, and the write-incrementally
-and say-the-state `## Reporting` paragraphs — are listed in its `MANDATED_CLAUSES`, each capped at
+fixed paragraphs and its `Skill(records-code-map)` line, the tool-not-held and close-out
+`## Guardrails` lines, and the write-incrementally, say-the-state and command-prefix-refusal
+`## Reporting` paragraphs — are listed in its `MANDATED_CLAUSES`, each capped at
 the lines it spans in the IC template, and left out of the count the ceiling compares. A clause made
 mandatory later joins that list in the same change that adds it to the template and to Step 5d.
 *Measured 2026-10-10 on nsayka-wawa: twelve ICs at or under 172 lines went to 184–187 when Step 5d
-inserted only these clauses, and a split of text no author wrote was ordered.*
+inserted only these clauses, and a split of text no author wrote was ordered. The 1.89 pair joined
+the list late, and that cost the same thing again: measured 2026-11-21 on amishwbf.com,
+`interworx-auditor` read 174 against 172 with those six template lines counted as authored.*
 
 **A recorded floor is measured on the authored body.** A floor is a statement about what an author
 can still relocate, so nothing an author did not write may move it: `wf-stamp --floor` records the
