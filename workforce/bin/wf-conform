@@ -3231,6 +3231,41 @@ def check_catalog_read(n, body, res, tally):
         "`audit` Step 5d item 2c. ADVISORY: this row blocks nothing")
 
 
+def check_retired_kind_read(n, body, res, cat, root):
+    """A handbook reading a catalog kind `wf-catalog` no longer serves, by `--kind <kind>`.
+
+    MEASURED ON amishwbf.com (W3, 2026-11-21): `swatch-engineer` and `design-critic` read the
+    image catalog through `wf-catalog --kind image`, which has exited 2 since 1.88.0 removed
+    the kind, and `audit` Step 5d item 2c said an image citation was "NOT healed and not
+    flagged". The project's copy had gone to the install on 2026-09-25, so the corpus was in
+    neither place. The match is `--kind <kind>` itself, not the `wf-catalog` token: one of
+    the two measured lines is a continuation that names only the flag. ADVISORY."""
+    rx = re.compile(r"--kind[ =]+(" + "|".join(map(re.escape, sorted(cat.RETIRED_KINDS)))
+                    + r")\b")
+    # A line SAYING the read is gone is a healed handbook explaining itself, not a read:
+    # `swatch-engineer` on the same project, healed by hand, says "`wf-catalog --kind image`
+    # now exits with an error" twice.
+    gone = re.compile(r"\b(?:exits|retired|removed|no longer)\b", re.I)
+    kinds = sorted({m.group(1) for line in body.splitlines() if not gone.search(line)
+                    for m in rx.finditer(line)})
+    for kind in kinds:
+        refs, arc, has = cat.retired_state(root, kind) if kind in cat.RETIRED_SKILLS \
+            else (None, None, False)
+        rel = os.path.relpath(refs, root) if refs else None
+        if has:
+            then = f"this project's own copy is at `{rel}`; rewrite the read to that path"
+        elif arc:
+            then = (f"this project's copy was archived to `{os.path.relpath(arc, root)}`. Run "
+                    f"`wf-catalog --restore-retired {kind} --execute`, then rewrite the read "
+                    f"to `{rel}`")
+        else:
+            then = "no copy of it is left here, so route the step to the jury or drop it"
+        res.advise(
+            f"{n}: reads the retired `{kind}` catalog through `--kind {kind}`",
+            f"`wf-catalog --kind {kind}` exits 2: {cat.RETIRED_KINDS[kind]} So {then}. The fix "
+            "is `audit` Step 5d item 2c. ADVISORY: this row blocks nothing")
+
+
 DESIGN_RECORD_RX = re.compile(r"\.claude/design/direction\.md")
 # The STEP, never a mention of the command. A Sources row describing the record as "written by
 # `/ui-design direct`" names the command that wrote it and obliges nothing; an obligation names
@@ -4528,6 +4563,7 @@ def main():
             org_edge_map[_name] = org_edges(_name, body)
             check_anti_gaslight(_name, body, res)
             check_catalog_read(_name, body, res, _catread)
+            check_retired_kind_read(_name, body, res, _cat, root)
             check_design_direction(_name, body, res, _direct)
             check_catalog_pins(_name, body, res, _pins)
             # GOVERNED ONLY, and deliberately outside `check_handbook` for that reason:

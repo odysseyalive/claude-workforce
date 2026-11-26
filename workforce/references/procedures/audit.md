@@ -1426,8 +1426,17 @@ Per **governed** handbook (adopted agents stay exempt until their first amendmen
    a bare command into a path list. **Every resolvable kind is healed, and that is now all four** —
    `text-eval`, `code-evaluator`, `security-evaluator` and `ui-design`, the last of which
    the resolver also serves under its `design-eval` spelling. A literal `.claude/skills/image-eval/`
-   citation is NOT healed and not flagged: the `image` kind was removed on 2026-11-10, and the
-   project's own image skill is a path it reads directly. *This item read `only the three
+   citation is left as it stands: the `image` kind was removed on 2026-11-10, and the project's own
+   image skill is a path it reads directly. **A `--kind image` read is the opposite case and IS
+   healed**, because it exits 2. `wf-conform` names each one (`reads the retired image catalog`).
+   Where the project's copy went to the install before the removal, Step 6-F archived its corpus to
+   `.claude/workforce/retired/image-eval-<stamp>/` and the install then stopped shipping it, so the
+   corpus is in neither place a reader looks. First run `wf-catalog --restore-retired image
+   --execute`, which puts the archived `references/` back and never the archived `SKILL.md`. Then
+   rewrite each read to the project path `.claude/skills/image-eval/references/`, or route the step to
+   the jury when the judgment is whether an image fits where it is shown (`senses.md`). *Measured
+   2026-11-21 on amishwbf.com (W3): `swatch-engineer` and `design-critic` read `--kind image`, and this
+   item said such a citation was "NOT healed and not flagged".* *This item read `only the three
    resolvable kinds` until 2026-09-13, and the restriction was correct when it was written: an earlier
    draft flagged all five against a three-kind resolver, and 5 of 13 flagged handbooks on
    `odyssey-alive` cited only catalogs the resolver did not serve — 38% false positives carrying a

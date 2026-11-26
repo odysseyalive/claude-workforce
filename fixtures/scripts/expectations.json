@@ -18334,5 +18334,76 @@
         "unchanged": true
       }
     }
+  },
+  "catalog-restore-retired-image": {
+    "_why": "amishwbf.com W3 (2026-11-21): Step 6-F archived the project's image-eval corpus to `.claude/workforce/retired/image-eval-<stamp>/` on 2026-09-25 because the install shipped it, then 1.88.0 stopped shipping the kind, so the corpus was in neither place a reader looks and `--kind image` exits 2. `--restore-retired image --execute` must put the archived `references/` back, byte for byte, and must NOT restore the archived `SKILL.md`, which would bring back a `/image-eval` the user removed. On b96469e the flag does not exist.",
+    "script": "wf-catalog",
+    "args": [
+      "--restore-retired",
+      "image",
+      "--execute"
+    ],
+    "exit": 0,
+    "want": [
+      "1 archived reference file(s) in .claude/workforce/retired/image-eval-20260925T184620Z, 1 absent",
+      "restored  .claude/skills/image-eval/references/image-tells.md"
+    ],
+    "not": [
+      "Traceback",
+      "SKILL.md"
+    ],
+    "after": {
+      ".claude/skills/image-eval/references/image-tells.md": {
+        "want": [
+          "| EXIF Software tag names a generator | I-04 |"
+        ]
+      },
+      ".claude/skills/image-eval/SKILL.md": {
+        "absent": true
+      },
+      ".claude/skills/image-eval/CATALOG-ANCHOR.md": {
+        "unchanged": true
+      }
+    }
+  },
+  "catalog-restore-retired-own-copy": {
+    "_why": "The gate on catalog-restore-retired-image. This project's image-eval already holds its own corpus (`references/watercolor.md`) beside an old archive, and 1.88.0 says a project's own image skill is the project's and is never written to. The restore must write nothing: the archived file stays out, and the live one is left byte for byte.",
+    "script": "wf-catalog",
+    "args": [
+      "--restore-retired",
+      "image",
+      "--execute"
+    ],
+    "exit": 0,
+    "want": [
+      "image: .claude/skills/image-eval/references already holds its own corpus; nothing to restore"
+    ],
+    "not": [
+      "restored",
+      "Traceback"
+    ],
+    "after": {
+      ".claude/skills/image-eval/references/image-tells.md": {
+        "absent": true
+      },
+      ".claude/skills/image-eval/references/watercolor.md": {
+        "unchanged": true
+      }
+    }
+  },
+  "conform-retired-kind-read": {
+    "_why": "amishwbf.com W3 (2026-11-21): `design-critic` reads the image catalog through `--kind image`, on a continuation line that names only the flag, and audit Step 5d item 2c said such a citation was 'NOT healed and not flagged'. wf-conform must name it, with the restore command, because this tree holds the archive. `healed.md` is the control: a hand-healed handbook whose line only SAYS `wf-catalog --kind image` now exits, which must not be flagged. On b96469e no row names either.",
+    "script": "wf-conform",
+    "exit": 0,
+    "want": [
+      "2 governed",
+      "0 failed",
+      "~ critic: reads the retired `image` catalog through `--kind image`",
+      "Run `wf-catalog --restore-retired image --execute`, then rewrite the read to `.claude/skills/image-eval/references`"
+    ],
+    "not": [
+      "~ healed: reads the retired",
+      "Traceback"
+    ]
   }
 }
