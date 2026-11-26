@@ -541,6 +541,9 @@ function Install-ClaudeWorkforce {
             $scopeRoots = @($skillsRoot, $agentsDir, $stylesDir)
             foreach ($pf in $recordLines) {
                 if (-not $pf) { continue }
+                # A row this run wrote is already in the new record and is no deletion
+                # candidate, wherever a linked directory takes it, so it is never reported dropped.
+                if ($extNow -contains $pf) { continue }
                 # The scope check comes first, before a row can be carried or deleted. A row
                 # outside is never deleted and leaves the record; one inside is kept as written,
                 # because `wf-catalog` matches the record line for line.

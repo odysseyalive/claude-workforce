@@ -674,6 +674,9 @@ prune_scope() {
     if [ -f "$_record" ]; then
         while IFS= read -r pf || [ -n "$pf" ]; do
             [ -n "$pf" ] || continue
+            # A row this run wrote is already in the new record and is no deletion candidate,
+            # wherever a linked directory takes it, so it is never reported as dropped.
+            grep -Fxq "$pf" "$_ext_now" && continue
             _in_scope="yes"
             if _pf_real="$(physical_path "$pf")"; then
                 in_prune_scope "$_pf_real" || _in_scope=""
