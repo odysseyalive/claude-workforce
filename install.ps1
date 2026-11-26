@@ -432,6 +432,29 @@ function Install-ClaudeWorkforce {
         return $null
     }
 
+    # A RECORDED PATH IS DELETED ONLY INSIDE THE ROOT BEING INSTALLED. `install` §
+    # physical_path carries the measurement: a config root copied from ~/.claude carried a
+    # record of ~/.claude paths, and one update under the copy pruned 12 sibling skills and 2
+    # agent registrations out of the other account. True when the full path (`..` already
+    # folded by Resolve-FullPath) lies past a separator under this scope's skills root, agents
+    # dir or output-styles dir, and no directory between that root and the file is a link or
+    # junction. Windows PowerShell 5.1 has no link resolver, so a linked component is refused
+    # rather than followed. Ordinal, unlike the deletion whitelists: a missed match here only
+    # drops a row and leaves a file, which is the safe direction.
+    function Test-InPruneScope([string]$full, [string[]]$roots) {
+        foreach ($r in $roots) {
+            $prefix = (Resolve-FullPath $r).TrimEnd('\', '/') + [System.IO.Path]::DirectorySeparatorChar
+            if (-not $full.StartsWith($prefix, [System.StringComparison]::Ordinal)) { continue }
+            $d = Split-Path -Parent $full
+            while ($d -and $d.Length -ge $prefix.Length) {
+                if (Test-ReparsePoint $d) { return $false }
+                $d = Split-Path -Parent $d
+            }
+            return $true
+        }
+        return $false
+    }
+
     function Invoke-ScopePrune([string]$skillDir, [string]$agentsDir, [string]$stylesDir,
                                [string[]]$keptSkills, [string[]]$slotClaimed) {
         $skillsRoot = Split-Path $skillDir -Parent
@@ -515,8 +538,17 @@ function Install-ClaudeWorkforce {
             $keptPrefixes = @($keptSkills | Where-Object { $_ } | ForEach-Object {
                 (Resolve-FullPath (Join-Path $skillsRoot $_)) + [System.IO.Path]::DirectorySeparatorChar })
             $recordLines = @(Get-Content -LiteralPath $recordPath)
+            $scopeRoots = @($skillsRoot, $agentsDir, $stylesDir)
             foreach ($pf in $recordLines) {
                 if (-not $pf) { continue }
+                # The scope check comes first, before a row can be carried or deleted. A row
+                # outside is never deleted and leaves the record; one inside is kept as written,
+                # because `wf-catalog` matches the record line for line.
+                try { $full = Resolve-FullPath $pf } catch { $full = $null }
+                if (-not $full -or -not (Test-InPruneScope $full $scopeRoots)) {
+                    Write-Host "  Not pruned $($pf): outside the skills, agents and output-styles of $(Split-Path -Parent $skillsRoot), dropped from the record."
+                    continue
+                }
                 if (@($keptPrefixes | Where-Object { $pf.StartsWith($_, [System.StringComparison]::Ordinal) }).Count -gt 0) {
                     if (-not $extNow.Contains($pf)) { $extNow.Add($pf) }
                     continue
@@ -531,13 +563,14 @@ function Install-ClaudeWorkforce {
                         continue
                     }
                     try {
-                        Remove-Item -LiteralPath $pf -Force -ErrorAction Stop; $pruned++
+                        Remove-Item -LiteralPath $full -Force -ErrorAction Stop; $pruned++
                         Write-Host "  Pruned $pf"
                         # A sibling the manifest dropped leaves no empty shell (`install` §
                         # prune_scope): its emptied directories go, up to the skills root and
-                        # never past a directory still holding something.
+                        # never past a directory still holding something. The walk climbs the
+                        # full path, never the row's text, which may hold `..`.
                         $rootPrefix = (Resolve-FullPath $skillsRoot) + [System.IO.Path]::DirectorySeparatorChar
-                        $pd = Split-Path -Parent $pf
+                        $pd = Split-Path -Parent $full
                         while ($pd -and $pd.StartsWith($rootPrefix, [System.StringComparison]::Ordinal)) {
                             if (@(Get-ChildItem -LiteralPath $pd -Force -ErrorAction SilentlyContinue).Count -ne 0) { break }
                             Remove-Item -LiteralPath $pd -Force -ErrorAction SilentlyContinue

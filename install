@@ -395,6 +395,9 @@ WIRE_FAILED=""
 #      in shared directories. NOTHING there is removed unless a previous run of this
 #      installer wrote it, recorded by exact path in `.installed-external`. A blunt
 #      basename match would delete a user's own agent that happened to share a name.
+#      And a recorded path is deleted only when it resolves under THIS scope's skills,
+#      agents or output-styles dir (`physical_path`): a record copied from another config
+#      root names that root's files, never this one's.
 #   3. `.claude/workforce/` project state is NEVER walked. `update.md` step 5 promises
 #      it is byte-identical across an update. That promise cost nothing while no prune
 #      existed; it is load-bearing now, so it is asserted below rather than inferred
@@ -471,6 +474,35 @@ still_bundled() {
         fi
         echo "$_sb_def"
         return 0
+    done
+    return 1
+}
+
+# A RECORDED PATH IS DELETED ONLY INSIDE THE ROOT BEING INSTALLED. Rule 2 deleted every
+# recorded path this run did not write, wherever it pointed. MEASURED 2026-11-25: a config
+# root made by copying ~/.claude carried a record of 42 ~/.claude paths, and one `update`
+# under CLAUDE_CONFIG_DIR=~/.claude-brooke pruned 12 sibling skills and 2 agent
+# registrations out of ~/.claude, a different account. A record is evidence of what a run
+# wrote, never of WHERE this run may delete.
+#
+# Prints a path with its directory resolved physically (`cd -P`: every symlink and `..`
+# followed), so neither can carry a path past a textual prefix. The last component is not
+# followed: removing a symlink removes the link, never its target. Returns 1 when the
+# directory does not exist, or the name is `.` or `..`.
+physical_path() {
+    _pp_base="$(basename -- "$1")"
+    case "$_pp_base" in .|..) return 1 ;; esac
+    _pp_dir="$(cd -P -- "$(dirname -- "$1")" 2>/dev/null && pwd -P)" || return 1
+    printf '%s/%s\n' "${_pp_dir%/}" "$_pp_base"
+}
+
+# True when a physical path lies in this scope's skills root, agents dir or output-styles
+# dir, each resolved the same way. A slash boundary, because `.claude` is a prefix of
+# `.claude-brooke`. A root that does not exist holds nothing, so it matches nothing.
+in_prune_scope() {
+    for _ips_root in "$_real_skills_root" "$_real_agents_dir" "$_real_styles_dir"; do
+        [ -n "$_ips_root" ] || continue
+        case "$1" in "$_ips_root"/*) return 0 ;; esac
     done
     return 1
 }
@@ -573,6 +605,11 @@ prune_scope() {
 
     _record="$_skill_dir/.installed-external"
     _pruned=0
+    # The roots themselves are followed all the way, so a config root that is a symlink
+    # still prunes its own rows. Empty when absent, which `in_prune_scope` skips.
+    _real_skills_root="$(cd -P -- "$_skills_root" 2>/dev/null && pwd -P)" || _real_skills_root=""
+    _real_agents_dir="$(cd -P -- "$_agents_dir" 2>/dev/null && pwd -P)" || _real_agents_dir=""
+    _real_styles_dir="$(cd -P -- "$_styles_dir" 2>/dev/null && pwd -P)" || _real_styles_dir=""
 
     # Rule 1 — the skill directory, where the manifest is the whole truth.
     find "$_skill_dir" -type f -print > "$_expect.found" 2>/dev/null || : > "$_expect.found"
@@ -597,6 +634,9 @@ prune_scope() {
     # ONLY when the record is absent. A record that exists is the authority on what
     # THIS host was written, and overwriting it with a static list would claim
     # authorship of files this installer may never have placed here.
+    #
+    # Every seeded path is a basename under THIS run's agents or output-styles dir, so the
+    # seed cannot name another root; Rule 2's scope check below would refuse it if it did.
     if [ ! -f "$_record" ] && [ -s "$_seed" ]; then
         _seeded=0
         while IFS= read -r sf || [ -n "$sf" ]; do
@@ -624,12 +664,37 @@ prune_scope() {
     # not re-claimed either — it stays in the record exactly as the previous run left it,
     # which is what it is: a file some earlier run wrote, in a directory now held by the
     # project.
+    #
+    # THE SCOPE CHECK COMES FIRST, before a row can be carried or deleted: a recorded path
+    # outside this scope's roots (physical_path above) is never deleted and leaves the
+    # record, so the next run does not meet it again. A row whose directory is gone has
+    # nothing on disk to delete, and is judged by its text: inside a root, with no `.` or
+    # `..` component. The row is kept as written, because `wf-catalog`, `wf-remainder` and
+    # `wf-model-lanes` match the record line for line; resolving decides, it never rewrites.
     if [ -f "$_record" ]; then
         while IFS= read -r pf || [ -n "$pf" ]; do
             [ -n "$pf" ] || continue
+            _in_scope="yes"
+            if _pf_real="$(physical_path "$pf")"; then
+                in_prune_scope "$_pf_real" || _in_scope=""
+            else
+                _pf_real=""
+                case "/$pf/" in */../*|*/./*) _in_scope="" ;; esac
+                case "$pf" in
+                    "$_skills_root"/*|"$_agents_dir"/*|"$_styles_dir"/*) : ;;
+                    *) _in_scope="" ;;
+                esac
+            fi
+            if [ -z "$_in_scope" ]; then
+                echo "  Not pruned $pf: outside the skills, agents and output-styles of $(dirname "$_skills_root"), dropped from the record."
+                continue
+            fi
             _kept_path=""
             for _ks in ${SIBLING_KEPT:-}; do
                 case "$pf" in "$_skills_root/$_ks/"*) _kept_path="yes" ;; esac
+                if [ -n "$_pf_real" ] && [ -n "$_real_skills_root" ]; then
+                    case "$_pf_real" in "$_real_skills_root/$_ks/"*) _kept_path="yes" ;; esac
+                fi
             done
             if [ -n "$_kept_path" ]; then
                 grep -Fxq "$pf" "$_ext_now" || echo "$pf" >> "$_ext_now"
@@ -639,7 +704,7 @@ prune_scope() {
                 # The bundle guard, for a registration directly in this scope's agents/.
                 # KEPT IN THE RECORD, as a kept skill's paths are: re-tested on every update,
                 # so it is pruned once nothing bundles it any more.
-                if [ "$(dirname "$pf")" = "$_agents_dir" ]; then
+                if [ "$(dirname "$_pf_real")" = "$_real_agents_dir" ]; then
                     case "$pf" in
                         *.md)
                             if _sb_by="$(still_bundled "$pf")"; then
@@ -649,28 +714,33 @@ prune_scope() {
                             fi ;;
                     esac
                 fi
-                rm -f "$pf" && _pruned=$((_pruned + 1))
+                rm -f "$_pf_real" && _pruned=$((_pruned + 1))
                 echo "  Pruned $pf"
                 # A SIBLING THE MANIFEST DROPPED LEAVES NO EMPTY SHELL. The `-empty -delete`
                 # below walks only the workforce skill directory, so removing `image-eval`
                 # (2026-11-10) left `skills/image-eval/references/` and
                 # `agents/image-validator/` standing, empty, in the user's skills root. rmdir
                 # removes only an empty directory, so a project file left inside stops it.
-                case "$pf" in
-                    "$_skills_root"/*/*)
-                        _pd="$(dirname "$pf")"
-                        while [ "$_pd" != "$_skills_root" ] && [ "${_pd#"$_skills_root"/}" != "$_pd" ]; do
-                            rmdir "$_pd" 2>/dev/null || break
-                            _pd="$(dirname "$_pd")"
-                        done ;;
-                esac
+                # The walk climbs the RESOLVED path against the resolved root: climbing the
+                # text of a `..` row would rmdir directories outside it.
+                if [ -n "$_real_skills_root" ]; then
+                    case "$_pf_real" in
+                        "$_real_skills_root"/*/*)
+                            _pd="$(dirname "$_pf_real")"
+                            while [ "$_pd" != "$_real_skills_root" ] && [ "${_pd#"$_real_skills_root"/}" != "$_pd" ]; do
+                                rmdir "$_pd" 2>/dev/null || break
+                                _pd="$(dirname "$_pd")"
+                            done ;;
+                    esac
+                fi
             fi
         done < "$_record"
     fi
     cp "$_ext_now" "$_record" 2>/dev/null || :
 
     # Directories the prune emptied. -delete on -empty never removes a non-empty
-    # parent, and $_skill_dir itself always holds .installed-external.
+    # parent, and $_skill_dir itself always holds .installed-external. find does not
+    # follow a symlink, so a linked directory under it is never descended into.
     find "$_skill_dir" -mindepth 1 -type d -empty -delete 2>/dev/null || :
 
     rm -f "$_expect" "$_expect.found" "$_ext_now" "$_seed"

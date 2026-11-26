@@ -17656,5 +17656,39 @@
       "working (engineering-coder)  second ask",
       "working (engineering-coder)  first item"
     ]
+  },
+  "install-prune-stays-in-its-root": {
+    "_why": "A RECORD NAMES WHAT A RUN WROTE, NEVER WHERE THIS RUN MAY DELETE. Measured 2026-11-25: ~/.claude-brooke was made by copying ~/.claude, so its `.installed-external` listed 42 ~/.claude paths, and `update` under CLAUDE_CONFIG_DIR=~/.claude-brooke pruned 12 sibling skills and 2 agent registrations out of ~/.claude, a different account. This record points outside the installed scope four ways: plain rows into ~/.claude, a `..` row, a row through a symlinked directory (`skills/borrowed`), and a directory whose name starts with a scope directory's (`agents.bak` beside `agents`, which a match with no slash boundary takes in). Every one is named as not pruned, its file is left byte-identical, and its row leaves the record. `retired-helper.md` is the control: recorded into THIS root and no longer shipped, it is still pruned, so a fix that stopped pruning altogether fails here.",
+    "script": "../../fixtures/scripts/install-driver.py",
+    "args": ["--user", "--no-wire", "--no-automode"],
+    "env": {"HOME": "${TREE}/home", "CLAUDE_CONFIG_DIR": "${TREE}/home/.claude-brooke"},
+    "subst": ["home/.claude-brooke/skills/workforce/.installed-external"],
+    "exit": 0,
+    "want": [
+      "/home/.claude/skills/text-eval/SKILL.md: outside the skills, agents and output-styles of ",
+      "/home/.claude/skills/text-eval/references/text-tells.md: outside ",
+      "/home/.claude/agents/deadcode-gardener.md: outside ",
+      "/home/.claude-brooke/skills/../../.claude/skills/code-evaluator/SKILL.md: outside ",
+      "/home/.claude-brooke/skills/borrowed/SKILL.md: outside ",
+      "/home/.claude-brooke/agents.bak/deadcode-gardener.md: outside ",
+      "/home/.claude-brooke/agents/retired-helper.md\n",
+      "Pruned 1 file(s) the manifest no longer lists.",
+      "Update complete (user)."
+    ],
+    "not": ["Traceback"],
+    "after": {
+      "home/.claude/skills/text-eval/SKILL.md": {"unchanged": true},
+      "home/.claude/skills/text-eval/references/text-tells.md": {"unchanged": true},
+      "home/.claude/agents/deadcode-gardener.md": {"unchanged": true},
+      "home/.claude/skills/code-evaluator/SKILL.md": {"unchanged": true},
+      "home/.claude/skills/voice/SKILL.md": {"unchanged": true},
+      "home/.claude-brooke/skills/borrowed/SKILL.md": {"want": ["# voice"]},
+      "home/.claude-brooke/agents.bak/deadcode-gardener.md": {"unchanged": true},
+      "home/.claude-brooke/agents/retired-helper.md": {"absent": true},
+      "home/.claude-brooke/skills/workforce/.installed-external": {
+        "want": ["/home/.claude-brooke/agents/deadcode-gardener.md\n"],
+        "not": ["/home/.claude/", "/agents.bak/", "/borrowed/", "/../", "retired-helper"]
+      }
+    }
   }
 }
