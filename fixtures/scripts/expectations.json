@@ -18391,6 +18391,71 @@
       }
     }
   },
+  "catalog-restore-retired-link-read": {
+    "_why": "Security review of e4820ae: the restore walked the archive and copied every entry with `shutil.copy2`, which follows a link. A cloned project's archive can carry `references/stolen.md -> ../../../../../secret.txt` (here a file outside the archive standing in for `~/.ssh/id_rsa`), and the restore put that file's bytes into the project. A linked entry must be skipped and named, never read, and the real file beside it still restored. On e4820ae `stolen.md` is written with the secret in it.",
+    "script": "wf-catalog",
+    "args": [
+      "--restore-retired",
+      "image",
+      "--execute"
+    ],
+    "exit": 0,
+    "want": [
+      "skipped  .claude/workforce/retired/image-eval-20260925T184620Z/references/stolen.md — a link in the archive is never followed",
+      "1 archived reference file(s) in .claude/workforce/retired/image-eval-20260925T184620Z, 1 absent",
+      "restored  .claude/skills/image-eval/references/image-tells.md"
+    ],
+    "not": [
+      "Traceback",
+      "TOKEN=",
+      "restored  .claude/skills/image-eval/references/stolen.md"
+    ],
+    "after": {
+      ".claude/skills/image-eval/references/stolen.md": {
+        "absent": true
+      },
+      ".claude/skills/image-eval/references/image-tells.md": {
+        "want": [
+          "| EXIF Software tag names a generator | I-04 |"
+        ]
+      },
+      "secret.txt": {
+        "unchanged": true
+      }
+    }
+  },
+  "catalog-restore-retired-link-out": {
+    "_why": "Security review of e4820ae: the copy loop checked only whether the file's own parent was a link, after `makedirs` had already run. The live copy's `references/sub` is a link to `outside/`, a directory beside the skills root, and the archive holds `references/sub/deeper/notes.md`, so `makedirs` made `outside/deeper/` and the copy wrote `outside/deeper/notes.md` out of the project's skills. Every path written must hold no link from the project root down, checked before any directory is made: that file is refused by name, the exit is 1, and the real file beside it is still restored. On e4820ae it writes `outside/deeper/notes.md` and exits 0.",
+    "script": "wf-catalog",
+    "args": [
+      "--restore-retired",
+      "image",
+      "--execute"
+    ],
+    "exit": 1,
+    "want": [
+      "2 archived reference file(s) in .claude/workforce/retired/image-eval-20260925T184620Z, 2 absent",
+      "restored  .claude/skills/image-eval/references/image-tells.md",
+      "! .claude/skills/image-eval/references/sub/deeper/notes.md not restored: a link in its path leaves the project"
+    ],
+    "not": [
+      "Traceback",
+      "restored  .claude/skills/image-eval/references/sub/deeper/notes.md"
+    ],
+    "after": {
+      "outside/deeper": {
+        "absent": true
+      },
+      "outside/README.txt": {
+        "unchanged": true
+      },
+      ".claude/skills/image-eval/references/image-tells.md": {
+        "want": [
+          "| EXIF Software tag names a generator | I-04 |"
+        ]
+      }
+    }
+  },
   "conform-retired-kind-read": {
     "_why": "amishwbf.com W3 (2026-11-21): `design-critic` reads the image catalog through `--kind image`, on a continuation line that names only the flag, and audit Step 5d item 2c said such a citation was 'NOT healed and not flagged'. wf-conform must name it, with the restore command, because this tree holds the archive. `healed.md` is the control: a hand-healed handbook whose line only SAYS `wf-catalog --kind image` now exits, which must not be flagged. On b96469e no row names either.",
     "script": "wf-conform",

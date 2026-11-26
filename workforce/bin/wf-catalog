@@ -2643,8 +2643,36 @@ def restore_retired(root, kind, execute):
               % kind)
         return 0
     src = os.path.join(arc, "references")
-    files = sorted(os.path.relpath(os.path.join(d, f), src)
-                   for d, _ds, fs in os.walk(src) for f in fs)
+    # NO LINK IS READ AND NONE IS WRITTEN THROUGH. The archive and the live copy are trees in
+    # the project, and a cloned project can carry any link in either. Read side: an archive
+    # whose path holds a link is refused whole, a linked file or directory inside it is
+    # skipped and named, and a source is opened O_NOFOLLOW, because `references/x.md ->
+    # ~/.ssh/id_rsa` would put that file's bytes into the project. Write side: the path to
+    # each restored file must hold no link from the project root down, checked before any
+    # directory is made, and the file is created O_EXCL|O_NOFOLLOW, because a `references/sub
+    # -> /elsewhere` link would take `makedirs` and the copy out of the project. Both checks
+    # are `unlinked()`: a path resolves to itself under the resolved root, or it holds a link.
+    real_root = os.path.realpath(root)
+
+    def unlinked(p):
+        return os.path.realpath(p) == os.path.join(real_root, os.path.relpath(p, root))
+
+    if not unlinked(src):
+        print("  ! %s holds a link; not read" % os.path.relpath(src, root), file=sys.stderr)
+        return 1
+    files, links = [], []
+    for d, ds, fs in os.walk(src):
+        for x in list(ds):
+            if os.path.islink(os.path.join(d, x)):
+                ds.remove(x)
+                links.append(os.path.relpath(os.path.join(d, x), src))
+        for f in fs:
+            (links if os.path.islink(os.path.join(d, f)) else files).append(
+                os.path.relpath(os.path.join(d, f), src))
+    files.sort()
+    for f in sorted(links):
+        print("  skipped  %s — a link in the archive is never followed"
+              % os.path.join(os.path.relpath(src, root), f))
     todo = [f for f in files if not os.path.lexists(os.path.join(refs, f))]
     print("%s: %d archived reference file(s) in %s, %d absent from %s"
           % (kind, len(files), os.path.relpath(arc, root), len(todo), rel))
@@ -2653,20 +2681,23 @@ def restore_retired(root, kind, execute):
             print("  would restore  %s" % os.path.join(rel, f))
         print("Re-run with --execute to restore them.")
         return 1 if todo else 0
-    real_live = os.path.realpath(os.path.dirname(refs))
-    if os.path.islink(os.path.dirname(refs)) or not real_live.startswith(
-            os.path.realpath(os.path.join(root, ".claude", "skills")) + os.sep):
-        print("  ! %s is a link or leaves the project; not written"
-              % os.path.dirname(rel), file=sys.stderr)
-        return 1
+    nofollow = getattr(os, "O_NOFOLLOW", 0)
     bad = 0
     for f in todo:
         out = os.path.join(refs, f)
         try:
+            if not unlinked(out):
+                raise OSError(0, "a link in its path leaves the project")
             os.makedirs(os.path.dirname(out), exist_ok=True)
-            if os.path.islink(os.path.dirname(out)):
-                raise OSError(0, "a link in the path")
-            shutil.copy2(os.path.join(src, f), out)
+            with os.fdopen(os.open(os.path.join(src, f), os.O_RDONLY | nofollow), "rb") as fh:
+                data = fh.read()
+            ofd = os.open(out, os.O_WRONLY | os.O_CREAT | os.O_EXCL | nofollow, 0o644)
+            try:
+                with os.fdopen(ofd, "wb") as fh:
+                    fh.write(data)
+            except BaseException:
+                os.unlink(out)
+                raise
             print("  restored  %s" % os.path.join(rel, f))
         except OSError as exc:
             bad += 1
