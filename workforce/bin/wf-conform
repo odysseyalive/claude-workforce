@@ -3165,6 +3165,10 @@ def _catread_kept(skill, tail, ctx):
     if not rel or any(c in rel for c in "*?[{"):
         return False
     parts = rel.split("/")
+    # A `..` part names a file outside the evaluator's directory, which no reading of the
+    # migration keeps: the citation stays a finding, and nothing above the skill is read.
+    if ".." in parts:
+        return False
     cat = ctx["cat"]
     if (len(parts) == 1 and parts[0] in cat.NON_CORPUS) or parts[0] in ("agents", "hooks"):
         return True

@@ -589,12 +589,13 @@ def stamp_directives(root, execute, restamp, files=None, authority_arg=None):
     # stamped on the old bytes moves to the new ones in the same write. Only the one
     # digest the lift replaced moves; any other stale row in that file is still DRIFT.
     lift_rows = {}
-    for rel, (old, new) in lifted.items():
+    for rel, pairs in lifted.items():
         rel = rel.replace(os.sep, "/")
-        if old in recorded.get(rel, set()):
-            recorded = dict(recorded)
-            lift_rows[rel] = recorded[rel]
-            recorded[rel] = (set(recorded[rel]) - {old}) | {new}
+        for old, new in pairs:
+            if old in recorded.get(rel, set()):
+                recorded = dict(recorded)
+                lift_rows[rel] = recorded[rel]
+                recorded[rel] = (set(recorded[rel]) - {old}) | {new}
     st = evaluate_sidecar(found, scope, recorded, unread)
 
     def show(st):
@@ -1140,7 +1141,8 @@ def _lift_write(root, rel, block, clean, sec):
 
 def mirror_pass(root, execute):
     """Compare every extracted mirror with the live skill it came from; under `execute`,
-    append a source block the mirror lacks. Returns (summary dict, {rel: (old, new)}).
+    append a source block the mirror lacks. Returns (summary dict, {rel: (old, new)},
+    {rel: [(old, new), ...]} for each `## Interface` lifted out of a block in that file).
 
     THE QUESTION NOTHING ASKED (odyssey-alive row 26). `.claude/workforce/directives/<skill>.md`
     is extracted once, and the user goes on adding directives to `<skill>/SKILL.md`. The
@@ -1200,13 +1202,14 @@ def mirror_pass(root, execute):
                                 f"--execute moves it above the block, verbatim")
                     continue
                 try:
-                    lifted[rel] = _lift_write(root, rel, text, clean, sec)
+                    old, new = _lift_write(root, rel, text, clean, sec)
                 except OSError as exc:
                     summary["failed"] += 1
                     summary["unmirrored"] += 1
                     rows.append(f"  ! NOT LIFTED  {rel}:{a}  {exc.strerror}; the file keeps "
                                 f"its bytes")
                     continue
+                lifted.setdefault(rel, []).append((old, new))
                 summary["lifted"] += 1
                 summary["mirrored"] += 1
                 rows.append(f"  + LIFTED      {rel}:{a}  `## Interface` ({n} lines) moved out of "
@@ -1214,8 +1217,8 @@ def mirror_pass(root, execute):
                             f"{mrel}'s byte for byte, and no word of it changed")
                 try:
                     ledger_append(root, [{"event": "interface-lifted", "file": rel,
-                                          "from": f"sha256:{lifted[rel][0]}",
-                                          "to": f"sha256:{lifted[rel][1]}",
+                                          "from": f"sha256:{old}",
+                                          "to": f"sha256:{new}",
                                           "authority": None, "mirror": mrel}])
                 except OSError as exc:
                     summary["failed"] += 1

@@ -18309,6 +18309,36 @@
       }
     }
   },
+  "stampdir-interface-lifted-two-in-one-file": {
+    "_why": "Code review of 53d91b5: `mirror_pass` kept the lifted digests in a map keyed by file, so a SKILL.md with TWO user blocks each carrying an inserted `## Interface` kept only the last (old, new) pair. Both sections were lifted, but the sidecar row stamped on the first polluted block never moved, and every later run reported that file as DRIFT. Both rows must move in the same write: `lifted 2` with `drift 0`. On 53d91b5 it reports `drift 1`.",
+    "script": "wf-stamp",
+    "args": [
+      "--directives",
+      "--execute"
+    ],
+    "exit": 0,
+    "want": [
+      "+ LIFTED      .claude/skills/exporter/SKILL.md:12  `## Interface` (9 lines) moved out of the user block",
+      "+ LIFTED      .claude/skills/exporter/SKILL.md:30  `## Interface` (5 lines) moved out of the user block",
+      "conflicted 0 \u00b7 failed 0 \u00b7 lifted 2",
+      "covered 4 \u00b7 unprotected 0 \u00b7 drift 0 \u00b7 missing 0"
+    ],
+    "not": [
+      "DRIFT",
+      "CONFLICTED",
+      "Traceback"
+    ],
+    "after": {
+      ".claude/skills/exporter/SKILL.md": {
+        "not": [
+          "immutable: true -->\n## Interface"
+        ]
+      },
+      ".claude/workforce/directives/exporter.md": {
+        "unchanged": true
+      }
+    }
+  },
   "stampdir-interface-user-edit-stays": {
     "_why": "The control for stampdir-interface-lifted: the same block with the inserted `## Interface`, and the user's own text ALSO differing from the mirror by one space. Lifting the section no longer reproduces the mirror's block, so this is a real edit of a directive: it must stay CONFLICTED and nothing may be written, the skill file included. A lift gated on anything looser than byte equality fails here.",
     "script": "wf-stamp",
