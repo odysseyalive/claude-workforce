@@ -29,7 +29,7 @@ Budget    worst-case CEO-entry fan-out 13 · departments 3/4 · widest Lead 3/3
 Health    fix ratio 0.31 ↓ · improvements 14/mo (4 deletions) · 1 two-live pair
 ```
 
-**The Payroll block leads**, and every row names where its value came from — `asked this run` /
+**The Budget block leads**, and every row names where its value came from — `asked this run` /
 `unchanged, pre-selected` / `shipped default (first run)` / `analytical default` / `lane override` / `blank -> analytical`. A setup question that was skipped
 and one that was answered must never look the same, which is the failure this receipt exists to make
 impossible.

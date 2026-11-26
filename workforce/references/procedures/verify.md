@@ -55,7 +55,7 @@ deferred    <n> open · <m> aged past the threshold · oldest: <id> (<age> invoc
 Three rules, each from a finding that was true and useless without it:
 
 - **A value with no source is half a finding.** Name where each line came from, by path — the way the
-  Payroll Receipt already distinguishes `asked this run` from `unchanged, pre-selected` from
+  Budget Receipt already distinguishes `asked this run` from `unchanged, pre-selected` from
   `shipped default (first run)` from `analytical default`. `/doctor` prints `Search: OK (bundled)`, not `Search: OK`.
 - **State the clean case explicitly.** `/doctor` ends "No installation issues found." Silence is not a
   result, and a reader cannot tell a passing check from a check that never ran.
