@@ -74,7 +74,13 @@ for its manager at a turn limit.
    another config root after this session's scratchpad is gone. Never cite an account-local path,
    such as the scratchpad (`/tmp/claude-<uid>/<project>/<session-id>/`),
    `<config-root>/projects/.../memory` or `<config-root>/skills/...`: copy the file into `$H` and
-   cite that copy.
+   cite that copy. The same goes for a file in another folder under `.claude/workforce/jobs/`,
+   which `working-files` deletes when its job is done. Once JOB.md is complete, including
+   `## For another account`, run this and fix each path it prints:
+
+   ```bash
+   H=<the folder from step 2>; grep -oE '\.claude/workforce/jobs/[^[:space:]`")]+' "$H/JOB.md" | grep -vF "jobs/$(basename "$H")"
+   ```
 
 4. Tell the user the path and the `next:` line. Writing a handoff commits nothing, stops nothing
    and deletes nothing, apart from the sync below when the user says yes to it.
