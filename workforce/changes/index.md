@@ -8,6 +8,7 @@
 
 | Version | Date | Surface | Org | Change |
 |---|---|---|---|---|
+| 1.90.0 | 2026-11-25 | update, changes, hooks, scripts, installer | no | Release 1.90.0: the work list spans sessions and accounts, handoffs carry across accounts, and install prunes only its own root |
 | 1.89.0 | 2026-11-19 | handbook, chart, audit, verify, update, changes, hooks, scripts, installer, platform | **yes** | Release 1.89.0: the main session cannot hold the turn, and working files a restart must not lose get a job folder |
 | 1.88.0 | 2026-11-10 | handbook, audit, verify, update, changes, hooks, scripts, installer, platform | **yes** | Release 1.88.0: stock workforce carries no one person's projects: image-eval and character-scanner retire into the jury and text-eval, playwright-mcp leads page fetch, directives load on demand |
 | 1.87.3 | 2026-11-10 | changes, scripts, installer | no | Release 1.87.3: the stdin warning only trusts this user's own temp tree |
