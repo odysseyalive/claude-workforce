@@ -280,6 +280,14 @@ SHIPPED_HOOKS = {
     # ms default, and denies ONCE the first file change of a turn that spawned no agent, the
     # retry allowed. Bash is in the matcher because that session's edits were all Bash.
     "wf-dispatch-guard": ("PreToolUse", "Bash|Edit|Write|MultiEdit|NotebookEdit"),
+    # A RULE SAVED TO CLAUDE MEMORY IS APPLIED IN THE PROJECT. User, 2026-11-26: memory items
+    # "stashed where they can't be accessed by any account" must be "'caught' and applied
+    # correctly within the project scope". At a memory write the session is told to apply the
+    # rule now through `reconcile-memory`; at session start every rule in any account's memory
+    # for this project that `.claude/workforce/carried-memory/` does not record is named.
+    # Context only, never a block. It cannot see memory held only by the service.
+    "wf-memory": ("PostToolUse", "Edit|Write|MultiEdit"),
+    "wf-memory@sessionstart": ("SessionStart", None),
 }
 
 # MATCHERS A SHIPPED HOOK USED TO BE REGISTERED ON, by SHIPPED_HOOKS name. Presence is decided

@@ -135,7 +135,10 @@ existing skills are additional evidence, never the only evidence (`references/or
 
 Gather, in order: `CLAUDE.md` · repository shape (directories, package manifests, config, test layout)
 · build and test tooling · git history where present · README and docs · then
-`.claude/skills/*/SKILL.md`, `.claude/agents/**/*.md`, any existing chart and personnel ledger.
+`.claude/skills/*/SKILL.md`, `.claude/agents/**/*.md`, any existing chart and personnel ledger
+· then the rules kept in Claude memory for this project, read-only: `wf-memory --scan --root
+"${CLAUDE_PROJECT_DIR:-$PWD}"` (every account on the machine, parent folders included). A rule the
+user set is evidence of how the project works; Step 6-K applies the uncarried ones.
 
 Per skill, where skills exist: workflow length, actors implied, inbound cross-references, immutable
 blocks, declared modes, existing agents.
@@ -1841,7 +1844,7 @@ the same.
 ## Step 6 — Execute
 
 Order: **conversions (each reduced at T7b) → **staging the removal set (Step 6-S)** → handbooks → the canary re-attempt (Step 6a) → data skills → charter and
-principles → model rewrite (Step 6-M) → `org index` → `org embed` → **seed evaluator additions + refresh house rules (Step 6-E)** →
+principles → **memory rules (Step 6-K)** → model rewrite (Step 6-M) → `org index` → `org embed` → **seed evaluator additions + refresh house rules (Step 6-E)** →
 `wf-claude-md` → `checksums` → `verify` → **discharge (Step 6b)** → the sweep.** *(Step 6-G, the git pin-guard install, sits between `checksums` and `verify`. The install is RETIRED — its script was removed on the user's marks — and the step now REMOVES a stranded guard instead of installing one, through the `--heal` this audit already runs. Measured 2026-10-10: four repositories on one workstation were still running the retired copy on every commit.)*
 
 **`org index` runs UNCONDITIONALLY here — every audit, every mode.** It maintains the project-local
@@ -2152,6 +2155,24 @@ department derivation from a residual — four things that produce the same cell
 Then per-task ✓ / ✗ with the step any failure reached — **and every ✗ carries `path:line`, the field or
 rule at fault by name, and the literal text that would fix it** (`verify.md` § Output). A bare ✗ with a
 T-step tells the user something broke; it does not tell them what to type.
+
+### Step 6-K — Apply the rules kept in Claude memory (every audit)
+
+**The audit runs the `reconcile-memory` skill and carries no logic of its own.** User, 2026-11-26:
+a rule *"stashed where they can't be accessed by any account"* must be caught *"and applied
+correctly within the project scope"*, and *"the audit should use that skill"*. It sits after the
+charter and principles because a rule's home may be a principle, a handbook amendment or a skill
+the run has just written, and before `checksums` and `verify` so both see what it changed.
+
+Follow `reconcile-memory` from its step 1, with the survey's `wf-memory --scan` as its input. Its
+steps 2 and 3 run unasked. Step 0's consent stands for the user's yes at its step 4: the writes
+land inside the tree Step 0.2 backed up, and the skill's own `--backup` runs as well. A
+`/workforce amend` it calls is the run's own amendment and is reported with the others. Memory
+entries are never edited.
+
+Print one line: `MEMORY RULES <n> found · <n> already in the project · <n> applied · <n> left ·
+<n> from recalled memory only`, then the skill's table. Under `--review`: the skill's steps 1 to
+3 and the table, and nothing written.
 
 ### Step 6-M — Reconcile every model pin to its lane (every audit)
 

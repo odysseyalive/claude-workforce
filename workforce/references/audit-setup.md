@@ -204,7 +204,8 @@ written nothing — not a partial run, not a half-built org.
 
 > **Set this project up with a team of agents?**
 > This will: back up your project (next question), add a couple of small helper skills if they're
-> missing, look at what this project does, and write a set of agents to do it.
+> missing, look at what this project does, and write a set of agents to do it. Rules you set that
+> Claude saved only to its memory are written into the project too, so every account follows them.
 >
 > Your existing skills are looked at one at a time, and **most of them stay**:
 > · one that runs a command or a script **stays**, trimmed down to just that, so you can still run it

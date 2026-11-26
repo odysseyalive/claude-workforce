@@ -161,6 +161,16 @@ what success depends on, and what it will not do.>
     operating session a message of a dozen words or more also gets a checklist of its asks, written
     before the work starts and updated as it goes, and a reader that did not write it checks the list
     and the reply against the message.
+15. **A rule the user sets lives in the project.** When the user sets a rule (what Claude Code
+    would save as `feedback`, `project` or `reference` memory), apply it in the project's own
+    files in that same turn, and do the same for any such rule recalled from memory, from any
+    store, that the project does not hold yet. Memory belongs to one account; the project's
+    files reach every account that opens it, whether `.claude/` is committed or kept local.
+    The home, in this order: an existing file that already covers it (merge it there, or
+    confirm it is there), a handbook amendment with its AMD record, a skill, a script or hook
+    when the rule can be checked mechanically, and a new principle last. The memory entry may
+    stay; the `reconcile-memory` skill records what was carried. Who the person is and how
+    they like to be spoken to (`user` memory) is personal and stays in memory.
 <!-- WF-PRINCIPLES END -->
 
 <!-- origin: user | immutable: true -->

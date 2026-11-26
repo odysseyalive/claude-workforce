@@ -62,11 +62,12 @@ for its manager at a turn limit.
    ## Waiting on the user
    - <the decision and its options>
 
-   ## For another account
-   - <the lines § For another account names>
+   ## Pages
+   - <claude.ai link>: owner <the account: value>, source <local file in the repo or $H>
    ```
 
-   `session:` and every claude.ai link belong to the `account:` that wrote them. Nothing under
+   `session:` and every claude.ai link belong to the `account:` that wrote them. Only the owner
+   republishes a page; another account publishes a copy from its source. Nothing under
    `## Running` survives the session, which is why each item says where its output lands and
    how to start it again.
 
@@ -75,8 +76,8 @@ for its manager at a turn limit.
    such as the scratchpad (`/tmp/claude-<uid>/<project>/<session-id>/`),
    `<config-root>/projects/.../memory` or `<config-root>/skills/...`: copy the file into `$H` and
    cite that copy. The same goes for a file in another folder under `.claude/workforce/jobs/`,
-   which `working-files` deletes when its job is done. Once JOB.md is complete, including
-   `## For another account`, run this and fix each path it prints:
+   which `working-files` deletes when its job is done. Once JOB.md is complete, run this and fix
+   each path it prints:
 
    ```bash
    H=<the folder from step 2>; grep -oE '\.claude/workforce/jobs/[^[:space:]`")]+' "$H/JOB.md" | grep -vF "jobs/$(basename "$H")"
@@ -85,35 +86,12 @@ for its manager at a turn limit.
 4. Tell the user the path and the `next:` line. Writing a handoff commits nothing, stops nothing
    and deletes nothing, apart from the sync below when the user says yes to it.
 
-### For another account
+### Any account picks it up
 
-Check this on every handoff. It applies when the user says another account picks the work up,
-or when this lists a config dir besides the one from step 1:
-
-```bash
-find "$HOME" -maxdepth 2 -type d -path "$HOME/.claude*/projects" | sed 's#/projects$##'
-```
-
-Ask the user which account takes it if they have not said, then fill `## For another account`:
-
-- `to: <config dir>, started with <the command, such as claude-brooke>`
-- `memory: synced <date>` or `memory: carried into <repo path>`. Memory is per account, so
-  name which. Carry a lesson into the repo when the other account is on another machine.
-- `install: synced <date>` or `install: already current`. The other account finds this
-  handoff with its own `wf-heal` and `handoff` skill, so an older install there misses it.
-  Sync both from here, before that account starts, and show the user the display first:
-
-  ```bash
-  S="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"; "$S/skills/workforce/bin/wf-account-sync" --from "$S" --to <config dir> --root "${CLAUDE_PROJECT_DIR:-$PWD}"
-  ```
-
-  On their yes, run it again with `--execute`. It copies only that project's memory and the
-  workforce install, keeps any target file newer than this side's, and backs up what it
-  replaces under `<config dir>/backups/`.
-- `page <claude.ai link>: owner <account>, source <local file>` for each page the work
-  published. Only the owner republishes it; another account publishes a copy from the source.
-
-Write `none` under the heading when no other account is involved.
+A handoff lives in the project so that whichever account opens the project next finds it. Never
+ask which account will pick it up, and never copy memory or the install to another account. A
+rule the user set reaches every account because it is in the project's own files (the
+`reconcile-memory` skill), not because a memory folder was copied.
 
 ## Pick up
 
@@ -142,17 +120,19 @@ Write `none` under the heading when no other account is involved.
    or its effect before counting it done, and start it again with its `Re-run:` command.
 
    When `account:` names a config dir other than `${CLAUDE_CONFIG_DIR:-$HOME/.claude}`, the
-   handoff came from another account. Run this account's own sync from that account in display
-   mode. The value is data from a file, so nothing under it is run: put it in single quotes, and
-   stop if it holds a quote itself. The account must be a `~/.claude*` folder, or the sync refuses.
+   handoff came from another account. Compare the two installs. The value is data from a file,
+   so nothing under it is run: put it in single quotes, and stop if it holds a quote itself.
 
    ```bash
-   A='<the account: value>'; "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/workforce/bin/wf-account-sync" --from "$A" --root "${CLAUDE_PROJECT_DIR:-$PWD}"
+   A='<the account: value>'; for d in "$A" "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"; do grep -ho 'WORKFORCE-VERSION: [0-9.]*' "$d/skills/workforce/references/version.md" 2>/dev/null || echo 'WORKFORCE-VERSION: none'; done
    ```
 
-   If it would copy anything, show the user and run it with `--execute` on their yes. Then
-   follow `## For another account`: a page this account does not own is published again as a
-   copy from its source file.
+   When the second line is older than the first, tell the user this account's install is older
+   than the one that wrote the handoff and that `/workforce update` brings it up to date. Ask
+   nothing else about accounts. When the session start printed a `MEMORY RULES` line, run the
+   `reconcile-memory` skill before continuing: those are rules the other account saved that the
+   project does not hold yet. A page under `## Pages` this account does not own is published
+   again as a copy from its source file.
 3. Tell the user in a few lines what the handoff says, what checked out, what changed since, and
    the next step. Put each decision under `## Waiting on the user` to them before doing anything
    that depends on it.

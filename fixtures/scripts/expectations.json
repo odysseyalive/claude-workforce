@@ -17786,9 +17786,7 @@
       "--from",
       "${TREE}/.claude-a",
       "--to",
-      "${TREE}/.claude-b",
-      "--root",
-      "/work/repo"
+      "${TREE}/.claude-b"
     ],
     "subst": [
       ".claude-a/skills/workforce/.installed-external",
@@ -17804,20 +17802,16 @@
     },
     "exit": 0,
     "want": [
-      "COPY   projects/-work-repo/memory/new-lesson.md  (new)",
-      "COPY   projects/-work-repo/memory/stale.md  (target older)",
-      "SKIP   projects/-work-repo/memory/MEMORY.md  (target is newer, kept; merge it by hand)",
-      "SKIP   projects/-work-repo/memory/linked.md  (target is a link or not a file)",
-      "KEEP   projects/-work-repo/memory/brooke-only.md  (only in the target)",
       "COPY   skills/workforce/SKILL.md  (target older)",
       "COPY   skills/handoff/SKILL.md  (new)",
       "KEEP   skills/blueprint/SKILL.md  (the target's own skill, not recorded as installed)",
       "REFUSE skills/handoff/.credentials.json  (could hold a credential, never copied)",
-      "summary: 5 to copy (3 new, 2 replacing an older file)",
+      "summary: 3 to copy (2 new, 1 replacing an older file)",
       "DISPLAY ONLY: nothing was written."
     ],
     "not": [
       "Traceback",
+      "projects/-work-repo",
       "srclink",
       "omarchy",
       "COPY   .credentials.json",
@@ -17838,7 +17832,7 @@
     }
   },
   "account-sync-execute-copies-newer-only": {
-    "_why": "Issue i10: --execute copies only where the target has nothing newer, backs up what it replaces, never writes through a target link, never copies a credential file, and rewrites the source's .installed-external rows to the target root. Fails when the mtime rule is dropped: the target's newer MEMORY.md is overwritten.",
+    "_why": "Issue i10: --execute copies only where the target has nothing newer, backs up what it replaces, never writes through a target link, never copies a credential file, and rewrites the source's .installed-external rows to the target root. Fails when the mtime rule is dropped. Since 2026-11-26 it copies no memory at all (issues i8-i12): the memory tree stays in the fixture to show nothing under projects/ is copied.",
     "script": "wf-account-sync",
     "env": {
       "HOME": "${TREE}"
@@ -17848,8 +17842,6 @@
       "${TREE}/.claude-a",
       "--to",
       "${TREE}/.claude-b",
-      "--root",
-      "/work/repo",
       "--execute"
     ],
     "subst": [
@@ -17866,20 +17858,16 @@
     },
     "exit": 0,
     "want": [
-      "COPY   projects/-work-repo/memory/new-lesson.md  (new)",
-      "COPY   projects/-work-repo/memory/stale.md  (target older)",
-      "SKIP   projects/-work-repo/memory/MEMORY.md  (target is newer, kept; merge it by hand)",
-      "SKIP   projects/-work-repo/memory/linked.md  (target is a link or not a file)",
-      "KEEP   projects/-work-repo/memory/brooke-only.md  (only in the target)",
       "COPY   skills/workforce/SKILL.md  (target older)",
       "COPY   skills/handoff/SKILL.md  (new)",
       "KEEP   skills/blueprint/SKILL.md  (the target's own skill, not recorded as installed)",
       "REFUSE skills/handoff/.credentials.json  (could hold a credential, never copied)",
-      "(2 file(s), SYNC.log lists every action)",
-      "copied: 5 file(s); record: 1 row(s) added"
+      "(1 file(s), SYNC.log lists every action)",
+      "copied: 3 file(s); record: 1 row(s) added"
     ],
     "not": [
       "Traceback",
+      "projects/-work-repo",
       "srclink",
       "omarchy",
       "COPY   .credentials.json",
@@ -17887,13 +17875,11 @@
     ],
     "after": {
       ".claude-b/projects/-work-repo/memory/new-lesson.md": {
-        "want": [
-          "a lesson the target lacks"
-        ]
+        "absent": true
       },
       ".claude-b/projects/-work-repo/memory/stale.md": {
         "want": [
-          "SOURCE version"
+          "TARGET version"
         ]
       },
       ".claude-b/projects/-work-repo/memory/MEMORY.md": {
@@ -17956,8 +17942,6 @@
       "${TREE}/.claude-a",
       "--to",
       "${TREE}/.claude-b",
-      "--root",
-      "/work/repo",
       "--execute"
     ],
     "subst": [
@@ -17997,7 +17981,7 @@
     ]
   },
   "account-sync-temp-link-not-followed": {
-    "_why": "Issue i10, coordinator order 2026-11-25: a link planted at the name a copy's temp file used to take, `<dest>.wf-account-sync.tmp`, is never opened or written through. The temp file is a new random name created O_CREAT|O_EXCL|O_NOFOLLOW. Fails on the first staged script, whose copy2 onto the fixed name wrote the source lesson into outside.txt and renamed the link over the destination.",
+    "_why": "Issue i10, coordinator order 2026-11-25: a link planted at the name a copy's temp file used to take, `<dest>.wf-account-sync.tmp`, is never opened or written through. The temp file is a new random name created O_CREAT|O_EXCL|O_NOFOLLOW. Fails on the first staged script, whose copy2 onto the fixed name wrote the source lesson into outside.txt and renamed the link over the destination. The link sits at the install's SKILL.md since 2026-11-26, when the sync stopped copying memory; the memory tree stays to show it is not copied.",
     "script": "wf-account-sync",
     "env": {
       "HOME": "${TREE}"
@@ -18007,8 +17991,6 @@
       "${TREE}/.claude-a",
       "--to",
       "${TREE}/.claude-b",
-      "--root",
-      "/work/repo",
       "--execute"
     ],
     "subst": [
@@ -18025,7 +18007,7 @@
     },
     "exit": 0,
     "want": [
-      "copied: 5 file(s); record: 1 row(s) added"
+      "copied: 3 file(s); record: 1 row(s) added"
     ],
     "not": [
       "Traceback",
@@ -18037,13 +18019,16 @@
           "must stay"
         ],
         "not": [
-          "a lesson the target lacks"
+          "SOURCE install"
+        ]
+      },
+      ".claude-b/skills/workforce/SKILL.md": {
+        "want": [
+          "SOURCE install"
         ]
       },
       ".claude-b/projects/-work-repo/memory/new-lesson.md": {
-        "want": [
-          "a lesson the target lacks"
-        ]
+        "absent": true
       }
     }
   },
@@ -18058,8 +18043,6 @@
       "${TREE}/.claude-a",
       "--to",
       "${TREE}/.claude-b",
-      "--root",
-      "/work/repo",
       "--execute"
     ],
     "subst": [
@@ -18076,7 +18059,7 @@
     },
     "exit": 0,
     "want": [
-      "copied: 5 file(s); record: 1 row(s) added"
+      "copied: 3 file(s); record: 1 row(s) added"
     ],
     "not": [
       "Traceback",
@@ -18109,8 +18092,6 @@
       "${TREE}/.claude-a",
       "--to",
       "${TREE}/.claude-b",
-      "--root",
-      "/work/repo",
       "--execute"
     ],
     "subst": [
@@ -18122,7 +18103,7 @@
       "SKIP   skills/workforce/SKILL.md  (target is a link or not a file)",
       "record: 0 row(s) to add (the target's record is reached through a link, so it is not written)",
       "SKIP   skills/handoff/SKILL.md  (the target's record is reached through a link)",
-      "copied: 1 file(s); record: 0 row(s) added"
+      "nothing to write."
     ],
     "not": [
       "Traceback",
@@ -18148,8 +18129,6 @@
       "${TREE}/cfg",
       "--to",
       "${TREE}/home/.claude-b",
-      "--root",
-      "/work/repo",
       "--execute"
     ],
     "mtime": {
@@ -18195,8 +18174,6 @@
       "${TREE}/home/.claude-link",
       "--to",
       "${TREE}/home/.claude-b",
-      "--root",
-      "/work/repo",
       "--execute"
     ],
     "exit": 2,
@@ -18230,8 +18207,6 @@
       "${TREE}/home/.claude-a",
       "--to",
       "${TREE}/home/.claude-b/../../out",
-      "--root",
-      "/work/repo",
       "--execute"
     ],
     "exit": 2,
@@ -18582,6 +18557,121 @@
     ],
     "not": [
       "~ healed: reads the retired",
+      "Traceback"
+    ]
+  },
+  "memory-hook-rule-save-notes": {
+    "_why": "User, 2026-11-26: a rule saved to Claude memory must be caught and applied in the project. A feedback entry written under this project's store in ~/.claude gets one non-blocking note naming the reconcile-memory skill and the record command. Fails when the hook stays silent on a rule, or blocks.",
+    "script": "wf-memory",
+    "env": {
+      "HOME": "${TREE}/home",
+      "CLAUDE_PROJECT_DIR": "/work/repo",
+      "CLAUDE_CONFIG_DIR": null
+    },
+    "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"tool_name\": \"Write\", \"tool_input\": {\"file_path\": \"${TREE}/home/.claude/projects/-work-repo/memory/feedback_tabs.md\"}}",
+    "exit": 0,
+    "want": [
+      "\"hookEventName\": \"PostToolUse\"",
+      "MEMORY RULE",
+      "feedback_tabs.md was just saved",
+      "type: feedback",
+      "reconcile-memory",
+      "wf-memory --record",
+      "The memory entry stays"
+    ],
+    "not": [
+      "Traceback",
+      "\"decision\"",
+      "block"
+    ]
+  },
+  "memory-hook-user-entry-silent": {
+    "_why": "A user-type entry (who the person is) is personal and stays in memory: the save-time hook prints nothing. Fails when the type rule is dropped and every memory save is noted.",
+    "script": "wf-memory",
+    "env": {
+      "HOME": "${TREE}/home",
+      "CLAUDE_PROJECT_DIR": "/work/repo",
+      "CLAUDE_CONFIG_DIR": null
+    },
+    "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"tool_name\": \"Write\", \"tool_input\": {\"file_path\": \"${TREE}/home/.claude/projects/-work-repo/memory/user_role.md\"}}",
+    "exit": 0,
+    "want": [],
+    "not": [
+      "MEMORY RULE",
+      "Traceback",
+      "hookSpecificOutput"
+    ]
+  },
+  "memory-hook-index-silent": {
+    "_why": "MEMORY.md is the memory index, not a rule: an edit to it prints nothing.",
+    "script": "wf-memory",
+    "env": {
+      "HOME": "${TREE}/home",
+      "CLAUDE_PROJECT_DIR": "/work/repo",
+      "CLAUDE_CONFIG_DIR": null
+    },
+    "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"tool_name\": \"Edit\", \"tool_input\": {\"file_path\": \"${TREE}/home/.claude/projects/-work-repo/memory/MEMORY.md\"}}",
+    "exit": 0,
+    "want": [],
+    "not": [
+      "MEMORY RULE",
+      "Traceback",
+      "hookSpecificOutput"
+    ]
+  },
+  "memory-sessionstart-names-uncarried": {
+    "_why": "User, 2026-11-26: at session start every rule in any account's memory for this project, and in a parent folder's store, that the project's ledger does not record is named, so another account's rules surface without an account-switch detector. The feedback entry in two accounts is one rule with one identical copy; the ancestor /work entry is named as such; the user entry, the index and another project's store are not. Fails when only one config dir is read, when ancestors are skipped, or when copies are counted twice.",
+    "script": "wf-memory",
+    "env": {
+      "HOME": "${TREE}/home",
+      "CLAUDE_PROJECT_DIR": "/work/repo",
+      "CLAUDE_CONFIG_DIR": null
+    },
+    "stdin_raw": "{\"hook_event_name\": \"SessionStart\", \"source\": \"startup\"}",
+    "exit": 0,
+    "want": [
+      "\"hookEventName\": \"SessionStart\"",
+      "MEMORY RULES  2 rule(s)",
+      "feedback_tabs.md (+1 identical copy)",
+      "project_shared.md (saved under ancestor /work)",
+      "/home/.claude-b",
+      "reconcile-memory"
+    ],
+    "not": [
+      "user_role",
+      "MEMORY.md",
+      "feedback_other",
+      "Traceback",
+      "changed since"
+    ]
+  },
+  "memory-scan-classifies": {
+    "_why": "wf-memory --scan lists every memory folder for this project and its parent folders in every ~/.claude* account, sorting entries into rule and personal and skipping the index. Fails when an account, an ancestor or the user type is missed.",
+    "script": "wf-memory",
+    "env": {
+      "HOME": "${TREE}/home",
+      "CLAUDE_PROJECT_DIR": "/work/repo",
+      "CLAUDE_CONFIG_DIR": null
+    },
+    "args": [
+      "--scan",
+      "--root",
+      "/work/repo"
+    ],
+    "exit": 0,
+    "want": [
+      "/home/.claude/projects/-work-repo/memory  (this project)",
+      "/home/.claude-b/projects/-work-repo/memory  (this project)",
+      "/home/.claude/projects/-work/memory  (ancestor /work)",
+      "RULE uncarried feedback  feedback_tabs.md",
+      "RULE uncarried project   project_shared.md",
+      "PERSONAL       user      user_role.md",
+      "summary: 3 rule(s) uncarried, 0 changed, 0 carried, 1 personal, 0 unreadable, in 3 memory folder(s)",
+      "Memory held only by the service is not a file"
+    ],
+    "not": [
+      "feedback_other",
+      "MEMORY.md",
       "Traceback"
     ]
   }

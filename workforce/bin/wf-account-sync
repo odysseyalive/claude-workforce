@@ -1,13 +1,20 @@
 #!/usr/bin/env python3
-"""wf-account-sync — bring a second Claude account's copy of a project's memory and the
-workforce install up to date from the account that wrote a handoff.
+"""wf-account-sync — bring a second Claude account's workforce install up to date from
+another account's, and name the Claude accounts on this machine.
 
-    wf-account-sync --from <config dir> [--to <config dir>] [--root <project>]
+    wf-account-sync --from <config dir> [--to <config dir>]
     wf-account-sync --from <config dir> ... --execute
 
 Display by default: it reads both sides and prints what it would copy, skip and back up.
 `--execute` writes. `--to` defaults to this session's account, `$CLAUDE_CONFIG_DIR` or
-`~/.claude`; `--root` defaults to `$CLAUDE_PROJECT_DIR` or the working directory.
+`~/.claude`.
+
+IT NO LONGER COPIES MEMORY (user, 2026-11-26, issues i8-i12): memory copied between accounts
+was the workaround for rules that never reached the project. A rule now reaches every account
+because it is applied in the project (`wf-memory`, the `reconcile-memory` skill), and the
+handoff skill no longer asks which account picks the work up. What stays here is the install
+copy, run by hand, and the one lookup of config dirs and store names `wf-memory` imports
+(`account_dir`, `config_dirs`, `memory_dirs`, `store_name`).
 
 WHY IT EXISTS (issue i10, from the mutze-studio producer, 2026-11-25): *"when we do a
 handoff that the work involved isn't account-centric but could be reawoken effectively
@@ -18,9 +25,6 @@ install without `handoff`, `working-files` and `build-as-you-go`, so its own `wf
 not name the handoff at session start. The sync was done by hand with `rsync -a`.
 
 WHAT IT COPIES, and nothing else:
-  * `projects/<slug>/memory/**`, the per-account project memory. The slug is Claude Code's
-    store name for the project path, `/` and `.` becoming `-` (`wf-runlength.store_name`
-    records the same observed heuristic).
   * `skills/workforce/**`, the workforce install itself.
   * every file the source install's `.installed-external` records under the source config
     dir: the sibling skills and agent registrations the installer wrote. The record is the
@@ -43,9 +47,10 @@ the target's root and merged in, for files the target now holds.
 
 ONLY A CONFIG DIR DIRECTLY IN $HOME NAMED `.claude*` IS ACCEPTED, on either side: `~/.claude`,
 `~/.claude-brooke`. The path is resolved with realpath first, so neither a link nor `..` can
-reach past the rule. Handoff pick-up passes a JOB.md's `account:` value as `--from`, and what
-this copies is the workforce install's own scripts, so without the rule a handoff file could
-point the live install at any folder's code (user decision, issue i10, 2026-11-25).
+reach past the rule. A `--from` can be copied out of a file a session read, such as a
+handoff's `account:` line, and what this copies is the workforce install's own scripts, so
+without the rule such a file could point the live install at any folder's code (user
+decision, issue i10, 2026-11-25).
 
 Exit: 0 done (or displayed), 1 a write failed, 2 refused (bad arguments, a config dir outside
 $HOME/.claude*, the same account on both sides, a config dir that is missing).
@@ -62,7 +67,7 @@ import time
 RECORD = ".installed-external"
 SKIP_DIRS = {"__pycache__"}
 # A file name a credential is kept under is never copied, wherever it sits. Matched on the
-# whole name, so a memory note that merely mentions auth is still a lesson to carry.
+# whole name, so a file such as `auth-notes.md` is still copied.
 SECRET = re.compile(r"^(\.?credentials(\.json)?|auth\.json|\.env(\..*)?|.*\.(pem|key))$", re.I)
 # The process umask, read once: `os.umask` can only be read by setting it.
 UMASK = os.umask(0o077)
@@ -71,8 +76,65 @@ NOFOLLOW = getattr(os, "O_NOFOLLOW", 0)  # absent on Windows, as wf-heal and wf-
 
 
 def store_name(project):
-    """Claude Code's `projects/` directory name for a project path (heuristic, observed)."""
+    """Claude Code's `projects/` directory name for a project path (heuristic, observed:
+    `/` and `.` become `-`, as `wf-runlength.store_name` records)."""
     return os.path.abspath(project).replace("/", "-").replace(".", "-")
+
+
+def account_dir(path, home=None):
+    """`path` resolved, when it is a directory directly in $HOME named `.claude*`; else None.
+
+    THE ONE RULE FOR WHICH FOLDER IS AN ACCOUNT, shared with `wf-memory`. realpath first,
+    so neither a link nor `..` reaches past it."""
+    home = home or os.path.realpath(os.path.expanduser("~"))
+    p = os.path.realpath(os.path.expanduser(path))
+    if os.path.dirname(p) != home or not os.path.basename(p).startswith(".claude"):
+        return None
+    return p if os.path.isdir(p) else None
+
+
+def config_dirs():
+    """Every Claude config dir on this machine, resolved and sorted: each `~/.claude*`
+    directory holding `projects/` or `skills/`, plus `$CLAUDE_CONFIG_DIR` wherever it is.
+
+    Measured 2026-11-26 on the maintainer's machine: `~/.claude` held 55 project memory
+    folders and `~/.claude-brooke` 14, one repository's memory split across both, so a
+    reader of one account's memory alone misses most of it."""
+    home = os.path.realpath(os.path.expanduser("~"))
+    found = set()
+    try:
+        names = os.listdir(home)
+    except OSError:
+        names = []
+    for name in names:
+        p = account_dir(os.path.join(home, name), home) if name.startswith(".claude") else None
+        if p and (os.path.isdir(os.path.join(p, "projects"))
+                  or os.path.isdir(os.path.join(p, "skills"))):
+            found.add(p)
+    env = os.environ.get("CLAUDE_CONFIG_DIR")
+    if env and os.path.isdir(env):
+        found.add(os.path.realpath(env))
+    return sorted(found)
+
+
+def memory_dirs(root):
+    """[(config dir, project path, memory dir rel to the config dir)] for `root` and each
+    of its ancestors below `/`, in every config dir, where that memory folder exists.
+
+    An ANCESTOR counts because a session launched from a parent folder saves under the
+    parent's store name: `~/.claude/projects/-home-francis-lab/memory` holds what sessions
+    started in `~/lab` saved about the projects inside it (2026-11-26)."""
+    paths, p = [], os.path.abspath(root)
+    while p != os.path.dirname(p):
+        paths.append(p)
+        p = os.path.dirname(p)
+    out = []
+    for cfg in config_dirs():
+        for proj in paths:
+            rel = os.path.join("projects", store_name(proj), "memory")
+            if os.path.isdir(os.path.join(cfg, rel)) and not has_link(cfg, rel):
+                out.append((cfg, proj, rel))
+    return out
 
 
 def has_link(root, rel):
@@ -151,8 +213,8 @@ def same_bytes(a, b):
     return bool(ra and rb) and ra[0] == rb[0]
 
 
-def plan(src, dst, memory_rel, wanted):
-    """[(action, why, rel)] for every file in `wanted`, plus target-only memory files."""
+def plan(src, dst, wanted):
+    """[(action, why, rel)] for every file in `wanted`."""
     dst_record = set(read_record(dst))
     owns = {}
     rows = []
@@ -188,10 +250,6 @@ def plan(src, dst, memory_rel, wanted):
                 rows.append(("SKIP", "same mtime, different bytes, kept", rel))
             else:
                 rows.append(("COPY", "target older", rel))
-    have = set(wanted)
-    for rel in walk(dst, memory_rel):
-        if rel not in have:
-            rows.append(("KEEP", "only in the target", rel))
     return rows
 
 
@@ -241,7 +299,9 @@ def main():
     ap.add_argument("--from", dest="src", required=True, help="the account that wrote the work")
     ap.add_argument("--to", dest="dst",
                     default=os.environ.get("CLAUDE_CONFIG_DIR") or os.path.expanduser("~/.claude"))
-    ap.add_argument("--root", default=os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd())
+    # Accepted and unused: the copy is per account, not per project. Every shipped script
+    # takes `--root`, and `bin/script-conformance` passes one to each.
+    ap.add_argument("--root", help=argparse.SUPPRESS)
     ap.add_argument("--execute", action="store_true", help="write; default is display only")
     a = ap.parse_args()
 
@@ -253,27 +313,24 @@ def main():
             print(f"REFUSED: {name} {p} is not a directory directly in $HOME ({home}) whose "
                   f"name starts with .claude.", file=sys.stderr)
             return 2
-        if not os.path.isdir(p):
+        if not account_dir(p, home):
             print(f"REFUSED: {name} {p} is not a directory.", file=sys.stderr)
             return 2
     if src == dst:
         print(f"REFUSED: --from and --to are the same account, {src}.", file=sys.stderr)
         return 2
-    if not os.path.isdir(os.path.join(src, "skills")) and not os.path.isdir(
-            os.path.join(src, "projects")):
-        print(f"REFUSED: {src} has no skills/ or projects/, so it is not a Claude config dir.",
+    if not os.path.isdir(os.path.join(src, "skills", "workforce")):
+        print(f"REFUSED: {src} has no skills/workforce/, so there is no install to copy.",
               file=sys.stderr)
         return 2
 
-    memory_rel = os.path.join("projects", store_name(a.root), "memory")
     src_record = read_record(src)
     wanted = list(dict.fromkeys(
-        walk(src, memory_rel)
-        + [r for r in walk(src, os.path.join("skills", "workforce"))
-           if os.path.basename(r) != RECORD]
+        [r for r in walk(src, os.path.join("skills", "workforce"))
+         if os.path.basename(r) != RECORD]
         + recorded(src, src_record)))
 
-    rows = plan(src, dst, memory_rel, wanted)
+    rows = plan(src, dst, wanted)
     # A record reached through a link is not written: the link points outside the target.
     # The sibling skills it would list are then not copied either, or the next run would
     # find them unrecorded and keep them as the target's own, never updated again.
@@ -299,8 +356,6 @@ def main():
 
     print(f"wf-account-sync  from {src}")
     print(f"                 to   {dst}")
-    print(f"                 project {os.path.abspath(a.root)}, memory at {memory_rel}"
-          + ("" if os.path.isdir(os.path.join(src, memory_rel)) else " (none in the source)"))
     for act, why, rel in rows:
         if act != "SAME":
             print(f"  {act:<7}{rel}" + (f"  ({why})" if why else ""))

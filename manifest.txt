@@ -135,6 +135,7 @@ hook workforce/bin/wf-turn-budget
 hook workforce/bin/wf-bash-stdin
 hook workforce/bin/wf-webfetch-guard
 hook workforce/bin/wf-dispatch-guard
+hook workforce/bin/wf-memory
 
 # ── Output styles ─────────────────────────────────────────────────────────────
 #
@@ -457,6 +458,24 @@ sibling workforce/skills/handoff/SKILL.md
 # It ships in the workforce tree rather than beside the skill because the handoff skill runs it
 # from the SOURCE account's install, the one known to be current.
 exec workforce/bin/wf-account-sync
+#
+# Issues i7-i12, 2026-11-26: it no longer copies memory. A rule reaches every account because it
+# is applied in the project, and the handoff skill no longer asks which account picks up. It
+# keeps the install copy, run by hand, and hosts the config-dir and store-name lookup
+# `wf-memory` imports.
+
+# ── reconcile-memory — the SIBLING that applies memory rules in the project ───────
+#
+# User, 2026-11-26: memory items "stashed where they can't be accessed by any account" must be
+# "'caught' and applied correctly within the project scope", and "the audit should use that
+# skill". The ONE implementation: scan every account's memory for this project and its parent
+# folders (`wf-memory --scan`), add the rules the session recalls that no file holds, route each
+# to an existing file, a handbook amendment, a skill, a script or a new principle, and record it
+# in the project's gitignored `.claude/workforce/carried-memory/ledger.json`. Called by
+# `/workforce audit` Step 6-K, by the `MEMORY RULES` session-start note, and by the user.
+# `wf-memory` is also the hook pair (save time and session start); it is listed above with the
+# hooks. Not an evaluator and not a catalog; registered in neither `wf-catalog` nor `wf-conform`.
+sibling workforce/skills/reconcile-memory/SKILL.md
 
 # ── build-as-you-go — the SIBLING playbook for a page built in a live dialogue ─
 #

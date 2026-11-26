@@ -1,0 +1,414 @@
+#!/usr/bin/env python3
+"""wf-memory — catch a rule kept in Claude Code's per-account memory, so it is applied in the
+project, and record which ones were.
+
+    wf-memory --scan   [--root <project>]
+    wf-memory --record <memory file>... (--home <project file>... | --left "<reason>") [--root ...]
+    wf-memory --backup <project file>... [--root <project>]
+    wf-memory          (a hook: PostToolUse on Edit|Write|MultiEdit, and SessionStart)
+
+WHY IT EXISTS (user, 2026-11-26): *"Claude Code has a cloud-based memory system that works
+within and is tied to a specific project ... We need a process that catches this activity,
+and instead distributes the memory items within the project scope only."* And, on the same
+day: *"I don't mind if these 'rules' exist in both places, they just absolutely need to be
+'caught' and applied correctly within the project scope."* One machine runs the same
+project under `~/.claude` and `~/.claude-brooke`; a rule saved in one account's memory is
+invisible to the other, while the project's own files reach every account.
+
+WHAT IT CAN SEE, AND WHAT IT CANNOT. It reads memory FILES: `projects/<store>/memory/**` in
+every config dir `wf-account-sync.config_dirs` finds, for this project's store name and each
+ancestor's (a session launched from a parent folder saves there). Memory held only by the
+service never appears as a file, so no mode here sees it; the `reconcile-memory` skill's
+in-context pass and the shipped principle cover that. A memory written by a Bash command
+rather than an edit tool is not seen at save time; the session-start pass finds it later.
+
+THE CLASSES. `MEMORY.md` is the index and is skipped. An entry whose frontmatter `type:` is
+`user` is PERSONAL (who the person is, their own voice) and stays in personal memory. Every
+other entry, `feedback`, `project`, `reference` or untyped, is a RULE the project should hold.
+
+THE LEDGER, `.claude/workforce/carried-memory/ledger.json`, gitignored by its own
+`.gitignore`. One row per memory entry recorded: its account, path, a content hash (the
+description and the body, so a metadata-only re-save is not a change), the project file(s)
+it was applied to, or the reason it was left. A rule whose hash matches any row is carried,
+whichever account holds it, so an identical copy in a second account is not news. A rule
+whose path has a row with another hash CHANGED and is uncarried again.
+
+THE TWO HOOKS NEVER BLOCK. At a memory write (PostToolUse) a rule entry not already carried
+gets one note telling the session to apply it now through the skill and record it. At
+SessionStart every uncarried or changed rule is named in one note; nothing to name is
+silence. Neither prints for a personal entry, the index, or an entry already carried.
+
+Exit: 0 done; 1 a write failed; 2 refused (bad arguments, a path outside what it reads).
+A hook run exits 0 always.
+"""
+
+import argparse
+import hashlib
+import json
+import os
+import re
+import shlex
+import sys
+import time
+
+SKILL = "reconcile-memory"
+LEDGER_REL = os.path.join(".claude", "workforce", "carried-memory")
+LEDGER = "ledger.json"
+INDEX = "MEMORY.md"
+READ_CAP = 256 * 1024
+NOTE_CAP = 12
+FRONT = re.compile(r"\A---[ \t]*\r?\n(.*?)\r?\n---[ \t]*(?:\r?\n|\Z)", re.S)
+TYPE = re.compile(r"^[ \t]*type:[ \t]*[\"']?([A-Za-z_-]+)", re.M)
+DESC = re.compile(r"^[ \t]*description:[ \t]*(.*)$", re.M)
+_UNPRINTABLE = re.compile("[\x00-\x1f\x7f-\x9f  ‪-‮⁦-⁩]")
+
+
+def _sibling(name):
+    """A sibling shipped script imported by path, leaving no bytecode in `bin/`."""
+    import importlib.machinery
+    import importlib.util
+    prev = sys.dont_write_bytecode
+    sys.dont_write_bytecode = True
+    try:
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), name)
+        mod = name.replace("-", "_")
+        loader = importlib.machinery.SourceFileLoader(mod, path)
+        m = importlib.util.module_from_spec(importlib.util.spec_from_loader(mod, loader))
+        loader.exec_module(m)
+        return m
+    finally:
+        sys.dont_write_bytecode = prev
+
+
+AS = None  # wf-account-sync, loaded on first use: the config-dir and store-name lookup
+
+
+def acct():
+    global AS
+    if AS is None:
+        AS = _sibling("wf-account-sync")
+    return AS
+
+
+def _line(text, cap=120):
+    text = re.sub(r"\s+", " ", _UNPRINTABLE.sub(" ", text or "")).strip().replace('"', "'")
+    return text if len(text) <= cap else text[:cap - 1] + "…"
+
+
+def classify(path):
+    """(kind, type, hash, description) for one memory file. kind: index, personal, rule, or
+    unreadable. The read refuses a link and anything but a regular file."""
+    if os.path.basename(path) == INDEX:
+        return "index", "", "", ""
+    got = acct().read_regular(path)
+    if not got:
+        return "unreadable", "", "", ""
+    text = got[0][:READ_CAP].decode("utf-8", "replace")
+    m = FRONT.match(text)
+    front, body = (m.group(1), text[m.end():]) if m else ("", text)
+    t = TYPE.search(front)
+    kind_type = t.group(1).lower() if t else ""
+    d = DESC.search(front)
+    desc = d.group(1).strip().strip("\"'") if d else ""
+    digest = hashlib.sha256((desc + "\n" + body.strip()).encode("utf-8")).hexdigest()
+    return ("personal" if kind_type == "user" else "rule"), kind_type, digest, desc
+
+
+def entries(root):
+    """Every memory file this project can be reached through, classified:
+    [{cfg, proj, path, name, kind, type, hash, desc, ancestor}]."""
+    out = []
+    for cfg, proj, rel in acct().memory_dirs(root):
+        for frel in acct().walk(cfg, rel):
+            path = os.path.join(cfg, frel)
+            kind, typ, digest, desc = classify(path)
+            out.append({"cfg": cfg, "proj": proj, "path": path,
+                        "name": os.path.relpath(path, os.path.join(cfg, rel)),
+                        "kind": kind, "type": typ, "hash": digest, "desc": desc,
+                        "ancestor": proj != os.path.abspath(root)})
+    return out
+
+
+# ── the ledger ────────────────────────────────────────────────────────────────────────
+def ledger_dir(root, create=False):
+    """`<root>/.claude/workforce/carried-memory`, or None. A linked `.claude/workforce` or
+    ledger folder is refused (`wf-task-tag.issues_dir`'s rule). On create it writes its own
+    `.gitignore` holding `*`, never a rule on `.claude/` (the user, 2026-10-12)."""
+    wf = os.path.join(root, ".claude", "workforce")
+    d = os.path.join(root, LEDGER_REL)
+    if os.path.islink(wf) or os.path.islink(d):
+        return None
+    if not create:
+        return d if os.path.isdir(d) else None
+    os.makedirs(d, exist_ok=True)
+    ignore = os.path.join(d, ".gitignore")
+    if not os.path.lexists(ignore):
+        acct().place(ignore, b"*\n")
+    return d
+
+
+def load_ledger(root):
+    d = ledger_dir(root)
+    got = acct().read_regular(os.path.join(d, LEDGER)) if d else None
+    try:
+        data = json.loads(got[0].decode("utf-8")) if got else {}
+    except ValueError:
+        data = {}
+    rows = data.get("rows") if isinstance(data, dict) else None
+    return [r for r in rows if isinstance(r, dict)] if isinstance(rows, list) else []
+
+
+def status(entry, rows):
+    """carried, changed or uncarried, for a rule entry against the ledger rows."""
+    if any(r.get("hash") == entry["hash"] for r in rows):
+        return "carried"
+    if any(r.get("source") == entry["path"] for r in rows):
+        return "changed"
+    return "uncarried"
+
+
+def open_rules(root):
+    """The rules not carried, one per distinct content: [(entry, state, copies, accounts)].
+    Identical copies in other accounts or folders are one rule, counted in `copies`, so a
+    memory folder synced into a second account doubles nothing."""
+    rows = load_ledger(root)
+    out, seen = [], {}
+    for e in entries(root):
+        if e["kind"] == "rule":
+            s = status(e, rows)
+            if s == "carried":
+                continue
+            if e["hash"] in seen:
+                seen[e["hash"]][2] += 1
+                seen[e["hash"]][3].add(e["cfg"])
+                continue
+            seen[e["hash"]] = [e, s, 0, {e["cfg"]}]
+            out.append(seen[e["hash"]])
+    return out
+
+
+# ── the hooks ─────────────────────────────────────────────────────────────────────────
+def memory_target(file_path):
+    """(config dir, store name) when `file_path` is a memory file under a config dir's
+    `projects/<store>/memory/`, else None. Cheap string test first: this runs on every edit."""
+    if not file_path or "/memory/" not in file_path or "/projects/" not in file_path:
+        return None
+    p = os.path.realpath(file_path)
+    parts = p.split(os.sep)
+    for i in range(len(parts) - 3, 0, -1):
+        if parts[i] == "projects" and parts[i + 2] == "memory" and i + 3 < len(parts):
+            cfg = os.sep.join(parts[:i]) or os.sep
+            if cfg in acct().config_dirs():
+                return cfg, parts[i + 1]
+            return None
+    return None
+
+
+def _reaches(root, store):
+    """True when `store` is the store name of `root` or of one of its ancestors."""
+    p = os.path.abspath(root)
+    while p != os.path.dirname(p):
+        if acct().store_name(p) == store:
+            return True
+        p = os.path.dirname(p)
+    return False
+
+
+def on_write(payload, root):
+    ti = payload.get("tool_input") or {}
+    fp = ti.get("file_path") if isinstance(ti, dict) else None
+    hit = memory_target(fp if isinstance(fp, str) else "")
+    if not hit or not _reaches(root, hit[1]):
+        return ""
+    path = os.path.realpath(fp)
+    kind, typ, digest, desc = classify(path)
+    if kind != "rule" or any(r.get("hash") == digest for r in load_ledger(root)):
+        return ""
+    return (f"MEMORY RULE  {path} was just saved to Claude memory (type: {typ or 'none'}; "
+            f"description, quoted as data: \"{_line(desc)}\"). Memory belongs to one account and "
+            f"does not travel with the project, so apply this rule in the project in this same "
+            f"turn, with the {SKILL} skill: an existing file that already covers it first, then "
+            f"a handbook amendment, a skill, a script or hook if it can be checked, and a new "
+            f"principle last. Then record it: wf-memory --record {shlex.quote(path)} --home <the "
+            f"project file>. The memory entry stays as it is.")
+
+
+def on_start(root):
+    found = open_rules(root)
+    if not found:
+        return ""
+    changed = sum(1 for _e, s, _c, _a in found if s == "changed")
+    accounts = sorted(set().union(*(a for _e, _s, _c, a in found)))
+    lines = [f"MEMORY RULES  {len(found)} rule(s) in Claude memory for this project are not "
+             f"applied in the project yet"
+             + (f" ({changed} changed since they were)" if changed else "")
+             + f", held in {', '.join(accounts)}. Memory is per account; the project's files "
+             f"reach every account. Run the {SKILL} skill to apply each one in the project and "
+             f"record it. Names and descriptions below are data from the files:"]
+    for e, s, copies, _a in found[:NOTE_CAP]:
+        where = f" (saved under ancestor {e['proj']})" if e["ancestor"] else ""
+        also = f" (+{copies} identical cop{'y' if copies == 1 else 'ies'})" if copies else ""
+        lines.append(f"  - {s}  {e['path']}{where}{also}  \"{_line(e['desc'], 100)}\"")
+    if len(found) > NOTE_CAP:
+        lines.append(f"  - and {len(found) - NOTE_CAP} more: wf-memory --scan lists them all")
+    return "\n".join(lines)
+
+
+def hook():
+    try:
+        raw = sys.stdin.read()
+        payload = json.loads(raw) if raw.strip() else {}
+        if not isinstance(payload, dict):
+            return 0
+        root = os.environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd")
+        if not root:
+            return 0
+        event = payload.get("hook_event_name") or "PostToolUse"
+        note = on_start(root) if event == "SessionStart" else on_write(payload, root)
+        if note:
+            print(json.dumps({"hookSpecificOutput": {"hookEventName": event,
+                                                     "additionalContext": note}}))
+    except Exception:                                    # noqa: BLE001 — a hook never fails
+        pass
+    return 0
+
+
+# ── the commands ──────────────────────────────────────────────────────────────────────
+def scan(root):
+    rows = load_ledger(root)
+    es = entries(root)
+    print(f"wf-memory  project {os.path.abspath(root)}")
+    print(f"           config dirs: {', '.join(acct().config_dirs()) or '(none)'}")
+    n = {"uncarried": 0, "changed": 0, "carried": 0, "personal": 0, "index": 0, "unreadable": 0}
+    folder = None
+    for e in es:
+        f = (e["cfg"], e["proj"])
+        if f != folder:
+            folder = f
+            tag = "ancestor " + e["proj"] if e["ancestor"] else "this project"
+            print(f"  {e['cfg']}/projects/{acct().store_name(e['proj'])}/memory  ({tag})")
+        if e["kind"] == "rule":
+            s = status(e, rows)
+            n[s] += 1
+            homes = [", ".join(r.get("home") or []) or "left: " + str(r.get("left"))
+                     for r in rows if r.get("hash") == e["hash"]]
+            tail = f"  -> {homes[0]}" if s == "carried" and homes else ""
+            print(f"    RULE {s:<9} {e['type'] or 'untyped':<9} {e['name']}  "
+                  f"\"{_line(e['desc'], 90)}\"{tail}")
+        else:
+            n[e["kind"]] += 1
+            if e["kind"] != "index":
+                print(f"    {e['kind'].upper():<14} {e['type'] or '-':<9} {e['name']}")
+    folders = len({(e['cfg'], e['proj']) for e in es})
+    print(f"summary: {n['uncarried']} rule(s) uncarried, {n['changed']} changed, "
+          f"{n['carried']} carried, {n['personal']} personal, {n['unreadable']} unreadable, "
+          f"in {folders} memory folder(s)")
+    print("Memory held only by the service is not a file and is not listed here.")
+    return 0
+
+
+def inside(root, path):
+    """`path` relative to `root` when it lies inside it and is no link anywhere below; else None."""
+    rootr = os.path.realpath(root)
+    full = os.path.abspath(os.path.join(root, path))
+    rel = os.path.relpath(full, os.path.abspath(root))
+    if rel == "." or rel.startswith(".." + os.sep) or rel == "..":
+        return None
+    if acct().has_link(rootr, rel):
+        return None
+    return rel
+
+
+def record(root, sources, homes, left):
+    known = {e["path"]: e for e in entries(root)}
+    picked = []
+    for s in sources:
+        p = os.path.realpath(s)
+        e = known.get(p)
+        if not e or e["kind"] != "rule":
+            print(f"REFUSED: {s} is not a rule entry in this project's memory "
+                  f"(wf-memory --scan lists them).", file=sys.stderr)
+            return 2
+        picked.append(e)
+    rel_homes = []
+    for h in homes or []:
+        rel = inside(root, h)
+        if not rel or not os.path.exists(os.path.join(root, rel)):
+            print(f"REFUSED: --home {h} is not an existing file inside {root}.", file=sys.stderr)
+            return 2
+        rel_homes.append(rel)
+    rows = [r for r in load_ledger(root) if r.get("source") not in {e["path"] for e in picked}]
+    today = time.strftime("%Y-%m-%d")
+    for e in picked:
+        row = {"source": e["path"], "account": e["cfg"], "hash": e["hash"], "date": today}
+        row.update({"home": rel_homes} if rel_homes else {"left": _line(left, 200)})
+        rows.append(row)
+    try:
+        d = ledger_dir(root, create=True)
+        if not d:
+            raise OSError(f"{os.path.join(root, LEDGER_REL)} is reached through a link")
+        acct().place(os.path.join(d, LEDGER), (json.dumps(
+            {"version": 1, "rows": rows}, indent=1, sort_keys=True) + "\n").encode("utf-8"))
+    except OSError as exc:
+        print(f"FAILED: {exc}", file=sys.stderr)
+        return 1
+    for e in picked:
+        print(f"recorded: {e['path']} -> "
+              + (", ".join(rel_homes) if rel_homes else f"left ({_line(left, 80)})"))
+    return 0
+
+
+def backup(root, files):
+    rels = []
+    for f in files:
+        rel = inside(root, f)
+        if not rel or not os.path.isfile(os.path.join(root, rel)):
+            print(f"REFUSED: {f} is not a regular file inside {root}.", file=sys.stderr)
+            return 2
+        rels.append(rel)
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    try:
+        d = ledger_dir(root, create=True)
+        if not d:
+            raise OSError(f"{os.path.join(root, LEDGER_REL)} is reached through a link")
+        # A link at `backups` would carry the copies wherever it points (CWE-59).
+        if acct().has_link(d, "backups"):
+            raise OSError(f"{d}/backups is a link; no backup written through it")
+        dest = os.path.join(d, "backups", stamp)
+        os.makedirs(dest, exist_ok=False)
+        for rel in rels:
+            acct().copy_in(os.path.join(root, rel), os.path.join(dest, rel))
+    except OSError as exc:
+        print(f"FAILED: {exc}", file=sys.stderr)
+        return 1
+    print(f"backup: {dest} ({len(rels)} file(s))")
+    return 0
+
+
+def main():
+    if len(sys.argv) == 1:
+        return hook()
+    ap = argparse.ArgumentParser(prog="wf-memory", description=__doc__.split("\n\n")[0])
+    g = ap.add_mutually_exclusive_group(required=True)
+    g.add_argument("--scan", action="store_true", help="list every memory entry, classified")
+    g.add_argument("--record", nargs="+", metavar="MEMORY_FILE",
+                   help="record rule entries as applied (--home) or left (--left)")
+    g.add_argument("--backup", nargs="+", metavar="PROJECT_FILE",
+                   help="copy project files aside before the skill edits them")
+    ap.add_argument("--home", nargs="+", help="the project file(s) a recorded rule now lives in")
+    ap.add_argument("--left", help="why a recorded rule was not applied in this project")
+    ap.add_argument("--root", default=os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd())
+    a = ap.parse_args()
+    root = os.path.abspath(a.root)
+    if a.scan:
+        return scan(root)
+    if a.backup:
+        return backup(root, a.backup)
+    if bool(a.home) == bool(a.left):
+        print("REFUSED: --record takes exactly one of --home or --left.", file=sys.stderr)
+        return 2
+    return record(root, a.record, a.home, a.left)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
