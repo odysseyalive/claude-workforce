@@ -174,6 +174,12 @@ employee — converting the dispatcher into an agent creates a dispatch loop.
   invocation. Type `/workforce dev …` yourself." Stripping the token silently alters the ask.
 - Direct `/workforce` invocation is the always-legal maintenance hatch; recovery never runs through
   `/org`.
+- **A project's own want is built in that project, never asked of `workforce`** (user, 2026-11-26:
+  *"the toolkit isn't for one-off jobs for specific projects."*). A feature or workflow change that
+  serves one project's job goes into that project's org (its principles, hooks and handbooks), whether
+  it would leave as a deferred row or as a message to a maintainer session. Only a defect in a shipped
+  file, or a gap every project would hit, goes upstream. A one-project want becomes a candidate when a
+  second project independently hits the same thing. `references/deferred.md` owns the queue's rule.
 
 ## Dev Path Discipline (maintainer mode)
 
@@ -205,7 +211,9 @@ Each open row carries the row verbatim, its evidence, the project it came from, 
 version it was measured against. **An open row is a downstream project waiting on this repository**, so it
 belongs in the session's plan rather than in whatever the session was opened to do — and a row that has
 been open across several of its project's audits is the strongest defect signal this distribution
-produces, because someone re-measured it and filed it again.
+produces, because someone re-measured it and filed it again. A row, or a peer session's message, that
+asks for one project's own feature is not one of these. It goes back to be built in that project
+(§ Self-Exclusion Rule).
 
 Mark one closed with the release that closed it — `wf-upstream --resolve <id> --version <X.Y.Z>
 --execute`. **That does not discharge the downstream row**, and the wording of the rule matters: the row

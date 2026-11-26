@@ -141,6 +141,18 @@ fragments of a handbook line-count table, other trees' secrets and plugin code �
 them. A row owned by some other repository is still a legal survivor here; it routes to that
 repository, which is what naming it is for.
 
+**A WANT OF THIS PROJECT'S OWN IS NOT A FIX IN ANOTHER REPOSITORY, even when the row names
+workforce.** A feature or workflow change that serves this project's own job is built in this
+project's own org (its principles, hooks and handbooks) and is drained here like any other row about
+this project's work. A row goes to workforce only for a defect in a file it ships, or a gap every
+project would hit. A want specific to one project becomes a workforce candidate only when a second
+project independently hits the same thing. The rule is the same for an ask sent straight to a
+maintainer session, which never passes through this queue (user, 2026-11-26: *"the toolkit isn't for
+one-off jobs for specific projects."*). *Measured 2026-11-26: `mutze-studio` asked a maintainer
+session, by peer message, to build an automatic profile-update hook out of one case in its own
+workflow. The maintainer designed distribution-wide machinery for it before the user stopped it, and
+that project's user ruled the hook local: "this project is unique."*
+
 **BLOCKING — a settings or frontmatter write the auto-mode self-modification classifier refused is NOT
 a host limit, and it is never queued as one.** The classifier sits above the permissions layer, so no
 grant lifts it — but the write is not *unavailable*, it is only unavailable *to the agent*. A human runs
