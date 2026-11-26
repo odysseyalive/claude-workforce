@@ -18218,5 +18218,45 @@
     "not": [
       "\u2717 "
     ]
+  },
+  "web-grant-pattern-not-a-use": {
+    "_why": "amishwbf.com W2 (2026-11-21): `legacy-export`'s Verification bar FM9 is a grep whose pattern names every fetch tool, `^tools:.*(WebFetch|web_fetch|WebSearch|...)`, the check that NONE is granted. It carries no prohibition word, so `fetches()` read it as a page fetch and a 2026-11-19 SessionStart heal granted `mcp__playwright-mcp, WebFetch, WebSearch` and turned FM9 red. This handbook carries that bar and its one-tool `.*WebFetch` form and no fetch step, so `--execute` must leave it byte for byte and print no heal; on b96469e it writes all three tools.",
+    "script": "wf-web-grant",
+    "args": [
+      "--execute"
+    ],
+    "exit": 0,
+    "want": [
+      "web fetch: playwright-mcp ABSENT"
+    ],
+    "not": [
+      "exporter.md",
+      "healed",
+      "Traceback"
+    ],
+    "after": {
+      ".claude/agents/exporter.md": {
+        "unchanged": true
+      }
+    }
+  },
+  "web-grant-fetch-step-heals": {
+    "_why": "The control for web-grant-pattern-not-a-use: a Procedure step that fetches with `mcp__playwright-mcp__web_fetch`, beside a second step whose grep pattern carries an alternation bar, must still be nominated and healed. A fix that stopped reading fetch tools at all would pass the pattern case and fail this one.",
+    "script": "wf-web-grant",
+    "args": [
+      "--execute"
+    ],
+    "exit": 0,
+    "want": [
+      "healed  researcher.md  +mcp__playwright-mcp; +WebFetch; +WebSearch; rule line added to `## Guardrails`"
+    ],
+    "after": {
+      ".claude/agents/researcher.md": {
+        "want": [
+          "tools: Read, Write, Bash, mcp__playwright-mcp, WebFetch, WebSearch",
+          "<!-- origin: workforce | modifiable: true | web-fetch -->"
+        ]
+      }
+    }
   }
 }

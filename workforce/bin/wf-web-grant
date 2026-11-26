@@ -69,6 +69,24 @@ PROHIBITION_RX = re.compile(r"\bNEVER\b|\bMUST NOT\b|\bSTOP\b|\bdo not\b|\bdon't
 # No leading `\b` before `web_fetch`: in `mcp__playwright-mcp__web_fetch` it follows `_`,
 # a word character, so `\bweb_fetch` never matches the form handbooks actually write.
 FETCH_USE_RX = re.compile(r"web_fetch\b|\bWebFetch\b")
+# A TOOL NAME INSIDE A SEARCH PATTERN IS A STRING BEING LOOKED FOR, NOT A STEP THAT FETCHES.
+# Measured on amishwbf.com (W2, 2026-11-21): `legacy-export`'s Verification bar FM9 is
+# `! grep -Eq '^tools:.*(WebFetch|web_fetch|WebSearch|…)' …`, the check that NO fetch tool is
+# granted. It carries no prohibition word, so a SessionStart heal read it as a page fetch,
+# granted all three tools, and turned FM9 red. A mention joined to a regex alternation bar
+# (`(WebFetch|`, `|web_fetch|`, `\|WebFetch`) or following a `.*` / `.+` wildcard is pattern
+# text. Prose never writes either, and a bare `(WebFetch)` in a sentence is still a use.
+PATTERN_BEFORE_RX = re.compile(r"(?:\||\.[*+])$")
+PATTERN_AFTER_RX = re.compile(r"^\\?\|")
+
+
+def _uses_fetch(line):
+    """True when `line` names a fetch tool anywhere outside a search pattern."""
+    for m in FETCH_USE_RX.finditer(line):
+        if not (PATTERN_BEFORE_RX.search(line[:m.start()])
+                or PATTERN_AFTER_RX.match(line[m.end():])):
+            return True
+    return False
 PRIMARY_TOKEN_RX = re.compile(rf"^mcp__{re.escape(SERVER)}(?:__.*)?$")
 
 SPAN_OPEN = "<!-- origin: workforce | modifiable: true | web-fetch -->"
@@ -163,7 +181,7 @@ def fetches(body):
         if sec is None:
             continue
         for line in text[sec[0]:sec[1]].splitlines():
-            if FETCH_USE_RX.search(line) and not PROHIBITION_RX.search(line):
+            if _uses_fetch(line) and not PROHIBITION_RX.search(line):
                 return True
     return False
 
