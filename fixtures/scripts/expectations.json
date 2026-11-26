@@ -18258,5 +18258,23 @@
         ]
       }
     }
+  },
+  "conform-catread-kept-files": {
+    "_why": "amishwbf.com W1 (2026-11-21): INV-CATREAD flagged three citations the migration never empties, and healing any of them would break a read that works: an OUT scope line naming the INSTALL path `~/.claude/skills/security-evaluator/`, `.claude/skills/code-evaluator/CATALOG-ANCHOR.md` (kept by design), and two project-only files under `text-eval/references/` that exist and ship nowhere. `keeper.md` carries all three and must be silent; on b96469e it reads `3 citation(s)`. `reader.md` is the control in the same tree: a glob over a catalog directory, and a `${CLAUDE_PROJECT_DIR}` path to a project file that the fake install at `acct/` ships byte for byte, which the migration DOES remove. Both must still be reported, so a fix that silenced the detector fails here.",
+    "script": "wf-conform",
+    "env": {
+      "CLAUDE_CONFIG_DIR": "${TREE}/acct"
+    },
+    "exit": 0,
+    "want": [
+      "2 governed",
+      "0 failed",
+      "~ reader: catalog read grounded on a literal path (2 citation(s))",
+      "INV-CATREAD: 2 handbook(s) \u00b7 1 on a literal catalog path \u00b7 1 resolver-form or no citation"
+    ],
+    "not": [
+      "~ keeper: catalog read",
+      "Traceback"
+    ]
   }
 }

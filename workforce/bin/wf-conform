@@ -3144,7 +3144,38 @@ CATALOG_KIND = {
 }
 CATALOG_PATH_RX = re.compile(
     r"\.claude/skills/(text-eval|code-evaluator|security-evaluator|ui-design"
-    r"|design-eval)\b")
+    r"|design-eval)\b((?:/[^\s`'\"()|<>]*)?)")
+# A path under the HOME config root is the install, which the migration never touches; the
+# project's own copy is the only thing it empties. `${CLAUDE_PROJECT_DIR}/.claude/skills/…`
+# is still a project path and still a finding.
+_INSTALL_PREFIX_RX = re.compile(r"(?:~|\$HOME|\$\{HOME\})/$")
+
+
+def _catread_kept(skill, tail, ctx):
+    """Is this citation one the migration leaves readable? The three measured on amishwbf.com
+    (W1, 2026-11-21) were all reported, and healing any of them would have broken a read
+    that works. The set is `wf-catalog`'s own, never a second list here:
+
+    a file `classify` keeps by construction (a top-level `NON_CORPUS` file such as
+    `CATALOG-ANCHOR.md`, anything under `agents/` or `hooks/`), or a project file that exists
+    and is not a copy of a shipped one, which `cited_project_files` keeps in place for
+    exactly the reader citing it. A directory, a glob, a file already gone and a file the
+    install ships byte for byte are all still findings."""
+    rel = tail.strip("/").rstrip(".,;:")
+    if not rel or any(c in rel for c in "*?[{"):
+        return False
+    parts = rel.split("/")
+    cat = ctx["cat"]
+    if (len(parts) == 1 and parts[0] in cat.NON_CORPUS) or parts[0] in ("agents", "hooks"):
+        return True
+    path = os.path.join(ctx["root"], ".claude", "skills", skill, *parts)
+    if not os.path.isfile(path):
+        return False
+    kind = CATALOG_KIND[skill]
+    if kind not in ctx["shipped"]:
+        ctx["shipped"][kind] = cat.install_index(ctx["root"], kind)[1]
+    body = cat.norm(cat.slurp(path))
+    return bool(body) and body not in ctx["shipped"][kind]
 
 
 def check_catalog_read(n, body, res, tally):
@@ -3171,8 +3202,13 @@ def check_catalog_read(n, body, res, tally):
     for line in body.splitlines():
         if "wf-catalog" in line:
             continue
-        m = CATALOG_PATH_RX.search(line)
-        if m:
+        # EVERY CITATION ON THE LINE, not the first: `voice-editor.md:145` on amishwbf.com
+        # names two project-only files on one Sources line.
+        for m in CATALOG_PATH_RX.finditer(line):
+            if _INSTALL_PREFIX_RX.search(line[:m.start()]):
+                continue
+            if "cat" in tally and _catread_kept(m.group(1), m.group(2), tally):
+                continue
             hits.append((m.group(0), m.group(1), line.strip() in sources))
     if not hits:
         tally["clean"] += 1
@@ -4467,6 +4503,7 @@ def main():
     # Every anchor key `wf-catalog` declares, corpus and additions slot alike, mapped to its
     # kind — read from its table, so a sixth catalog is pinned-checked the day it ships.
     _cat = _load_sibling("wf-catalog")
+    _catread.update(root=root, cat=_cat, shipped={})
     _pin_keys = {}
     for _k, _spec in _cat.CATALOGS.items():
         _pin_keys[_spec["anchor"]] = (_k, "corpus")
