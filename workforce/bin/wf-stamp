@@ -576,7 +576,7 @@ def stamp_directives(root, execute, restamp, files=None, authority_arg=None):
         restamp = True
     agents = os.path.join(root, ".claude", "agents")
     links_before = symlink_census(agents) if os.path.isdir(agents) else {}
-    mirrors, moved = mirror_pass(root, execute)
+    mirrors, moved, lifted = mirror_pass(root, execute)
     pins = pins_pass(root, execute, restamp and not paths, moved)
 
     path = os.path.join(root, DIRECTIVES_REL)
@@ -584,6 +584,17 @@ def stamp_directives(root, execute, restamp, files=None, authority_arg=None):
     found, scope = scan_blocks(root, unreadable)
     recorded = read_sidecar(path, malformed, legacy)
     unread = {os.path.relpath(p, root).replace(os.sep, "/") for p, _e in unreadable}
+    # A LIFT IS ITS OWN AUTHORITY FOR THE ROW IT MOVED, as a mirror append is for the pins
+    # that follow it: this run changed the block's bytes and nothing else, so the row
+    # stamped on the old bytes moves to the new ones in the same write. Only the one
+    # digest the lift replaced moves; any other stale row in that file is still DRIFT.
+    lift_rows = {}
+    for rel, (old, new) in lifted.items():
+        rel = rel.replace(os.sep, "/")
+        if old in recorded.get(rel, set()):
+            recorded = dict(recorded)
+            lift_rows[rel] = recorded[rel]
+            recorded[rel] = (set(recorded[rel]) - {old}) | {new}
     st = evaluate_sidecar(found, scope, recorded, unread)
 
     def show(st):
@@ -644,7 +655,10 @@ def stamp_directives(root, execute, restamp, files=None, authority_arg=None):
         for d in drop:
             print(f"      - sha256:{d}")
 
-    if execute and (merged != recorded or malformed or legacy):
+    for rel in sorted(lift_rows):
+        print(f"  + RESTAMP      {rel}  under the `## Interface` lift: the row stamped on the "
+              f"block with the section inside it moves to the block without it")
+    if execute and (merged != recorded or malformed or legacy or lift_rows):
         # WRITE, THEN READ BACK WITH THIS SCRIPT'S OWN READER (`checksums.md` rule 2).
         os.makedirs(os.path.dirname(path), exist_ok=True)
         open(path, "w", encoding="utf-8").write(sidecar_body(merged))
@@ -667,7 +681,7 @@ def stamp_directives(root, execute, restamp, files=None, authority_arg=None):
                 "to": f"{n_rows} row(s)",
                 "authority": (authority[1] if authority and changed
                               else "--restamp" if changed else None),
-                "restamped": changed,
+                "restamped": changed + sorted(lift_rows),
                 "retired": {rel: sorted(recorded.get(rel, set()) - merged.get(rel, set()))
                             for rel in changed},
                 "migrated": len(legacy)}])
@@ -694,7 +708,8 @@ def stamp_directives(root, execute, restamp, files=None, authority_arg=None):
     print(f"INV-MIRROR  {mirrors['mirrors']} mirror(s) with a live source · "
           f"{mirrors['blocks']} source block(s) · mirrored {mirrors['mirrored']} · "
           f"unmirrored {mirrors['unmirrored']} · appended {mirrors['appended']} · "
-          f"conflicted {mirrors['conflicted']} · failed {mirrors['failed']}")
+          f"conflicted {mirrors['conflicted']} · failed {mirrors['failed']} · "
+          f"lifted {mirrors['lifted']}")
     print(f"INV-DIRPINS  {pins['pins']} pin(s) in {pins['handbooks']} handbook(s) · "
           f"current {pins['current']} · stale {pins['stale']} · repinned {pins['repinned']} · "
           f"missing {pins['missing']} · failed {pins['failed']}")
@@ -1075,6 +1090,54 @@ def _source_blocks(root, skill_dir):
     return out
 
 
+_IFACE_HEAD_RX = re.compile(r"^##[ \t]+Interface[ \t]*:?[ \t]*$")
+_NEXT_HEAD_RX = re.compile(r"^#{1,2}[ \t]")
+
+
+def _lift_interface(block, mirror_blocks):
+    """(clean block, the `## Interface` section) when `block` is a mirror block with ONE
+    `## Interface` section inserted into it, byte for byte; None otherwise.
+
+    MEASURED ON amishwbf.com (W5, 2026-11-21): a 2026-08-10 audit wrote `## Interface` by
+    hand, before `wf-remainder --interface-only` existed, right after the opener of five
+    `origin: user | immutable: true` blocks. The mirrors were extracted before that, so every
+    one of them read CONFLICTED and nothing healed it. The section is not the user's words:
+    the mirror, extracted verbatim from that same block earlier, does not hold it. Lifting
+    it out is allowed only when what is left IS the mirror's block, every byte, so no text
+    of the user's is ever touched, reordered or re-spaced."""
+    lines = block.splitlines(keepends=True)
+    heads = [i for i, ln in enumerate(lines) if _IFACE_HEAD_RX.match(ln)]
+    if len(heads) != 1 or heads[0] == 0:
+        return None
+    i = j = heads[0]
+    j += 1
+    while j < len(lines) - 1 and not _NEXT_HEAD_RX.match(lines[j]):
+        j += 1
+    clean = "".join(lines[:i] + lines[j:])
+    if clean not in mirror_blocks:
+        return None
+    return clean, "".join(lines[i:j])
+
+
+def _lift_write(root, rel, block, clean, sec):
+    """Move `sec` out of `block` in `rel`, to just above the block's opener. Returns
+    (old digest, new digest) or raises OSError. Read back before it is counted."""
+    path = os.path.join(root, rel)
+    text = open(path, encoding="utf-8").read()
+    at = text.find(block)
+    if at < 0 or text.find(block, at + 1) >= 0:
+        raise OSError(0, "the block is not in the file exactly once")
+    out = sec.rstrip("\n") + "\n\n"
+    new = text[:at] + out + clean + text[at + len(block):]
+    _load_sibling("wf-ledger").atomic_write(root, path, new.encode("utf-8"))
+    if open(path, encoding="utf-8").read() != new:
+        raise OSError(0, "read back different bytes")
+
+    def digest(b):
+        return hashlib.sha256(normalize(BLOCK_RX.match(b).group(1)).encode("utf-8")).hexdigest()
+    return digest(block), digest(clean)
+
+
 def mirror_pass(root, execute):
     """Compare every extracted mirror with the live skill it came from; under `execute`,
     append a source block the mirror lacks. Returns (summary dict, {rel: (old, new)}).
@@ -1097,8 +1160,9 @@ def mirror_pass(root, execute):
     employee to obey. That is CONFLICTED: reported, never written, left to a person."""
     ddir = os.path.join(root, DIRECTIVES_DIR_REL)
     summary = {"mirrors": 0, "blocks": 0, "mirrored": 0, "unmirrored": 0, "appended": 0,
-               "conflicted": 0, "failed": 0}
+               "conflicted": 0, "failed": 0, "lifted": 0}
     moved = {}
+    lifted = {}
     rows = []
     for mpath in sorted(glob.glob(os.path.join(ddir, "*.md"))):
         skill = os.path.basename(mpath)[:-3]
@@ -1121,6 +1185,42 @@ def mirror_pass(root, execute):
             continue
         stale = [mb for mb in mirror if not any(b[4] in mb for b in source)]
         mrel = _rel(root, mpath)
+        # AN `## Interface` WRITTEN INSIDE A USER BLOCK is the one CONFLICTED shape that has a
+        # heal, and only when lifting that section out leaves the mirror's block exactly.
+        raw = {m.group(0) for m in BLOCK_RX.finditer(mtext)}
+        lifts = [_lift_interface(t, raw) for _r, _a, _b, t, _n in missing] if stale else []
+        if lifts and all(lifts):
+            for (rel, a, _b, text, _n), (clean, sec) in zip(missing, lifts):
+                n = sec.rstrip("\n").count("\n") + 1
+                if not execute:
+                    summary["unmirrored"] += 1
+                    rows.append(f"  ~ INTERFACE IN A USER BLOCK  {rel}:{a}  `## Interface` "
+                                f"({n} lines) sits inside an `origin: user | immutable: true` "
+                                f"block; without it the block is {mrel}'s byte for byte. "
+                                f"--execute moves it above the block, verbatim")
+                    continue
+                try:
+                    lifted[rel] = _lift_write(root, rel, text, clean, sec)
+                except OSError as exc:
+                    summary["failed"] += 1
+                    summary["unmirrored"] += 1
+                    rows.append(f"  ! NOT LIFTED  {rel}:{a}  {exc.strerror}; the file keeps "
+                                f"its bytes")
+                    continue
+                summary["lifted"] += 1
+                summary["mirrored"] += 1
+                rows.append(f"  + LIFTED      {rel}:{a}  `## Interface` ({n} lines) moved out of "
+                            f"the user block, verbatim, to just above it; the block now equals "
+                            f"{mrel}'s byte for byte, and no word of it changed")
+                try:
+                    ledger_append(root, [{"event": "interface-lifted", "file": rel,
+                                          "from": f"sha256:{lifted[rel][0]}",
+                                          "to": f"sha256:{lifted[rel][1]}",
+                                          "authority": None, "mirror": mrel}])
+                except OSError as exc:
+                    summary["failed"] += 1
+                    rows.append(f"      lifted, and the ledger was NOT written: {exc.strerror}")
+            continue
         for rel, a, b, _text, _n in missing:
             rows.append(f"  ✗ UNMIRRORED   {rel}:{a}  sacred block not in {mrel} — the "
                         f"employee bound to the mirror never reads it")
@@ -1169,7 +1269,7 @@ def mirror_pass(root, execute):
             rows.append(f"      appended, and the ledger was NOT written: {exc.strerror}")
     for row in rows:
         print(row)
-    return summary, moved
+    return summary, moved, lifted
 
 
 def pins_pass(root, execute, restamp, moved):

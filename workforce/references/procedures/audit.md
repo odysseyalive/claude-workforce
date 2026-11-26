@@ -1682,6 +1682,13 @@ unchanged: healed in this same run, never deferred, never handed back as an opti
    surface is unchanged, and **REFUSES a skill that already declares one** rather than overwriting it:
    an existing `## Interface` is somebody's contract, and replacing it silently is the two-canonical-texts
    failure wearing a repair's clothes.
+4. **An `## Interface` already written INSIDE an `origin: user | immutable: true` block is healed by
+   `wf-stamp --directives --execute`** (Step 5-STAMP), never by hand. Sessions wrote the section by
+   hand before this producer existed. On amishwbf.com (W5, 2026-11-21) a 2026-08-10 audit put it right
+   after the opener of five blocks, and every mirror read CONFLICTED. The stamp pass moves the section
+   above the block, verbatim, only when what remains is the mirror's block byte for byte, and moves the
+   sidecar row in the same write. Any other difference stays CONFLICTED, because it is an edit to the
+   user's own words.
 
 The run prints **`INV-IFACE`** (`references/invariants.md` row 33), all counts, always:
 

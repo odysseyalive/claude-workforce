@@ -18276,5 +18276,63 @@
       "~ keeper: catalog read",
       "Traceback"
     ]
+  },
+  "stampdir-interface-lifted": {
+    "_why": "amishwbf.com W5 (2026-11-21): a 2026-08-10 audit wrote `## Interface` by hand right after the opener of five `origin: user | immutable: true` blocks, after their mirrors were extracted, so `wf-stamp --directives` read all five CONFLICTED with no heal and the project moved them out by hand. This block is that shape, with a sidecar stamped on the polluted block as the project's was. `--execute` must lift the section to just above the opener, verbatim, leave the block equal to the mirror's byte for byte, move the sidecar row in the same write (`drift 0`), and never write the mirror. On b96469e it reports CONFLICTED and exits 1.",
+    "script": "wf-stamp",
+    "args": [
+      "--directives",
+      "--execute"
+    ],
+    "exit": 0,
+    "want": [
+      "+ LIFTED      .claude/skills/exporter/SKILL.md:12  `## Interface` (9 lines) moved out of the user block",
+      "conflicted 0 \u00b7 failed 0 \u00b7 lifted 1",
+      "mirrored 1 \u00b7 unmirrored 0",
+      "drift 0 \u00b7 missing 0"
+    ],
+    "not": [
+      "CONFLICTED",
+      "Traceback"
+    ],
+    "after": {
+      ".claude/skills/exporter/SKILL.md": {
+        "once": [
+          "## Interface\n\nThe judgment that decides *whether* an export is warranted lives in the handbook.\n\n| Row | |\n|---|---|\n| `Invoke` | `/exporter` |\n| `Returns` | a CSV of active products, streamed |\n| `Fails` | a non-200 is a fault to report, never a retry loop |\n\n<!-- origin: user | added: 2026-02-11 | immutable: true -->\n## Directives\n\n> **Only share the export URL over a secure channel. HTTPS only.**\n\n*\u2014 Added 2026-02-11, source: CLAUDE.md extraction*\n<!-- /origin -->"
+        ],
+        "not": [
+          "immutable: true -->\n## Interface"
+        ]
+      },
+      ".claude/workforce/directives/exporter.md": {
+        "unchanged": true
+      }
+    }
+  },
+  "stampdir-interface-user-edit-stays": {
+    "_why": "The control for stampdir-interface-lifted: the same block with the inserted `## Interface`, and the user's own text ALSO differing from the mirror by one space. Lifting the section no longer reproduces the mirror's block, so this is a real edit of a directive: it must stay CONFLICTED and nothing may be written, the skill file included. A lift gated on anything looser than byte equality fails here.",
+    "script": "wf-stamp",
+    "args": [
+      "--directives",
+      "--execute"
+    ],
+    "exit": 1,
+    "want": [
+      "CONFLICTED",
+      "conflicted 1",
+      "lifted 0"
+    ],
+    "not": [
+      "LIFTED",
+      "Traceback"
+    ],
+    "after": {
+      ".claude/skills/exporter/SKILL.md": {
+        "unchanged": true
+      },
+      ".claude/workforce/directives/exporter.md": {
+        "unchanged": true
+      }
+    }
   }
 }
