@@ -1111,6 +1111,16 @@
       "1 resolved"
     ]
   },
+  "chooser-answer-keys-example-is-silent": {
+    "_why": "A LIVE WRONG FIRE, the second of 2026-11-25, on the report explaining the first: \"meant for answer keys like `S = skip`\" was read as the reply asking for an answer in codes. `answer` here is a noun (answer keys), and the legend is an example being named, not a key being handed over. The fix is in the VERB, not the legend: `S = skip` IS a real legend shape and must keep counting, so the reply verb now has to be followed by what an instruction is followed by -- with, using, in, by, as, a colon, an opening quote, or the legend itself. A noun is followed by a noun (keys) or a verb (carried), and neither of those is an ask.",
+    "exit": 0,
+    "not": [
+      "\"decision\"",
+      "CHOOSER"
+    ],
+    "script": "wf-chooser",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"The `re=b59b3de3/i15` block is fixed in the working tree and not committed yet. The cause is a pattern in `workforce/bin/wf-chooser` meant for answer keys like `S = skip`; it also matches `re=b` at the start of `re=b59b3de3/i15`. It adds a fixture for that line.\"}"
+  },
   "chooser-asked-with-a-chooser-is-silent": {
     "_why": "THE FIX ITSELF MUST NOT BE BLOCKED. Byte for byte the park of chooser-handback-waiting-blocks -- \"still waiting on your decisions\" -- with one difference: the turn called AskUserQuestion. The question was put the way the user asked for it (\"if there is an answer that it is needed, it needs to be evident in a chooser situation\"), so there is nothing left to object to, and prose describing the chooser beside the chooser is not the defect. Read from the transcript, never inferred from the reply, because the call leaves a record and the prose does not.",
     "exit": 0,
@@ -1179,6 +1189,16 @@
       "AskUserQuestion"
     ]
   },
+  "chooser-marker-reply-carried-is-silent": {
+    "_why": "A LIVE WRONG FIRE, the first of 2026-11-25, verbatim. A turn reported that \"cpu-dev's reply carried `re=b59b3de3/i15` in its header\", and the codes class read `reply` as the instruction and `re=b` -- a two-letter key and the first letter of a hex session id -- as a legend. Two things were wrong and both are fixed, because either alone would let the next shape through: a legend's value is now a whole word (`S = skip`, `C=no-agent` still count; `re=b59b3de3` does not, nor an all-letter id like `re=deadbeef/i3`, which a slash after the value rules out), and `reply` followed by a verb (carried) is a noun.",
+    "exit": 0,
+    "not": [
+      "\"decision\"",
+      "CHOOSER"
+    ],
+    "script": "wf-chooser",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"## Handoffs: 1 of 7 written\\n\\n| Session | Status |\\n|---|---|\\n| cpu-dev | **Done.** I checked it on disk: it has the 1.90.0 shape. |\\n| ps-dev | **Not sent.** agent-say refused it because too many introductions are already waiting. |\\n\\ncpu-dev's reply carried `re=b59b3de3/i15` in its header and continued this issue, so the marker round trip works with real sessions.\"}"
+  },
   "chooser-neither-needs-your-input-is-silent": {
     "_why": "THE SECOND SHAPE OF THE SAME DEFECT, found by re-reading the corpus after the first one fired live. \"engineering-coder raised two points as decisions for you. Neither needs your input\" is a turn REPORTING that it settled both -- the opposite of a park -- and the un-narrowed trigger read the nouns and blocked it. This row exists beside chooser-describes-removed-decision-is-silent because the two markers are different (a negative subject, not a substitution), and a narrowing pinned by one example is a narrowing that survives being rewritten to cover only that example.",
     "exit": 0,
@@ -1199,6 +1219,16 @@
     "script": "wf-chooser",
     "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"Orders B and C are still running.\\n\\nWhen Order A's `OUTPUT.md` lands I'll bring you one message with everything that needs your decision at once, in a chooser. Nothing irreversible happens before then.\"}"
   },
+  "chooser-quantity-ranges-is-silent": {
+    "_why": "A LIVE WRONG FIRE, found while fixing the other two by re-reading every match of the codes class in the transcripts on disk: a tmux-revive results table ending \"about 58–62 ms, median 12–14 ms\" was blocked five times as \"58–62 ms, median 12–14 ms\". Two ranges in one clause is the PAIR rule, and a range followed by a unit of measure is a quantity, not a range of items mapped to a code. The unit list holds multi-letter units only: a single letter stays a code, because `7-31 S` in the agenda run's own key is one.",
+    "exit": 0,
+    "not": [
+      "\"decision\"",
+      "CHOOSER"
+    ],
+    "script": "wf-chooser",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"| Target | Result |\\n|---|---|\\n| Arrow key under 20 ms at load 12 | Missed at p95: about 58\\u201362 ms, median 12\\u201314 ms; bash's median is about 490 ms |\\n\\nThe miss comes from a move that changes the pane count, and the next change targets it.\"}"
+  },
   "chooser-reply-codes-blocks": {
     "_why": "THE REPORTED DEFECT, verbatim. An /agenda today run posted 31 proposals as plain markdown and asked for an answer in codes -- \"1-4 accept, 5-6 sbdc, 7-31 S\" -- then sat for about fifteen minutes. The user's spec: \"If there is an answer that it is needed, it needs to be evident in a chooser situation\", \"much like we choose the budget for audit\". The block quotes the turn its own words back, because a reason that says \"try harder\" hands the tunnel back to itself.",
     "exit": 0,
@@ -1210,6 +1240,18 @@
       "Reply with decisions",
       "AskUserQuestion",
       "4 options per question"
+    ]
+  },
+  "chooser-reply-single-legend-blocks": {
+    "_why": "THE FLOOR THE THREE NARROWINGS OF 2026-11-25 CANNOT SINK BELOW. The marker, answer-keys and quantity-range rows each narrowed the codes class -- a legend's value is a whole word with no slash after it, a range followed by a unit is a quantity, and the reply verb must be followed by what an instruction is followed by. This is the plain ask all three must leave standing: an imperative `reply with` and single-letter keys whose values are words. Every narrowing of a blocking hook fails the same way, by growing until it swallows the true fire beside the false one, and chooser-reply-codes-blocks alone pins only the pair shape.",
+    "exit": 0,
+    "script": "wf-chooser",
+    "stdin_raw": "{\"transcript_path\": \"t.jsonl\", \"cwd\": \".\", \"hook_event_name\": \"Stop\", \"last_assistant_message\": \"Nine of the twelve stale TODOs are dated now and recorded.\\n\\nFor the other three, reply with `K = keep` or `D = drop` next to each number.\"}",
+    "want": [
+      "\"decision\": \"block\"",
+      " codes ",
+      "reply with `K = k",
+      "AskUserQuestion"
     ]
   },
   "chooser-stop-hook-active-is-silent": {

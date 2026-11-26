@@ -62,6 +62,12 @@ dropped, and each candidate class was counted against the total.
   `chooser-describes-removed-decision-is-silent` and
   `chooser-neither-needs-your-input-is-silent`.
 
+  AND `codes` SHIPPED WRONG THREE TIMES MORE, all live on 2026-11-25: a work-list marker
+  (`re=b59b3de3/i15`), a sentence naming "answer keys like `S = skip`", and a latency
+  table ("58–62 ms, median 12–14 ms"). The three narrowings sit with `_LEGEND`, each
+  pinned by its row, and `chooser-reply-single-legend-blocks` is the plain ask they must
+  leave standing.
+
   DROPPED  offer     6.45%   (229 turns)  "want me to …?", "should I …?", "let me know"
            at the end of a reply. Over budget by more than four times, and the
            measurement says why it has to be: the same shape is `wf-widen`'s HANDOFF
@@ -140,10 +146,32 @@ TAIL = 600
 # own it is ordinary prose (`C=no-agent` appears in this project's own canary reports),
 # so it counts only next to a reply verb, or repeated — a pair of mappings in one clause
 # is a key, and a key exists to be answered in.
-_LEGEND = (r"\b\d{1,2}\s*[-–]\s*\d{1,2}\s+[A-Za-z]{1,12}\b"
-           r"|(?<![\w-])[A-Za-z]{1,4}\s*=\s*[A-Za-z]")
+#
+# IT FIRED WRONG THREE TIMES LIVE, 2026-11-25, and each narrowing below is one of them.
+# The September corpus that measured this class is gone from disk, so the re-read was of
+# every match in the transcripts that remain: 13 across 10,493 assistant texts, 3 of them
+# turn-ending fires, and no true fire among the 13. Each fire is pinned by a row.
+#   · A VALUE IS A WHOLE WORD. "cpu-dev's reply carried `re=b59b3de3/i15`" read `re=b`,
+#     a key and the first letter of a hex id, as a legend. `S = skip` and `C=no-agent`
+#     still count; `re=b59b3de3` does not, and neither does an all-letter id such as
+#     `re=deadbeef/i3`, which the slash after it rules out
+#     (`chooser-marker-reply-carried-is-silent`).
+#   · A RANGE FOLLOWED BY A UNIT IS A QUANTITY. "about 58–62 ms, median 12–14 ms" was two
+#     ranges in one clause, so the pair rule called it a key. Multi-letter units only:
+#     `7-31 S` is a code in the agenda run's own key (`chooser-quantity-ranges-is-silent`).
+#   · THE VERB HAS TO BE AN INSTRUCTION. "meant for answer keys like `S = skip`" holds a
+#     real legend shape, so only the verb can tell it apart: an instruction is followed by
+#     with, using, in, by, as, a colon, an opening quote or the legend itself, and a noun
+#     is followed by a noun (keys) or a verb (carried)
+#     (`chooser-answer-keys-example-is-silent`).
+_UNIT = (r"(?:ms|secs?|seconds?|mins?|minutes?|hrs?|hours?|days?|weeks?|months?|years?"
+         r"|[kmgt]i?b|px|fps|percent)\b")
+_LEGEND = (r"\b\d{1,2}\s*[-–]\s*\d{1,2}\s+(?!" + _UNIT + r")[A-Za-z]{1,12}\b"
+           r"|(?<![\w-])[A-Za-z]{1,4}\s*=\s*[A-Za-z]+\b(?!/)")
 CODES = re.compile(
-    r"\b(?:reply|respond|answer|send back)\b[^\n]{0,120}?(?:" + _LEGEND + r")"
+    r"\b(?:reply|respond|answer|send back)\b"
+    r"(?=\s*(?:with|using|in|by|as)\b|\s*[:`\"“']|\s+(?:" + _LEGEND + r"))"
+    r"[^\n]{0,120}?(?:" + _LEGEND + r")"
     r"|(?:" + _LEGEND + r")[^\n]{0,30}?,[^\n]{0,30}?(?:" + _LEGEND + r")", re.I)
 
 # ── CLASS 2: THE TURN SAYS IT IS PARKED ON THE USER ──────────────────────────────
