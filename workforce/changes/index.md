@@ -8,6 +8,7 @@
 
 | Version | Date | Surface | Org | Change |
 |---|---|---|---|---|
+| 1.94.0 | 2026-11-27 | handbook, chart, changes, hooks, scripts, installer, platform | **yes** | Release 1.94.0: a hung background shell is caught, diagnosed and negotiated |
 | 1.93.0 | 2026-11-27 | changes | no | Release 1.93.0: writing a handoff folds the other job folders into it |
 | 1.92.2 | 2026-11-27 | changes, scripts, installer | no | Release 1.92.2: a session started in your home folder saves handoffs there without asking, and user-scope hook wiring works from any folder |
 | 1.92.1 | 2026-11-27 | audit, verify, changes, hooks, scripts, installer | no | Release 1.92.1: memory saved for your home folder is no longer offered to every project under it |
