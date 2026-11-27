@@ -551,6 +551,16 @@ someone can read instead of re-derive.
    finished, and the results sat unread for about 20 minutes until the user asked whether things
    were still running.*
 
+   **A child's "waiting on its own background work" notice, or a STALLED report, is checked and
+   negotiated, never relayed.** `wf-bg-watch` reports a background shell STALLED when its process
+   tree has used no CPU, done no I/O and written no output for ten minutes, with what it is blocked
+   on. Read the child's work dir and output first, since a child that looks stuck is often slow or
+   finished without reporting. Then ask the child through `SendMessage` what it is waiting on and
+   what it will do. What it cannot resolve goes to the user with the diagnosis and the choices
+   (stop it, keep waiting, rerun) as an `AskUserQuestion` chooser. Nobody waits silently past a
+   STALLED report. *Issue i18, 2026-11-27: an e2e-proof-mcp test gate hung for four hours while the
+   parent relayed the child's waiting notice three times.*
+
    **A `HANDOFF` you leave unread is worse than a stalled run**, because the predecessor already
    stopped and reported success at stopping. *Added 2026-09-08: `wf-handoff` shipped, five Lead
    handbooks carried the clause, and `HANDOFF` had no consumer anywhere in `.claude/` — an agent

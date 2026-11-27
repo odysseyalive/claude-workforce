@@ -623,6 +623,12 @@ TERMINAL_TEXT_RULE = (
 #      where each one lives: the DIRECTING node checks the name against the callee's
 #      grant before dispatching, and the RUNNING one says so and works with what it has.
 #
+#   4. A HANG NOBODY WAS TOLD ABOUT (issue i18, 2026-11-27). An e2e-proof-mcp lead's test
+#      gate hung in the background for four hours at 0% CPU while its parent relayed the
+#      child's "waiting on its own background work" notice three times. `wf-bg-watch` now
+#      reports such a shell STALLED; the STALLED sentences below say who does what with that
+#      report, because the user's words were "These issues need caught and negotiated."
+#
 # IT LIVES HERE FOR THE REASON `USER_WORDS` AND `CHOOSER_RULE` DO. This hook is wired at
 # user scope, so the rule reaches every project on the next `update` with no audit, and it
 # is the ONE carrier that fires on both ends: `UserPromptSubmit` for the operator who
@@ -648,8 +654,43 @@ CLEANUP_RULE = (
     "`timeout`, and no background shell or process is left running once the work is done. "
     "A wait on a long job polls the job's own progress, prints it, and carries a timeout, "
     "with one waiter at a time; the job's own queue or the Monitor tool is preferred over a "
-    "sleep loop."
+    "sleep loop. A background shell whose process tree has used no CPU, done no I/O and "
+    "written no output for ten minutes is reported STALLED, with what it is blocked on. The "
+    "agent that started it stops it and reruns the job with the cause fixed, or stops it and "
+    "reports why it could not. A parent given a STALLED report for a child's shell, or a "
+    "child's notice that it is waiting on its own background work, first reads the child's "
+    "work dir and output (a child that looks stuck is often slow, or done without reporting), "
+    "then asks the child through SendMessage what it is waiting on and what it will do; what "
+    "the child cannot resolve goes to the user with the diagnosis and the choices (stop it, "
+    "keep waiting, rerun) as a chooser. Nobody waits silently past a STALLED report or relays "
+    "it as \"waiting\"."
 )
+
+
+# A STALLED BACKGROUND SHELL REACHES THE NEXT MESSAGE (issue i18). `wf-bg-watch` writes the flag;
+# this is the UserPromptSubmit half of handing it over, and the notification that opens a turn
+# fires this event too (measured 2026-11-27, 2.1.332), so an idle main session is told on the
+# next notice as well as on the next typed message. `wf-bash-stdin` is the PreToolUse half.
+# Loaded only when a flag directory exists; "" on any failure.
+def stall_line(payload):
+    getuid = getattr(os, "getuid", None)
+    roots = {os.environ.get("TMPDIR") or "", "/tmp", "/private/tmp"}
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "wf-bg-watch")
+    if getuid is None or not os.path.isfile(path) or not any(
+            os.path.isdir(os.path.join(r, "claude-%d" % getuid(), "wf-bg-watch"))
+            for r in roots if r):
+        return ""
+    try:
+        import importlib.machinery
+        import importlib.util
+        sys.dont_write_bytecode = True
+        spec = importlib.util.spec_from_loader(
+            "wf_bg_watch", importlib.machinery.SourceFileLoader("wf_bg_watch", path))
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod.pending(payload)
+    except Exception:
+        return ""
 
 
 # `hearing` named `workforce/changes/` as its record until 2026-11-10. That is this
@@ -4768,7 +4809,7 @@ def main():
             "hookEventName": "UserPromptSubmit",
             "additionalContext": "\n\n".join(
                 x for x in (USER_WORDS, CHOOSER_RULE, TERMINAL_TEXT_RULE, CLEANUP_RULE,
-                            checklist_line) if x),
+                            checklist_line, stall_line(payload)) if x),
         }}))
         return 0
 
@@ -4819,6 +4860,9 @@ def main():
         lines.append(f"Senses are described at `{SENSES_DOC}`.")
     if checklist_line:
         lines += ["", checklist_line]
+    _stall = stall_line(payload)
+    if _stall:
+        lines += ["", _stall]
 
     print(json.dumps({"hookSpecificOutput": {
         "hookEventName": "UserPromptSubmit",

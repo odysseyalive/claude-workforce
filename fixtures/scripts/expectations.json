@@ -18867,5 +18867,346 @@
         ]
       }
     }
+  },
+  "bg-watch-hung-tree-is-flagged": {
+    "script": "wf-bg-watch",
+    "args": [
+      "--sample",
+      "${TREE}/watch/bfxhung01.state.json"
+    ],
+    "subst": [
+      "watch/bfxhung01.state.json"
+    ],
+    "_why": "THE MEASURED CASE, issue i18: e2e-proof-mcp's test gate hung in the background for four hours at 0% CPU and nobody was told. A tree that used no CPU, did no I/O and wrote nothing since the last sample is STALLED once the window has passed (0 s here), and the flag says what it is blocked on: each process's state and wait channel, a stdin that is an open socket, the open TCP connection, the child that exited unreaped, and the output's last lines.",
+    "exit": 0,
+    "env": {
+      "WF_PROC_ROOT": "${TREE}/proc",
+      "WF_BG_STALL_SECONDS": "0"
+    },
+    "want": [
+      "stalled\n",
+      "\"task\": \"bfxhung01\"",
+      "pid 4242 python3: sleeping in unix_stream_read_generic",
+      "pid 4241 zsh: sleeping in do_wait",
+      "stdin of pid 4242 python3 is an open socket (socket:[9001]) that nothing writes to or closes",
+      "1 open TCP connection(s), to 127.0.0.1:5432",
+      "pid 4243 node has exited and its parent pid 4241 (zsh) has not collected it",
+      "Jest did not exit one second after the test run has completed.",
+      "\"agent_id\": \"a-lead\""
+    ],
+    "not": [
+      "unrelated",
+      "Traceback"
+    ]
+  },
+  "bg-watch-cpu-is-not-flagged": {
+    "script": "wf-bg-watch",
+    "args": [
+      "--sample",
+      "${TREE}/watch/bfxhung01.state.json"
+    ],
+    "subst": [
+      "watch/bfxhung01.state.json"
+    ],
+    "_why": "A BUSY JOB IS NEVER FLAGGED, however long it runs: the user's rule for liveness watching. The leaf used 5 s of CPU since the last sample, so the tree is active and no flag is written.",
+    "exit": 0,
+    "env": {
+      "WF_PROC_ROOT": "${TREE}/proc",
+      "WF_BG_STALL_SECONDS": "0"
+    },
+    "want": [
+      "active"
+    ],
+    "not": [
+      "stalled",
+      "\"diagnosis\"",
+      "Traceback"
+    ]
+  },
+  "bg-watch-printing-is-not-flagged": {
+    "script": "wf-bg-watch",
+    "args": [
+      "--sample",
+      "${TREE}/watch/bfxhung01.state.json"
+    ],
+    "subst": [
+      "watch/bfxhung01.state.json"
+    ],
+    "_why": "A JOB THAT IS STILL PRINTING IS NEVER FLAGGED. The output file grew since the last sample, with no CPU and no I/O counted, so the tree is active.",
+    "exit": 0,
+    "env": {
+      "WF_PROC_ROOT": "${TREE}/proc",
+      "WF_BG_STALL_SECONDS": "0"
+    },
+    "want": [
+      "active"
+    ],
+    "not": [
+      "stalled",
+      "\"diagnosis\"",
+      "Traceback"
+    ]
+  },
+  "bg-watch-io-is-not-flagged": {
+    "script": "wf-bg-watch",
+    "args": [
+      "--sample",
+      "${TREE}/watch/bfxhung01.state.json"
+    ],
+    "subst": [
+      "watch/bfxhung01.state.json"
+    ],
+    "_why": "A JOB DOING I/O IS NOT HUNG: a silent download or a copy reads and writes with almost no CPU and no output. 100 KB of read/write since the last sample makes the tree active.",
+    "exit": 0,
+    "env": {
+      "WF_PROC_ROOT": "${TREE}/proc",
+      "WF_BG_STALL_SECONDS": "0"
+    },
+    "want": [
+      "active"
+    ],
+    "not": [
+      "stalled",
+      "\"diagnosis\"",
+      "Traceback"
+    ]
+  },
+  "bg-watch-listening-server-is-excused": {
+    "script": "wf-bg-watch",
+    "args": [
+      "--sample",
+      "${TREE}/watch/bfxhung01.state.json"
+    ],
+    "subst": [
+      "watch/bfxhung01.state.json"
+    ],
+    "_why": "A DEV SERVER IS IDLE BY DESIGN. The tree holds a socket in LISTEN in /proc/net/tcp, so an idle tree is a server waiting for requests and is never flagged.",
+    "exit": 0,
+    "env": {
+      "WF_PROC_ROOT": "${TREE}/proc",
+      "WF_BG_STALL_SECONDS": "0"
+    },
+    "want": [
+      "excused"
+    ],
+    "not": [
+      "stalled",
+      "\"diagnosis\"",
+      "Traceback"
+    ]
+  },
+  "bg-watch-timed-sleep-is-excused": {
+    "script": "wf-bg-watch",
+    "args": [
+      "--sample",
+      "${TREE}/watch/bfxhung01.state.json"
+    ],
+    "subst": [
+      "watch/bfxhung01.state.json"
+    ],
+    "_why": "A TIMED WAIT IS NOT A HANG. Every leaf of the tree is `sleep` in hrtimer_nanosleep, so it is waiting on a clock that will end it, and is never flagged.",
+    "exit": 0,
+    "env": {
+      "WF_PROC_ROOT": "${TREE}/proc",
+      "WF_BG_STALL_SECONDS": "0"
+    },
+    "want": [
+      "excused"
+    ],
+    "not": [
+      "stalled",
+      "\"diagnosis\"",
+      "Traceback"
+    ]
+  },
+  "bg-watch-file-watcher-is-excused": {
+    "script": "wf-bg-watch",
+    "args": [
+      "--sample",
+      "${TREE}/watch/bfxhung01.state.json"
+    ],
+    "subst": [
+      "watch/bfxhung01.state.json"
+    ],
+    "_why": "A FILE WATCHER IS IDLE BY DESIGN (`--watch`, `tail -f`). The tree holds an inotify descriptor, so it is never flagged.",
+    "exit": 0,
+    "env": {
+      "WF_PROC_ROOT": "${TREE}/proc",
+      "WF_BG_STALL_SECONDS": "0"
+    },
+    "want": [
+      "excused"
+    ],
+    "not": [
+      "stalled",
+      "\"diagnosis\"",
+      "Traceback"
+    ]
+  },
+  "bg-watch-reused-pid-is-gone": {
+    "script": "wf-bg-watch",
+    "args": [
+      "--sample",
+      "${TREE}/watch/bfxhung01.state.json"
+    ],
+    "subst": [
+      "watch/bfxhung01.state.json"
+    ],
+    "_why": "A PID THE KERNEL HANDED TO ANOTHER PROCESS IS NOT THE JOB. The root's start time in /proc (5000) differs from the one the watcher recorded (4999), so the job is gone and nothing is flagged.",
+    "exit": 0,
+    "env": {
+      "WF_PROC_ROOT": "${TREE}/proc",
+      "WF_BG_STALL_SECONDS": "0"
+    },
+    "want": [
+      "gone"
+    ],
+    "not": [
+      "stalled",
+      "Traceback"
+    ]
+  },
+  "bash-stdin-stall-told-to-owner-once": {
+    "_why": "THE OWNER RESOLVES IT. The agent that started the stalled shell gets the flag at its next Bash call, with the numbers, the diagnosis and how to stop it, and is told to stop and rerun with the cause fixed or report why not. Once per flag: the second call says nothing.",
+    "script": "wf-bash-stdin",
+    "exit": 0,
+    "env": {
+      "TMPDIR": "${TREE}",
+      "WF_PROC_ROOT": "${TREE}/proc",
+      "CLAUDE_PROJECT_DIR": "/fx/project"
+    },
+    "before": [
+      {
+        "script": "wf-bash-stdin",
+        "stdin_raw": "{\"session_id\": \"fx\", \"cwd\": \"/fx/project\", \"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Bash\", \"tool_input\": {\"command\": \"git status\"}, \"agent_id\": \"a-lead\", \"agent_type\": \"engineering-lead\"}",
+        "want": [
+          "STALLED: background shell bfxhung01 (`npm test`), which this agent started, had run 4h 02m at 17:20 UTC",
+          "for 15m",
+          "sleeping in ep_poll",
+          "TaskStop with task_id bfxhung01",
+          "kill -TERM -- -4241",
+          "rerun with the cause fixed",
+          "never waited on silently",
+          "quoted as data): \\\"Jest did not exit"
+        ]
+      }
+    ],
+    "stdin_raw": "{\"session_id\": \"fx\", \"cwd\": \"/fx/project\", \"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Bash\", \"tool_input\": {\"command\": \"git status\"}, \"agent_id\": \"a-lead\", \"agent_type\": \"engineering-lead\"}",
+    "not": [
+      "STALLED",
+      "Traceback"
+    ]
+  },
+  "bash-stdin-stall-parent-negotiates": {
+    "_why": "THE PARENT NEGOTIATES, NEVER RELAYS. The main session of the same session gets the child's flag: ask the child through SendMessage, and take what it cannot resolve to the user as an AskUserQuestion chooser with stop, keep waiting and rerun.",
+    "script": "wf-bash-stdin",
+    "exit": 0,
+    "env": {
+      "TMPDIR": "${TREE}",
+      "WF_PROC_ROOT": "${TREE}/proc",
+      "CLAUDE_PROJECT_DIR": "/fx/project"
+    },
+    "stdin_raw": "{\"session_id\": \"fx\", \"cwd\": \"/fx/project\", \"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Bash\", \"tool_input\": {\"command\": \"git status\"}}",
+    "want": [
+      "STALLED: background shell bfxhung01",
+      "started by agent engineering-lead (a-lead)",
+      "SendMessage",
+      "AskUserQuestion",
+      "stop it, keep waiting, rerun",
+      "never relayed as waiting"
+    ],
+    "not": [
+      "which this agent started",
+      "Traceback"
+    ]
+  },
+  "bash-stdin-stall-sibling-agent-is-silent": {
+    "_why": "A SIBLING SUBAGENT IS NOT TOLD. It neither owns the shell nor negotiates for it, so a flag in its context is noise.",
+    "script": "wf-bash-stdin",
+    "exit": 0,
+    "env": {
+      "TMPDIR": "${TREE}",
+      "WF_PROC_ROOT": "${TREE}/proc",
+      "CLAUDE_PROJECT_DIR": "/fx/project"
+    },
+    "stdin_raw": "{\"session_id\": \"fx\", \"cwd\": \"/fx/project\", \"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Bash\", \"tool_input\": {\"command\": \"git status\"}, \"agent_id\": \"a-other\", \"agent_type\": \"engineering-lead\"}",
+    "not": [
+      "STALLED",
+      "hookSpecificOutput",
+      "Traceback"
+    ]
+  },
+  "bash-stdin-stall-other-project-is-silent": {
+    "_why": "ANOTHER PROJECT'S STALL STAYS THERE. The flag names /fx/project; this session's project is /fx/other.",
+    "script": "wf-bash-stdin",
+    "exit": 0,
+    "env": {
+      "TMPDIR": "${TREE}",
+      "WF_PROC_ROOT": "${TREE}/proc",
+      "CLAUDE_PROJECT_DIR": "/fx/other"
+    },
+    "stdin_raw": "{\"session_id\": \"fx\", \"cwd\": \"/fx/project\", \"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Bash\", \"tool_input\": {\"command\": \"git status\"}}",
+    "not": [
+      "STALLED",
+      "hookSpecificOutput",
+      "Traceback"
+    ]
+  },
+  "bash-stdin-stall-dead-job-is-silent": {
+    "_why": "A FLAG FOR A JOB THAT HAS ENDED IS NOT REPORTED. Its pid (4250) is not in /proc, so the shell is gone and the watcher will clear the flag.",
+    "script": "wf-bash-stdin",
+    "exit": 0,
+    "env": {
+      "TMPDIR": "${TREE}",
+      "WF_PROC_ROOT": "${TREE}/proc",
+      "CLAUDE_PROJECT_DIR": "/fx/project"
+    },
+    "stdin_raw": "{\"session_id\": \"fx\", \"cwd\": \"/fx/project\", \"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Bash\", \"tool_input\": {\"command\": \"git status\"}}",
+    "not": [
+      "STALLED",
+      "hookSpecificOutput",
+      "Traceback"
+    ]
+  },
+  "task-tag-stall-reaches-next-message": {
+    "_why": "AN IDLE SESSION IS TOLD ON ITS NEXT MESSAGE. UserPromptSubmit fires on a typed message and on a task notification (measured 2026-11-27, 2.1.332), so the main session of another session of the same project gets the flag there, named as that session's to resolve.",
+    "script": "wf-task-tag",
+    "exit": 0,
+    "env": {
+      "TMPDIR": "${TREE}",
+      "WF_PROC_ROOT": "${TREE}/proc",
+      "CLAUDE_PROJECT_DIR": "/fx/project"
+    },
+    "stdin_raw": "{\"session_id\": \"peer\", \"cwd\": \"/fx/project\", \"scratchpad_dir\": \".\", \"hook_event_name\": \"UserPromptSubmit\", \"prompt\": \"<task-notification>\\n<task-id>bzz</task-id>\\n<status>completed</status>\\n</task-notification>\"}",
+    "want": [
+      "STALLED: background shell bfxhung01",
+      "in another session of this project (fx)",
+      "It is that session's to resolve",
+      "Nobody waits silently past a STALLED report"
+    ],
+    "not": [
+      "which this agent started",
+      "Traceback"
+    ]
+  },
+  "task-tag-stall-reaches-tagged-message": {
+    "_why": "THE SAME HAND-OVER ON A TYPED MESSAGE WHOSE ASK IS TAGGED. A message with a claim to check takes the other of wf-task-tag's two UserPromptSubmit outputs, so the flag is carried on that one too.",
+    "script": "wf-task-tag",
+    "exit": 0,
+    "env": {
+      "TMPDIR": "${TREE}",
+      "WF_PROC_ROOT": "${TREE}/proc",
+      "CLAUDE_PROJECT_DIR": "/fx/project"
+    },
+    "stdin_raw": "{\"session_id\": \"peer\", \"cwd\": \"/fx/project\", \"scratchpad_dir\": \".\", \"hook_event_name\": \"UserPromptSubmit\", \"prompt\": \"why is the test failing? it is broken\"}",
+    "want": [
+      "closed by TOUCH",
+      "STALLED: background shell bfxhung01",
+      "in another session of this project (fx)"
+    ],
+    "not": [
+      "which this agent started",
+      "Traceback"
+    ]
   }
 }

@@ -1,0 +1,694 @@
+#!/usr/bin/env python3
+"""wf-bg-watch — a background shell that hangs is reported as STALLED, with what it is blocked on.
+
+THE ASK (user, 2026-11-27, issue i18): hung processes are flagged without anyone having to ask,
+and "These issues need caught and negotiated." A timeout was rejected as the fix: "I don't think
+a timeout is robust enough." Set long it waits hours, set short it kills real work, and either
+way it says nothing while the job hangs.
+
+THE MEASURED CASE. In e2e-proof-mcp an engineering-lead subagent ran its test gate in the
+background with no timeout. The test never exited. The subagent idled "waiting on its own
+background work", the parent got that notice three times with no elapsed time and no sign the
+child was at 0% CPU, and relayed it. Four hours passed before anyone looked.
+
+WHAT IT DOES. `wf-bash-stdin@background` (PostToolUse on Bash) calls `start` for every Bash
+call that came back backgrounded. `start` writes one spec file and launches this script,
+detached, as the job's one watcher. The watcher samples the job's process tree every 30 s and
+flags STALLED when, for 10 minutes running, the tree has used under 1% of one CPU, done no more
+than 4 KiB of read/write I/O per sample, and its output file has not changed. A job that is busy,
+doing I/O or printing is never flagged, however long it runs. The flag is a file carrying the
+numbers and a diagnosis: each process's state and kernel wait channel, a stdin that is an open
+socket or a pipe and who writes it, open TCP connections, a child that exited unreaped, and the
+last lines of the output. It also goes to the desktop through `notify-send` where that exists.
+`pending` is how the flag reaches a model: `wf-bash-stdin` (PreToolUse on Bash) and
+`wf-task-tag` (UserPromptSubmit) put each flag in context once per recipient. The agent that
+started the shell is told to resolve it; the main session of the same session, and of any other
+session of the project, is told to ask the owner and take what it cannot resolve to the user.
+
+WHAT IS NEVER FLAGGED, because each one is idle by design:
+  · a tree holding a LISTENING socket: a dev server waiting for requests
+  · a tree holding an inotify descriptor: a file watcher (`--watch`, `tail -f`)
+  · a tree whose every leaf sleeps on a timer (`sleep`, `hrtimer_nanosleep`): a timed wait
+  · a Monitor watch, which is not a Bash call, and a foreground call, which is not backgrounded
+A command already under `timeout` IS watched: a ten-minute stall under a two-hour timeout is
+still a stall.
+
+MEASURED 2026-11-27 on Claude Code 2.1.332, one `claude -p` run in a throwaway project with a
+hook dumping every payload: the main session and a `general-purpose` subagent each started a
+`run_in_background` Bash call. (1) PostToolUse fired for both, the subagent's with its
+`agent_id`, and `tool_response.backgroundTaskId` named the shell. (2) The output file sat at
+`<tmp>/claude-<uid>/<project>/<parent session>/tasks/<id>.output` for both, the subagent's
+under the PARENT's session id, and `fuser` on it returned the shell and its child. (3) A
+process the hook started in its own session outlived the hook and sampled the file every 3 s
+until no process held it, then exited. (4) UserPromptSubmit fired on the main session's
+`<task-notification>`, so a notification turn picks up a flag like a typed message does.
+
+WATCHER HYGIENE. One watcher per job: `start` creates `<id>.watch` with O_EXCL, so a second
+PostToolUse for the same shell starts nothing. It exits when no process of the tree is left,
+and in any case after 24 hours. It holds no terminal and no stdin, runs from `/`, and removes
+its spec, its flag and every told-marker when the job is gone.
+
+TUNING, by environment: `WF_BG_STALL_SECONDS` (600), `WF_BG_SAMPLE_SECONDS` (30),
+`WF_BG_WATCH_MAX_SECONDS` (86400). `WF_PROC_ROOT` names the /proc tree to read, for fixtures.
+Where there is no /proc (macOS), the tree, CPU time and states come from `ps`, the holder of
+the output file from `lsof`, and there is no I/O count and no stdin or socket diagnosis.
+
+Usage
+    wf-bg-watch --watch <spec>     the detached watcher (started by `start`)
+    wf-bg-watch --sample <state>   one sample against a saved state, for fixtures
+
+FAIL-OPEN AND SILENT. Every failure ends the watcher or returns "" from `pending`; a hook that
+loads this never fails the call it serves. Exit 0 always.
+"""
+import json
+import os
+import re
+import shutil
+import stat
+import subprocess
+import sys
+import time
+
+
+def _env_int(name, default):
+    try:
+        return max(0, int(os.environ.get(name, default)))
+    except ValueError:
+        return default
+
+
+STALL_SECONDS = _env_int("WF_BG_STALL_SECONDS", 600)
+SAMPLE_SECONDS = _env_int("WF_BG_SAMPLE_SECONDS", 30)
+MAX_SECONDS = _env_int("WF_BG_WATCH_MAX_SECONDS", 86400)
+PROC = os.environ.get("WF_PROC_ROOT") or "/proc"
+CPU_FRACTION = 0.01          # under 1% of one CPU between samples is idle
+IO_BYTES = 4096              # at most this much read/write I/O between samples is idle
+FLAG_DIR = "wf-bg-watch"
+TASK_ID = re.compile(r"\A[A-Za-z0-9_-]{1,64}\Z")
+_UNSAFE = re.compile(r"[^A-Za-z0-9_.-]")
+_WS = re.compile(r"\s+")
+try:
+    TICK = float(os.sysconf("SC_CLK_TCK"))
+except (AttributeError, ValueError, OSError):
+    TICK = 100.0
+STATES = {"R": "running", "S": "sleeping", "D": "in uninterruptible I/O", "T": "stopped",
+          "t": "stopped by a tracer", "Z": "exited, not collected", "I": "idle"}
+
+
+def _flat(text, n):
+    """One line of untrusted text (a command, a process name, a line of output), at most `n`
+    characters, with backticks made quotes so it cannot close the span it is quoted in."""
+    return _WS.sub(" ", str(text or "")).strip().replace("`", "'")[:n]
+
+
+def _span(seconds):
+    s = max(0, int(seconds))
+    if s < 60:
+        return "%ds" % s
+    m = s // 60
+    return "%dh %02dm" % (m // 60, m % 60) if m >= 60 else "%dm" % m
+
+
+# ── where flags live: this user's own `<tmp>/claude-<uid>/wf-bg-watch/`, nothing followed ──
+def _owned(path, kind):
+    try:
+        st = os.lstat(path)
+    except OSError:
+        return False
+    return kind(st.st_mode) and st.st_uid == os.getuid()
+
+
+def uid_base(output):
+    """The `claude-<uid>` directory an output file sits under, or None."""
+    name = "claude-%d" % os.getuid()
+    parts = os.path.abspath(output).split(os.sep)
+    if name not in parts:
+        return None
+    base = os.sep.join(parts[:len(parts) - parts[::-1].index(name)])
+    return base if _owned(base, stat.S_ISDIR) else None
+
+
+def flag_dir(base, create=False):
+    d = os.path.join(base, FLAG_DIR)
+    if create and not os.path.lexists(d):
+        try:
+            os.mkdir(d, 0o700)
+        except OSError:
+            return None
+    return d if _owned(d, stat.S_ISDIR) else None
+
+
+def flag_dirs():
+    roots = {os.environ.get("TMPDIR") or "", "/tmp", "/private/tmp"}
+    seen = []
+    for root in sorted(r for r in roots if r):
+        base = os.path.join(root, "claude-%d" % os.getuid())
+        d = flag_dir(base) if _owned(base, stat.S_ISDIR) else None
+        if d and os.path.realpath(d) not in seen:
+            seen.append(os.path.realpath(d))
+    return seen
+
+
+def _excl(path, body=""):
+    """Create `path` once, never through a link (CWE-59). True when this call created it."""
+    try:
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0),
+                     0o600)
+    except OSError:
+        return False
+    with os.fdopen(fd, "w") as fh:
+        fh.write(body)
+    return True
+
+
+def _read_json(path, cap=65536):
+    if not _owned(path, stat.S_ISREG):
+        return None
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data = json.loads(fh.read(cap))
+    except (OSError, ValueError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _write_json(path, obj):
+    tmp = "%s.%d.tmp" % (path, os.getpid())
+    if _excl(tmp, json.dumps(obj, indent=1)):
+        os.replace(tmp, path)
+
+
+# ── the process tree ────────────────────────────────────────────────────────────────────
+def _read(path, n=8192):
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            return fh.read(n)
+    except OSError:
+        return ""
+
+
+def _stat(pid):
+    raw = _read(os.path.join(PROC, str(pid), "stat"))
+    if ")" not in raw:
+        return None
+    comm = raw[raw.find("(") + 1:raw.rfind(")")]
+    f = raw[raw.rfind(")") + 2:].split()
+    try:
+        return {"pid": int(pid), "comm": comm, "state": f[0], "ppid": int(f[1]),
+                "cpu": sum(int(x) for x in f[11:15]) / TICK, "start": int(f[19])}
+    except (IndexError, ValueError):
+        return None
+
+
+def _ps_rows():
+    """Every process from `ps`, where there is no /proc."""
+    try:
+        out = subprocess.run(["ps", "-A", "-o", "pid=,ppid=,stat=,time=,comm="],
+                             capture_output=True, text=True, timeout=10,
+                             stdin=subprocess.DEVNULL).stdout
+    except (OSError, subprocess.SubprocessError):
+        return {}
+    rows = {}
+    for line in out.splitlines():
+        f = line.split(None, 4)
+        if len(f) < 5:
+            continue
+        try:
+            days, _, clock = f[3].rpartition("-")
+            secs = sum(float(x) * 60 ** i for i, x in enumerate(reversed(clock.split(":"))))
+            rows[int(f[0])] = {"pid": int(f[0]), "ppid": int(f[1]), "state": f[2][:1],
+                               "cpu": secs + 86400 * int(days or 0),
+                               "comm": os.path.basename(f[4]), "start": 0}
+        except ValueError:
+            continue
+    return rows
+
+
+def _have_proc():
+    return os.path.isdir(os.path.join(PROC, "1")) or os.environ.get("WF_PROC_ROOT")
+
+
+def all_procs():
+    if not _have_proc():
+        return _ps_rows()
+    out = {}
+    try:
+        names = os.listdir(PROC)
+    except OSError:
+        return out
+    for n in names:
+        if n.isdigit():
+            s = _stat(n)
+            if s:
+                out[s["pid"]] = s
+    return out
+
+
+def tree(root, start):
+    """The root process and every descendant, or [] when the root is gone or was reused."""
+    procs = all_procs()
+    top = procs.get(root)
+    if not top or (start and top["start"] != start):
+        return []
+    found, todo = [top], [root]
+    while todo:
+        p = todo.pop()
+        for q in procs.values():
+            if q["ppid"] == p and q["pid"] != root and q not in found:
+                found.append(q)
+                todo.append(q["pid"])
+    return found
+
+
+def _io(pid):
+    total = 0
+    for line in _read(os.path.join(PROC, str(pid), "io")).splitlines():
+        k, _, v = line.partition(":")
+        if k in ("rchar", "wchar"):
+            try:
+                total += int(v)
+            except ValueError:
+                pass
+    return total
+
+
+def _fds(pid):
+    d = os.path.join(PROC, str(pid), "fd")
+    try:
+        names = os.listdir(d)
+    except OSError:
+        return []
+    out = []
+    for n in names:
+        try:
+            out.append((n, os.readlink(os.path.join(d, n))))
+        except OSError:
+            pass
+    return out
+
+
+def holder(path):
+    """The root of the processes that hold `path` open on stdout or stderr: the shell the host
+    started for the command (it is a session leader whose fds 1 and 2 are that file)."""
+    real = os.path.realpath(path)
+    if not _have_proc():
+        try:
+            out = subprocess.run(["lsof", "-t", "--", real], capture_output=True, text=True,
+                                 timeout=10, stdin=subprocess.DEVNULL).stdout
+        except (OSError, subprocess.SubprocessError):
+            return None
+        pids = {int(x) for x in out.split() if x.isdigit()}
+        rows = _ps_rows()
+        roots = sorted(p for p in pids if rows.get(p, {}).get("ppid") not in pids)
+        return (roots[0], 0) if roots else None
+    procs = all_procs()
+    held = set()
+    for pid in procs:
+        for fd, link in _fds(pid):
+            if fd in ("1", "2") and link == real:
+                held.add(pid)
+    roots = sorted(p for p in held if procs[p]["ppid"] not in held)
+    return (roots[0], procs[roots[0]]["start"]) if roots else None
+
+
+# ── one sample, and what it means ───────────────────────────────────────────────────────
+def snapshot(procs, output):
+    try:
+        out = os.stat(output).st_size
+    except OSError:
+        out = -1
+    return {"pids": {str(p["pid"]): [p["cpu"], _io(p["pid"])] for p in procs}, "out": out}
+
+
+def active(prev, snap, dt):
+    """Why the tree moved between two samples, or None when it did not."""
+    cpu = io = 0
+    for pid, (c, i) in snap["pids"].items():
+        pc, pi = prev["pids"].get(pid, [0, 0])
+        cpu += max(0, c - pc)
+        io += max(0, i - pi)
+    if snap["out"] != prev["out"]:
+        return "output"
+    if cpu > CPU_FRACTION * dt:
+        return "cpu"
+    if io > IO_BYTES:
+        return "io"
+    return None
+
+
+def _sockets(kind, want):
+    """Inodes of `kind` sockets (`tcp`, `tcp6`, `unix`) in state `want`, with the remote end."""
+    out = {}
+    for line in _read(os.path.join(PROC, "net", kind), 1 << 20).splitlines()[1:]:
+        f = line.split()
+        try:
+            if kind == "unix":
+                if int(f[3], 16) & 0x10000 and want == "listen":
+                    out[f[6]] = ""
+            elif f[3] == want:
+                out[f[9]] = f[2]
+        except (IndexError, ValueError):
+            continue
+    return out
+
+
+def _remote(hexaddr):
+    ip, _, port = hexaddr.partition(":")
+    try:
+        if len(ip) == 8:
+            return "%s:%d" % (".".join(str(int(ip[i:i + 2], 16)) for i in (6, 4, 2, 0)),
+                              int(port, 16))
+        return "[ipv6]:%d" % int(port, 16)
+    except ValueError:
+        return "?"
+
+
+def excused(procs):
+    """Why this idle tree is idle by design, or None."""
+    if not procs:
+        return None
+    parents = {p["ppid"] for p in procs}
+    leaves = [p for p in procs if p["pid"] not in parents]
+    if _have_proc():
+        links = {link for p in procs for _, link in _fds(p["pid"])}
+        inodes = {link[8:-1] for link in links if link.startswith("socket:[")}
+        listening = {}
+        for kind in ("tcp", "tcp6"):
+            listening.update(_sockets(kind, "0A"))
+        listening.update(_sockets("unix", "listen"))
+        if inodes & set(listening):
+            return "it is listening on a socket, so it is a server waiting for requests"
+        if "anon_inode:inotify" in links:
+            return "it holds an inotify watch, so it is a file watcher"
+    else:
+        try:
+            out = subprocess.run(["lsof", "-a", "-iTCP", "-sTCP:LISTEN", "-t", "-p",
+                                  ",".join(str(p["pid"]) for p in procs)],
+                                 capture_output=True, text=True, timeout=10,
+                                 stdin=subprocess.DEVNULL).stdout
+        except (OSError, subprocess.SubprocessError):
+            out = ""
+        if out.strip():
+            return "it is listening on a socket, so it is a server waiting for requests"
+    if all(p["comm"] == "sleep" or "nanosleep" in _read(os.path.join(PROC, str(p["pid"]),
+                                                                     "wchan"), 64)
+           for p in leaves):
+        return "every process at the end of it is sleeping on a timer"
+    return None
+
+
+def diagnose(procs):
+    """What the stalled tree is blocked on, as short lines of fact."""
+    lines = []
+    parents = {p["ppid"] for p in procs}
+    leaves = [p for p in procs if p["pid"] not in parents]
+    shown = (leaves + [p for p in procs if p not in leaves])[:6]
+    for p in shown:
+        w = _read(os.path.join(PROC, str(p["pid"]), "wchan"), 64).strip()
+        lines.append("pid %d %s: %s%s, %.1f s CPU in all" % (
+            p["pid"], _flat(p["comm"], 32), STATES.get(p["state"], p["state"]),
+            " in %s" % _flat(w, 40) if w and w != "0" else "", p["cpu"]))
+    for p in procs:
+        if p["state"] == "Z":
+            par = next((q for q in procs if q["pid"] == p["ppid"]), None)
+            lines.append("pid %d %s has exited and its parent pid %d%s has not collected it" % (
+                p["pid"], _flat(p["comm"], 32), p["ppid"],
+                " (%s)" % _flat(par["comm"], 32) if par else ""))
+    if _have_proc():
+        pipes = {}
+        for p in procs:
+            for fd, link in _fds(p["pid"]):
+                if link.startswith("pipe:["):
+                    flags = _read(os.path.join(PROC, str(p["pid"]), "fdinfo", fd), 256)
+                    m = re.search(r"^flags:\s*([0-7]+)", flags, re.M)
+                    if m and int(m.group(1), 8) & 3:
+                        pipes.setdefault(link, []).append(p)
+        for p in leaves:
+            link = dict(_fds(p["pid"])).get("0", "")
+            if link.startswith("socket:["):
+                lines.append("stdin of pid %d %s is an open socket (%s) that nothing writes to "
+                             "or closes, so a read from stdin never returns" % (
+                                 p["pid"], _flat(p["comm"], 32), link))
+            elif link.startswith("pipe:["):
+                w = [q for q in pipes.get(link, []) if q["pid"] != p["pid"]]
+                lines.append("stdin of pid %d %s is a pipe %s" % (
+                    p["pid"], _flat(p["comm"], 32),
+                    "written by pid %d %s (%s)" % (w[0]["pid"], _flat(w[0]["comm"], 32),
+                                                   STATES.get(w[0]["state"], w[0]["state"]))
+                    if w else "whose writer is outside this job"))
+        inodes = {link[8:-1] for p in procs for _, link in _fds(p["pid"])
+                  if link.startswith("socket:[")}
+        est = {}
+        for kind in ("tcp", "tcp6"):
+            est.update(_sockets(kind, "01"))
+        conns = [_remote(est[i]) for i in sorted(inodes & set(est))]
+        if conns:
+            lines.append("%d open TCP connection(s), to %s" % (len(conns), ", ".join(conns[:3])))
+    return lines
+
+
+def output_tail(output, n=3):
+    try:
+        with open(output, "rb") as fh:
+            fh.seek(max(0, os.fstat(fh.fileno()).st_size - 4096))
+            text = fh.read().decode("utf-8", "replace")
+    except OSError:
+        return []
+    return [_flat(x, 160) for x in text.splitlines() if x.strip()][-n:]
+
+
+# ── the flag ────────────────────────────────────────────────────────────────────────────
+def _paths(d, task):
+    return {"spec": os.path.join(d, task + ".watch"), "flag": os.path.join(d, task + ".flag")}
+
+
+def clear(d, task, keep_spec=False):
+    for name in os.listdir(d) if os.path.isdir(d) else []:
+        if name.startswith(task + ".") and not (keep_spec and name == task + ".watch"):
+            try:
+                os.remove(os.path.join(d, name))
+            except OSError:
+                pass
+
+
+def notify(flag):
+    exe = shutil.which("notify-send")
+    if not exe:
+        return
+    try:
+        subprocess.run([exe, "-a", "Claude Code", "Background job stalled: %s" %
+                        _flat(flag["command"], 60),
+                        "%s, no CPU, I/O or output for %s, in %s. Shell %s." % (
+                            _span(flag["elapsed"]), _span(flag["idle"]),
+                            os.path.basename(flag["project"]) or flag["project"],
+                            flag["task"])],
+                       stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                       stderr=subprocess.DEVNULL, timeout=5)
+    except (OSError, subprocess.SubprocessError):
+        pass
+
+
+def step(spec, state, d, now):
+    """Sample once. Returns "gone" when the job has ended, else the job's state word."""
+    procs = tree(state["pid"], state.get("start"))
+    if not procs:
+        return "gone"
+    snap = snapshot(procs, spec["output"])
+    prev = state.get("last")
+    why = active(prev, snap, now - state.get("at", now)) if prev else "first sample"
+    if why:
+        state["idle_since"] = now
+    state["last"], state["at"] = snap, now
+    flag_path = _paths(d, spec["task"])["flag"]
+    idle = now - state.get("idle_since", now)
+    if why:
+        if state.pop("flagged", None):
+            clear(d, spec["task"], keep_spec=True)
+        return "active"
+    if idle < STALL_SECONDS or state.get("flagged"):
+        return "flagged" if state.get("flagged") else "idle"
+    if excused(procs):
+        return "excused"
+    flag = {"v": 1, "task": spec["task"], "command": _flat(spec.get("command"), 200),
+            "project": spec.get("project") or "", "session": spec.get("session") or "",
+            "agent_id": spec.get("agent_id") or "", "agent_type": spec.get("agent_type") or "",
+            "pid": state["pid"], "start": state.get("start") or 0,
+            "flagged_at": int(now), "elapsed": int(now - spec.get("started", now)),
+            "idle": int(idle), "cpu": round(sum(p["cpu"] for p in procs), 1),
+            "diagnosis": diagnose(procs),
+            "tail": output_tail(spec["output"])}
+    _write_json(flag_path, flag)
+    state["flagged"] = int(now)
+    notify(flag)
+    return "stalled"
+
+
+def watch(spec_path):
+    spec = _read_json(spec_path)
+    d = os.path.dirname(spec_path)
+    if not spec or not TASK_ID.match(str(spec.get("task"))):
+        return 0
+    try:
+        root = holder(spec["output"])
+        if not root:
+            return 0
+        state = {"pid": root[0], "start": root[1]}
+        deadline = time.time() + MAX_SECONDS
+        while time.time() < deadline:
+            if step(spec, state, d, time.time()) == "gone":
+                break
+            time.sleep(max(1, SAMPLE_SECONDS))
+        else:
+            # THE CAP, not the job, ended the watch: a flag already written stays, because
+            # `pending` re-checks the job is alive and the numbers carry their own time.
+            os.remove(spec_path)
+            return 0
+    finally:
+        if os.path.exists(spec_path):
+            clear(d, spec["task"])
+    return 0
+
+
+def sample(state_path):
+    """One `step` against a saved state, the fixture seam: the state names its spec, and the
+    flag is written beside the state file and printed."""
+    state = _read_json(state_path)
+    if not state or not isinstance(state.get("spec"), dict):
+        return 0
+    spec, d = state["spec"], os.path.dirname(os.path.abspath(state_path))
+    if not TASK_ID.match(str(spec.get("task"))):
+        return 0
+    print(step(spec, state, d, time.time()))
+    flag = _read_json(_paths(d, spec["task"])["flag"])
+    if flag:
+        print(json.dumps(flag, indent=1))
+    _write_json(state_path, state)
+    return 0
+
+
+# ── the two hook-side entry points ──────────────────────────────────────────────────────
+def start(payload, output):
+    """Launch the one watcher for a backgrounded Bash call. Silent on every failure."""
+    res = payload.get("tool_response")
+    task = res.get("backgroundTaskId") if isinstance(res, dict) else None
+    if os.name != "posix" or not output or not TASK_ID.match(str(task or "")):
+        return False
+    base = uid_base(output)
+    d = flag_dir(base, create=True) if base else None
+    if not d:
+        return False
+    ti = payload.get("tool_input") if isinstance(payload.get("tool_input"), dict) else {}
+    project = os.environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd") or ""
+    spec = {"task": task, "output": output, "command": _flat(ti.get("command"), 300),
+            "project": os.path.realpath(project) if project else "",
+            "session": str(payload.get("session_id") or ""),
+            "agent_id": str(payload.get("agent_id") or ""),
+            "agent_type": str(payload.get("agent_type") or ""), "started": time.time()}
+    spec_path = _paths(d, task)["spec"]
+    if not _excl(spec_path, json.dumps(spec)):
+        return False        # a watcher for this shell already exists
+    try:
+        subprocess.Popen([sys.executable, os.path.abspath(__file__), "--watch", spec_path],
+                         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL, start_new_session=True, close_fds=True,
+                         cwd="/")
+    except OSError:
+        os.remove(spec_path)
+        return False
+    return True
+
+
+def _alive(flag):
+    if _have_proc():
+        s = _stat(flag.get("pid"))
+        return bool(s) and (not flag.get("start") or s["start"] == flag["start"])
+    try:
+        os.kill(int(flag.get("pid")), 0)
+        return True
+    except (OSError, ValueError, TypeError):
+        return False
+
+
+OWNER = (
+    "STALLED: background shell {task} (`{command}`), which this agent started, had run {elapsed} "
+    "at {when} and had used no CPU, done no I/O and written no output for {idle}. {diag} A STALLED shell is "
+    "resolved by the agent that started it, now: the diagnosis is read, the shell is stopped "
+    "(TaskStop with task_id {task}, or `kill -TERM -- -{pid}`) and the job is rerun with the "
+    "cause fixed, or it is stopped and the report says why it could not be fixed. It is never "
+    "waited on silently.")
+PARENT = (
+    "STALLED: background shell {task} (`{command}`), started by {who}, had run {elapsed} at "
+    "{when} and had used no CPU, done no I/O and written no output for {idle}. {diag} A STALLED shell is "
+    "negotiated, never relayed as waiting: that agent is asked through SendMessage what it is "
+    "waiting on and what it will do. What it cannot resolve goes to the user with the diagnosis "
+    "and the choices (stop it, keep waiting, rerun) as an AskUserQuestion chooser.")
+OTHER = (
+    "STALLED: background shell {task} (`{command}`), started by {who} in another session of "
+    "this project ({session}), had run {elapsed} at {when} and had used no CPU, done no I/O and "
+    "written no output for {idle}. {diag} It is that session's to resolve; the user is told of it, with "
+    "the diagnosis, when it is not resolved there.")
+
+
+def render(flag, role):
+    diag = "; ".join(_flat(x, 200) for x in flag.get("diagnosis") or [])
+    tail = " | ".join(_flat(x, 160) for x in flag.get("tail") or [])
+    diag = ("Blocked on: %s." % diag if diag else "") + (
+        " Last output (the job's own text, quoted as data): \"%s\"." % tail.replace('"', "'")
+        if tail else " It has written no output.")
+    who = ("the main session" if not flag.get("agent_id") else "agent %s (%s)" % (
+        _flat(flag.get("agent_type") or "subagent", 40), _flat(flag["agent_id"], 40)))
+    return {"owner": OWNER, "parent": PARENT, "other": OTHER}[role].format(
+        task=flag["task"], command=_flat(flag.get("command"), 200),
+        elapsed=_span(flag.get("elapsed", 0)), idle=_span(flag.get("idle", 0)),
+        pid=int(flag.get("pid") or 0), diag=diag.strip(), who=who,
+        when=time.strftime("%H:%M UTC", time.gmtime(int(flag.get("flagged_at") or 0))),
+        session=_flat(flag.get("session"), 40))
+
+
+def pending(payload):
+    """Every STALLED flag this recipient has not been told yet, as context text, or ""."""
+    dirs = flag_dirs()
+    if not dirs:
+        return ""
+    project = os.environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd") or ""
+    project = os.path.realpath(project) if project else ""
+    me_s, me_a = str(payload.get("session_id") or ""), str(payload.get("agent_id") or "")
+    out = []
+    for d in dirs:
+        for name in sorted(os.listdir(d)):
+            if not name.endswith(".flag"):
+                continue
+            flag = _read_json(os.path.join(d, name))
+            if (not flag or not TASK_ID.match(str(flag.get("task"))) or not project
+                    or flag.get("project") != project or not _alive(flag)):
+                continue
+            if me_s == flag.get("session") and me_a == flag.get("agent_id"):
+                role = "owner"
+            elif me_a:
+                continue       # a sibling subagent: its parent negotiates, it does not
+            else:
+                role = "parent" if me_s == flag.get("session") else "other"
+            marker = "%s.%s.told.%s.%s" % (flag["task"], int(flag.get("flagged_at") or 0),
+                                           _UNSAFE.sub("_", me_s)[:64] or "nosession",
+                                           _UNSAFE.sub("_", me_a)[:64] or "main")
+            if _excl(os.path.join(d, marker)):
+                out.append(render(flag, role))
+    return "\n\n".join(out)
+
+
+def main(argv):
+    if argv[:1] == ["--root"]:      # the fixture harness's leading `--root <tree>`, unused
+        argv = argv[2:]
+    if len(argv) == 2 and argv[0] == "--watch":
+        return watch(argv[1])
+    if len(argv) == 2 and argv[0] == "--sample":
+        return sample(argv[1])
+    print("usage: wf-bg-watch --watch <spec> | --sample <state>", file=sys.stderr)
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main(sys.argv[1:]))
+    except Exception:       # a watcher never leaves a traceback for anyone to read
+        sys.exit(0)

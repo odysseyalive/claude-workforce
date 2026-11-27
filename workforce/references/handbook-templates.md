@@ -500,6 +500,10 @@ sections contradict each other, which is the defect itself.*
   or a package the task names. **Never guess a package name from a tool's or a project's name**, and
   reach an MCP server through its tools rather than starting it from the shell. Wrapping a command
   that might wait on input or on the network in `timeout` is worth doing.
+- **A background shell reported STALLED is resolved, never waited on.** If you started it, read its
+  diagnosis, stop it and rerun with the cause fixed, or stop it and report why you could not. If a
+  child of yours started it, ask that child through `SendMessage` what it is waiting on and what it
+  will do, and report what it cannot resolve to your caller with the diagnosis.
 - <Role-specific NEVER / MUST NOT / STOP lines.>
 
 ## Exit criteria

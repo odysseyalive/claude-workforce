@@ -57,8 +57,15 @@ ended only when killed: 110 of the 140 that timed out, and 6 of the 33 run with
 Without `<` the timed-out path ended in a kill or never closed 114 times in 445, which is
 why `<` is the gate.
 
+AND EVERY BACKGROUNDED SHELL IS WATCHED, `<` or not (issue i18, 2026-11-27). The same
+PostToolUse starts `wf-bg-watch` for the shell, one detached watcher that flags it STALLED
+when its process tree has used no CPU, done no I/O and written no output for 10 minutes. On
+PreToolUse this hook hands each agent the flags it has not been told yet, as context: the
+agent that started the shell is told to resolve it, and the main session to ask that agent and
+take what it cannot resolve to the user. `wf-bg-watch`'s header has the measurements.
+
 FAIL-OPEN AND SILENT ON NO SIGNAL. Always exits 0, never denies, never asks. A payload it
-cannot read, a tool that is not Bash, a command with no `<`: no output.
+cannot read, a tool that is not Bash, a command with no `<` and no flag pending: no output.
 """
 import json
 import os
@@ -157,15 +164,7 @@ def task_file(sid):
 def stop_line(sid, out):
     """`wf-widen`'s stop line for this shell, so the two never say different things. Loaded
     only on this path: a backgrounded command holding `<` is a few per hundred Bash calls."""
-    import importlib.machinery
-    import importlib.util
-    sys.dont_write_bytecode = True   # never drop a __pycache__ into the install
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "wf-widen")
-    spec = importlib.util.spec_from_loader(
-        "wf_widen", importlib.machinery.SourceFileLoader("wf_widen", path))
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod.stop_remedy(sid, out)
+    return _load("wf-widen").stop_remedy(sid, out)
 
 
 def backgrounded(payload):
@@ -185,19 +184,77 @@ def backgrounded(payload):
     return {"hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": note}}
 
 
+def bg_watch():
+    """`wf-bg-watch`, loaded only when some session has backgrounded a shell, since its flag
+    directory exists only then. None when it is absent or cannot be loaded."""
+    getuid = getattr(os, "getuid", None)
+    roots = {os.environ.get("TMPDIR") or "", "/tmp", "/private/tmp"}
+    if getuid is None or not any(
+            os.path.isdir(os.path.join(r, "claude-%d" % getuid(), "wf-bg-watch"))
+            for r in roots if r):
+        return None
+    return _load("wf-bg-watch")
+
+
+def _load(name):
+    import importlib.machinery
+    import importlib.util
+    sys.dont_write_bytecode = True   # never drop a __pycache__ into the install
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), name)
+    if not os.path.isfile(path):
+        return None
+    mod_name = name.replace("-", "_")
+    spec = importlib.util.spec_from_loader(
+        mod_name, importlib.machinery.SourceFileLoader(mod_name, path))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def watch_backgrounded(payload):
+    """EVERY backgrounded shell gets one liveness watcher, `<` or not (`wf-bg-watch`)."""
+    res = payload.get("tool_response")
+    sid = res.get("backgroundTaskId") if isinstance(res, dict) else None
+    if not (isinstance(sid, str) and re.match(r"\A[A-Za-z0-9_-]+\Z", sid)):
+        return
+    try:
+        path = task_file(sid)
+        mod = _load("wf-bg-watch") if path else None
+        if mod:
+            mod.start(payload, path)
+    except Exception:   # a hook never fails the call it follows
+        pass
+
+
+def stalled(payload):
+    """The STALLED flags this agent has not been told about yet, or ""."""
+    try:
+        mod = bg_watch()
+        return mod.pending(payload) if mod else ""
+    except Exception:
+        return ""
+
+
 def decide(payload):
     """The hook's output for one payload, or None."""
     if payload.get("tool_name") != "Bash":
         return None
     inp = payload.get("tool_input")
     cmd = inp.get("command") if isinstance(inp, dict) else None
-    if not isinstance(cmd, str) or "<" not in cmd or ALREADY.match(cmd):
+    if not isinstance(cmd, str):
         return None
+    hazard = "<" in cmd and not ALREADY.match(cmd)
     if payload.get("hook_event_name") == "PostToolUse":
-        return backgrounded(payload)
-    if not noted_once(payload):
+        watch_backgrounded(payload)
+        return backgrounded(payload) if hazard else None
+    notes = [NOTE] if hazard and noted_once(payload) else []
+    stall = stalled(payload)
+    if stall:
+        notes.append(stall)
+    if not notes:
         return None
-    return {"hookSpecificOutput": {"hookEventName": "PreToolUse", "additionalContext": NOTE}}
+    return {"hookSpecificOutput": {"hookEventName": "PreToolUse",
+                                   "additionalContext": "\n\n".join(notes)}}
 
 
 def main():
