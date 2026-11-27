@@ -18620,7 +18620,7 @@
     ]
   },
   "memory-sessionstart-names-uncarried": {
-    "_why": "User, 2026-11-26: at session start every rule in any account's memory for this project, and in a parent folder's store, that the project's ledger does not record is named, so another account's rules surface without an account-switch detector. The feedback entry in two accounts is one rule with one identical copy; the ancestor /work entry is named as such; the user entry, the index and another project's store are not. Fails when only one config dir is read, when ancestors are skipped, or when copies are counted twice.",
+    "_why": "User, 2026-11-26: at session start every rule in any account's memory for this project that the project's ledger does not record is named, so another account's rules surface without an account-switch detector. The feedback entry in two accounts is one rule with one identical copy. The parent /work folder's entry is another folder's memory and is not named (issue i14, 2026-11-27); nor are the user entry, the index or another project's store. Fails when only one config dir is read, when copies are counted twice, or when a parent folder's rule is offered as this project's.",
     "script": "wf-memory",
     "env": {
       "HOME": "${TREE}/home",
@@ -18631,13 +18631,13 @@
     "exit": 0,
     "want": [
       "\"hookEventName\": \"SessionStart\"",
-      "MEMORY RULES  2 rule(s)",
+      "MEMORY RULES  1 rule(s)",
       "feedback_tabs.md (+1 identical copy)",
-      "project_shared.md (saved under ancestor /work)",
       "/home/.claude-b",
       "reconcile-memory"
     ],
     "not": [
+      "project_shared",
       "user_role",
       "MEMORY.md",
       "feedback_other",
@@ -18646,7 +18646,7 @@
     ]
   },
   "memory-scan-classifies": {
-    "_why": "wf-memory --scan lists every memory folder for this project and its parent folders in every ~/.claude* account, sorting entries into rule and personal and skipping the index. Fails when an account, an ancestor or the user type is missed.",
+    "_why": "wf-memory --scan lists every memory folder for this project in every ~/.claude* account, sorting entries into rule and personal and skipping the index, then a parent folder's memory in its own section, uncounted (issue i14). Fails when an account or the user type is missed, or when a parent folder's rule is counted as this project's.",
     "script": "wf-memory",
     "env": {
       "HOME": "${TREE}/home",
@@ -18662,16 +18662,130 @@
     "want": [
       "/home/.claude/projects/-work-repo/memory  (this project)",
       "/home/.claude-b/projects/-work-repo/memory  (this project)",
-      "/home/.claude/projects/-work/memory  (ancestor /work)",
+      "Another folder's memory, saved by a session started in a parent folder. Not this project's",
+      "/home/.claude/projects/-work/memory  (another folder: /work)",
       "RULE uncarried feedback  feedback_tabs.md",
-      "RULE uncarried project   project_shared.md",
+      "OTHER rule     project   project_shared.md",
       "PERSONAL       user      user_role.md",
-      "summary: 3 rule(s) uncarried, 0 changed, 0 carried, 1 personal, 0 unreadable, in 3 memory folder(s)",
+      "summary: 2 rule(s) uncarried, 0 changed, 0 carried, 1 personal, 0 unreadable, in 2 memory folder(s)",
+      "another folder's memory: 1 rule(s) in 1 memory folder(s), not counted",
       "Memory held only by the service is not a file"
     ],
     "not": [
+      "RULE uncarried project",
       "feedback_other",
       "MEMORY.md",
+      "Traceback"
+    ]
+  },
+  "memory-scan-home-not-read": {
+    "_why": "Issue i14, user 2026-11-27: memory saved for $HOME or a folder above it is never read, so notes from sessions started in ~ are not offered to every project under ~ (\"that shouldn't have been for memory items not related to the project\"). HOME is /work/me and the project /work/me/lab/repo: the -work-me and -work folders are not listed, the -work-me-lab folder is listed apart and not counted, and the project's own rule is counted. Fails when $HOME's memory is read, or when an intermediate folder's rule is counted.",
+    "script": "wf-memory",
+    "env": {
+      "HOME": "/work/me",
+      "CLAUDE_CONFIG_DIR": "${TREE}/cfg",
+      "CLAUDE_PROJECT_DIR": "/work/me/lab/repo"
+    },
+    "args": [
+      "--scan",
+      "--root",
+      "/work/me/lab/repo"
+    ],
+    "exit": 0,
+    "want": [
+      "/projects/-work-me-lab-repo/memory  (this project)",
+      "RULE uncarried feedback  feedback_own.md",
+      "/projects/-work-me-lab/memory  (another folder: /work/me/lab)",
+      "OTHER rule     project   project_lab.md",
+      "summary: 1 rule(s) uncarried, 0 changed, 0 carried, 0 personal, 0 unreadable, in 1 memory folder(s)",
+      "another folder's memory: 1 rule(s) in 1 memory folder(s), not counted"
+    ],
+    "not": [
+      "feedback_airpods",
+      "feedback_above",
+      "/projects/-work-me/memory",
+      "/projects/-work/memory",
+      "Traceback"
+    ]
+  },
+  "memory-sessionstart-own-only": {
+    "_why": "Issue i14: the session-start note names only this project's own rules. Neither the $HOME folder's note nor the parent lab folder's rule is counted or named, so a session is never told to run reconcile-memory over another folder's memory. Fails when either is offered.",
+    "script": "wf-memory",
+    "env": {
+      "HOME": "/work/me",
+      "CLAUDE_CONFIG_DIR": "${TREE}/cfg",
+      "CLAUDE_PROJECT_DIR": "/work/me/lab/repo"
+    },
+    "stdin_raw": "{\"hook_event_name\": \"SessionStart\", \"source\": \"startup\"}",
+    "exit": 0,
+    "want": [
+      "MEMORY RULES  1 rule(s)",
+      "feedback_own.md"
+    ],
+    "not": [
+      "feedback_airpods",
+      "feedback_above",
+      "project_lab",
+      "Traceback"
+    ]
+  },
+  "memory-hook-home-save-silent": {
+    "_why": "Issue i14: a rule saved to the $HOME folder's memory while working in a project under it gets no save-time note. Fails when the hook still reaches $HOME's store.",
+    "script": "wf-memory",
+    "env": {
+      "HOME": "/work/me",
+      "CLAUDE_CONFIG_DIR": "${TREE}/cfg",
+      "CLAUDE_PROJECT_DIR": "/work/me/lab/repo"
+    },
+    "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"tool_name\": \"Write\", \"tool_input\": {\"file_path\": \"${TREE}/cfg/projects/-work-me/memory/feedback_airpods.md\"}}",
+    "exit": 0,
+    "want": [],
+    "not": [
+      "MEMORY RULE",
+      "hookSpecificOutput",
+      "Traceback"
+    ]
+  },
+  "memory-hook-ancestor-save-silent": {
+    "_why": "Issue i14: a rule saved to a parent folder's memory is another folder's, so the save-time note, which tells the session to apply it here, stays silent. Fails when the hook still reaches a parent folder's store.",
+    "script": "wf-memory",
+    "env": {
+      "HOME": "/work/me",
+      "CLAUDE_CONFIG_DIR": "${TREE}/cfg",
+      "CLAUDE_PROJECT_DIR": "/work/me/lab/repo"
+    },
+    "stdin_raw": "{\"hook_event_name\": \"PostToolUse\", \"tool_name\": \"Write\", \"tool_input\": {\"file_path\": \"${TREE}/cfg/projects/-work-me-lab/memory/project_lab.md\"}}",
+    "exit": 0,
+    "want": [],
+    "not": [
+      "MEMORY RULE",
+      "hookSpecificOutput",
+      "Traceback"
+    ]
+  },
+  "memory-scan-root-is-home": {
+    "_why": "Issue i14's one exception: a project whose root IS $HOME reads its own store, the -work-me folder, as this project's. The -work folder above it is still not read. Fails when the $HOME rule also hides a home-rooted project's own memory.",
+    "script": "wf-memory",
+    "env": {
+      "HOME": "/work/me",
+      "CLAUDE_CONFIG_DIR": "${TREE}/cfg",
+      "CLAUDE_PROJECT_DIR": "/work/me"
+    },
+    "args": [
+      "--scan",
+      "--root",
+      "/work/me"
+    ],
+    "exit": 0,
+    "want": [
+      "/projects/-work-me/memory  (this project)",
+      "RULE uncarried feedback  feedback_airpods.md",
+      "summary: 1 rule(s) uncarried, 0 changed, 0 carried, 0 personal, 0 unreadable, in 1 memory folder(s)"
+    ],
+    "not": [
+      "feedback_above",
+      "/projects/-work/memory",
+      "another folder",
       "Traceback"
     ]
   }

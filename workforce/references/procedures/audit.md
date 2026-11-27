@@ -137,8 +137,9 @@ Gather, in order: `CLAUDE.md` · repository shape (directories, package manifest
 · build and test tooling · git history where present · README and docs · then
 `.claude/skills/*/SKILL.md`, `.claude/agents/**/*.md`, any existing chart and personnel ledger
 · then the rules kept in Claude memory for this project, read-only: `wf-memory --scan --root
-"${CLAUDE_PROJECT_DIR:-$PWD}"` (every account on the machine, parent folders included). A rule the
-user set is evidence of how the project works; Step 6-K applies the uncarried ones.
+"${CLAUDE_PROJECT_DIR:-$PWD}"` (every account on the machine; a parent folder's memory is listed
+apart and not counted, and `$HOME`'s is not read). A rule the user set is evidence of how the
+project works; Step 6-K applies the uncarried ones.
 
 Per skill, where skills exist: workflow length, actors implied, inbound cross-references, immutable
 blocks, declared modes, existing agents.

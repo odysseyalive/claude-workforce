@@ -121,12 +121,20 @@ def memory_dirs(root):
     """[(config dir, project path, memory dir rel to the config dir)] for `root` and each
     of its ancestors below `/`, in every config dir, where that memory folder exists.
 
-    An ANCESTOR counts because a session launched from a parent folder saves under the
+    An ANCESTOR is read because a session launched from a parent folder saves under the
     parent's store name: `~/.claude/projects/-home-francis-lab/memory` holds what sessions
-    started in `~/lab` saved about the projects inside it (2026-11-26)."""
-    paths, p = [], os.path.abspath(root)
+    started in `~/lab` saved (2026-11-26). It is another folder's memory, not this project's.
+
+    $HOME AND EVERY FOLDER ABOVE IT ARE NEVER READ, unless `root` is that folder (issue i14,
+    2026-11-27): `-home-francis` held personal-machine notes, audio and printer setup, and
+    every project under ~ was offered them. *"that shouldn't have been for memory items not
+    related to the project."*"""
+    root = os.path.abspath(root)
+    homes = {os.path.abspath(os.path.expanduser("~")), os.path.realpath(os.path.expanduser("~"))}
+    paths, p = [], root
     while p != os.path.dirname(p):
-        paths.append(p)
+        if p == root or not any(h == p or h.startswith(p + os.sep) for h in homes):
+            paths.append(p)
         p = os.path.dirname(p)
     out = []
     for cfg in config_dirs():

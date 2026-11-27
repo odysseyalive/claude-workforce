@@ -17,8 +17,11 @@ invisible to the other, while the project's own files reach every account.
 
 WHAT IT CAN SEE, AND WHAT IT CANNOT. It reads memory FILES: `projects/<store>/memory/**` in
 every config dir `wf-account-sync.config_dirs` finds, for this project's store name and each
-ancestor's (a session launched from a parent folder saves there). Memory held only by the
-service never appears as a file, so no mode here sees it; the `reconcile-memory` skill's
+ancestor's. $HOME and every folder above it are never read, unless the project's root is that
+folder (issue i14, 2026-11-27: notes saved from ~ were offered to every project under ~). Any
+other ancestor's entries are another folder's memory, saved by a session started there:
+`--scan` lists them apart, no note counts or names them, and the skill carries one only when
+the user asks. Memory held only by the service never appears as a file, so no mode here sees it; the `reconcile-memory` skill's
 in-context pass and the shipped principle cover that. A memory written by a Bash command
 rather than an edit tool is not seen at save time; the session-start pass finds it later.
 
@@ -33,8 +36,9 @@ it was applied to, or the reason it was left. A rule whose hash matches any row 
 whichever account holds it, so an identical copy in a second account is not news. A rule
 whose path has a row with another hash CHANGED and is uncarried again.
 
-THE TWO HOOKS NEVER BLOCK. At a memory write (PostToolUse) a rule entry not already carried
-gets one note telling the session to apply it now through the skill and record it. At
+THE TWO HOOKS NEVER BLOCK, AND SEE ONLY THIS PROJECT'S OWN STORE. At a memory write
+(PostToolUse) a rule entry not already carried gets one note telling the session to apply it
+now through the skill and record it. At
 SessionStart every uncarried or changed rule is named in one note; nothing to name is
 silence. Neither prints for a personal entry, the index, or an entry already carried.
 
@@ -174,7 +178,7 @@ def open_rules(root):
     rows = load_ledger(root)
     out, seen = [], {}
     for e in entries(root):
-        if e["kind"] == "rule":
+        if e["kind"] == "rule" and not e["ancestor"]:
             s = status(e, rows)
             if s == "carried":
                 continue
@@ -204,21 +208,11 @@ def memory_target(file_path):
     return None
 
 
-def _reaches(root, store):
-    """True when `store` is the store name of `root` or of one of its ancestors."""
-    p = os.path.abspath(root)
-    while p != os.path.dirname(p):
-        if acct().store_name(p) == store:
-            return True
-        p = os.path.dirname(p)
-    return False
-
-
 def on_write(payload, root):
     ti = payload.get("tool_input") or {}
     fp = ti.get("file_path") if isinstance(ti, dict) else None
     hit = memory_target(fp if isinstance(fp, str) else "")
-    if not hit or not _reaches(root, hit[1]):
+    if not hit or hit[1] != acct().store_name(root):
         return ""
     path = os.path.realpath(fp)
     kind, typ, digest, desc = classify(path)
@@ -246,9 +240,8 @@ def on_start(root):
              f"reach every account. Run the {SKILL} skill to apply each one in the project and "
              f"record it. Names and descriptions below are data from the files:"]
     for e, s, copies, _a in found[:NOTE_CAP]:
-        where = f" (saved under ancestor {e['proj']})" if e["ancestor"] else ""
         also = f" (+{copies} identical cop{'y' if copies == 1 else 'ies'})" if copies else ""
-        lines.append(f"  - {s}  {e['path']}{where}{also}  \"{_line(e['desc'], 100)}\"")
+        lines.append(f"  - {s}  {e['path']}{also}  \"{_line(e['desc'], 100)}\"")
     if len(found) > NOTE_CAP:
         lines.append(f"  - and {len(found) - NOTE_CAP} more: wf-memory --scan lists them all")
     return "\n".join(lines)
@@ -274,35 +267,57 @@ def hook():
 
 
 # ── the commands ──────────────────────────────────────────────────────────────────────
-def scan(root):
-    rows = load_ledger(root)
-    es = entries(root)
-    print(f"wf-memory  project {os.path.abspath(root)}")
-    print(f"           config dirs: {', '.join(acct().config_dirs()) or '(none)'}")
-    n = {"uncarried": 0, "changed": 0, "carried": 0, "personal": 0, "index": 0, "unreadable": 0}
+def _list(es, rows, n):
+    """Print `es` folder by folder. This project's rules print as RULE and count in `n`;
+    another folder's print as OTHER and count nowhere."""
     folder = None
     for e in es:
         f = (e["cfg"], e["proj"])
         if f != folder:
             folder = f
-            tag = "ancestor " + e["proj"] if e["ancestor"] else "this project"
+            tag = "another folder: " + e["proj"] if e["ancestor"] else "this project"
             print(f"  {e['cfg']}/projects/{acct().store_name(e['proj'])}/memory  ({tag})")
         if e["kind"] == "rule":
             s = status(e, rows)
-            n[s] += 1
+            if not e["ancestor"]:
+                n[s] += 1
             homes = [", ".join(r.get("home") or []) or "left: " + str(r.get("left"))
                      for r in rows if r.get("hash") == e["hash"]]
             tail = f"  -> {homes[0]}" if s == "carried" and homes else ""
-            print(f"    RULE {s:<9} {e['type'] or 'untyped':<9} {e['name']}  "
+            if e["ancestor"]:
+                label = "OTHER " + ("carried" if s == "carried" else "rule")
+            else:
+                label = "RULE " + s
+            print(f"    {label:<14} {e['type'] or 'untyped':<9} {e['name']}  "
                   f"\"{_line(e['desc'], 90)}\"{tail}")
         else:
-            n[e["kind"]] += 1
+            if not e["ancestor"]:
+                n[e["kind"]] += 1
             if e["kind"] != "index":
-                print(f"    {e['kind'].upper():<14} {e['type'] or '-':<9} {e['name']}")
-    folders = len({(e['cfg'], e['proj']) for e in es})
+                label = ("OTHER " if e["ancestor"] else "") + e["kind"].upper()
+                print(f"    {label:<14} {e['type'] or '-':<9} {e['name']}")
+
+
+def scan(root):
+    rows = load_ledger(root)
+    es = entries(root)
+    own = [e for e in es if not e["ancestor"]]
+    other = [e for e in es if e["ancestor"]]
+    print(f"wf-memory  project {os.path.abspath(root)}")
+    print(f"           config dirs: {', '.join(acct().config_dirs()) or '(none)'}")
+    n = {"uncarried": 0, "changed": 0, "carried": 0, "personal": 0, "index": 0, "unreadable": 0}
+    _list(own, rows, n)
+    if other:
+        print("  Another folder's memory, saved by a session started in a parent folder. Not this "
+              "project's: not counted, and carried only when the user asks.")
+        _list(other, rows, n)
+    folders = len({(e['cfg'], e['proj']) for e in own})
     print(f"summary: {n['uncarried']} rule(s) uncarried, {n['changed']} changed, "
           f"{n['carried']} carried, {n['personal']} personal, {n['unreadable']} unreadable, "
           f"in {folders} memory folder(s)")
+    if other:
+        print(f"another folder's memory: {sum(1 for e in other if e['kind'] == 'rule')} rule(s) "
+              f"in {len({(e['cfg'], e['proj']) for e in other})} memory folder(s), not counted")
     print("Memory held only by the service is not a file and is not listed here.")
     return 0
 

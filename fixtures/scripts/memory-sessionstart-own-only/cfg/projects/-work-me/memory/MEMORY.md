@@ -1,0 +1,1 @@
+- [Earbuds](feedback_airpods.md) — silent sink fix

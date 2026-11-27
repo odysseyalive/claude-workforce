@@ -19,7 +19,9 @@ entries stay where they are.
 
 | Source | Seen by |
 |---|---|
-| memory files under `<config dir>/projects/<this project or a parent folder>/memory/`, every `~/.claude*` account and `$CLAUDE_CONFIG_DIR` | `wf-memory --scan`, the session-start note, and the save-time note |
+| memory files under `<config dir>/projects/<this project>/memory/`, every `~/.claude*` account and `$CLAUDE_CONFIG_DIR` | `wf-memory --scan`, the session-start note, and the save-time note |
+| memory files saved for a parent folder of this project | `wf-memory --scan` only, in its own section as another folder's memory. Never counted or named in a note |
+| memory files saved for `$HOME` or a folder above it | nothing, unless this project's root is that folder |
 | memory the service holds that never appears as a file | only this session, in its recalled memory. No hook and no scan sees it |
 | a memory file written by a Bash command | the scan and the session-start note, not the save-time note |
 
@@ -33,9 +35,9 @@ entries stay where they are.
    ```
 
    Each `RULE uncarried` or `RULE changed` line is one to place. `PERSONAL` entries (`user`
-   memory: who the person is, their voice and preferences) stay where they are. An entry saved
-   under an ancestor folder came from a session started in a parent directory; it may be about
-   another project.
+   memory: who the person is, their voice and preferences) stay where they are. `OTHER` lines are
+   another folder's memory, saved by a session started in a parent folder. They are not this
+   project's: leave them unless the user asks for one.
 2. **Add what the session itself recalls.** List every `feedback`, `project` or `reference`
    memory in this session's context (recalled-memory reminders, the loaded memory index) that the
    scan did not list. Each is a rule to place too. These cannot be recorded in the ledger, since
@@ -51,7 +53,6 @@ entries stay where they are.
    5. a new principle in the project's own span of `operating-principles`, below the
       `WF-PRINCIPLES END` marker, in the user's words, last of all.
 
-   An ancestor-folder rule that is about another project is left: record it with `--left`.
    Show the user one table: entry, account(s), rule in a line, proposed home, action
    (`already there`, `merge`, `amend`, `new`, `left: <why>`). Under `--review`, stop here.
 4. **On the user's yes, back up, then apply.** Back up every project file you will change:
@@ -71,5 +72,4 @@ entries stay where they are.
    ```
 
 6. **Report** each rule and where it now lives. A rule found only in recalled memory is now in the
-   project, and its service-held copy is redundant but left alone. Name each ancestor rule left
-   and why. Run the scan again; it should list no `uncarried` or `changed` rule.
+   project, and its service-held copy is redundant but left alone. Run the scan again; it should list no `uncarried` or `changed` rule.
