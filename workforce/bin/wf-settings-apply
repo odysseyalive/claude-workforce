@@ -596,7 +596,11 @@ def scopes_collapse(root):
     scope on top of" user scope: the two files sit side by side in one directory and the
     harness reads both for the same session, so a hook wired at user scope is already
     live for this project and adding the project-scope one DOUBLE-FIRES it.
+
+    AT USER SCOPE THERE IS NO PROJECT (`root` is `""`), so nothing collapses.
     """
+    if not root:
+        return False
     return os.path.realpath(os.path.join(root, ".claude")) == os.path.realpath(config_root())
 
 
@@ -614,9 +618,15 @@ def union_settings_paths(root):
     Deduped by realpath because the same file reached through two spellings must not be
     read twice, and ordered project-first so the path REPORTED is the one whose scope
     was asked about.
+
+    AT USER SCOPE (`root` is `""`) ONLY THE USER FILE IS IN FORCE. `""` joined to `.claude`
+    is the working directory's, and with the shell in `$HOME` under a second account's
+    `CLAUDE_CONFIG_DIR` that is the DEFAULT account's user file: its hooks read as "already
+    registered" and the second account was left unwired (i16).
     """
     seen, out = set(), []
-    for cand in [os.path.join(root, ".claude", n) for n in PROJECT_SETTINGS] + [user_settings_path()]:
+    project = [os.path.join(root, ".claude", n) for n in PROJECT_SETTINGS] if root else []
+    for cand in project + [user_settings_path()]:
         key = os.path.realpath(cand)
         if key in seen:
             continue
@@ -1082,8 +1092,9 @@ def count_registrations(root, name):
     """
     event, _matcher = SHIPPED_HOOKS[name]
     script = hook_script(name)
-    out = {}
-    for scope in ("user", "project"):
+    out = {"user": 0, "project": 0}
+    # AT USER SCOPE THERE IS NO PROJECT, and `""` resolves against the working directory.
+    for scope in (("user", "project") if root else ("user",)):
         spath = settings_for_scope(root, scope)
         data, _ = load(spath)
         n = 0

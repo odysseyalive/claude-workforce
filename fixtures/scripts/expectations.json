@@ -18788,5 +18788,49 @@
       "another folder",
       "Traceback"
     ]
+  },
+  "sa-wire-user-from-home-second-account": {
+    "_why": "USER-SCOPE WIRING TARGETS THE ACCOUNT'S CONFIG DIR, WHATEVER THE WORKING DIRECTORY (i16). `--scope user` has no project, so `root` is `\"\"`, and `\"\"` joined to `.claude` was the WORKING DIRECTORY's. Run from `$HOME` under a second account (`CLAUDE_CONFIG_DIR=$HOME/.claude-b`), that is the DEFAULT account's user file: every default hook read as `already registered ... in .claude/settings.json`, nothing was written to `.claude-b/settings.json`, and the run exited 0. Reproduced on this tree against HEAD b34fba8: 22 NOOPs, 0 rows in `.claude-b/settings.json`. Now every hook is registered in `.claude-b/settings.json`, pointing at that account's install, and the default account's file is untouched.",
+    "script": "wf-settings-apply",
+    "args": [
+      "--scope",
+      "user",
+      "--wire-defaults",
+      "--execute"
+    ],
+    "cwd": ".",
+    "subst": [
+      ".claude/settings.json"
+    ],
+    "env": {
+      "HOME": "${TREE}",
+      "CLAUDE_CONFIG_DIR": "${TREE}/.claude-b"
+    },
+    "exit": 0,
+    "want": [
+      "/.claude-b/settings.json          <- resolved, not assumed",
+      "+ wf-heal  SessionStart  registered",
+      "+ wf-task-tag  UserPromptSubmit  registered",
+      "+ wf-widen-agent  Stop  registered"
+    ],
+    "not": [
+      "already registered",
+      "Traceback",
+      "NOT WRITTEN",
+      "DOUBLE-FIRING"
+    ],
+    "after": {
+      ".claude-b/settings.json": {
+        "once": [
+          "/.claude-b/skills/workforce/bin/wf-heal\\\"",
+          "/.claude-b/skills/workforce/bin/wf-chooser\\\""
+        ]
+      },
+      ".claude/settings.json": {
+        "not": [
+          ".claude-b"
+        ]
+      }
+    }
   }
 }

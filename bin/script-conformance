@@ -16,6 +16,7 @@ spellings of one assertion, all read). A stdin-driven script (the hook) takes
 `stdin_raw`. A script that reads the process environment takes `env`: a map of
 variable name to value, where `null` UNSETS the variable in the child. A case about
 file age takes `mtime`: a map of path inside the tree to its age in seconds.
+A case about the working directory takes `cwd`: a path inside the tree to run from.
 
 **Exit code and output are both checked.** A script that exits correctly while
 reporting the wrong thing is the failure this project keeps finding — a report that
@@ -53,7 +54,7 @@ BIN = os.path.join(ROOT, "workforce", "bin")
 # be invented, but it can no longer be ignored. Measured 2026-09-13.
 NEGATIVE_KEYS = ("not", "must_not", "reject")
 ROW_KEYS = {"script", "exit", "args", "env", "want", "after", "chmod", "concurrent", "mtime",
-            "subst", "hardlink", "git", "before",
+            "subst", "hardlink", "git", "before", "cwd",
             "stdin_file", "stdin_raw", "_why", *NEGATIVE_KEYS}
 AFTER_KEYS = {"want", "once", "absent", "unchanged", "inserted_only", *NEGATIVE_KEYS}
 GIT_KEYS = {"init", "hooks_from", "commit", "config", "links", "corrupt_index"}
@@ -548,8 +549,17 @@ def _run_in(tree, script, spec):
         # eighth. Constants are stated once (SKILL.md Principle 9a); this is that rule
         # reaching the fixture args.
         _args = [_sub_tree(_sub_version(a), tree) for a in spec.get("args", [])]
+        # `cwd` RUNS THE SCRIPT FROM A DIRECTORY INSIDE THE TREE (`.` is the tree), for a case
+        # about what a script reads from the working directory: a user-scope write run from
+        # `$HOME` read the default account's `.claude` as a project (i16). Absent, the child
+        # inherits this harness's directory, as every row before it did.
+        _cwd = None
+        if "cwd" in spec:
+            _cwd = os.path.normpath(os.path.join(tree, str(spec["cwd"])))
+            if _cwd != os.path.normpath(tree) and not _cwd.startswith(os.path.normpath(tree) + os.sep):
+                return False, f"cwd {spec['cwd']!r} is not inside the tree"
         p = subprocess.run([sys.executable, script, "--root", tree] + _args,
-                           text=True, capture_output=True, env=env, timeout=CASE_TIMEOUT)
+                           text=True, capture_output=True, env=env, cwd=_cwd, timeout=CASE_TIMEOUT)
 
     shutil.rmtree(_home, ignore_errors=True)
 
