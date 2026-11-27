@@ -8,6 +8,7 @@
 
 | Version | Date | Surface | Org | Change |
 |---|---|---|---|---|
+| 1.92.1 | 2026-11-27 | audit, verify, changes, hooks, scripts, installer | no | Release 1.92.1: memory saved for your home folder is no longer offered to every project under it |
 | 1.92.0 | 2026-11-26 | principles, audit, changes, hooks, scripts, installer | **yes** | Release 1.92.0: a rule kept in Claude memory is caught and applied in the project, and a handoff no longer asks which account picks it up |
 | 1.91.0 | 2026-11-25 | audit, changes, scripts | no | Release 1.91.0: five upstream inbox fixes, a wf-catalog restore that follows no link, and a chooser hook with no known wrong fire |
 | 1.90.0 | 2026-11-25 | update, changes, hooks, scripts, installer | no | Release 1.90.0: the work list spans sessions and accounts, handoffs carry across accounts, and install prunes only its own root |
