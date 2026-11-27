@@ -18,6 +18,10 @@ written. The deliverable itself goes where the task says, as always.
 
 When unsure, ask whether you would redo work to get the file back. If you would, it is resumable.
 
+`<project>` is the folder the session started in, even your home folder, where the job folder is
+`~/.claude/workforce/jobs/` and every account starting in `~` reads it. Save there without asking
+the user to pick a scope or an account.
+
 ## Starting a job
 
 1. Pick a `<job-id>`: short, lowercase, letters, digits, `.`, `_` and `-` only, such as

@@ -89,9 +89,12 @@ for its manager at a turn limit.
 ### Any account picks it up
 
 A handoff lives in the project so that whichever account opens the project next finds it. Never
-ask which account will pick it up, and never copy memory or the install to another account. A
-rule the user set reaches every account because it is in the project's own files (the
-`reconcile-memory` skill), not because a memory folder was copied.
+ask which account will pick it up, and never copy memory or the install to another account.
+The project is the folder the session started in, even your home folder: there the handoff goes
+to `~/.claude/workforce/jobs`, which every account starting in `~` reads, so save it without
+asking which scope or account it belongs to. A rule the user set reaches every account because
+it is in the project's own files (the `reconcile-memory` skill), not because a memory folder was
+copied.
 
 ## Pick up
 
