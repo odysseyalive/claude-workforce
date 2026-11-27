@@ -18832,5 +18832,40 @@
         ]
       }
     }
+  },
+  "sa-wire-home-one-folder-counts-once": {
+    "_why": "ONE FOLDER IS ONE SCOPE'S FILE, COUNTED ONCE (i16). The project is `$HOME` and CLAUDE_CONFIG_DIR is unset, so project scope resolves to `~/.claude/settings.json`, the user file itself, already holding every default hook once. Nothing may be written twice and nothing may be refused: every hook reads `already registered`, the file keeps one row per hook, and the exit is 0. The double-firing report counted that one file as both scopes and printed `registered at BOTH user and project scope (user 1, project 1)` for all 21 command hooks. Reproduced on this tree against 3022e9b.",
+    "script": "wf-settings-apply",
+    "args": [
+      "--wire-defaults",
+      "--execute"
+    ],
+    "subst": [
+      ".claude/settings.json"
+    ],
+    "env": {
+      "HOME": "${TREE}",
+      "CLAUDE_CONFIG_DIR": null
+    },
+    "exit": 0,
+    "want": [
+      "wf-heal already registered on SessionStart",
+      "wf-widen-agent already registered on Stop"
+    ],
+    "not": [
+      "DOUBLE-FIRING",
+      "BOTH user and project scope",
+      "registered at",
+      "NOT WRITTEN",
+      "Traceback"
+    ],
+    "after": {
+      ".claude/settings.json": {
+        "once": [
+          "/.claude/skills/workforce/bin/wf-heal\\\"",
+          "/.claude/skills/workforce/bin/wf-chooser\\\""
+        ]
+      }
+    }
   }
 }

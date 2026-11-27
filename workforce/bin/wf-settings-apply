@@ -1094,8 +1094,14 @@ def count_registrations(root, name):
     script = hook_script(name)
     out = {"user": 0, "project": 0}
     # AT USER SCOPE THERE IS NO PROJECT, and `""` resolves against the working directory.
+    # UNDER SCOPE COLLAPSE the project file can BE the user file (the project is `$HOME`
+    # with no CLAUDE_CONFIG_DIR): one row, read once, or every hook reads as firing twice.
+    read = set()
     for scope in (("user", "project") if root else ("user",)):
         spath = settings_for_scope(root, scope)
+        if os.path.realpath(spath) in read:
+            continue
+        read.add(os.path.realpath(spath))
         data, _ = load(spath)
         n = 0
         if isinstance(data, dict):
