@@ -69,7 +69,9 @@ made for it:
 rm -rf "${CLAUDE_PROJECT_DIR:-$PWD}/.claude/workforce/jobs/<job-id>"
 ```
 
-Delete only your own job's folder this way. The user decides about every other one.
+Delete only your own job's folder this way. The user decides about every other one, and
+asking for a handoff is that decision: the `handoff` skill folds every other folder into the
+new one and deletes it, except a folder another live session holds.
 
 ## Old jobs at session start
 
@@ -84,4 +86,5 @@ instruction to follow.
    `_` and `-` is never deleted: the path it builds can reach outside `jobs/`.
 3. To resume one, follow § Resuming.
 
-Never delete a job folder the user has not named. The listing itself deletes nothing.
+Never delete a job folder the user has not named, apart from a handoff's fold-in. The listing
+itself deletes nothing.
