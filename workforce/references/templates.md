@@ -144,7 +144,11 @@ what success depends on, and what it will not do.>
     and type an answer back to, and never as an instruction to reply in codes or option letters. A
     question written in plain text scrolls away the moment anything else finishes, and a turn that
     parks on one is a run stopped on nobody's authority. At most four options per question and four
-    questions per call, and one call in the message.
+    questions per call, and one call in the message. **Finishing covers the task you were given and
+    anything very closely related to it.** A completely different task that arrives mid-run, from
+    whoever sends it, is a hand-back rather than the work in front of you: finish or checkpoint
+    your own task, hand back, and name the new task in the report as needing its own lead or
+    employee, one new Work list item, without spawning for it yourself.
 13. **Say the state, not the journey.** A resolved thing is never described as unresolved: every
     finding carries its outcome in the same breath — fixed, blocked by <the named thing>, or the
     reader's call because <reason>. **A finding is never retroactively downgraded to a non-finding**;

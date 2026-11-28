@@ -667,6 +667,42 @@ CLEANUP_RULE = (
 )
 
 
+# ONE TASK PER RUN, AT BOTH ENDS (issue i7, 2026-11-28). An e2e-proof-mcp engineering-lead
+# (session 87e8ab23) spawned for one task ran 12 hours to 767k context on 53 mid-run messages:
+# new cycles from its coordinator, the user typing into its view, peer sessions' agent-say.
+# Nothing told it that a different task was a hand-off point, and "finish rather than hedge"
+# read as "a task arrived, complete it". `org.md` 12c held the sender back for ICs only.
+#
+# SPAWN TIME IS THE ONLY CARRIER THAT REACHES A RUNNING AGENT. Measured on that run's own
+# transcript (Claude Code 2.1.332): a mid-run message to a subagent fires no `UserPromptSubmit`,
+# and a resume after the agent went idle re-runs `SubagentStart` but sends none of its
+# `additionalContext` — the request after the coordinator's first resume ends with the agent's
+# last reply and the coordinator's message and nothing else, and the transcript holds 34
+# `SubagentStart` runs against one delivered context. The text an agent holds when a message
+# lands is the text it got at spawn, so the receiving half rides `SubagentStart`; the sending
+# half rides `UserPromptSubmit`, for the main session that writes the messages. Principle 12 in
+# `templates.md` and `org.md` 12c carry the same rule for orgs that re-audit.
+#
+# IT ADDS NO DISPATCH OF ITS OWN (issue i8). "Related" is `PARTITION_LINE`'s own grouping, by
+# the files or areas touched, so one rule decides both what rides a message and what shares an
+# agent. The unrelated task returns as ONE Work list item per task and is dispatched from the
+# list, so `PARTITION_LINE` and `DISPATCH_LINE` still decide when, by whom and how many at once,
+# and an earlier session's carried rows stay out of it as `earlier_lines` already keeps them.
+TASK_SCOPE_RULE = (
+    "A message to an employee that is already running carries a correction, or work very "
+    "closely related to its current task: the same deliverable, grouped with it by the files "
+    "or areas they touch, as the Work list groups its items. A completely different task is "
+    "never sent to the running employee; it goes on the main session's Work list as one item "
+    "of its own and is dispatched from there like any other item. Whether a task is related "
+    "is judged by the work, not by its issue id. An employee whose mid-run message asks for a "
+    "completely different task, whoever sent it (its coordinator, the user typing into its "
+    "view, or another session), neither takes it on nor spawns for it: it finishes or "
+    "checkpoints its own task, hands back, and names each such task in its report as needing "
+    "its own lead or employee, one new Work list item apiece. Finishing covers the task it "
+    "was given and the work very closely related to it."
+)
+
+
 # A STALLED BACKGROUND SHELL REACHES THE NEXT MESSAGE (issue i18). `wf-bg-watch` writes the flag;
 # this is the UserPromptSubmit half of handing it over, and the notification that opens a turn
 # fires this event too (measured 2026-11-27, 2.1.332), so an idle main session is told on the
@@ -4728,7 +4764,7 @@ def main():
         print(json.dumps({"hookSpecificOutput": {
             "hookEventName": "SubagentStart",
             "additionalContext": "\n\n".join(
-                x for x in (USER_WORDS, CLEANUP_RULE, _dir_line) if x),
+                x for x in (USER_WORDS, CLEANUP_RULE, TASK_SCOPE_RULE, _dir_line) if x),
         }}))
         return 0
 
@@ -4809,7 +4845,7 @@ def main():
             "hookEventName": "UserPromptSubmit",
             "additionalContext": "\n\n".join(
                 x for x in (USER_WORDS, CHOOSER_RULE, TERMINAL_TEXT_RULE, CLEANUP_RULE,
-                            checklist_line, stall_line(payload)) if x),
+                            TASK_SCOPE_RULE, checklist_line, stall_line(payload)) if x),
         }}))
         return 0
 
@@ -4848,6 +4884,7 @@ def main():
     # said "on record in this project", which was this repository's history read out as the
     # reader's own.
     lines = [USER_WORDS, "", CHOOSER_RULE, "", TERMINAL_TEXT_RULE, "", CLEANUP_RULE, "",
+             TASK_SCOPE_RULE, "",
              "This ask is of a kind whose wrong answers are well documented."]
     if docket_from:
         lines[-1] = ("This message is not the user's: it carries the work of the user's ask"

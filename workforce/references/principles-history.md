@@ -39,3 +39,4 @@ holds the text.
 - `223db4c34b9b48b6669ba4a126db590e32889b933bbc556ee62018bedf3b1c5b` — item 12 as of `2594bbc` (2026-09-16): **Finish rather than hedge.** When the work is doable, do it
 - `912da4273b6a05d60eb4ea9000542dbc42b83c69e9f13b87fa0bae5634f692cb` — item 12 as of the working tree (2026-09-24, the chooser release): **Finish rather than hedge.** When the work is doable, do it
 - `b72b334040db416e5fad47453e321973f8cddc8b20bc9eb9dd646b9175b14801` — item 15 as of the working tree (2026-11-26, the memory-rules release): **A rule the user sets lives in the project.** When the user
+- `a6a20d2132277c02f220d62a9d7c04b2592ba35a16fabb75bbba54d04abcb156` — item 12 as of the working tree (2026-11-28, issue i7, a different task mid-run is a hand-back): **Finish rather than hedge.** When the work is doable, do it

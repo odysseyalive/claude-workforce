@@ -582,12 +582,23 @@ someone can read instead of re-derive.
    not starting all over again?" Measured against 269 capped IC dispatches: 45 were cut (16%) and
    none delivered a report, while three resumed agents that same day all finished.*
 
-12c. **Never add scope to a running IC by message.** Queue a follow-up order for after the
-   hand-back, or make the small correction yourself once you have read it. **Measured cost**
+12c. **A running employee is sent only its own task**, whether it is an IC, a lead or the CEO. A
+   message to it carries a correction, or work very closely related to its current task: the same
+   deliverable, grouped with it by the files or areas they touch, as `wf-task-tag`'s Work list
+   partitions its items. A completely different task is not sent to it. It goes on the Work list
+   as one item of its own and is dispatched from there like any other item, to the employee that
+   fits it (a new lead run, or an IC directly when that is the fit). Whether a task is related is
+   judged by the work, not by its issue id. **Measured cost for an IC**
    (odyssey-alive session `52aabcb1`, 2026-10-12): two mid-run scope additions re-opened work the
    agent had already finished and verified, and both of those runs were among the ones the turn
    limit then cut off with no report. A message mid-run spends the budget twice — once on the new
-   work, once on re-verifying the old.
+   work, once on re-verifying the old. **And for a lead** (e2e-proof-mcp session `87e8ab23`,
+   2026-11-28, issue i7): one engineering-lead spawned for one task ran 12 hours to 767k context
+   on 53 mid-run messages, new cycles and different issues from its coordinator, from the user
+   typing into its view, and from peer sessions. This rung then named ICs only. The receiving
+   side is Principle 12 (`references/templates.md`) and `wf-task-tag`'s spawn text, which reaches
+   projects with no org: the employee hands back and names each unrelated task as one new Work
+   list item, and spawns nothing for it itself.
 
 12d. **Split a build order that also carries live rebuild, design review or fixtures.** Order A
    implements and unit-tests; order B — a verifier or a second IC — runs the live checks.
