@@ -8,7 +8,7 @@
 
 | Version | Date | Surface | Org | Change |
 |---|---|---|---|---|
-| 1.96.0 | 2026-11-28 | docs | no | (pending — message lands on the next regeneration) |
+| 1.96.0 | 2026-11-28 | chart, principles, changes, hooks, scripts | **yes** | Release 1.96.0: a running employee is sent only its own task, and a completely different task becomes its own Work list item and its own lead or employee |
 | 1.95.1 | 2026-11-28 | changes, scripts, installer | no | Release 1.95.1: wf-conform reads hyphenated MCP servers whole, wf-map --tests finds test files named after the target |
 | 1.95.0 | 2026-11-27 | handbook, audit, changes, hooks, scripts, installer, platform | **yes** | Release 1.95.0: web access survives the playwright-mcp to e2e-proof-mcp rename |
 | 1.94.0 | 2026-11-27 | handbook, chart, changes, hooks, scripts, installer, platform | **yes** | Release 1.94.0: a hung background shell is caught, diagnosed and negotiated |
