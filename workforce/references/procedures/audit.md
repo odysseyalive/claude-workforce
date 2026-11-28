@@ -1379,8 +1379,9 @@ Per **governed** handbook (adopted agents stay exempt until their first amendmen
    page-fetch fallback. **The page-fetch grant is the one exception to "never widen", because a rule
    owns it** (user, 2026-11-10: playwright-mcp primary, native fallback where it is absent). Run
    `"$WF/bin/wf-web-grant" --root "${CLAUDE_PROJECT_DIR:-$PWD}" --execute` and put its output in the
-   run report. It adds whichever of `mcp__playwright-mcp`, `WebFetch` and `WebSearch` a page-fetching
-   handbook's `tools:` lacks, and appends `procedures/handbook.md` Step 2a's one `## Guardrails` rule
+   run report. It adds whichever of `mcp__e2e-proof-mcp`, `mcp__playwright-mcp`, `WebFetch` and
+   `WebSearch` a page-fetching handbook's `tools:` lacks, gives any grant naming one of the server's
+   two names (renamed from `playwright-mcp` 2026-11-27) the other, and appends `procedures/handbook.md` Step 2a's one `## Guardrails` rule
    line. It never removes an entry, and the grant is the same on every host, so a project that moves
    between servers heals once and is then left alone. It writes nothing in `## Procedure` or
    `## Verification`, so the heal is not a contract change. **This command is exempt from item 1's

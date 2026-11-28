@@ -4,7 +4,7 @@
 
 > **Supersedes** [claude-enforcer](https://github.com/odysseyalive/claude-enforcer). If you run the enforcer today, [here's the migration path](#coming-from-claude-enforcer).
 
-> **PAIRS WELL WITH:** playwright-mcp. Nobody here is hired without a way to prove the work is right, and the employees who deal with websites are the hardest to hire, because clicking around a web page rarely leaves behind a clean pass-or-fail signal the way finished code does. This tool records you logging into a site once, then turns that recording into a repeatable test the employee can actually run, so the proof is a test that passes, not a model's say-so. It also handles fetching web pages, which these employees otherwise can't do on their own. [Visit the repo →](https://github.com/odysseyalive/playwright-mcp)
+> **PAIRS WELL WITH:** e2e-proof-mcp (formerly playwright-mcp). Nobody here is hired without a way to prove the work is right, and the employees who deal with websites are the hardest to hire, because clicking around a web page rarely leaves behind a clean pass-or-fail signal the way finished code does. This tool records you logging into a site once, then turns that recording into a repeatable test the employee can actually run, so the proof is a test that passes, not a model's say-so. It also handles fetching web pages, which these employees otherwise can't do on their own. [Visit the repo →](https://github.com/odysseyalive/e2e-proof-mcp)
 
 ## Contents
 
@@ -232,7 +232,7 @@ There's no build to test yet. The rule that every employee names a real check wo
 ### Proving the work is done
 
 ```
-/org every phase ships playwright-mcp e2e tests that cover new and existing functionality
+/org every phase ships e2e-proof-mcp e2e tests that cover new and existing functionality
 ```
 
 That sets a standing rule, so it lands in the verification bar every web-facing employee works to. From then on, a phase counts as finished only when a recorded browser test runs green across the new work and the old, catching whatever a change quietly broke alongside whatever it added. No model grades the result. The test passes or it fails, and that is the kind of proof that survives a missing image trying to slip through as good enough.
@@ -314,7 +314,7 @@ Both are right, for different readers. A lead reasoning about how to coordinate 
 
 Every handbook names a check that proves the work: a command that comes back successful, a set of tests that pass, a file that has to exist. *"Review the output for quality"* gets rejected at authoring time, because an employee that can't verify itself either stops early or claims a success it didn't earn.
 
-Web-facing work is the hardest kind to write a real check for. [playwright-mcp](https://github.com/odysseyalive/playwright-mcp) solves it. It records you logging into a site once, then builds a repeatable test out of that recording, with no model involved in the checking. The employee proves its work by running that test and watching it pass. It also does the web-page fetching these employees otherwise can't do on their own.
+Web-facing work is the hardest kind to write a real check for. [e2e-proof-mcp](https://github.com/odysseyalive/e2e-proof-mcp), formerly playwright-mcp, solves it. It records you logging into a site once, then builds a repeatable test out of that recording, with no model involved in the checking. The employee proves its work by running that test and watching it pass. It also does the web-page fetching these employees otherwise can't do on their own.
 
 Some work has no command that can check it. There, the check is a catalog, a written list to grade against. Every project gets two reviewers, one for code quality and one for whether writing reads as genuinely human, each carrying a list of tells and common mistakes. A catalog turns taste into a checklist. *"Does this read as machine-written?"* is subjective. *"Does this trip three or more of these specific tells?"* is close to mechanical.
 

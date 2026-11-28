@@ -18286,7 +18286,7 @@
     ],
     "exit": 0,
     "want": [
-      "web fetch: playwright-mcp ABSENT"
+      "web fetch: e2e-proof-mcp / playwright-mcp ABSENT"
     ],
     "not": [
       "exporter.md",
@@ -18307,12 +18307,12 @@
     ],
     "exit": 0,
     "want": [
-      "healed  researcher.md  +mcp__playwright-mcp; +WebFetch; +WebSearch; rule line added to `## Guardrails`"
+      "healed  researcher.md  +mcp__e2e-proof-mcp; +mcp__playwright-mcp; +WebFetch; +WebSearch; rule line added to `## Guardrails`"
     ],
     "after": {
       ".claude/agents/researcher.md": {
         "want": [
-          "tools: Read, Write, Bash, mcp__playwright-mcp, WebFetch, WebSearch",
+          "tools: Read, Write, Bash, mcp__e2e-proof-mcp, mcp__playwright-mcp, WebFetch, WebSearch",
           "<!-- origin: workforce | modifiable: true | web-fetch -->"
         ]
       }
@@ -19207,6 +19207,219 @@
     "not": [
       "which this agent started",
       "Traceback"
+    ]
+  },
+  "web-grant-old-name-heals-to-both": {
+    "_why": "THE RENAME, OLD-ONLY INSTALL (2026-11-27). `playwright-mcp` became `e2e-proof-mcp`, same tools under a new prefix, and an employee has to keep its web access before and after a host's installer runs. This handbook is what 1.88.0-1.94.0 wrote: the old server name alone and the old one-name rule line. `--execute` must add `mcp__e2e-proof-mcp` beside the old entry, never remove the old one, and refresh the rule line to name both. On 1.94.0 it reads `ok` and the employee loses `web_fetch` the moment the host switches.",
+    "script": "wf-web-grant",
+    "args": [
+      "--execute"
+    ],
+    "exit": 0,
+    "want": [
+      "healed  researcher.md  +mcp__e2e-proof-mcp; rule line refreshed"
+    ],
+    "not": [
+      "+mcp__playwright-mcp",
+      "Traceback"
+    ],
+    "after": {
+      ".claude/agents/researcher.md": {
+        "want": [
+          "tools: Read, Write, Bash, mcp__e2e-proof-mcp, mcp__playwright-mcp, WebFetch, WebSearch",
+          "or with `mcp__playwright-mcp__web_fetch` (the same server under its earlier name) when only that one is among your tools"
+        ],
+        "once": [
+          "<!-- origin: workforce | modifiable: true | web-fetch -->"
+        ],
+        "not": [
+          "Fetch every page with `mcp__playwright-mcp__web_fetch` and find pages with"
+        ]
+      }
+    }
+  },
+  "web-grant-new-name-heals-to-both": {
+    "_why": "THE RENAME, NEW-ONLY INSTALL. A handbook written by hand against the new name alone, on a host whose installer has not run yet, holds a grant that resolves to nothing there. `--execute` must add the old name beside the new one and touch nothing else: the rule line already reads as the current release writes it, so no `rule line` change may be reported.",
+    "script": "wf-web-grant",
+    "args": [
+      "--execute"
+    ],
+    "exit": 0,
+    "want": [
+      "healed  researcher.md  +mcp__playwright-mcp"
+    ],
+    "not": [
+      "+mcp__e2e-proof-mcp",
+      "rule line",
+      "Traceback"
+    ],
+    "after": {
+      ".claude/agents/researcher.md": {
+        "want": [
+          "tools: Read, Write, Bash, mcp__e2e-proof-mcp, mcp__playwright-mcp, WebFetch, WebSearch"
+        ],
+        "once": [
+          "<!-- origin: workforce | modifiable: true | web-fetch -->"
+        ]
+      }
+    }
+  },
+  "web-grant-both-names-ok": {
+    "_why": "THE RENAME, BOTH NAMES. A handbook carrying both server names and the current rule line is conformant: the report-only run exits 0 and reads `ok`, and `--execute` would write nothing. A heal that kept re-adding an alias, or reordered the pair, would print `heal` and exit 1 here.",
+    "script": "wf-web-grant",
+    "exit": 0,
+    "want": [
+      "ok      researcher.md"
+    ],
+    "not": [
+      "heal ",
+      "healed",
+      "Traceback"
+    ],
+    "after": {
+      ".claude/agents/researcher.md": {
+        "unchanged": true
+      }
+    }
+  },
+  "web-grant-browser-grant-gets-both-names": {
+    "_why": "THE RENAME REACHES AN EMPLOYEE THAT FETCHES NO PAGE. An e2e tester granted `browser_*` tools by name under the old prefix loses its browser at the switch exactly as a fetcher loses `web_fetch`, and a `disallowedTools:` entry under the old name stops denying anything. Each tool-level entry gets its new-name twin beside it, in both lines. It fetches nothing, so it gets no `WebFetch`, no `WebSearch` and no rule line. `plain.md` names no server and must not be touched or mentioned.",
+    "script": "wf-web-grant",
+    "args": [
+      "--execute"
+    ],
+    "exit": 0,
+    "want": [
+      "healed  tester.md  +mcp__e2e-proof-mcp__browser_navigate; +mcp__e2e-proof-mcp__browser_snapshot; +disallowed mcp__e2e-proof-mcp__movie_record"
+    ],
+    "not": [
+      "plain.md",
+      "rule line",
+      "+WebFetch",
+      "Traceback"
+    ],
+    "after": {
+      ".claude/agents/tester.md": {
+        "want": [
+          "tools: Read, Bash, mcp__e2e-proof-mcp__browser_navigate, mcp__playwright-mcp__browser_navigate, mcp__e2e-proof-mcp__browser_snapshot, mcp__playwright-mcp__browser_snapshot",
+          "disallowedTools: Agent, mcp__e2e-proof-mcp__movie_record, mcp__playwright-mcp__movie_record"
+        ],
+        "not": [
+          "web-fetch -->",
+          "WebFetch"
+        ]
+      },
+      ".claude/agents/plain.md": {
+        "unchanged": true
+      }
+    }
+  },
+  "web-grant-detects-new-name": {
+    "_why": "A host configured under the new name reads PRESENT, and the primary it names is the new name's `web_fetch`. Under 1.94.0 this host read ABSENT, so its guard allowed `WebFetch` around the server's exfiltration guards.",
+    "script": "wf-web-grant",
+    "exit": 0,
+    "want": [
+      "web fetch: e2e-proof-mcp PRESENT (",
+      ".mcp.json mcpServers.e2e-proof-mcp) -> primary `mcp__e2e-proof-mcp__web_fetch`"
+    ],
+    "not": [
+      "ABSENT",
+      "Traceback"
+    ]
+  },
+  "web-grant-detects-old-name": {
+    "_why": "The control for web-grant-detects-new-name: a host still configured under the old name reads PRESENT too, and names the old name's `web_fetch`, the tool an employee there can actually call.",
+    "script": "wf-web-grant",
+    "exit": 0,
+    "want": [
+      "web fetch: playwright-mcp PRESENT (",
+      ".mcp.json mcpServers.playwright-mcp) -> primary `mcp__playwright-mcp__web_fetch`"
+    ],
+    "not": [
+      "ABSENT",
+      "Traceback"
+    ]
+  },
+  "webfetch-guard-new-name-denies": {
+    "_why": "The enforcing layer after the rename. A host configured under `e2e-proof-mcp` must deny `WebFetch`, and the reason must name `mcp__e2e-proof-mcp__web_fetch`, the tool the agent there holds. On 1.94.0 this call was allowed.",
+    "script": "wf-webfetch-guard",
+    "stdin_raw": "{\"tool_name\": \"WebFetch\", \"tool_input\": {\"url\": \"https://example.com\"}, \"cwd\": \".\", \"hook_event_name\": \"PreToolUse\"}",
+    "exit": 0,
+    "want": [
+      "\"permissionDecision\": \"deny\"",
+      "e2e-proof-mcp is configured on this host",
+      "Call `mcp__e2e-proof-mcp__web_fetch` with the same url"
+    ],
+    "not": [
+      "mcp__playwright-mcp__web_fetch",
+      "Traceback"
+    ]
+  },
+  "webfetch-guard-old-name-denies": {
+    "_why": "Before the rename reaches a host: configured under `playwright-mcp`, the guard still denies `WebFetch`, and names the old name's tool, not the new one the host does not have.",
+    "script": "wf-webfetch-guard",
+    "stdin_raw": "{\"tool_name\": \"WebFetch\", \"tool_input\": {\"url\": \"https://example.com\"}, \"cwd\": \".\", \"hook_event_name\": \"PreToolUse\"}",
+    "exit": 0,
+    "want": [
+      "\"permissionDecision\": \"deny\"",
+      "playwright-mcp is configured on this host",
+      "Call `mcp__playwright-mcp__web_fetch` with the same url"
+    ],
+    "not": [
+      "mcp__e2e-proof-mcp__web_fetch",
+      "Traceback"
+    ]
+  },
+  "webfetch-guard-other-server-allows": {
+    "_why": "The control for both guard cases: a host whose `.mcp.json` configures some other server, and neither name, allows `WebFetch`, the native fallback. A guard that denied on any configured server would pass the two deny cases and fail this one.",
+    "script": "wf-webfetch-guard",
+    "stdin_raw": "{\"tool_name\": \"WebFetch\", \"tool_input\": {\"url\": \"https://example.com\"}, \"cwd\": \".\", \"hook_event_name\": \"PreToolUse\"}",
+    "exit": 0,
+    "not": [
+      "deny",
+      "Traceback"
+    ]
+  },
+  "heal-web-grant-old-name-at-session-start": {
+    "_why": "The path that reaches an existing org with no audit and no typed command: `wf-heal` at SessionStart. A page-fetching handbook carrying only the old server name, as every org healed by 1.88.0-1.94.0 does, is given the new name and the two-name rule line the next time the project is opened.",
+    "script": "wf-heal",
+    "stdin_raw": "{\"cwd\": \".\", \"hook_event_name\": \"SessionStart\", \"source\": \"startup\"}",
+    "exit": 0,
+    "want": [
+      "healed  researcher.md  +mcp__e2e-proof-mcp; rule line refreshed"
+    ],
+    "not": [
+      "Traceback",
+      "NOT written"
+    ],
+    "after": {
+      ".claude/agents/researcher.md": {
+        "want": [
+          "tools: Read, Write, Bash, mcp__e2e-proof-mcp, mcp__playwright-mcp, WebFetch, WebSearch"
+        ]
+      }
+    }
+  },
+  "conform-mcp-either-name-satisfies": {
+    "_why": "ONE SERVER UNDER TWO NAMES IS NOT A MISSING GRANT. After the rename a body may name either prefix and a grant may carry either: `oldbody` invokes the old name and is granted the new, `newbody` the reverse, `bothbody` carries both. All three must pass the body-vs-grant row. On 1.94.0 `oldbody` and `newbody` each fail it, so a heal that adds the second name would be the only thing standing between a renamed host and a red gate.",
+    "script": "wf-conform",
+    "exit": 0,
+    "want": [
+      "3 governed",
+      "0 failed"
+    ],
+    "not": [
+      "✗ ",
+      "body routes work through"
+    ]
+  },
+  "conform-mcp-renamed-server-still-needs-a-grant": {
+    "_why": "The control for conform-mcp-either-name-satisfies: the alias map makes the two names one server, not any server. A body invoking `mcp__e2e-proof-mcp__web_fetch` under a grant of `mcp__other-mcp` still fails the row and names the server.",
+    "script": "wf-conform",
+    "exit": 1,
+    "want": [
+      "✗ g.md: every MCP server its body uses is named in tools:",
+      "body routes work through e2e-proof-mcp"
     ]
   }
 }

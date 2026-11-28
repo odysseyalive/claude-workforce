@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
-"""wf-webfetch-guard — PreToolUse hook on WebFetch: where playwright-mcp is configured, a page
-is fetched through it, and `WebFetch` is refused.
+"""wf-webfetch-guard — PreToolUse hook on WebFetch: where e2e-proof-mcp (formerly playwright-mcp)
+is configured, a page is fetched through it, and `WebFetch` is refused.
 
 THE RULE (user, 2026-11-10): "for item 05, we need to set up the playwright-mcp as a primary
 (not a suggestion), if the mcp doesn't exist, it falls back to native tools." `wf-web-grant`
-grants every page-fetching employee `mcp__playwright-mcp`, `WebFetch` and `WebSearch` on every
-host, so a project that moves between servers never rewrites its tracked `tools:` lines. That
-leaves the choice between the two fetch tools to be made per host, at the call.
+grants every page-fetching employee `mcp__e2e-proof-mcp`, `mcp__playwright-mcp`, `WebFetch` and
+`WebSearch` on every host, so a project that moves between servers never rewrites its tracked
+`tools:` lines. That leaves the choice between the fetch tools to be made per host, at the call.
+
+THE SERVER WAS RENAMED (2026-11-27): `playwright-mcp` is now `e2e-proof-mcp`, same tools. A host
+configured under either name denies `WebFetch`, and the reason names the `web_fetch` tool of
+the name that host actually configured, which is the one the agent can call.
 
 TWO LAYERS, AND WHAT EACH IS WORTH.
   - The `## Guardrails` line `wf-web-grant` writes tells the employee to use `web_fetch` while
@@ -57,12 +61,13 @@ def decide(payload):
         return None
     root = os.environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd") or os.getcwd()
     grant = _sibling("wf-web-grant")
-    present, where, _ = grant.detect(root)
-    if not present:
+    server, where, _ = grant.detect(root)
+    if not server:
         return None
-    return (f"playwright-mcp is configured on this host ({where}), so pages are fetched with "
-            f"`{grant.FETCH_TOOL}`, which applies the exfiltration guards `WebFetch` skips. "
-            f"Call `{grant.FETCH_TOOL}` with the same url. If that tool is not among your "
+    tool = f"mcp__{server}__web_fetch"
+    return (f"{server} is configured on this host ({where}), so pages are fetched with "
+            f"`{tool}`, which applies the exfiltration guards `WebFetch` skips. "
+            f"Call `{tool}` with the same url. If that tool is not among your "
             f"tools, report it as a tooling limit and do not retry `WebFetch`.")
 
 

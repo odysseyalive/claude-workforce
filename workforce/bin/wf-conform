@@ -151,6 +151,12 @@ AGENT_ALLOWLIST_RX = re.compile(r"^(?:tools|disallowedTools):.*\bAgent\(", re.M)
 # `\b` terminator, and `\b` matches at a hyphen — it read `mcp__playwright-mcp` as
 # the server `playwright`, then reported it missing from a grant that contained it.
 MCP_TOOL_RX = re.compile(r"mcp__([A-Za-z0-9-]+)")
+# ONE SERVER UNDER TWO NAMES. `playwright-mcp` was renamed `e2e-proof-mcp` (2026-11-27), same
+# server and same tool names, and both are accepted until the old name is dropped in a later
+# release. A body naming either is served by a grant naming either, so the row below compares
+# servers through this map. `wf-web-grant` is what gives a handbook carrying one name the
+# other; this row only refuses to call either half of the pair missing.
+MCP_SERVER_ALIASES = {"playwright-mcp": "e2e-proof-mcp"}
 # LINE-ANCHORED AT COLUMN 0, byte-identical to `wf-census`'s IMMUTABLE_OPEN and to
 # every other counter in this distribution — an indented marker is a markdown code
 # block and therefore documentation ABOUT the format, never a span opener.
@@ -1613,7 +1619,8 @@ def check_handbook(path, body, res, ceiling, floors=None):
             wanted |= {s.lower() for s in MCP_SLUG_RX.findall(line)
                        if _is_server_slug(s.lower(), line)}
         have = {s.lower() for s in MCP_TOOL_RX.findall(granted)}
-        missing = sorted(wanted - have)
+        _served = {MCP_SERVER_ALIASES.get(x, x) for x in have}
+        missing = sorted(w for w in wanted if MCP_SERVER_ALIASES.get(w, w) not in _served)
         res.add(
             not missing,
             f"{n}: every MCP server its body uses is named in tools:",

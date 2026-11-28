@@ -97,7 +97,8 @@ timeout 240 python3 -I -m http.server <port> --bind 127.0.0.1 --directory <page 
 ```
 
 A refused first navigation means the server was still starting; retry once. Then, with
-playwright-mcp's browser tools or whatever browser automation the session has:
+e2e-proof-mcp's browser tools (playwright-mcp's, under its earlier name) or whatever browser
+automation the session has:
 
 1. SVG text sits inside its box and inside the diagram.
 2. The page has no horizontal overflow.

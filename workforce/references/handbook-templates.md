@@ -616,7 +616,7 @@ owner is this employee, and stating it is what makes every unlisted path someone
 ## Untrusted-content-facing IC
 
 **This covers every IC whose tools reach content it did not write** — a fetched web page
-(`mcp__playwright-mcp` web_fetch, or `WebFetch`) AND an inbound correspondence, inbox, or calendar
+(`mcp__e2e-proof-mcp` or `mcp__playwright-mcp` web_fetch, or `WebFetch`) AND an inbound correspondence, inbox, or calendar
 source (`mcp__*Gmail*`, `mcp__*Calendar*`, IMAP/Slack/Quo). The frontmatter and the
 injection-resistance section below apply to all of them; a web fetcher and a mail reader face the same
 hostile channel.
@@ -625,15 +625,22 @@ hostile channel.
 without them — and because `tools:` is a hard ceiling for MCP (fact 13), the server it works through
 is named **at server level, inside that allowlist**.
 
-**A web fetcher's fetch tool is a rule, not a choice.** `playwright-mcp` is the primary page fetch;
+**A web fetcher's fetch tool is a rule, not a choice.** `e2e-proof-mcp` is the primary page fetch;
 where the host has not configured it, the employee falls back to native `WebFetch`. Discovery is
 `WebSearch` on both. The grant is the same on every host, so a project that moves between servers
 never rewrites it (`procedures/handbook.md` Step 2a), and `wf-web-grant` writes it:
 
 ```yaml
-tools: Read, Write, Bash, mcp__playwright-mcp, WebFetch, WebSearch
+tools: Read, Write, Bash, mcp__e2e-proof-mcp, mcp__playwright-mcp, WebFetch, WebSearch
 disallowedTools: Agent
 ```
+
+**The server has two names, and the grant carries both.** `playwright-mcp` was renamed
+`e2e-proof-mcp` (2026-11-27), the same server with the same tool names, so a host has one name or the
+other depending on whether its installer has run. Every grant names the server under both, a
+`browser_*` or tool-level entry as much as the server-level one, so the employee keeps its web access
+either side of the switch. `wf-web-grant` gives a grant carrying one name the other; the earlier name
+is dropped in a later release.
 
 Where the server is not configured its grant resolves to nothing (fact 13b), so `web_fetch` is simply
 not among the employee's tools. On a host that has the server, the `wf-webfetch-guard` hook denies
@@ -643,7 +650,7 @@ it tells the model the same rule, so it does not spend a call on the denial:
 
 ```markdown
 <!-- origin: workforce | modifiable: true | web-fetch -->
-- **Web fetch.** Fetch every page with `mcp__playwright-mcp__web_fetch` and find pages with `WebSearch`. When `mcp__playwright-mcp__web_fetch` is not among your tools, fetch with `WebFetch` instead and name that fallback in your report. NEVER use `WebFetch` while `mcp__playwright-mcp__web_fetch` is among your tools, and NEVER report the network unavailable while either fetch tool is.
+- **Web fetch.** Fetch every page with `mcp__e2e-proof-mcp__web_fetch`, or with `mcp__playwright-mcp__web_fetch` (the same server under its earlier name) when only that one is among your tools, and find pages with `WebSearch`. When neither is among your tools, fetch with `WebFetch` instead and name that fallback in your report. NEVER use `WebFetch` while either `web_fetch` tool is among your tools, and NEVER report the network unavailable while any fetch tool is.
 <!-- /origin -->
 ```
 

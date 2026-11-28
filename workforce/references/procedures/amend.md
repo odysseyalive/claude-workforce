@@ -48,9 +48,10 @@ else it would have done.
 **The fourth row is not a technicality.** `modifiable: true` is a statement about who may rewrite the
 block, not an invitation to whoever reads it — a foreign marker means another generator will rewrite
 that span on its own schedule, so an amendment there is overwritten without warning and the two tools
-fight over one file forever. The live case: `playwright-mcp`'s `suite_scaffold` writes
-`.claude/skills/test-suite/` with `<!-- origin: playwright-mcp suite_scaffold | modifiable: true -->`,
-and `suite_scaffold --force` rewrites the whole span. Match on the **full marker text**, never on
+fight over one file forever. The live case: `e2e-proof-mcp`'s `suite_scaffold` writes
+`.claude/skills/test-suite/` with `<!-- origin: e2e-proof-mcp suite_scaffold | modifiable: true -->`,
+and `suite_scaffold --force` rewrites the whole span. A suite scaffolded before the server's rename
+carries `<!-- origin: playwright-mcp suite_scaffold | modifiable: true -->`; both are the same owner. Match on the **full marker text**, never on
 `modifiable: true` alone.
 
 ## Step 3 — Determine blast radius

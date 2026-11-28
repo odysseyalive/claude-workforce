@@ -7,9 +7,21 @@
 THE RULE (user, 2026-11-10): "for item 05, we need to set up the playwright-mcp as a primary
 (not a suggestion), if the mcp doesn't exist, it falls back to native tools." And: "the
 playwright-mcp is mainly for page fetch". So this governs PAGE FETCH only. Discovery is
-native `WebSearch`; interactive browsing (`browser_*`) is not touched here.
+native `WebSearch`; interactive browsing (`browser_*`) is not touched here, except by name.
 
-ONE GRANT ON EVERY HOST: `tools:` carries `mcp__playwright-mcp`, `WebFetch` and `WebSearch`.
+THE SERVER IS RENAMED, AND BOTH NAMES ARE GRANTED UNTIL THE OLD ONE IS DROPPED (2026-11-27).
+`playwright-mcp` becomes `e2e-proof-mcp`: the same server with the same tool names, so after
+its installer runs every tool is `mcp__e2e-proof-mcp__<name>` instead of
+`mcp__playwright-mcp__<name>`. A host can hold either name, and an employee has to keep its web
+access across the switch, so `SERVERS` lists both. Any grant naming one server name is given
+the other beside it: a server-level entry, a tool-level one (`..__browser_click`) and a
+`disallowedTools:` entry alike, in every governed handbook and not only the page-fetching ones,
+because an e2e employee that drives `browser_*` loses its browser the same way. Nothing is
+removed, so a handbook that carries only the old name heals to carry both, and one that already
+carries both is left alone. The old name leaves `SERVERS` in a later release.
+
+ONE GRANT ON EVERY HOST: `tools:` carries `mcp__e2e-proof-mcp`, `mcp__playwright-mcp`, `WebFetch`
+and `WebSearch`.
 The choice between the two fetch tools is made per host at the call, not in the tracked file:
 `wf-webfetch-guard` (a PreToolUse hook) denies `WebFetch` where the server is configured, which
 ENFORCES it, and the `## Guardrails` line below tells the model the same, which is ADVISORY. the user runs projects across several servers, and a `tools:` line
@@ -32,9 +44,11 @@ WHICH HANDBOOKS. Governed ones (an ORG-RECORD marker) with a comma-list `tools:`
 `## Procedure` or `## Verification` names a page fetch (`web_fetch` or `WebFetch`) on a line
 that is not a prohibition. Mentioning a tool is not using it: "`Grep`/`Glob`/`WebFetch` do
 not reach subagents" is a sentence about a tool, not a step that uses one. A delegating tier
-has no `tools:` line and inherits both tools, so it is reported and never edited.
+has no `tools:` line and inherits both tools, so it is reported and never edited. For the
+second name alone, every governed handbook whose `tools:` or `disallowedTools:` names either
+server name.
 
-WHAT IT WRITES, and nothing else: the one `tools:` line, and one `origin: workforce` span
+WHAT IT WRITES, and nothing else: the `tools:` and `disallowedTools:` lines, and one `origin: workforce` span
 at the end of `## Guardrails` stating the rule to the employee. Neither is in the
 `## Procedure` + `## Verification` text that `contract-stamp` hashes, so a heal never reads
 as CONTRACT-DRIFT. A link is never written through.
@@ -54,14 +68,17 @@ import os
 import re
 import sys
 
-SERVER = "playwright-mcp"
-PRIMARY = f"mcp__{SERVER}"
-FETCH_TOOL = f"mcp__{SERVER}__web_fetch"
+# The current name first, then the earlier one. Order is what gets written, and what is
+# named first in the rule line; detection accepts any entry.
+SERVERS = ("e2e-proof-mcp", "playwright-mcp")
+PRIMARIES = tuple(f"mcp__{s}" for s in SERVERS)
+FETCH_TOOLS = tuple(f"mcp__{s}__web_fetch" for s in SERVERS)
 FALLBACK = "WebFetch"
 DISCOVER = "WebSearch"
 
 FM_RX = re.compile(r"\A---\n(.*?)\n---\n", re.S)
 TOOLS_LINE_RX = re.compile(r"^tools:[ \t]*(.*)$", re.M)
+DENY_LINE_RX = re.compile(r"^disallowedTools:[ \t]*(.*)$", re.M)
 # Copied from `wf-conform`, as `wf-stamp` copies it: the governed discriminator is the marker.
 ORG_RECORD_RX = re.compile(r"^[ \t]*<!--\s*ORG-RECORD\s+START\b", re.I | re.M)
 # Copied from `wf-conform`: a line that forbids something is not a step that does it.
@@ -89,17 +106,20 @@ def _uses_fetch(line):
     return False
 
 
-PRIMARY_TOKEN_RX = re.compile(rf"^mcp__{re.escape(SERVER)}(?:__.*)?$")
+# One grant entry naming either server name: group 1 the name, group 2 what follows it
+# (`""` for the server-level entry, `__web_fetch`, `__*`, ...).
+SERVER_TOKEN_RX = re.compile(r"^mcp__(" + "|".join(map(re.escape, SERVERS)) + r")((?:__.*)?)$")
 
 SPAN_OPEN = "<!-- origin: workforce | modifiable: true | web-fetch -->"
 SPAN_RX = re.compile(r"^" + re.escape(SPAN_OPEN) + r"\n.*?^<!-- /origin -->\n?", re.M | re.S)
 # One line on purpose. It carries NEVER, so `wf-conform`'s body-vs-grant row reads it as a
 # rule about a tool rather than a use of one, on a host where the grant names no server.
-RULE = (f"- **Web fetch.** Fetch every page with `{FETCH_TOOL}` and find pages with "
-        f"`{DISCOVER}`. When `{FETCH_TOOL}` is not among your tools, fetch with `{FALLBACK}` "
-        f"instead and name that fallback in your report. NEVER use `{FALLBACK}` while "
-        f"`{FETCH_TOOL}` is among your tools, and NEVER report the network unavailable while "
-        f"either fetch tool is.")
+RULE = (f"- **Web fetch.** Fetch every page with `{FETCH_TOOLS[0]}`, or with `{FETCH_TOOLS[1]}` "
+        f"(the same server under its earlier name) when only that one is among your tools, and "
+        f"find pages with `{DISCOVER}`. When neither is among your tools, fetch with `{FALLBACK}` "
+        f"instead and name that fallback in your report. NEVER use `{FALLBACK}` while either "
+        f"`web_fetch` tool is among your tools, and NEVER report the network unavailable while "
+        f"any fetch tool is.")
 SPAN = f"{SPAN_OPEN}\n{RULE}\n<!-- /origin -->\n"
 
 
@@ -125,7 +145,8 @@ def _claude_json_paths():
 
 
 def detect(root):
-    """-> (present, where, searched). `where` names the file and key that said PRESENT."""
+    """-> (server, where, searched). `server` is the configured name out of `SERVERS`, or
+    None, so it reads as the PRESENT flag; `where` names the file and key that said PRESENT."""
     root = os.path.abspath(root)
     sources = []
     for p in _claude_json_paths():
@@ -145,9 +166,11 @@ def detect(root):
             sources.append((f"{p} mcpServers", data.get("mcpServers")))
     searched = [s for s, _ in sources]
     for where, servers in sources:
-        if isinstance(servers, dict) and SERVER in servers:
-            return True, where, searched
-    return False, None, searched
+        if isinstance(servers, dict):
+            for name in SERVERS:
+                if name in servers:
+                    return name, f"{where}.{name}", searched
+    return None, None, searched
 
 
 def fallback_denied(root):
@@ -188,35 +211,83 @@ def fetches(body):
     return False
 
 
-def want_tokens(tokens):
-    """The same grant on every host. Only ever adds, so a second run anywhere is a no-op."""
-    out = list(tokens)
-    if not any(PRIMARY_TOKEN_RX.match(t) for t in out):
-        out.append(PRIMARY)
-    for t in (FALLBACK, DISCOVER):
-        if t not in out:
-            out.append(t)
+def with_both_names(tokens):
+    """Each entry naming one server name, with the same entry under every other name beside
+    it, current name first. Existing entries keep their order; nothing is removed."""
+    out = []
+    for t in tokens:
+        m = SERVER_TOKEN_RX.match(t)
+        group = [f"mcp__{s}{m.group(2)}" for s in SERVERS] if m else [t]
+        for g in group:
+            if g not in out and (g == t or g not in tokens):
+                out.append(g)
     return out
+
+
+def want_tokens(tokens, fetching=True):
+    """The same grant on every host. Only ever adds, so a second run anywhere is a no-op."""
+    out = with_both_names(tokens)
+    if fetching:
+        if not any(SERVER_TOKEN_RX.match(t) for t in out):
+            out.extend(PRIMARIES)
+        for t in (FALLBACK, DISCOVER):
+            if t not in out:
+                out.append(t)
+    return out
+
+
+def _comma_list(line_match):
+    """The entries of a frontmatter list line, or None when it is not a comma list."""
+    raw = line_match.group(1).strip()
+    if not raw or raw.startswith("[") or raw.startswith("-"):
+        return None
+    return [t.strip() for t in raw.split(",") if t.strip()]
+
+
+def names_server(body):
+    """True when the frontmatter's `tools:` or `disallowedTools:` names either server name."""
+    fm = FM_RX.match(body)
+    if not fm:
+        return False
+    for rx in (TOOLS_LINE_RX, DENY_LINE_RX):
+        m = rx.search(fm.group(1))
+        if m and any(SERVER_TOKEN_RX.match(t) for t in (_comma_list(m) or [])):
+            return True
+    return False
 
 
 def plan(body):
     """-> (state, new_body, changes). state: ok | change | skip:<why> | none."""
     fm = FM_RX.match(body)
-    if not fm or not ORG_RECORD_RX.search(body) or not fetches(body):
+    if not fm or not ORG_RECORD_RX.search(body):
+        return "none", body, []
+    fetching = fetches(body)
+    if not fetching and not names_server(body):
         return "none", body, []
     tl = TOOLS_LINE_RX.search(fm.group(1))
-    if tl is None:
+    if tl is None and fetching:
         return "skip:no `tools:` line (a delegating tier inherits both tools)", body, []
-    raw = tl.group(1).strip()
-    if not raw or raw.startswith("[") or raw.startswith("-"):
+    tokens = _comma_list(tl) if tl else []
+    if tokens is None:
         return "skip:`tools:` is not a comma list, so it is not edited", body, []
-    tokens = [t.strip() for t in raw.split(",") if t.strip()]
-    want = want_tokens(tokens)
-    changes = [f"+{t}" for t in want if t not in tokens]
+    changes, edits = [], []
+    if tl is not None:
+        want = want_tokens(tokens, fetching)
+        changes += [f"+{t}" for t in want if t not in tokens]
+        if want != tokens:
+            edits.append((tl.start(1), tl.end(1), ", ".join(want)))
+    dl = DENY_LINE_RX.search(fm.group(1))
+    deny = _comma_list(dl) if dl else None
+    if deny:
+        want = with_both_names(deny)
+        changes += [f"+disallowed {t}" for t in want if t not in deny]
+        if want != deny:
+            edits.append((dl.start(1), dl.end(1), ", ".join(want)))
     new = body
-    if want != tokens:
-        start = fm.start(1) + tl.start(1)
-        new = new[:start] + ", ".join(want) + new[fm.start(1) + tl.end(1):]
+    for a, b, text in sorted(edits, reverse=True):     # later span first, offsets hold
+        new = new[:fm.start(1) + a] + text + new[fm.start(1) + b:]
+    if not fetching:
+        return ("change", new, changes) if new != body else ("ok", body, [])
     have = SPAN_RX.search(new)
     if have is None:
         sec = _section(new, "## Guardrails")
@@ -262,13 +333,13 @@ def handbooks(root):
 def run(root, execute):
     """-> (exit code, lines). The first line says which fetch tool an employee on THIS host
     will use; what is written does not depend on it."""
-    present, where, searched = detect(root)
-    if present:
-        lines = [f"web fetch: {SERVER} PRESENT ({where}) -> primary `{FETCH_TOOL}`, "
+    server, where, searched = detect(root)
+    if server:
+        lines = [f"web fetch: {server} PRESENT ({where}) -> primary `mcp__{server}__web_fetch`, "
                  f"discovery `{DISCOVER}`"]
     else:
-        lines = [f"web fetch: {SERVER} ABSENT (searched {len(searched)} config source(s)) -> "
-                 f"native fallback `{FALLBACK}`, discovery `{DISCOVER}`"]
+        lines = [f"web fetch: {' / '.join(SERVERS)} ABSENT (searched {len(searched)} config "
+                 f"source(s)) -> native fallback `{FALLBACK}`, discovery `{DISCOVER}`"]
         for p in fallback_denied(root):
             lines.append(f"web fetch: `{FALLBACK}` is DENIED by {p} permissions.deny, so no "
                          f"page fetch reaches an employee on this host. Research degrades to "
@@ -305,15 +376,17 @@ def run(root, execute):
 
 def heal(root, progress=None):
     """`wf-heal`'s entry: execute, and return the lines to show, or "" when nothing moved.
-    Near zero when there is nothing to do: no handbook names a fetch, nothing is parsed."""
+    Near zero when there is nothing to do: no handbook names a fetch or either server name,
+    and no config is read."""
     paths = handbooks(root)
     if not paths:
         return ""
     for p in paths:
         try:
             with open(p, encoding="utf-8") as fh:
-                if fetches(fh.read()):
-                    break
+                text = fh.read()
+            if fetches(text) or names_server(text):
+                break
         except OSError:
             continue
     else:

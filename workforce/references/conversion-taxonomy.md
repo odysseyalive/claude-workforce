@@ -500,8 +500,9 @@ No panel. Do not convert.
    the handbook and the regenerated skill become **two live copies of one job** — the exact two-canonical-
    texts failure conversion exists to avoid. Report the owner by name so the reason is legible.
 
-   **Two live cases, and the second is the common one.** `playwright-mcp`'s `suite_scaffold`
-   (`.claude/skills/test-suite/`, marker `origin: playwright-mcp suite_scaffold`) rewrites the file
+   **Two live cases, and the second is the common one.** `e2e-proof-mcp`'s `suite_scaffold`
+   (`.claude/skills/test-suite/`, marker `origin: e2e-proof-mcp suite_scaffold`, or
+   `origin: playwright-mcp suite_scaffold` from before the server's rename) rewrites the file
    wholesale in `--force` mode — one skill, one owner, unambiguous. The larger case is a project whose
    whole skill library is maintained by a **generator installed and running in that same project**:
    dozens of skills, every one of them rule 7. Detected at `audit-setup.md` § Step 0.7 as `foreign-owned`.

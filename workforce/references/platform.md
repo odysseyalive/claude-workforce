@@ -336,11 +336,12 @@ headless session refuses an unapproved call, and a copy of this probe without th
 permission refusal as a missing grant.
 
 **Page fetch follows from it** (user, 2026-11-10: playwright-mcp is the primary, and where it is absent
-the employee falls back to native tools). A page-fetching IC is granted `mcp__playwright-mcp`,
-`WebFetch` and `WebSearch` on every host, because projects move between servers and a per-host grant
-would rewrite a tracked file on each one. It discovers with `WebSearch`. Where the server is
-configured it fetches with `mcp__playwright-mcp__web_fetch`, and its `## Guardrails` line forbids
-`WebFetch` while that tool is present. Where the server is not configured, the grant for it resolves
+the employee falls back to native tools). The server was renamed `e2e-proof-mcp` on 2026-11-27, same
+tools, so a page-fetching IC is granted `mcp__e2e-proof-mcp`, `mcp__playwright-mcp`, `WebFetch` and
+`WebSearch` on every host, because projects move between servers and a per-host grant would rewrite a
+tracked file on each one; the earlier name is dropped in a later release. It discovers with
+`WebSearch`. Where the server is configured under either name it fetches with that name's `web_fetch`,
+and its `## Guardrails` line forbids `WebFetch` while either is present. Where the server is not configured, the grant for it resolves
 to nothing (fact 13b) and the employee fetches with `WebFetch`. `wf-web-grant` writes and heals that
 grant, and reports a `permissions.deny` rule that leaves the fallback with nothing
 (`procedures/handbook.md` Step 2a).

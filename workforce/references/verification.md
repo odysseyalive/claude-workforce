@@ -22,7 +22,7 @@ own opinion.** Ranked, best first:
 | Tier | Check | Why it ranks here |
 |---|---|---|
 | 1 | A **command with an exit code** — `npm test`, `tsc --noEmit`, a linter, a build | Binary, reproducible, no judgment |
-| 2 | A **deterministic test suite** — including a `playwright-mcp` scaffolded suite (see below) | Binary, and covers behavior a command cannot reach |
+| 2 | A **deterministic test suite** — including an `e2e-proof-mcp` scaffolded suite (see below) | Binary, and covers behavior a command cannot reach |
 | 3 | A **file/string assertion**, including **a grep against an evaluator catalog** | Mechanical, though it proves less |
 | 4 | A **second agent in a fresh context** judging **against a catalog** | Independent, and catalogued rather than tasteful |
 | — | *"Review the output for quality"* | **Not a check.** Reject it at authoring time |
@@ -347,10 +347,16 @@ named is a measurement.**
 
 ---
 
-## Web-facing work: playwright-mcp
+## Web-facing work: e2e-proof-mcp
 
 For anything with a browser in the loop — a site, a dev server, a UI change, an auth flow — the
-verification tier-1 command usually does not exist. `playwright-mcp` supplies tier 2.
+verification tier-1 command usually does not exist. `e2e-proof-mcp` supplies tier 2.
+
+**It was `playwright-mcp` until 2026-11-27**: the same server and the same tool names under a new
+prefix, `mcp__e2e-proof-mcp__<name>` where it was `mcp__playwright-mcp__<name>`. A host carries one
+name or the other until its installer has run, so every grant here names both, and `wf-web-grant`
+gives a grant that carries one name the other. The earlier name is dropped in a later release. The
+measurements below were taken under the earlier name and are quoted as taken.
 
 **Why it is the right fit here specifically, and not just a nice tool:**
 
@@ -377,7 +383,7 @@ verification tier-1 command usually does not exist. `playwright-mcp` supplies ti
 
 ### The guards an employee will meet, and the false defect they cause
 
-`playwright-mcp` refuses some outbound requests by design (its `src/exfil.ts` is the authority; do not
+`e2e-proof-mcp` refuses some outbound requests by design (its `src/exfil.ts` is the authority; do not
 restate its numbers here, they are its constants to change). Three refusals reach an employee, all
 surfacing the same way — a `blocked` result carrying the word *refused*:
 
@@ -395,7 +401,8 @@ between them, and the employee that trips it did nothing wrong. Its handbook mus
 > Report it as a tooling limit and STOP. Never file it as a defect, never retry around it, and never
 > record the check as FAIL against the product.
 
-Raising the limit is environment-only (`PLAYWRIGHT_MCP_FETCH_LIMIT`) and needs a server restart, so it
+Raising the limit is environment-only (`E2E_PROOF_MCP_FETCH_LIMIT`, the earlier
+`PLAYWRIGHT_MCP_FETCH_LIMIT` still honoured) and needs a server restart, so it
 is **a human's act, never an employee's** — the guard is deliberately unreachable from tool arguments
 precisely so an injected page cannot talk a model into lifting it.
 
@@ -413,7 +420,7 @@ no budget.
 | **IC** | **`tools:` naming the server, plus `disallowedTools: Agent`** | `SKILL.md` rule 3 refuses to register an IC without both lines, and an explicit `tools:` is a hard ceiling for MCP (fact 13) — so the server must be named inside it |
 
 ```yaml
-tools: Read, Write, Bash, mcp__playwright-mcp
+tools: Read, Write, Bash, mcp__e2e-proof-mcp, mcp__playwright-mcp
 disallowedTools: Agent
 ```
 
@@ -433,7 +440,7 @@ counter-productive. `handbook-templates.md` § Untrusted-content-facing IC carri
 
 ### When the server is absent
 
-**Most projects that install workforce will not have `playwright-mcp`.** It is one person's local
+**Most projects that install workforce will not have `e2e-proof-mcp`.** It is one person's local
 server, and this file names it because it is what got measured — not because the design needs that
 vendor. Read this section before granting it anywhere.
 
@@ -459,7 +466,7 @@ project with its own `npm run test:e2e`, `npx playwright test`, or `pytest` need
 | a browser-automation MCP server configured (any vendor) | tier 2 — a deterministic suite through it |
 | neither | say so in the handbook, take the best available tier, and **report the gap** — never dress a judgment call as a check |
 
-So the requirement is *a deterministic browser check*, and `playwright-mcp` is the reference
+So the requirement is *a deterministic browser check*, and `e2e-proof-mcp` is the reference
 implementation of one. Where another server fills the same role, the grammar for granting it is measured
 and vendor-neutral (fact 13); the specific tool names in this file are not portable and the pattern is.
 
