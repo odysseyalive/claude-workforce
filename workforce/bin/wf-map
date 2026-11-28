@@ -12,7 +12,7 @@ So this answers three questions an employee otherwise answers with a dozen reads
 
     where in this file          `wf-map <file>`    sections and defs, with line numbers
     which files mention this    `wf-map --topic …`  ranked, bounded, pasteable
-    what covers this file       `wf-map --tests …`  the checks, fixtures and prove cases
+    what covers this file       `wf-map --tests …`  the tests named after it, checks, fixtures
 
 NOTHING IS STORED, AND THAT IS THE DESIGN RATHER THAN AN OMISSION. A hand-kept index
 goes stale silently: the `lab` CLAUDE.md carried a roster of ~30 subprojects in which
@@ -504,9 +504,71 @@ def handbook_checks(root, rel):
     return out
 
 
+# THE TEST NAMED AFTER THE FILE, the coverage most projects have and the other groups
+# never see: a fixture case needs this repository's `expectations.json`, and a handbook
+# row names a file only when someone wrote it in. FILED 2026-11-27 from e2e-proof-mcp:
+# `--tests scripts/merge-codex.mjs` listed four handbook checks and not
+# `scripts/test-merge-codex.mjs` beside it, and the handbook procedures read this output
+# to name the area's test. Nothing here looked for a test file at all.
+#
+# FOUND BY NAME ONLY: directories are listed, no file is opened or run, so the security
+# floor above is unchanged. The forms are each ecosystem's own convention, the extension
+# ignored so a `.test.ts` for a `.tsx`, a `test-x.mjs` and an `x_test.go` all match:
+#   test-x  test_x  x.test  x.spec  x-test  x_test  x-spec  x_spec  xTest  xTests  xSpec
+#   TestX  and, inside a test directory only, plain `x`.
+# Searched: the file's own directory, a test directory under it or under any ancestor
+# (flat, or mirroring the rest of the path: `tests/lib/x` for `src/lib/x`), and the path
+# with one component swapped for a test directory (`src/test/java/a/XTest.java` for
+# `src/main/java/a/X.java`). Fixtures `map-tests-sibling-test-files`,
+# `map-tests-test-dirs-and-mirrors` and `map-tests-maven-mirror`.
+TEST_DIRS = ("test", "tests", "__tests__", "spec", "specs")
+
+
+def test_names(stem):
+    """The basenames, extension stripped, that name a test of `stem`."""
+    cap = stem[:1].upper() + stem[1:]
+    return {f"test-{stem}", f"test_{stem}", f"{stem}.test", f"{stem}.spec",
+            f"{stem}-test", f"{stem}_test", f"{stem}-spec", f"{stem}_spec",
+            f"{stem}Test", f"{stem}Tests", f"{stem}Spec", f"Test{cap}"}
+
+
+def named_tests(root, rel):
+    """Files whose NAME says they test `rel` — directories listed, nothing opened."""
+    folder, base = os.path.split(rel)
+    stem = os.path.splitext(base)[0]
+    if not stem or stem.startswith("."):
+        return []
+    names = test_names(stem)
+    parts = [p for p in folder.split(os.sep) if p and p != "."]
+    dirs = {(folder, False)}
+    for i in range(len(parts) + 1):
+        for t in TEST_DIRS:
+            dirs.add((os.path.join(*parts[:i], t), True))                 # A/tests
+            dirs.add((os.path.join(*parts[:i], t, *parts[i:]), True))     # A/tests/rest
+            if i < len(parts):
+                dirs.add((os.path.join(*parts[:i], t, *parts[i + 1:]), True))  # swap one
+    out = set()
+    for d, in_test_dir in dirs:
+        p = os.path.join(root, d)
+        if os.path.islink(p) or not os.path.isdir(p) or not inside(root, p):
+            continue
+        try:
+            entries = os.listdir(p)
+        except OSError:
+            continue
+        for f in entries:
+            name = os.path.splitext(f)[0]
+            if name in names or (in_test_dir and name == stem):
+                r = os.path.normpath(os.path.join(d, f))
+                if r != os.path.normpath(rel) and have(root, r):
+                    out.add(r)
+    return sorted(out)
+
+
 def print_tests(root, rel, target):
-    """What covers `rel`: the commands that answer it, the fixtures a text read is sure
-    of, and the handbook checks that name it. NOTHING HERE IS EXECUTED."""
+    """What covers `rel`: the commands that answer it, the test files named after it, the
+    fixtures a text read is sure of, and the handbook checks that name it. NOTHING HERE
+    IS EXECUTED."""
     print(f"tests covering {rel}\n")
     cmds = [(c.format(rel=rel), why) for tool, c, why in COVERAGE_COMMANDS
             if have(root, tool)]
@@ -515,6 +577,14 @@ def print_tests(root, rel, target):
               f"wf-map never executes a script it found in the tree")
         for c, why in cmds:
             print("    $ " + clip(f"{c}    # {why}", WIDTH - 8))
+    found = named_tests(root, rel)
+    print(f"\n  test files named after it · {len(found)} (found by name; nothing opened or run)")
+    for t in found[:20]:
+        print("    · " + clip(t, WIDTH - 8))
+    if len(found) > 20:
+        print(f"    … {len(found) - 20} more")
+    if not found:
+        print("    no test-<name>, <name>.test, test_<name>, <name>_test or like-named file")
     cases = fixture_cases(root, rel)
     if cases:
         print(f"\n  conformance fixtures naming it · {len(cases)} "

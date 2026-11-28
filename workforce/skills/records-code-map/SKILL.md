@@ -26,7 +26,7 @@ Three views, each a stream of text rows on stdout. No file on disk, in any of th
 |---|---|---|
 | outline | `wf-map <file> [<file>…]` | `<line:int>  <kind>  <name>  <first doc or comment line>`, where `kind` is `§` (section), `def`, `class` or `fn`. Preceded by a header: path, language (`python` \| `shell` \| `markdown` \| `generic`), line count, def count, section count |
 | topic | `wf-map --topic <words…>` | a per-file block: `<path>  ·  <hits:int> hit(s) · <words matched:int>/<words asked:int>`, then up to 3 `<line:int>  <text>` rows. Ranked by words matched, then hits, then path |
-| coverage | `wf-map --tests <file>` | three groups — the coverage COMMANDS present in this tree (`$ <command>    # <what it answers>`, for the caller to run; nothing is executed), the conformance cases naming the file read out of `expectations.json`, and the handbook rows `<handbook>:<line>  Check\|Regression\|Negative: <command>` |
+| coverage | `wf-map --tests <file>` | four groups — the coverage COMMANDS present in this tree (`$ <command>    # <what it answers>`, for the caller to run; nothing is executed), the test files named after it (`test-<name>`, `<name>.test`, `test_<name>`, `<name>_test`, `<Name>Test` and the like, beside it or in a `test`/`tests`/`__tests__`/`spec` directory; found by listing directories, nothing opened), the conformance cases naming the file read out of `expectations.json`, and the handbook rows `<handbook>:<line>  Check\|Regression\|Negative: <command>` |
 
 Options: `--root DIR` (default `$CLAUDE_PROJECT_DIR`, else the working directory),
 `--limit N` (outline rows, default 200; files shown per topic, max 12).

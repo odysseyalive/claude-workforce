@@ -81,6 +81,43 @@
     ],
     "not": ["Traceback", "bin/check assertions", "Regression: `pytest` "]
   },
+  "map-tests-sibling-test-files": {
+    "_why": "THE TEST BESIDE THE FILE, FAILING FIRST. Filed 2026-11-27 from e2e-proof-mcp: `--tests scripts/merge-codex.mjs` listed four handbook checks and not `scripts/test-merge-codex.mjs` next to it, because `--tests` never looked for a test file at all -- only this repository's expectations.json and handbook rows. Handbook procedures read this output to name the area's test. Both named forms here must be listed (`test-<name>` and `<name>.test`, the second with a different extension), and the near misses must not: `test-merge.mjs` tests another file, and `test-merge-codex-live.mjs` is a longer name that only starts the same.",
+    "script": "wf-map",
+    "args": ["--tests", "scripts/merge-codex.mjs"],
+    "exit": 0,
+    "want": [
+      "tests covering scripts/merge-codex.mjs",
+      "test files named after it · 2",
+      "· scripts/merge-codex.test.ts",
+      "· scripts/test-merge-codex.mjs"
+    ],
+    "not": ["Traceback", "scripts/test-merge.mjs", "test-merge-codex-live", "· scripts/merge-codex.mjs"]
+  },
+  "map-tests-test-dirs-and-mirrors": {
+    "_why": "THE TEST IN A TEST DIRECTORY, the Python and JavaScript layouts. `src/pkg/widget.py` is tested from a flat root `tests/test_widget.py`, from the mirror with `src` swapped for `tests` (`tests/pkg/test_widget.py`), and by a plain `widget.py` inside a `tests` directory under its own. All three are listed. `tests/test_widgets.py` names another stem and `docs/widget.md` has the plain stem outside any test directory, so neither may appear: a plain name counts only inside a test directory.",
+    "script": "wf-map",
+    "args": ["--tests", "src/pkg/widget.py"],
+    "exit": 0,
+    "want": [
+      "test files named after it · 3",
+      "· src/pkg/tests/widget.py",
+      "· tests/pkg/test_widget.py",
+      "· tests/test_widget.py"
+    ],
+    "not": ["Traceback", "test_widgets.py", "docs/widget.md"]
+  },
+  "map-tests-maven-mirror": {
+    "_why": "THE MIRRORED TREE, the JVM layout: `src/main/java/app/Widget.java` is tested by `src/test/java/app/WidgetTest.java`, one path component swapped for a test directory and the `<Name>Test` form. `GadgetTest.java` beside it tests another class and must not be listed.",
+    "script": "wf-map",
+    "args": ["--tests", "src/main/java/app/Widget.java"],
+    "exit": 0,
+    "want": [
+      "test files named after it · 1",
+      "· src/test/java/app/WidgetTest.java"
+    ],
+    "not": ["Traceback", "GadgetTest"]
+  },
   "map-escape-symlink": {
     "_why": "THE SECURITY FLOOR, FAILING FIRST. This script is handed arbitrary paths out of a work order, so a symlink pointing out of the tree must be REFUSED by name rather than followed: `escape.py` resolves to a path above the root and the run exits 2 having read nothing. The link is created at run time because a dangling or escaping link cannot be committed. `kept.py` is beside it and is never read either -- the refusal is per path, and a run that mapped nothing exits 2 rather than reporting an empty map as a map.",
     "script": "wf-map",
