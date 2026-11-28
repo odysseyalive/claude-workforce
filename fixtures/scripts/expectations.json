@@ -19421,5 +19421,29 @@
       "✗ g.md: every MCP server its body uses is named in tools:",
       "body routes work through e2e-proof-mcp"
     ]
+  },
+  "conform-mcp-hyphenated-server-not-misread": {
+    "_why": "A HYPHEN INSIDE A SERVER NAME IS NOT WHERE A SLUG STARTS. The bare-slug pattern opened on `\\b`, and `\\b` fires at the inner hyphen, so a body naming the server `mcp__e2e-proof-mcp` also yielded the slug `proof-mcp`, and `mcp__my-widget-mcp` yielded `widget-mcp`. Neither is a server; the row then reported both missing from a grant that names the real ones. Seen live on 1.95.0: three odyssey-alive handbooks (design-evaluator, engineering-site, engineering-verifier) failed this row before and after the e2e-proof-mcp migration. Both servers here are granted and both are named by their bare `mcp__<server>` prefix, so the row must pass and neither inner suffix may appear.",
+    "script": "wf-conform",
+    "exit": 0,
+    "want": [
+      "1 governed",
+      "0 failed"
+    ],
+    "not": [
+      "✗ ",
+      "body routes work through",
+      "proof-mcp,",
+      "'widget-mcp'"
+    ]
+  },
+  "conform-mcp-hyphenated-server-still-needs-a-grant": {
+    "_why": "The control for conform-mcp-hyphenated-server-not-misread: the slug fix stops reading a suffix of a server name, not reading servers. The same body under a grant of only `mcp__e2e-proof-mcp` still fails the row and names `my-widget-mcp` alone, with no spurious `widget-mcp` or `proof-mcp` beside it.",
+    "script": "wf-conform",
+    "exit": 1,
+    "want": [
+      "✗ g.md: every MCP server its body uses is named in tools:",
+      "body routes work through my-widget-mcp but"
+    ]
   }
 }

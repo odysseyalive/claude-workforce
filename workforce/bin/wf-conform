@@ -169,7 +169,15 @@ MCP_SERVER_ALIASES = {"playwright-mcp": "e2e-proof-mcp"}
 IMMUTABLE_OPEN_RX = re.compile(
     r"^<!--\s*origin:\s*user\b[^>]*immutable:\s*true[^>]*-->$", re.M)
 EXTRACT_CITE_RX = re.compile(r"\.claude/skills/([^/`\s]+)/([^`\s:]+):(\d+)")
-MCP_SLUG_RX = re.compile(r"\b([a-z0-9][a-z0-9-]*-mcp)\b")
+# THE SLUG OPENS WHERE NO NAME CHARACTER PRECEDES IT, never at a `\b`. `\b` fires at a
+# hyphen, so `\b`-opened this read `mcp__e2e-proof-mcp` as the slug `proof-mcp` too — the
+# same hyphen trap the `MCP_TOOL_RX` note above records — and reported a server nobody
+# named as missing. Seen live on 1.95.0: three odyssey-alive handbooks that granted
+# `mcp__e2e-proof-mcp` failed the body-vs-grant row on `proof-mcp`. The lookbehind refuses
+# a start after a hyphen or a word character (`_` included, so a slug never starts inside
+# a `mcp__<server>` token, which `MCP_TOOL_RX` already reads whole). Fixtures
+# `conform-mcp-hyphenated-server-not-misread` and its `-still-needs-a-grant` control.
+MCP_SLUG_RX = re.compile(r"(?<![-\w])([a-z0-9][a-z0-9-]*-mcp)\b")
 # A `## Sources` ACCESS CHANNEL that is a skill invocation rather than a path.
 # `org-design.md` § The access channel is part of every entry: a read-write state
 # store is named by its GATEWAY SKILL — `Skill(<data-skill>)` — never by the raw
