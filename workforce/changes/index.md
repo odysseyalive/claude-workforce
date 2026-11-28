@@ -8,6 +8,7 @@
 
 | Version | Date | Surface | Org | Change |
 |---|---|---|---|---|
+| 1.95.1 | 2026-11-28 | changes, scripts, installer | no | Release 1.95.1: wf-conform reads hyphenated MCP servers whole, wf-map --tests finds test files named after the target |
 | 1.95.0 | 2026-11-27 | handbook, audit, changes, hooks, scripts, installer, platform | **yes** | Release 1.95.0: web access survives the playwright-mcp to e2e-proof-mcp rename |
 | 1.94.0 | 2026-11-27 | handbook, chart, changes, hooks, scripts, installer, platform | **yes** | Release 1.94.0: a hung background shell is caught, diagnosed and negotiated |
 | 1.93.0 | 2026-11-27 | changes | no | Release 1.93.0: writing a handoff folds the other job folders into it |
